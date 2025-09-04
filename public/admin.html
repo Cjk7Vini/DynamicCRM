@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>Dynamic CRM - Leads (Admin)</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
+    h1 { color: #333; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    .controls { margin-bottom: 8px; }
+    #msg { margin-top: 8px; font-weight: bold; }
+    #msg.error { color: red; }
+    #msg.success { color: green; }
+    input { padding: 6px; }
+    button { padding: 6px 10px; margin-left: 6px; cursor: pointer; }
+    .password-wrapper { display: inline-flex; align-items: center; }
+    .toggle-btn { margin-left: 4px; font-size: 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Dynamic CRM — Admin</h1>
+
+  <div class="controls">
+    <label>Admin sleutel:
+      <span class="password-wrapper">
+        <input id="key" type="password" placeholder="voer ADMIN_KEY in" style="width:300px">
+        <button type="button" id="toggle">👁️</button>
+      </span>
+    </label>
+    <button id="load">Laad leads</button>
+    <button id="autofill">Vul sleutel uit URL</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div id="table-wrap">
+    <table id="table">
+      <thead><tr id="thead"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 👉 externe script ipv inline -->
+  <script src="admin.js"></script>
+</body>
+</html>

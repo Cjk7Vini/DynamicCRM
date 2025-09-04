@@ -1,0 +1,21 @@
+{
+  "name": "mini-crm",
+  "version": "1.0.0",
+  "type": "module", 
+  "description": "Een simpele CRM webapplicatie gekoppeld aan Oracle",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "oracledb": "^6.4.0",
+    "dotenv": "^16.3.1",
+    "body-parser": "^1.20.2",
+    "joi": "^17.11.0",
+    "axios": "^1.6.7",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0"
+  }
+}

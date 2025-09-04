@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>Dynamic CRM - Lead formulier</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
+    h1 { color: #333; }
+    form { background: white; padding: 16px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+    label { display: block; margin-top: 12px; }
+    input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; }
+    button { margin-top: 16px; padding: 10px 16px; cursor: pointer; }
+    #msg { margin-top: 12px; font-weight: bold; text-align: center; }
+    #msg.error { color: red; }
+    #msg.success { color: green; }
+  </style>
+</head>
+<body>
+  <h1>Dynamic CRM — Nieuw lead</h1>
+
+  <form id="leadForm">
+    <label>Volledige naam:
+      <input type="text" name="fullName" required>
+    </label>
+    <label>Email:
+      <input type="email" name="email" required>
+    </label>
+    <label>Telefoon:
+      <input type="tel" name="phone">
+    </label>
+    <label>Notities:
+      <textarea name="notes"></textarea>
+    </label>
+    <label>
+      <input type="checkbox" name="consent"> Ik geef toestemming
+    </label>
+    <label>Bron:
+      <select name="source" required>
+        <option value="Website">Website</option>
+        <option value="Beurs">Beurs</option>
+        <option value="Referral">Referral</option>
+      </select>
+    </label>
+    <button type="submit">Verstuur</button>
+  </form>
+
+  <div id="msg"></div>
+
+  <!-- 👉 Externe script ipv inline -->
+  <script src="form.js"></script>
+</body>
+</html>
