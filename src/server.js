@@ -1,3 +1,5 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 // src/server.js  (Postgres / Supabase met NL kolomnamen)
 import express from 'express';
 import morgan from 'morgan';
