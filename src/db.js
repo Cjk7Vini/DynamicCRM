@@ -1,34 +1,30 @@
-import oracledb from 'oracledb';
-import dotenv from 'dotenv';
-dotenv.config();
+// src/db.js
+import pkg from 'pg';
+const { Pool } = pkg;
 
-const {
-  ORACLE_USER,
-  ORACLE_PASSWORD,
-  ORACLE_CONNECT_STRING
-} = process.env;
+const sslEnabled = String(process.env.PGSSL || '').toLowerCase() === 'true';
+const rejectUnauthorized = String(process.env.PGSSL_REJECT_UNAUTHORIZED || '').toLowerCase() !== 'false';
 
-// node-oracledb defaults to THIN mode and does not require Instant Client.
-export async function getPool() {
-  if (!global.__oraclePool) {
-    global.__oraclePool = await oracledb.createPool({
-      user: ORACLE_USER,
-      password: ORACLE_PASSWORD,
-      connectString: ORACLE_CONNECT_STRING,
-      poolMin: 1,
-      poolMax: 4,
-      poolIncrement: 1
-    });
-  }
-  return global.__oraclePool;
+const common = sslEnabled ? { ssl: { rejectUnauthorized } } : {};
+
+const readPool = new Pool({
+  connectionString: process.env.PG_READ_URL,
+  ...common
+});
+
+const writePool = new Pool({
+  connectionString: process.env.PG_WRITE_URL,
+  ...common
+});
+
+export async function withReadConnection(fn) {
+  const client = await readPool.connect();
+  try { return await fn(client); }
+  finally { client.release(); }
 }
 
-export async function withConnection(fn) {
-  const pool = await getPool();
-  const conn = await pool.getConnection();
-  try {
-    return await fn(conn);
-  } finally {
-    await conn.close();
-  }
+export async function withWriteConnection(fn) {
+  const client = await writePool.connect();
+  try { return await fn(client); }
+  finally { client.release(); }
 }

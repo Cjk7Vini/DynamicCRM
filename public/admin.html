@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <title>Dynamic CRM - Leads (Admin)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
     h1 { color: #333; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom: 10px; }
+    input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+    button { padding: 8px 12px; border: 0; border-radius: 6px; background: #2c7be5; color: #fff; cursor:pointer; }
+    .password-wrapper { display: inline-flex; align-items: center; gap:6px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; background:#fff; }
+    th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
     th { background: #f4f4f4; }
-    .controls { margin-bottom: 8px; }
     #msg { margin-top: 8px; font-weight: bold; }
-    #msg.error { color: red; }
-    #msg.success { color: green; }
-    input { padding: 6px; }
-    button { padding: 6px 10px; margin-left: 6px; cursor: pointer; }
-    .password-wrapper { display: inline-flex; align-items: center; }
-    .toggle-btn { margin-left: 4px; font-size: 12px; cursor: pointer; }
+    #msg.error { color: #c00; }
+    #msg.success { color: #2c7be5; }
   </style>
 </head>
 <body>
@@ -25,24 +25,92 @@
   <div class="controls">
     <label>Admin sleutel:
       <span class="password-wrapper">
-        <input id="key" type="password" placeholder="voer ADMIN_KEY in" style="width:300px">
+        <input id="key" type="password" placeholder="voer ADMIN_KEY in" style="width:280px" />
         <button type="button" id="toggle">👁️</button>
       </span>
     </label>
     <button id="load">Laad leads</button>
-    <button id="autofill">Vul sleutel uit URL</button>
   </div>
 
   <div id="msg"></div>
 
-  <div id="table-wrap">
-    <table id="table">
-      <thead><tr id="thead"></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
+  <table id="table" hidden>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Volledige naam</th>
+        <th>E-mailadres</th>
+        <th>Telefoon</th>
+        <th>Bron</th>
+        <th>Toestemming</th>
+        <th>Doel</th>
+        <th>Aangemaakt</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-  <!-- 👉 externe script ipv inline -->
-  <script src="admin.js"></script>
+  <script>
+    // toggle wachtwoord zichtbaar
+    document.getElementById('toggle').addEventListener('click', () => {
+      const el = document.getElementById('key');
+      el.type = el.type === 'password' ? 'text' : 'password';
+    });
+
+    // haal leads op
+    document.getElementById('load').addEventListener('click', async () => {
+      const key = document.getElementById('key').value.trim();
+      const msg = document.getElementById('msg');
+      const table = document.getElementById('table');
+      const tbody = table.querySelector('tbody');
+
+      msg.textContent = '';
+      msg.className = '';
+
+      if (!key) {
+        msg.textContent = 'Vul eerst de admin sleutel in.';
+        msg.className = 'error';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/leads', { headers: { 'x-admin-key': key } });
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.textContent = 'Fout: ' + (data.error || res.statusText);
+          msg.className = 'error';
+          table.hidden = true;
+          return;
+        }
+
+        // data is een array van rijen met: id, volledige_naam, emailadres, telefoon, bron, toestemming, doel, aangemaakt
+        tbody.innerHTML = '';
+        (data || []).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.id ?? ''}</td>
+            <td>${r.volledige_naam ?? ''}</td>
+            <td>${r.emailadres ?? ''}</td>
+            <td>${r.telefoon ?? ''}</td>
+            <td>${r.bron ?? ''}</td>
+            <td>${r.toestemming ? 'Ja' : 'Nee'}</td>
+            <td>${r.doel ?? ''}</td>
+            <td>${r.aangemaakt ?? ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        table.hidden = false;
+        msg.textContent = `Leads geladen (${data.length} gevonden).`;
+        msg.className = 'success';
+
+      } catch (e) {
+        msg.textContent = 'Netwerkfout: ' + e.message;
+        msg.className = 'error';
+        table.hidden = true;
+      }
+    });
+  </script>
 </body>
 </html>

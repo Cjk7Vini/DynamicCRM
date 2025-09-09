@@ -1,52 +1,102 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8">
-  <title>Dynamic CRM - Lead formulier</title>
+  <meta charset="utf-8" />
+  <title>Dynamic CRM – Lead formulier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
-    h1 { color: #333; }
-    form { background: white; padding: 16px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-    label { display: block; margin-top: 12px; }
-    input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; }
-    button { margin-top: 16px; padding: 10px 16px; cursor: pointer; }
-    #msg { margin-top: 12px; font-weight: bold; text-align: center; }
-    #msg.error { color: red; }
-    #msg.success { color: green; }
+    body{font-family:Arial,sans-serif;background:#fafafa;padding:16px}
+    form{max-width:520px;margin:auto;background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+    label{display:block;margin-top:12px}
+    input,select,textarea{width:100%;padding:8px;margin-top:4px}
+    button{margin-top:16px;padding:10px 16px;cursor:pointer}
+    #msg{margin-top:12px;font-weight:bold;text-align:center}
+    #msg.error{color:#c00}
+    #msg.success{color:#080}
   </style>
 </head>
 <body>
   <h1>Dynamic CRM — Nieuw lead</h1>
 
-  <form id="leadForm">
-    <label>Volledige naam:
-      <input type="text" name="fullName" required>
+  <form id="leadForm" novalidate>
+    <label>Volledige naam
+      <input type="text" name="volledige_naam" required />
     </label>
-    <label>Email:
-      <input type="email" name="email" required>
+
+    <label>Emailadres
+      <input type="email" name="emailadres" />
     </label>
-    <label>Telefoon:
-      <input type="tel" name="phone">
+
+    <label>Telefoon
+      <input type="tel" name="telefoon" />
     </label>
-    <label>Notities:
-      <textarea name="notes"></textarea>
-    </label>
-    <label>
-      <input type="checkbox" name="consent"> Ik geef toestemming
-    </label>
-    <label>Bron:
-      <select name="source" required>
+
+    <label>Bron
+      <select name="bron">
+        <option value="">(kies)</option>
         <option value="Website">Website</option>
-        <option value="Beurs">Beurs</option>
+        <option value="Instagram">Instagram</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="YouTube">YouTube</option>
         <option value="Referral">Referral</option>
       </select>
     </label>
+
+    <label>Doel (bv. “afspraak”, “offerte”, …)
+      <input type="text" name="doel" />
+    </label>
+
+    <label>
+      <input type="checkbox" name="toestemming" checked />
+      Ik geef toestemming om mijn gegevens te verwerken
+    </label>
+
     <button type="submit">Verstuur</button>
   </form>
 
   <div id="msg"></div>
 
-  <!-- 👉 Externe script ipv inline -->
-  <script src="form.js"></script>
+  <script>
+    const form = document.getElementById('leadForm');
+    const msg = document.getElementById('msg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      msg.className = '';
+
+      const data = {
+        volledige_naam: form.volledige_naam.value.trim(),
+        emailadres: form.emailadres.value.trim() || null,
+        telefoon: form.telefoon.value.trim() || null,
+        bron: form.bron.value || null,
+        doel: form.doel.value.trim() || null,
+        toestemming: form.toestemming.checked
+      };
+
+      try {
+        const res = await fetch('/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          msg.textContent = 'Fout: ' + (json.error || res.statusText);
+          msg.className = 'error';
+          console.error('Server detail:', json.details);
+          return;
+        }
+
+        msg.textContent = 'Lead opgeslagen! ID: ' + (json.lead?.id ?? '?');
+        msg.className = 'success';
+        form.reset();
+      } catch (err) {
+        msg.textContent = 'Kon niet opslaan: ' + err.message;
+        msg.className = 'error';
+      }
+    });
+  </script>
 </body>
 </html>
