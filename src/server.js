@@ -1,6 +1,9 @@
+// src/server.js — Postgres/Supabase + NL-kolommen
+
+// 0) Forceer IPv4 eerst (voorkomt IPv6 ENETUNREACH op Render)
 import dns from 'dns';
-dns.setDefaultResultOrder('ipv4first');
-// src/server.js  (Postgres / Supabase met NL kolomnamen)
+dns.setDefaultResultOrder?.('ipv4first');
+
 import express from 'express';
 import morgan from 'morgan';
 import helmet from 'helmet';
@@ -16,30 +19,36 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "style-src": ["'self'", "'unsafe-inline'"],
-      "img-src": ["'self'", "data:"]
+// 1) Security headers (inline scripts toegestaan i.v.m. simpele HTML)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:"]
+      }
     }
-  }
-}));
+  })
+);
+
+// 2) Basis middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// 3) Static files (admin.html / form.html in /public)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Static files (admin.html, form.html in /public)
 app.use('/', express.static(path.join(__dirname, '..', 'public')));
 
-// Health
-app.get('/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// 4) Healthcheck
+app.get('/health', (_req, res) =>
+  res.json({ ok: true, time: new Date().toISOString() })
+);
 
-// ✅ Validatie voor POST /leads — let op NL veldnamen
+// 5) Validatie (NL veldnamen)
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
@@ -49,7 +58,7 @@ const leadSchema = Joi.object({
   toestemming: Joi.boolean().default(true)
 });
 
-// Admin key check
+// 6) Admin check
 function requireAdmin(req, res, next) {
   const key = req.headers['x-admin-key'];
   if (!ADMIN_KEY || key !== ADMIN_KEY) {
@@ -58,11 +67,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ✅ Lijst met leads (NL kolommen, sorteren op aangemaakt_op)
+// 7) GET /api/leads (NL kolommen, sorteren op aangemaakt_op)
 app.get('/api/leads', requireAdmin, async (_req, res) => {
   try {
     const rows = await withReadConnection(async (client) => {
-      const q = `
+      const sql = `
         select
           id,
           volledige_naam,
@@ -76,7 +85,7 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
         order by aangemaakt_op desc
         limit 500
       `;
-      const r = await client.query(q);
+      const r = await client.query(sql);
       return r.rows;
     });
     res.json(rows);
@@ -86,12 +95,17 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
   }
 });
 
-// ✅ Nieuwe lead (neemt NL kolommen aan)
+// 8) POST /leads (neemt NL kolommen aan)
 app.post('/leads', async (req, res) => {
   try {
-    const { value, error } = leadSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
+    const { value, error } = leadSchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
     if (error) {
-      return res.status(400).json({ error: 'Validation failed', details: error.details.map(d => d.message) });
+      return res
+        .status(400)
+        .json({ error: 'Validation failed', details: error.details.map(d => d.message) });
     }
 
     const {
@@ -123,6 +137,7 @@ app.post('/leads', async (req, res) => {
       return r.rows[0]; // { id, aangemaakt_op }
     });
 
+    // optioneel: naar Zapier forwarden
     if (process.env.ZAPIER_WEBHOOK_URL) {
       try {
         await axios.post(process.env.ZAPIER_WEBHOOK_URL, {
@@ -146,6 +161,7 @@ app.post('/leads', async (req, res) => {
   }
 });
 
+// 9) Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
