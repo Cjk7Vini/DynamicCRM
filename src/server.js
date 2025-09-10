@@ -41,21 +41,32 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// 3) Static files (admin.html / form.html in /public)
+// 3) Handige redirects — LET OP: boven static!
+app.get('/', (_req, res) => res.redirect(302, '/form.html'));     // home → formulier
+app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));// korte URL → admin
+
+// 4) Static files (admin.html / form.html in /public) + no-cache voor .html
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use('/', express.static(path.join(__dirname, '..', 'public')));
+app.use(
+  '/',
+  express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    },
+  })
+);
 
-// 3a) Handige redirects
-app.get('/', (_req, res) => res.redirect('/form.html'));     // home → formulier
-app.get('/admin', (_req, res) => res.redirect('/admin.html'));// korte URL → admin
-
-// 4) Healthcheck
+// 5) Healthcheck
 app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
-// 5) Validatie (NL veldnamen)
+// 6) Validatie (NL veldnamen)
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
@@ -65,7 +76,7 @@ const leadSchema = Joi.object({
   toestemming: Joi.boolean().default(true)
 });
 
-// 6) Admin check
+// 7) Admin check
 function requireAdmin(req, res, next) {
   const key = req.headers['x-admin-key'];
   if (!ADMIN_KEY || key !== ADMIN_KEY) {
@@ -74,7 +85,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// 7) GET /api/leads (NL kolommen, sorteren op aangemaakt_op)
+// 8) GET /api/leads (NL kolommen, sorteren op aangemaakt_op)
 app.get('/api/leads', requireAdmin, async (_req, res) => {
   try {
     const rows = await withReadConnection(async (client) => {
@@ -102,7 +113,7 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
   }
 });
 
-// 8) POST /leads (neemt NL kolommen aan)
+// 9) POST /leads (neemt NL kolommen aan)
 app.post('/leads', async (req, res) => {
   try {
     const { value, error } = leadSchema.validate(req.body, {
@@ -168,7 +179,7 @@ app.post('/leads', async (req, res) => {
   }
 });
 
-// 9) Start server
+// 10) Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
