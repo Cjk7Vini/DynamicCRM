@@ -4,43 +4,35 @@ import { Pool } from 'pg';
 const READ_URL  = process.env.PG_READ_URL;
 const WRITE_URL = process.env.PG_WRITE_URL;
 
-function ensureEndpointOption(url) {
-  // als options=endpoint%3D... ontbreekt -> voeg toe
-  if (!/options=endpoint%3D/.test(url)) {
-    // endpoint-id is het stuk tot de 1e punt
-    const host = url.split('@')[1].split('/')[0]; // ep-xxx-pooler.c-2...
-    const endpointId = host.split('.')[0];        // ep-xxx-pooler
-    // Soms heet het hostdeel ep-xxx **zonder** “-pooler”; haal tot de 1e punt:
-    const id = endpointId.replace('-pooler','');  // veilige fallback
-    const sep = url.includes('?') ? '&' : '?';
-    url = `${url}${sep}options=endpoint%3D${encodeURIComponent(id)}`;
-  }
-  return url;
+if (!READ_URL || !WRITE_URL) {
+  throw new Error('PG_READ_URL en/of PG_WRITE_URL ontbreken in de environment variables.');
 }
 
-const readConn  = ensureEndpointOption(READ_URL);
-const writeConn = ensureEndpointOption(WRITE_URL);
-
-// pg heeft SNI/hostname nodig; gebruik ssl met servername
+/**
+ * Maakt een Pool zonder extra endpoint-/project-tweaks.
+ * We gebruiken de URL precies zoals je die in Render hebt gezet.
+ * Voor Neon is SNI belangrijk; daarom geven we de host mee als ssl.servername.
+ */
 function makePool(connStr) {
-  // haal de hostname voor servername uit de URL
-  const afterAt = connStr.split('@')[1];
-  const host = afterAt.split('/')[0].split('?')[0];
+  // host uit de connection string halen voor SNI
+  // voorbeeld: postgresql://user:pass@ep-xxx-pooler.c-2.eu-central-1.aws.neon.tech/db?sslmode=require&options=project%3Dep-xxx-pooler
+  const afterAt = connStr.split('@')[1] || '';
+  const host = afterAt.split('/')[0]?.split('?')[0];
 
   return new Pool({
     connectionString: connStr,
     ssl: {
-      rejectUnauthorized: true,
-      servername: host, // belangrijk voor Neon
+      rejectUnauthorized: true, // Neon gebruikt geldige certs
+      servername: host,         // belangrijk voor SNI
     },
     max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
   });
 }
 
-const readPool  = makePool(readConn);
-const writePool = makePool(writeConn);
+const readPool  = makePool(READ_URL);
+const writePool = makePool(WRITE_URL);
 
 export async function withReadConnection(fn) {
   const client = await readPool.connect();
