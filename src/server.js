@@ -1,6 +1,6 @@
-// src/server.js — Postgres/Supabase + NL-kolommen
+// src/server.js — Postgres/Neon (of Supabase) + NL-kolommen
 
-// 0) Forceer IPv4 eerst (voorkomt IPv6 ENETUNREACH op Render)
+// 0) Forceer IPv4 eerst (voorkomt IPv6 ENETUNREACH op Render / sommige hosts)
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
 
@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 // 1) Security headers (inline scripts toegestaan i.v.m. simpele HTML)
+//    COEP/COOP uitzetten voorkomt issues met simpele statische pagina’s.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -29,7 +30,9 @@ app.use(
         "style-src": ["'self'", "'unsafe-inline'"],
         "img-src": ["'self'", "data:"]
       }
-    }
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
   })
 );
 
@@ -42,6 +45,10 @@ app.use(morgan('dev'));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/', express.static(path.join(__dirname, '..', 'public')));
+
+// 3a) Handige redirects
+app.get('/', (_req, res) => res.redirect('/form.html'));     // home → formulier
+app.get('/admin', (_req, res) => res.redirect('/admin.html'));// korte URL → admin
 
 // 4) Healthcheck
 app.get('/health', (_req, res) =>
