@@ -16,9 +16,12 @@
   </style>
 </head>
 <body>
-  <h1>Dynamic CRM — Nieuw lead</h1>
+  <h1>Dynamic — Nieuw lead</h1>
 
   <form id="leadForm" novalidate>
+    <!-- Verborgen veld voor praktijkcode -->
+    <input type="hidden" name="praktijk_code" id="praktijk_code" />
+
     <label>Volledige naam
       <input type="text" name="volledige_naam" required />
     </label>
@@ -58,12 +61,35 @@
 
   <script>
     const form = document.getElementById('leadForm');
-    const msg = document.getElementById('msg');
+    const msg  = document.getElementById('msg');
+    const hidden = document.getElementById('praktijk_code');
+
+    // Normaliseer de code: trim en verwijder alles behalve [A-Za-z0-9-_]
+    function normalizeCode(raw) {
+      if (!raw) return '';
+      const trimmed = String(raw).trim();
+      // haal emojis/rare tekens weg
+      const cleaned = trimmed.replace(/[^A-Za-z0-9_-]/g, '');
+      return cleaned;
+    }
+
+    // Zet praktijk_code vanuit URL (?s=... of ?praktijk=...)
+    (function setPraktijkCodeFromUrl() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const raw = params.get('s') || params.get('praktijk') || '';
+        const code = normalizeCode(raw);
+        if (code) hidden.value = code;
+      } catch (_) { /* ignore */ }
+    })();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       msg.textContent = '';
       msg.className = '';
+
+      // Zorg dat we de laatste/geschoonde waarde meesturen
+      const code = normalizeCode(hidden.value);
 
       const data = {
         volledige_naam: form.volledige_naam.value.trim(),
@@ -71,7 +97,8 @@
         telefoon: form.telefoon.value.trim() || null,
         bron: form.bron.value || null,
         doel: form.doel.value.trim() || null,
-        toestemming: form.toestemming.checked
+        toestemming: form.toestemming.checked,
+        praktijk_code: code || null
       };
 
       try {
@@ -91,7 +118,10 @@
 
         msg.textContent = 'Lead opgeslagen! ID: ' + (json.lead?.id ?? '?');
         msg.className = 'success';
+
+        // Form resetten, maar code behouden (voor snelle herinvoer)
         form.reset();
+        hidden.value = code;
       } catch (err) {
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';
