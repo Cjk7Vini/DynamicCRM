@@ -50,8 +50,8 @@
     </label>
 
     <label>
-      <input type="checkbox" name="toestemming" checked />
-      Ik geef toestemming om mijn gegevens te verwerken
+      
+      Ik geef toestemming om mijn gegevens te verwerken <input type="checkbox" name="toestemming" checked />
     </label>
 
     <button type="submit">Verstuur</button>
@@ -64,23 +64,19 @@
     const msg  = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
 
-    // Normaliseer de code: trim en verwijder alles behalve [A-Za-z0-9-_]
     function normalizeCode(raw) {
       if (!raw) return '';
       const trimmed = String(raw).trim();
-      // haal emojis/rare tekens weg
-      const cleaned = trimmed.replace(/[^A-Za-z0-9_-]/g, '');
-      return cleaned;
+      return trimmed.replace(/[^A-Za-z0-9_-]/g, '');
     }
 
-    // Zet praktijk_code vanuit URL (?s=... of ?praktijk=...)
     (function setPraktijkCodeFromUrl() {
       try {
         const params = new URLSearchParams(location.search);
         const raw = params.get('s') || params.get('praktijk') || '';
         const code = normalizeCode(raw);
         if (code) hidden.value = code;
-      } catch (_) { /* ignore */ }
+      } catch (_) { }
     })();
 
     form.addEventListener('submit', async (e) => {
@@ -88,7 +84,6 @@
       msg.textContent = '';
       msg.className = '';
 
-      // Zorg dat we de laatste/geschoonde waarde meesturen
       const code = normalizeCode(hidden.value);
 
       const data = {
@@ -116,10 +111,10 @@
           return;
         }
 
-        msg.textContent = 'Lead opgeslagen! ID: ' + (json.lead?.id ?? '?');
+        // ✅ Hier geen ID meer tonen
+        msg.textContent = 'Bedankt! Je gegevens zijn succesvol verstuurd.';
         msg.className = 'success';
 
-        // Form resetten, maar code behouden (voor snelle herinvoer)
         form.reset();
         hidden.value = code;
       } catch (err) {
