@@ -218,7 +218,8 @@ app.post('/leads', async (req, res) => {
           from: SMTP.from,
           to: practice.email_to,
           cc: practice.email_cc || undefined,
-          subject: `Nieuwe lead voor ${practice.naam} — #${inserted.id}`,
+          // ▼▼▼ ID verwijderd uit het onderwerp ▼▼▼
+          subject: `Nieuwe lead voor ${practice.naam}`,
           text:
 `Er is een nieuwe lead binnengekomen.
 
