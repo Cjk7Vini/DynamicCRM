@@ -12,7 +12,7 @@ import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Joi from 'joi';
-import nodemailer from 'nodemailer'; // <-- toegevoegd
+import nodemailer from 'nodemailer';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
@@ -29,13 +29,14 @@ const SMTP = {
   from: process.env.SMTP_FROM || 'no-reply@example.com',
 };
 
-// 1) Security headers (inline scripts toegestaan i.v.m. simpele HTML)
+// 1) Security headers — extern script toestaan (geen inline JS meer)
 app.use(
   helmet({
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        "script-src": ["'self'", "'unsafe-inline'"],
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],               // geen 'unsafe-inline' nodig
         "style-src": ["'self'", "'unsafe-inline'"],
         "img-src": ["'self'", "data:"]
       }
@@ -48,6 +49,8 @@ app.use(
 // 2) Basis middleware
 app.use(cors());
 app.use(express.json());
+// 🔸 Belangrijk voor HTML form POST zonder JS:
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // 3) Handige redirects — LET OP: boven static!
@@ -85,7 +88,7 @@ app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
-// 6) Validatie (NL veldnamen) — UITGEBREID MET praktijk_code
+// 6) Validatie (NL veldnamen) — praktijk_code inbegrepen
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
@@ -93,7 +96,10 @@ const leadSchema = Joi.object({
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
   toestemming: Joi.boolean().default(true),
-  praktijk_code: Joi.string().max(64).allow('', null) // nieuw
+  praktijk_code: Joi.string().max(64).allow('', null),
+  // extra velden uit form (worden gestript):
+  _ts: Joi.any(),
+  _hp: Joi.any()
 });
 
 // 7) Admin check
@@ -139,6 +145,7 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
 // 9) POST /leads — sla praktijk_code op, zoek praktijk, stuur mail
 app.post('/leads', async (req, res) => {
   try {
+    // req.body werkt nu voor zowel JSON als x-www-form-urlencoded
     const { value, error } = leadSchema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true
@@ -218,7 +225,6 @@ app.post('/leads', async (req, res) => {
           from: SMTP.from,
           to: practice.email_to,
           cc: practice.email_cc || undefined,
-          // ▼▼▼ ID verwijderd uit het onderwerp ▼▼▼
           subject: `Nieuwe lead voor ${practice.naam}`,
           text:
 `Er is een nieuwe lead binnengekomen.
@@ -262,7 +268,7 @@ app.post('/testmail', requireAdmin, async (req, res) => {
       port: SMTP.port,
       secure: SMTP.secure,
       auth: { user: SMTP.user, pass: SMTP.pass },
-      logger: true, // extra debug in Render logs
+      logger: true,
       debug: true
     });
 
