@@ -1,6 +1,5 @@
 // src/server.js — Postgres/Neon + NL-kolommen + praktijk_code + SMTP mail + TESTMAIL
 
-// 0) Forceer IPv4 eerst (voorkomt IPv6 ENETUNREACH op Render / sommige hosts)
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
 
@@ -19,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
-// SMTP configuratie (Render → Environment)
+// SMTP configuratie
 const SMTP = {
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT || 587),
@@ -29,17 +28,10 @@ const SMTP = {
   from: process.env.SMTP_FROM || 'no-reply@example.com',
 };
 
-// 1) Security headers (inline scripts toegestaan i.v.m. simpele HTML)
+// 1) Security headers – CSP UITGEZET zodat inline scripts werken
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        "script-src": ["'self'", "'unsafe-inline'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "img-src": ["'self'", "data:"]
-      }
-    },
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
   })
@@ -50,20 +42,18 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// 3) Handige redirects — LET OP: boven static!
+// 3) Redirects
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
   res.redirect(302, q ? `/form.html?${q}` : '/form.html');
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
-
-// Optioneel: support voor /form.html/:code of /r/:code
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
   res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
 });
 
-// 4) Static files (admin.html / form.html in /public) + no-cache voor .html
+// 4) Static files
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(
@@ -84,7 +74,7 @@ app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
-// 6) Validatie (NL veldnamen)
+// 6) Validatie
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
@@ -104,7 +94,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// 8) GET /api/leads — toon ook praktijk_code + praktijk_naam
+// 8) GET /api/leads
 app.get('/api/leads', requireAdmin, async (_req, res) => {
   try {
     const rows = await withReadConnection(async (client) => {
@@ -135,7 +125,7 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
   }
 });
 
-// 9) POST /leads — sla praktijk_code op, zoek praktijk, stuur mail
+// 9) POST /leads
 app.post('/leads', async (req, res) => {
   try {
     const { value, error } = leadSchema.validate(req.body, {
@@ -158,7 +148,6 @@ app.post('/leads', async (req, res) => {
       praktijk_code
     } = value;
 
-    // Insert lead
     const inserted = await withWriteConnection(async (client) => {
       const sql = `
         INSERT INTO public.leads
@@ -180,7 +169,6 @@ app.post('/leads', async (req, res) => {
       return r.rows[0];
     });
 
-    // Zoek praktijk
     let practice = null;
     if (praktijk_code) {
       practice = await withReadConnection(async (client) => {
@@ -194,7 +182,6 @@ app.post('/leads', async (req, res) => {
       });
     }
 
-    // Verstuur mail
     if (practice && SMTP.host && SMTP.user && SMTP.pass) {
       try {
         const transporter = nodemailer.createTransport({
@@ -204,7 +191,7 @@ app.post('/leads', async (req, res) => {
           auth: { user: SMTP.user, pass: SMTP.pass }
         });
 
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
           from: SMTP.from,
           to: practice.email_to,
           cc: practice.email_cc || undefined,
@@ -223,7 +210,7 @@ Datum: ${inserted.aangemaakt_op}
 `,
         });
 
-        console.log('MAIL-SEND: OK →', practice.email_to, 'messageId:', info && info.messageId);
+        console.log('MAIL-SEND: OK →', practice.email_to);
       } catch (mailErr) {
         console.warn('MAIL-ERROR:', mailErr && mailErr.message);
       }
@@ -236,14 +223,14 @@ Datum: ${inserted.aangemaakt_op}
   }
 });
 
-// 10) TESTMAIL ENDPOINT (alleen admin)
+// 10) TESTMAIL ENDPOINT
 app.post('/testmail', requireAdmin, async (req, res) => {
   try {
     const to = req.body?.to;
     if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
 
     if (!SMTP.host || !SMTP.user || !SMTP.pass) {
-      return res.status(400).json({ error: 'SMTP config ontbreekt (host/user/pass)' });
+      return res.status(400).json({ error: 'SMTP config ontbreekt' });
     }
 
     const transporter = nodemailer.createTransport({
