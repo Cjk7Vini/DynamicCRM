@@ -29,14 +29,13 @@ const SMTP = {
   from: process.env.SMTP_FROM || 'no-reply@example.com',
 };
 
-// 1) Security headers — extern script toestaan (geen inline JS meer)
+// 1) Security headers (inline scripts toegestaan i.v.m. simpele HTML)
 app.use(
   helmet({
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        "default-src": ["'self'"],
-        "script-src": ["'self'"],               // geen 'unsafe-inline' nodig
+        "script-src": ["'self'", "'unsafe-inline'"],
         "style-src": ["'self'", "'unsafe-inline'"],
         "img-src": ["'self'", "data:"]
       }
@@ -49,13 +48,10 @@ app.use(
 // 2) Basis middleware
 app.use(cors());
 app.use(express.json());
-// 🔸 Belangrijk voor HTML form POST zonder JS:
-app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // 3) Handige redirects — LET OP: boven static!
 app.get('/', (req, res) => {
-  // behoud querystring als iemand toch /?s=... gebruikt
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
   res.redirect(302, q ? `/form.html?${q}` : '/form.html');
 });
@@ -88,7 +84,7 @@ app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
-// 6) Validatie (NL veldnamen) — praktijk_code inbegrepen
+// 6) Validatie (NL veldnamen)
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
@@ -96,10 +92,7 @@ const leadSchema = Joi.object({
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
   toestemming: Joi.boolean().default(true),
-  praktijk_code: Joi.string().max(64).allow('', null),
-  // extra velden uit form (worden gestript):
-  _ts: Joi.any(),
-  _hp: Joi.any()
+  praktijk_code: Joi.string().max(64).allow('', null)
 });
 
 // 7) Admin check
@@ -145,7 +138,6 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
 // 9) POST /leads — sla praktijk_code op, zoek praktijk, stuur mail
 app.post('/leads', async (req, res) => {
   try {
-    // req.body werkt nu voor zowel JSON als x-www-form-urlencoded
     const { value, error } = leadSchema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true
@@ -166,7 +158,7 @@ app.post('/leads', async (req, res) => {
       praktijk_code
     } = value;
 
-    // 9a) Insert lead inclusief praktijk_code
+    // Insert lead
     const inserted = await withWriteConnection(async (client) => {
       const sql = `
         INSERT INTO public.leads
@@ -185,10 +177,10 @@ app.post('/leads', async (req, res) => {
         praktijk_code || null
       ];
       const r = await client.query(sql, params);
-      return r.rows[0]; // { id, aangemaakt_op }
+      return r.rows[0];
     });
 
-    // 9b) Zoek praktijk op basis van praktijk_code
+    // Zoek praktijk
     let practice = null;
     if (praktijk_code) {
       practice = await withReadConnection(async (client) => {
@@ -202,22 +194,13 @@ app.post('/leads', async (req, res) => {
       });
     }
 
-    // Logging om te zien waarom mail eventueel geskipt wordt
-    if (!praktijk_code) {
-      console.log('MAIL-SKIP: geen praktijk_code voor lead', inserted.id);
-    } else if (!practice) {
-      console.log('MAIL-SKIP: code niet gevonden/inactief:', praktijk_code);
-    } else if (!SMTP.host || !SMTP.user || !SMTP.pass) {
-      console.log('MAIL-SKIP: SMTP config ontbreekt (host/user/pass).');
-    }
-
-    // 9c) Verstuur e-mail via SMTP als praktijk + SMTP config aanwezig zijn
+    // Verstuur mail
     if (practice && SMTP.host && SMTP.user && SMTP.pass) {
       try {
         const transporter = nodemailer.createTransport({
           host: SMTP.host,
           port: SMTP.port,
-          secure: SMTP.secure, // true voor 465, false voor 587 (STARTTLS)
+          secure: SMTP.secure,
           auth: { user: SMTP.user, pass: SMTP.pass }
         });
 
@@ -253,7 +236,7 @@ Datum: ${inserted.aangemaakt_op}
   }
 });
 
-/* --- TESTMAIL ENDPOINT (alleen admin) --- */
+// 10) TESTMAIL ENDPOINT (alleen admin)
 app.post('/testmail', requireAdmin, async (req, res) => {
   try {
     const to = req.body?.to;
@@ -287,7 +270,7 @@ app.post('/testmail', requireAdmin, async (req, res) => {
   }
 });
 
-// 10) Start server
+// 11) Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });

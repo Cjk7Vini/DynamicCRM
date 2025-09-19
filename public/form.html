@@ -1,153 +1,155 @@
-// public/js/form.js
-(function () {
-  const form   = document.getElementById('leadForm');
-  if (!form) return;
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <title>Aanmelden – Fysiopraktijk</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --bg:#f7f7fb; --card:#ffffff; --ink:#111827; --muted:#6b7280; --brand:#2563eb; --ok:#0a7a32; --err:#b91c1c; --ring: rgba(37,99,235,.35); }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0}
+    .wrap{max-width:960px;margin:32px auto;padding:0 16px}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
+    @media (max-width:900px){.hero{grid-template-columns:1fr}}
+    h1{font-size:clamp(26px,3vw,36px);margin:0 0 8px}
+    .sub{color:var(--muted);margin:0 0 20px;line-height:1.5}
+    .bullets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
+    .bullet{background:#eef2ff;border:1px solid #e0e7ff;border-radius:12px;padding:12px;font-weight:500}
+    @media (max-width:900px){.bullets{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 30px rgba(17,24,39,.06);padding:18px}
+    label{display:block;margin:12px 0 6px;font-weight:600}
+    input,select,textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;background:#fff}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:700px){.row{grid-template-columns:1fr}}
+    .actions{margin-top:14px;display:flex;align-items:center;gap:12px}
+    button{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}
+    button:hover{filter:brightness(.95)}
+    .hint{color:var(--muted);font-size:14px}
+    #msg{margin-top:12px;font-weight:700;text-align:center}
+    #msg.error{color:var(--err)}
+    #msg.success{color:var(--ok)}
+    .privacy{margin-top:8px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Plan je eerste afspraak – we helpen je snel weer vrij te bewegen</h1>
+        <p class="sub">Laat je gegevens achter en we nemen <strong>binnen één werkdag</strong> contact met je op voor een vrijblijvende intake bij de fysiopraktijk.</p>
+        <div class="bullets">
+          <div class="bullet">✅ Persoonlijk behandelplan</div>
+          <div class="bullet">⏱️ Snel ingepland</div>
+          <div class="bullet">🛡️ AVG-proof & veilig</div>
+        </div>
+      </div>
 
-  const msg    = document.getElementById('msg');
-  const hidden = document.getElementById('praktijk_code');
-  const tsEl   = document.getElementById('_ts');
-  const hpEl   = document.getElementById('_hp');
+      <form id="leadForm" class="card" novalidate>
+        <input type="hidden" name="praktijk_code" id="praktijk_code" />
+        <div class="row">
+          <div>
+            <label>Volledige naam</label>
+            <input type="text" name="volledige_naam" placeholder="Voor- en achternaam" required />
+          </div>
+          <div>
+            <label>Telefoon</label>
+            <input type="tel" name="telefoon" placeholder="06 12345678" />
+          </div>
+        </div>
 
-  const errNaam = document.getElementById('err_naam');
-  const errTel  = document.getElementById('err_tel');
-  const errMail = document.getElementById('err_mail');
+        <label>Emailadres</label>
+        <input type="email" name="emailadres" placeholder="jij@example.com" />
 
-  const MIN_SUBMIT_MS = 1500;
+        <label>Waar ken je ons van?</label>
+        <select name="bron">
+          <option value="">(kies)</option>
+          <option value="Website">Website</option>
+          <option value="Instagram">Instagram</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="YouTube">YouTube</option>
+          <option value="Referral">Doorverwijzing</option>
+        </select>
 
-  function normalizeCode(raw){
-    if(!raw) return '';
-    return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
-  }
+        <label>Wat is je doel of klacht?</label>
+        <input type="text" name="doel" placeholder="Bijv. rugpijn, sterker worden, sneller herstellen…" />
 
-  // praktijk_code uit URL
-  try{
-    const p   = new URLSearchParams(location.search);
-    const raw = p.get('s') || p.get('praktijk') || '';
-    const code = normalizeCode(raw);
-    if(code) hidden.value = code;
-  }catch(_){}
+        <div class="actions">
+          <label class="hint" style="display:flex;align-items:center;gap:8px;margin:0;">
+            <input type="checkbox" name="toestemming" checked />
+            Ik geef toestemming om mijn gegevens te verwerken
+          </label>
+          <span style="flex:1"></span>
+          <button type="submit">Verstuur</button>
+        </div>
 
-  // timestamp voor time-to-submit
-  function resetTimestamp(){ tsEl.value = String(Date.now()); }
-  resetTimestamp();
+        <p class="privacy">We gebruiken je gegevens alleen om je aanmelding te behandelen. Geen spam, geen verkoop aan derden.</p>
+        <div id="msg"></div>
+      </form>
+    </section>
+  </div>
 
-  // simpele disposable domeinen lijst (client-side deterrent)
-  const DISPOSABLE = new Set([
-    'mailinator.com','yopmail.com','guerrillamail.com','10minutemail.com','temp-mail.org',
-    'fakeinbox.com','getnada.com','trashmail.com','dispostable.com','sharklasers.com'
-  ]);
+  <script>
+    const form   = document.getElementById('leadForm');
+    const msg    = document.getElementById('msg');
+    const hidden = document.getElementById('praktijk_code');
 
-  function showError(el, text){
-    if(!el) return;
-    el.textContent = text || '';
-    el.hidden = !text;
-  }
-
-  function clearErrors(){
-    showError(errNaam, ''); showError(errTel,''); showError(errMail,'');
-    if (msg){ msg.textContent=''; msg.className=''; }
-  }
-
-  function atLeastOneContact(email, tel){
-    return !!email || !!tel;
-  }
-
-  form.addEventListener('submit', async (e) => {
-    // Alleen JS-pad gebruiken als JS werkt
-    e.preventDefault();
-    clearErrors();
-
-    const code = normalizeCode(hidden.value);
-    const naam = form.volledige_naam.value.trim();
-    const mail = form.emailadres.value.trim().toLowerCase();
-    const tel  = form.telefoon.value.trim();
-
-    // Honeypot
-    if (hpEl && hpEl.value) {
-      if (msg){ msg.textContent = 'Fout: ongeldige invoer.'; msg.className = 'error'; }
-      return;
+    function normalizeCode(raw){
+      if(!raw) return '';
+      return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
     }
 
-    // Time-to-submit
-    const age = Date.now() - Number(tsEl.value || 0);
-    if (age < MIN_SUBMIT_MS) {
-      if (msg){ msg.textContent = 'Te snel verstuurd. Probeer het nog eens.'; msg.className = 'error'; }
-      return;
-    }
+    (function setPraktijkCodeFromUrl(){
+      try{
+        const p   = new URLSearchParams(location.search);
+        const raw = p.get('s') || p.get('praktijk') || '';
+        const code = normalizeCode(raw);
+        if(code) hidden.value = code;
+      }catch(_){}
+    })();
 
-    // Naam
-    if (!/^[\p{L}][\p{L}\p{M}\-\' ]{1,98}$/u.test(naam)) {
-      showError(errNaam, 'Vul je volledige naam in (alleen letters, spaties, - en ’).');
-      return;
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      msg.className = '';
 
-    // Minstens één contact
-    if (!atLeastOneContact(mail, tel)) {
-      showError(errMail, 'Vul e-mail of telefoon in (minstens één).');
-      showError(errTel,  'Vul e-mail of telefoon in (minstens één).');
-      return;
-    }
+      const code = normalizeCode(hidden.value);
 
-    // Telefoon
-    if (tel && !/^[0-9+\-() ]{8,20}$/.test(tel)) {
-      showError(errTel, 'Ongeldig telefoonnummer.');
-      return;
-    }
+      const data = {
+        volledige_naam: form.volledige_naam.value.trim(),
+        emailadres:     form.emailadres.value.trim() || null,
+        telefoon:       form.telefoon.value.trim() || null,
+        bron:           form.bron.value || null,
+        doel:           form.doel.value.trim() || null,
+        toestemming:    form.toestemming.checked,
+        praktijk_code:  code || null
+      };
 
-    // Email
-    if (mail) {
-      const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(mail);
-      if (!basic) {
-        showError(errMail, 'Ongeldig e-mailadres.');
-        return;
+      try{
+        const res  = await fetch('/leads', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(data)
+        });
+        const json = await res.json().catch(()=>({}));
+
+        if(!res.ok){
+          msg.textContent = 'Fout: ' + (json.error || res.statusText);
+          msg.className = 'error';
+          console.error('Server detail:', json.details);
+          return;
+        }
+
+        msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
+        msg.className = 'success';
+
+        form.reset();
+        hidden.value = code; // code behouden
+      }catch(err){
+        msg.textContent = 'Kon niet opslaan: ' + err.message;
+        msg.className = 'error';
       }
-      const domain = mail.split('@')[1];
-      if (DISPOSABLE.has(domain)) {
-        showError(errMail, 'Gebruik een echt e-mailadres (wegwerp niet toegestaan).');
-        return;
-      }
-    }
-
-    // Toestemming
-    if (!form.toestemming.checked) {
-      if (msg){ msg.textContent = 'Geef toestemming om je gegevens te verwerken.'; msg.className = 'error'; }
-      return;
-    }
-
-    // Payload
-    const data = {
-      volledige_naam: naam,
-      emailadres:     mail || null,
-      telefoon:       tel  || null,
-      bron:           form.bron.value || null,
-      doel:           form.doel.value.trim() || null,
-      toestemming:    form.toestemming.checked,
-      praktijk_code:  code || null,
-      _ts:            Number(tsEl.value),
-      _hp:            '' // hoort leeg te zijn
-    };
-
-    try{
-      const res  = await fetch('/leads', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(data)
-      });
-      const json = await res.json().catch(()=>({}));
-
-      if(!res.ok){
-        if (msg){ msg.textContent = 'Fout: ' + (json.error || res.statusText); msg.className = 'error'; }
-        console.error('Server detail:', json.details);
-        return;
-      }
-
-      if (msg){ msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.'; msg.className = 'success'; }
-
-      form.reset();
-      hidden.value = code; // code behouden
-      resetTimestamp();
-    }catch(err){
-      if (msg){ msg.textContent = 'Kon niet opslaan: ' + err.message; msg.className = 'error'; }
-    }
-  });
-})();
+    });
+  </script>
+</body>
+</html>
