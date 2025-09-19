@@ -2,115 +2,339 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8">
-  <title>Dynamic CRM - Leads (Admin)</title>
+  <title>Dynamic CRM — Admin (Leads per praktijk)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; padding: 16px; background: #fafafa; }
-    h1 { color: #333; }
-    .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom: 10px; }
-    input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
-    button { padding: 8px 12px; border: 0; border-radius: 6px; background: #2c7be5; color: #fff; cursor:pointer; }
-    .password-wrapper { display: inline-flex; align-items: center; gap:6px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; background:#fff; }
-    th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
-    th { background: #f4f4f4; }
-    #msg { margin-top: 8px; font-weight: bold; }
-    #msg.error { color: #c00; }
-    #msg.success { color: #2c7be5; }
+    :root{
+      --bg:#f7f7fb; --card:#fff; --ink:#0f172a; --muted:#64748b;
+      --brand:#2563eb; --ok:#0a7a32; --err:#b91c1c; --ring:rgba(37,99,235,.35);
+      --border:#e5e7eb; --soft:#eef2ff;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    h1{margin:0 0 6px;font-size:clamp(22px,3vw,30px)}
+    .sub{margin:0 0 18px;color:var(--muted)}
+    .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(2,6,23,.06)}
+    .controls{padding:14px}
+    input[type="password"],input[type="text"]{
+      padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;min-width:220px
+    }
+    input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+    button{
+      background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer
+    }
+    button.ghost{background:#eef2ff;color:#1e293b}
+    button:hover{filter:brightness(.97)}
+    .msg{margin-top:8px;font-weight:700}
+    .msg.error{color:var(--err)} .msg.success{color:var(--ok)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0}
+    .practice{overflow:hidden}
+    .practice header{
+      display:flex;gap:10px;align-items:center;justify-content:space-between;cursor:pointer;
+      padding:14px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#fafcff, #f5f7ff)
+    }
+    .title{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+    .name{font-weight:800}
+    .code{color:var(--muted);font-size:13px;background:#f1f5f9;border:1px solid var(--border);padding:2px 8px;border-radius:999px}
+    .count{font-weight:700;background:#e0f2fe;border:1px solid #bae6fd;color:#0c4a6e;padding:4px 10px;border-radius:999px}
+    .actions{display:flex;gap:8px}
+    .panel{padding:0}
+    .panel[hidden]{display:none}
+    .tablewrap{overflow:auto}
+    table{border-collapse:collapse;width:100%;min-width:880px}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+    th{background:#f8fafc;color:#0f172a;font-weight:700;position:sticky;top:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #cbd5e1;background:#f1f5f9;font-size:12px}
+    .quiet{color:var(--muted)}
+    .toolbar{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+    .toolbar input{min-width:240px}
+    .totals{margin-left:auto;color:var(--muted);font-size:14px}
+    .footer{padding:10px 14px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}
+    .badge{background:#ecfeff;border:1px solid #a5f3fc;color:#164e63;padding:3px 8px;border-radius:999px;font-size:12px}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#f1f5f9;border:1px solid #e2e8f0;padding:1px 6px;border-radius:6px}
   </style>
 </head>
 <body>
-  <h1>Dynamic CRM — Admin</h1>
+  <div class="wrap">
+    <h1>Leads per praktijk</h1>
+    <p class="sub">Vul je <span class="kbd">ADMIN_KEY</span> in, laad de leads, en bekijk per praktijk een overzicht. Je kunt zoeken en exporteren naar CSV.</p>
 
-  <div class="controls">
-    <label>Admin sleutel:
-      <span class="password-wrapper">
-        <input id="key" type="password" placeholder="voer ADMIN_KEY in" style="width:280px" />
-        <button type="button" id="toggle">👁️</button>
-      </span>
-    </label>
-    <button id="load">Laad leads</button>
+    <div class="card">
+      <div class="controls">
+        <div class="bar">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <span>Admin sleutel</span>
+            <input id="key" type="password" placeholder="voer ADMIN_KEY in" />
+            <button type="button" id="toggle" class="ghost">👁️</button>
+          </label>
+          <button id="load">Laad leads</button>
+          <input id="globalsearch" type="text" placeholder="Zoek in alle praktijken (naam, e-mail, telefoon, bron, doel…)" />
+          <button id="exportAll" class="ghost">Export CSV (alles)</button>
+        </div>
+        <div id="msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <p class="footer">Tip: klik op een praktijkheader om het venster in/uit te klappen.</p>
   </div>
 
-  <div id="msg"></div>
-
-  <table id="table" hidden>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Volledige naam</th>
-        <th>E-mailadres</th>
-        <th>Telefoon</th>
-        <th>Bron</th>
-        <th>Toestemming</th>
-        <th>Doel</th>
-        <th>Aangemaakt</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
   <script>
-    // toggle wachtwoord zichtbaar
-    document.getElementById('toggle').addEventListener('click', () => {
-      const el = document.getElementById('key');
-      el.type = el.type === 'password' ? 'text' : 'password';
+    // ---------- Helpers ----------
+    const $ = (q, el=document) => el.querySelector(q);
+    const $$ = (q, el=document) => Array.from(el.querySelectorAll(q));
+    const fmtDate = (iso) => {
+      try { return new Date(iso).toLocaleString('nl-NL'); }
+      catch { return iso || ''; }
+    };
+    const toCSV = (rows) => {
+      const headers = ["praktijk_code","praktijk_naam","id","volledige_naam","emailadres","telefoon","bron","doel","toestemming","aangemaakt_op"];
+      const esc = (v) => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      };
+      const lines = [headers.join(",")];
+      for (const r of rows) {
+        lines.push(headers.map(h => esc(r[h])).join(","));
+      }
+      return lines.join("\n");
+    };
+    const download = (filename, text) => {
+      const blob = new Blob([text], {type: "text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    };
+
+    // ---------- UI state ----------
+    const keyEl = $('#key');
+    const msgEl = $('#msg');
+    const grid  = $('#grid');
+    const toggleEl = $('#toggle');
+    const loadEl = $('#load');
+    const globalSearchEl = $('#globalsearch');
+    const exportAllEl = $('#exportAll');
+
+    toggleEl.addEventListener('click', () => {
+      keyEl.type = keyEl.type === 'password' ? 'text' : 'password';
     });
 
-    // haal leads op
-    document.getElementById('load').addEventListener('click', async () => {
-      const key = document.getElementById('key').value.trim();
-      const msg = document.getElementById('msg');
-      const table = document.getElementById('table');
-      const tbody = table.querySelector('tbody');
+    let allRows = [];        // alle leads van API
+    let grouped = {};        // { code: { meta, rows } }
+    let expanded = {};       // onthoud open/dicht per praktijk
 
-      msg.textContent = '';
-      msg.className = '';
-
+    // ---------- Data laden ----------
+    loadEl.addEventListener('click', loadData);
+    async function loadData(){
+      msgEl.textContent = ''; msgEl.className = 'msg';
+      const key = keyEl.value.trim();
       if (!key) {
-        msg.textContent = 'Vul eerst de admin sleutel in.';
-        msg.className = 'error';
-        return;
+        msgEl.textContent = 'Vul eerst de admin sleutel in.'; msgEl.classList.add('error'); return;
       }
-
       try {
         const res = await fetch('/api/leads', { headers: { 'x-admin-key': key } });
         const data = await res.json();
-
         if (!res.ok) {
-          msg.textContent = 'Fout: ' + (data.error || res.statusText);
-          msg.className = 'error';
-          table.hidden = true;
-          return;
+          msgEl.textContent = 'Fout: ' + (data.error || res.statusText);
+          msgEl.classList.add('error'); grid.innerHTML = ''; return;
         }
+        allRows = Array.isArray(data) ? data : [];
+        render(allRows);
+        msgEl.textContent = `Leads geladen: ${allRows.length}`;
+        msgEl.classList.add('success');
+      } catch (e) {
+        msgEl.textContent = 'Netwerkfout: ' + e.message;
+        msgEl.classList.add('error');
+        grid.innerHTML = '';
+      }
+    }
 
-        // data is een array van rijen met: id, volledige_naam, emailadres, telefoon, bron, toestemming, doel, aangemaakt
-        tbody.innerHTML = '';
-        (data || []).forEach(r => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${r.id ?? ''}</td>
-            <td>${r.volledige_naam ?? ''}</td>
-            <td>${r.emailadres ?? ''}</td>
-            <td>${r.telefoon ?? ''}</td>
-            <td>${r.bron ?? ''}</td>
-            <td>${r.toestemming ? 'Ja' : 'Nee'}</td>
-            <td>${r.doel ?? ''}</td>
-            <td>${r.aangemaakt ?? ''}</td>
-          `;
-          tbody.appendChild(tr);
+    // ---------- Groeperen & renderen ----------
+    function groupByPractice(rows){
+      const map = {};
+      for (const r of rows) {
+        const code = r.praktijk_code || '(geen-code)';
+        if (!map[code]) map[code] = { meta: { code, naam: r.praktijk_naam || 'Onbekende praktijk' }, rows: [] };
+        map[code].rows.push(r);
+      }
+      return map;
+    }
+
+    function render(rows){
+      grouped = groupByPractice(rows);
+      grid.innerHTML = '';
+      const codes = Object.keys(grouped).sort((a,b) => {
+        const A = (grouped[a].meta.naam || '').toLowerCase();
+        const B = (grouped[b].meta.naam || '').toLowerCase();
+        return A.localeCompare(B);
+      });
+
+      for (const code of codes) {
+        const { meta, rows } = grouped[code];
+        if (!(code in expanded)) expanded[code] = true; // standaard open
+
+        const card = document.createElement('div');
+        card.className = 'practice card';
+
+        const header = document.createElement('header');
+        header.innerHTML = `
+          <div class="title">
+            <span class="name">${meta.naam}</span>
+            <span class="code">code: ${meta.code}</span>
+          </div>
+          <div class="actions">
+            <span class="count">${rows.length} lead${rows.length===1?'':'s'}</span>
+            <button class="ghost" data-action="export">Export CSV</button>
+            <button class="ghost" data-action="toggle">${expanded[code] ? 'Inklappen' : 'Uitklappen'}</button>
+          </div>
+        `;
+        card.appendChild(header);
+
+        const panel = document.createElement('div');
+        panel.className = 'panel';
+        if (!expanded[code]) panel.setAttribute('hidden','');
+
+        // toolbar per praktijk
+        const toolbar = document.createElement('div');
+        toolbar.className = 'toolbar';
+        toolbar.innerHTML = `
+          <input type="text" placeholder="Zoek binnen deze praktijk…" />
+          <div class="totals">${rows.length} resultaten</div>
+        `;
+        panel.appendChild(toolbar);
+
+        // tabel
+        const tablewrap = document.createElement('div'); tablewrap.className = 'tablewrap';
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Volledige naam</th>
+              <th>E-mail</th>
+              <th>Telefoon</th>
+              <th>Bron</th>
+              <th>Doel</th>
+              <th>Toestemming</th>
+              <th>Aangemaakt</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+
+        function renderBody(items){
+          tbody.innerHTML = '';
+          for (const r of items) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${r.volledige_naam ?? ''}</td>
+              <td>${r.emailadres ? `<span class="pill">${r.emailadres}</span>` : '<span class="quiet">–</span>'}</td>
+              <td>${r.telefoon ? `<span class="pill">${r.telefoon}</span>` : '<span class="quiet">–</span>'}</td>
+              <td>${r.bron ?? ''}</td>
+              <td>${r.doel ?? ''}</td>
+              <td>${r.toestemming ? '<span class="badge">Ja</span>' : 'Nee'}</td>
+              <td>${fmtDate(r.aangemaakt_op)}</td>
+            `;
+            tbody.appendChild(tr);
+          }
+        }
+        renderBody(rows);
+
+        tablewrap.appendChild(table);
+        panel.appendChild(tablewrap);
+
+        // footer
+        const foot = document.createElement('div');
+        foot.className = 'footer';
+        foot.textContent = 'Alleen zichtbaar voor admins. Persoonsgegevens worden conform AVG verwerkt.';
+        panel.appendChild(foot);
+
+        card.appendChild(panel);
+        grid.appendChild(card);
+
+        // handlers
+        header.addEventListener('click', (ev) => {
+          const btn = ev.target.closest('button');
+          if (btn && btn.dataset.action === 'export') {
+            const csv = toCSV(rows.map(r => ({
+              praktijk_code: r.praktijk_code || '',
+              praktijk_naam: r.praktijk_naam || '',
+              id: r.id ?? '',
+              volledige_naam: r.volledige_naam ?? '',
+              emailadres: r.emailadres ?? '',
+              telefoon: r.telefoon ?? '',
+              bron: r.bron ?? '',
+              doel: r.doel ?? '',
+              toestemming: r.toestemming ? 'Ja' : 'Nee',
+              aangemaakt_op: fmtDate(r.aangemaakt_op)
+            })));
+            const safeName = (meta.naam || 'praktijk').replace(/[^A-Za-z0-9_-]/g,'_');
+            download(`leads_${safeName}.csv`, csv);
+            ev.stopPropagation();
+            return;
+          }
+          if (btn && btn.dataset.action === 'toggle') {
+            expanded[code] = !expanded[code];
+            panel.toggleAttribute('hidden', !expanded[code]);
+            btn.textContent = expanded[code] ? 'Inklappen' : 'Uitklappen';
+            ev.stopPropagation();
+            return;
+          }
+          // Klik op header zelf togglet ook
+          if (!btn) {
+            const tbtn = header.querySelector('button[data-action="toggle"]');
+            tbtn.click();
+          }
         });
 
-        table.hidden = false;
-        msg.textContent = `Leads geladen (${data.length} gevonden).`;
-        msg.className = 'success';
-
-      } catch (e) {
-        msg.textContent = 'Netwerkfout: ' + e.message;
-        msg.className = 'error';
-        table.hidden = true;
+        // per-praktijk zoek
+        const localSearch = toolbar.querySelector('input');
+        const totals = toolbar.querySelector('.totals');
+        localSearch.addEventListener('input', () => {
+          const q = localSearch.value.trim().toLowerCase();
+          const filtered = !q ? rows : rows.filter(r => {
+            return [
+              r.volledige_naam, r.emailadres, r.telefoon, r.bron, r.doel
+            ].some(v => (v||'').toLowerCase().includes(q));
+          });
+          totals.textContent = `${filtered.length} resultaten`;
+          renderBody(filtered);
+        });
       }
-    });
+
+      // globale export & search
+      exportAllEl.onclick = () => {
+        const csv = toCSV(allRows.map(r => ({
+          praktijk_code: r.praktijk_code || '',
+          praktijk_naam: r.praktijk_naam || '',
+          id: r.id ?? '',
+          volledige_naam: r.volledige_naam ?? '',
+          emailadres: r.emailadres ?? '',
+          telefoon: r.telefoon ?? '',
+          bron: r.bron ?? '',
+          doel: r.doel ?? '',
+          toestemming: r.toestemming ? 'Ja' : 'Nee',
+          aangemaakt_op: fmtDate(r.aangemaakt_op)
+        })));
+        download('leads_alles.csv', csv);
+      };
+
+      globalSearchEl.oninput = () => {
+        const q = globalSearchEl.value.trim().toLowerCase();
+        const rows2 = !q ? allRows : allRows.filter(r => {
+          return [
+            r.praktijk_naam, r.praktijk_code, r.volledige_naam, r.emailadres, r.telefoon, r.bron, r.doel
+          ].some(v => (v||'').toLowerCase().includes(q));
+        });
+        render(rows2); // herteken met gefilterde set
+      };
+    }
   </script>
 </body>
 </html>
