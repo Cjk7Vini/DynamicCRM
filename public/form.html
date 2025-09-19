@@ -5,26 +5,78 @@
   <title>Aanmelden – Fysiopraktijk</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{ --bg:#f7f7fb; --card:#ffffff; --ink:#111827; --muted:#6b7280; --brand:#2563eb; --ok:#0a7a32; --err:#b91c1c; --ring: rgba(37,99,235,.35); }
+    :root{
+      --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
+      --card:#ffffff;
+      --ink:#111827;
+      --muted:#6b7280;
+      --brand:#2563eb;
+      --cta:#f97316; /* opvallend oranje voor CTA */
+      --ok:#0a7a32;
+      --err:#b91c1c;
+      --ring: rgba(37,99,235,.35);
+    }
     *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0}
-    .wrap{max-width:960px;margin:32px auto;padding:0 16px}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg-gradient);
+      color:var(--ink);
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .wrap{max-width:960px;width:100%}
     .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
     @media (max-width:900px){.hero{grid-template-columns:1fr}}
-    h1{font-size:clamp(26px,3vw,36px);margin:0 0 8px}
-    .sub{color:var(--muted);margin:0 0 20px;line-height:1.5}
+    h1{font-size:clamp(26px,3vw,36px);margin:0 0 8px;color:#fff}
+    .sub{color:#e0f2fe;margin:0 0 20px;line-height:1.5}
     .bullets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
-    .bullet{background:#eef2ff;border:1px solid #e0e7ff;border-radius:12px;padding:12px;font-weight:500}
+    .bullet{
+      background:rgba(255,255,255,0.15);
+      color:#fff;
+      border:1px solid rgba(255,255,255,0.25);
+      border-radius:12px;
+      padding:12px;
+      font-weight:500
+    }
     @media (max-width:900px){.bullets{grid-template-columns:1fr}}
-    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 30px rgba(17,24,39,.06);padding:18px}
+    .card{
+      background:var(--card);
+      border:1px solid #e5e7eb;
+      border-radius:16px;
+      box-shadow:0 10px 30px rgba(17,24,39,.1);
+      padding:18px
+    }
     label{display:block;margin:12px 0 6px;font-weight:600}
-    input,select,textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;background:#fff}
-    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+    input,select,textarea{
+      width:100%;
+      padding:12px;
+      border:1px solid #d1d5db;
+      border-radius:10px;
+      background:#fff
+    }
+    input:focus,select:focus,textarea:focus{
+      outline:none;
+      border-color:var(--brand);
+      box-shadow:0 0 0 4px var(--ring)
+    }
     .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     @media (max-width:700px){.row{grid-template-columns:1fr}}
     .actions{margin-top:14px;display:flex;align-items:center;gap:12px}
-    button{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}
-    button:hover{filter:brightness(.95)}
+    button{
+      background:var(--cta);
+      color:#fff;
+      border:0;
+      border-radius:10px;
+      padding:12px 16px;
+      font-weight:700;
+      cursor:pointer;
+      transition:all 0.2s ease;
+    }
+    button:hover{filter:brightness(.9);transform:translateY(-1px)}
     .hint{color:var(--muted);font-size:14px}
     #msg{margin-top:12px;font-weight:700;text-align:center}
     #msg.error{color:var(--err)}
@@ -80,7 +132,7 @@
             Ik geef toestemming om mijn gegevens te verwerken
           </label>
           <span style="flex:1"></span>
-          <button type="submit">Verstuur</button>
+          <button type="submit">Gratis afspraak aanvragen</button>
         </div>
 
         <p class="privacy">We gebruiken je gegevens alleen om je aanmelding te behandelen. Geen spam, geen verkoop aan derden.</p>
@@ -144,7 +196,7 @@
         msg.className = 'success';
 
         form.reset();
-        hidden.value = code; // code behouden
+        hidden.value = code;
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';
