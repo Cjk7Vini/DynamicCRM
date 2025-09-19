@@ -6,15 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --bg-gradient: linear-gradient(160deg, #0f172a 0%, #1e3a8a 60%, #0d9488 100%);
+      --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
       --card:#ffffff;
       --ink:#111827;
       --muted:#6b7280;
-      --brand:#1e3a8a;
-      --cta:#f97316; /* oranje CTA */
-      --ok:#22c55e;
-      --err:#ef4444;
-      --ring: rgba(16,185,129,.35);
+      --brand:#2563eb;
+      --cta:#f97316; /* opvallend oranje voor CTA */
+      --ok:#0a7a32;
+      --err:#b91c1c;
+      --ring: rgba(37,99,235,.35);
     }
     *{box-sizing:border-box}
     body{
@@ -29,15 +29,15 @@
       padding:20px;
     }
     .wrap{max-width:960px;width:100%}
-    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
     @media (max-width:900px){.hero{grid-template-columns:1fr}}
     h1{font-size:clamp(26px,3vw,36px);margin:0 0 8px;color:#fff}
-    .sub{color:#cbd5e1;margin:0 0 20px;line-height:1.5}
+    .sub{color:#e0f2fe;margin:0 0 20px;line-height:1.5}
     .bullets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
     .bullet{
-      background:rgba(255,255,255,0.08);
-      color:#f8fafc;
-      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.15);
+      color:#fff;
+      border:1px solid rgba(255,255,255,0.25);
       border-radius:12px;
       padding:12px;
       font-weight:500
@@ -47,8 +47,8 @@
       background:var(--card);
       border:1px solid #e5e7eb;
       border-radius:16px;
-      box-shadow:0 15px 35px rgba(0,0,0,.2);
-      padding:22px
+      box-shadow:0 10px 30px rgba(17,24,39,.1);
+      padding:18px
     }
     label{display:block;margin:12px 0 6px;font-weight:600}
     input,select,textarea{
@@ -97,7 +97,8 @@
         </div>
       </div>
 
-      <form id="leadForm" class="card" novalidate>
+      <!-- Fallback: altijd POST naar /leads (geen data in URL) -->
+      <form id="leadForm" class="card" novalidate method="post" action="/leads" accept-charset="utf-8">
         <input type="hidden" name="praktijk_code" id="praktijk_code" />
         <div class="row">
           <div>
@@ -146,6 +147,17 @@
     const msg    = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
 
+    // Toon groene melding bij fallback-redirect (?ok=1)
+    (function showOk(){
+      try{
+        const p=new URLSearchParams(location.search);
+        if(p.get('ok')==='1'){
+          msg.textContent='Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
+          msg.className='success';
+        }
+      }catch(_){}
+    })();
+
     function normalizeCode(raw){
       if(!raw) return '';
       return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
@@ -161,6 +173,7 @@
     })();
 
     form.addEventListener('submit', async (e) => {
+      // JS-pad (fetch). Browser-fallback blijft POST door form-attribuut.
       e.preventDefault();
       msg.textContent = '';
       msg.className = '';

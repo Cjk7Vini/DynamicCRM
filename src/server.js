@@ -40,6 +40,8 @@ app.use(
 // 2) Basis middleware
 app.use(cors());
 app.use(express.json());
+// ▼▼▼ Belangrijk: accepteer ook klassieke form posts (fallback)
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // 3) Redirects
@@ -81,7 +83,8 @@ const leadSchema = Joi.object({
   telefoon: Joi.string().max(50).allow('', null),
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
-  toestemming: Joi.boolean().default(true),
+  // ▼▼▼ Checkbox 'on' -> true bij form POST
+  toestemming: Joi.boolean().truthy('on').falsy('off').default(true),
   praktijk_code: Joi.string().max(64).allow('', null)
 });
 
@@ -214,6 +217,11 @@ Datum: ${inserted.aangemaakt_op}
       } catch (mailErr) {
         console.warn('MAIL-ERROR:', mailErr && mailErr.message);
       }
+    }
+
+    // ▼▼▼ Fallback: bij klassieke form POST redirecten i.p.v. JSON
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.redirect(302, '/form.html?ok=1');
     }
 
     res.status(201).json({ ok: true, lead: inserted });
