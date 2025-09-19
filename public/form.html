@@ -33,6 +33,12 @@
     #msg.error{color:var(--err)}
     #msg.success{color:var(--ok)}
     .privacy{margin-top:8px;color:var(--muted);font-size:13px}
+
+    /* Honeypot: off-screen maar wel in DOM (screenreaders laten we met aria-hidden met rust) */
+    .hp{position:absolute;left:-5000px;height:0;overflow:hidden}
+
+    /* Inline foutmeldingen bij velden */
+    .field-error{color:var(--err);font-size:13px;margin-top:6px}
   </style>
 </head>
 <body>
@@ -52,23 +58,63 @@
       <form id="leadForm" class="card" novalidate>
         <!-- Verborgen veld voor praktijkcode -->
         <input type="hidden" name="praktijk_code" id="praktijk_code" />
+        <!-- Verborgen time-to-submit veld -->
+        <input type="hidden" name="_ts" id="_ts" />
+
+        <!-- Honeypot: moet leeg blijven -->
+        <div class="hp" aria-hidden="true">
+          <label for="_hp">Laat leeg</label>
+          <input type="text" name="_hp" id="_hp" tabindex="-1" autocomplete="off" />
+        </div>
 
         <div class="row">
           <div>
-            <label>Volledige naam</label>
-            <input type="text" name="volledige_naam" placeholder="Voor- en achternaam" required />
+            <label for="volledige_naam">Volledige naam</label>
+            <input
+              id="volledige_naam"
+              type="text"
+              name="volledige_naam"
+              placeholder="Voor- en achternaam"
+              required
+              minlength="2"
+              maxlength="100"
+              autocomplete="name"
+              pattern="^[\p{L}][\p{L}\p{M}\-\' ]{1,98}$"
+              title="Alleen letters, spaties, - en '"
+            />
+            <div class="field-error" id="err_naam" hidden></div>
           </div>
           <div>
-            <label>Telefoon</label>
-            <input type="tel" name="telefoon" placeholder="06 12345678" />
+            <label for="telefoon">Telefoon</label>
+            <input
+              id="telefoon"
+              type="tel"
+              name="telefoon"
+              placeholder="06 12345678"
+              inputmode="tel"
+              autocomplete="tel"
+              minlength="8"
+              maxlength="20"
+              pattern="^[0-9+\-() ]{8,20}$"
+              title="Alleen cijfers, +, -, (), spaties (min. 8 tekens)"
+            />
+            <div class="field-error" id="err_tel" hidden></div>
           </div>
         </div>
 
-        <label>Emailadres</label>
-        <input type="email" name="emailadres" placeholder="jij@example.com" />
+        <label for="emailadres">Emailadres</label>
+        <input
+          id="emailadres"
+          type="email"
+          name="emailadres"
+          placeholder="jij@example.com"
+          autocomplete="email"
+          maxlength="254"
+        />
+        <div class="field-error" id="err_mail" hidden></div>
 
-        <label>Waar ken je ons van?</label>
-        <select name="bron">
+        <label for="bron">Waar ken je ons van?</label>
+        <select name="bron" id="bron">
           <option value="">(kies)</option>
           <option value="Website">Website</option>
           <option value="Instagram">Instagram</option>
@@ -77,12 +123,19 @@
           <option value="Referral">Doorverwijzing</option>
         </select>
 
-        <label>Wat is je doel of klacht?</label>
-        <input type="text" name="doel" placeholder="Bijv. rugpijn, sterker worden, sneller herstellen…" />
+        <label for="doel">Wat is je doel of klacht?</label>
+        <input
+          id="doel"
+          type="text"
+          name="doel"
+          placeholder="Bijv. rugpijn, sterker worden, sneller herstellen…"
+          maxlength="200"
+          autocomplete="off"
+        />
 
         <div class="actions">
           <label class="hint" style="display:flex;align-items:center;gap:8px;margin:0;">
-            <input type="checkbox" name="toestemming" checked />
+            <input type="checkbox" name="toestemming" id="toestemming" checked />
             Ik geef toestemming om mijn gegevens te verwerken
           </label>
           <span style="flex:1"></span>
@@ -90,7 +143,7 @@
         </div>
 
         <p class="privacy">We gebruiken je gegevens alleen om je aanmelding te behandelen. Geen spam, geen verkoop aan derden.</p>
-        <div id="msg"></div>
+        <div id="msg" aria-live="polite"></div>
       </form>
     </section>
   </div>
@@ -99,12 +152,21 @@
     const form   = document.getElementById('leadForm');
     const msg    = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
+    const tsEl   = document.getElementById('_ts');
+    const hpEl   = document.getElementById('_hp');
+
+    const errNaam = document.getElementById('err_naam');
+    const errTel  = document.getElementById('err_tel');
+    const errMail = document.getElementById('err_mail');
+
+    const MIN_SUBMIT_MS = 1500; // time-to-submit drempel
 
     function normalizeCode(raw){
       if(!raw) return '';
       return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
     }
 
+    // 1) praktijk_code uit URL
     (function setPraktijkCodeFromUrl(){
       try{
         const p   = new URLSearchParams(location.search);
@@ -114,21 +176,110 @@
       }catch(_){}
     })();
 
+    // 2) zet start-timestamp
+    function resetTimestamp(){ tsEl.value = String(Date.now()); }
+    resetTimestamp();
+
+    // 3) simpele disposable domeinen lijst (client-side deterrent)
+    const DISPOSABLE = new Set([
+      'mailinator.com','yopmail.com','guerrillamail.com','10minutemail.com','temp-mail.org',
+      'fakeinbox.com','getnada.com','trashmail.com','dispostable.com','sharklasers.com'
+    ]);
+
+    function showError(el, msg){
+      el.textContent = msg;
+      el.hidden = !msg;
+    }
+
+    function clearErrors(){
+      showError(errNaam, ''); showError(errTel,''); showError(errMail,'');
+      msg.textContent=''; msg.className='';
+    }
+
+    function atLeastOneContact(email, tel){
+      const hasEmail = !!email;
+      const hasTel   = !!tel;
+      return hasEmail || hasTel;
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      msg.textContent = '';
-      msg.className = '';
+      clearErrors();
 
       const code = normalizeCode(hidden.value);
+      const naam = form.volledige_naam.value.trim();
+      const mail = form.emailadres.value.trim().toLowerCase();
+      const tel  = form.telefoon.value.trim();
 
+      // Client-side validaties
+
+      // Honeypot
+      if (hpEl.value) {
+        msg.textContent = 'Fout: ongeldige invoer.';
+        msg.className = 'error';
+        return;
+      }
+
+      // Time-to-submit
+      const age = Date.now() - Number(tsEl.value || 0);
+      if (age < MIN_SUBMIT_MS) {
+        msg.textContent = 'Te snel verstuurd. Probeer het nog eens.';
+        msg.className = 'error';
+        return;
+      }
+
+      // Naam pattern (spiegel aan input@pattern)
+      if (!/^[\p{L}][\p{L}\p{M}\-\' ]{1,98}$/u.test(naam)) {
+        showError(errNaam, 'Vul je volledige naam in (alleen letters, spaties, - en ’).');
+        return;
+      }
+
+      // Vereist: minstens één van e-mail of telefoon
+      if (!atLeastOneContact(mail, tel)) {
+        showError(errMail, 'Vul e-mail of telefoon in (minstens één).');
+        showError(errTel,  'Vul e-mail of telefoon in (minstens één).');
+        return;
+      }
+
+      // Telefoon: alleen checken als ingevuld
+      if (tel && !/^[0-9+\-() ]{8,20}$/.test(tel)) {
+        showError(errTel, 'Ongeldig telefoonnummer.');
+        return;
+      }
+
+      // Email: basis check + disposable
+      if (mail) {
+        // native type=email + extra regex vangt meeste
+        const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(mail);
+        if (!basic) {
+          showError(errMail, 'Ongeldig e-mailadres.');
+          return;
+        }
+        const domain = mail.split('@')[1];
+        if (DISPOSABLE.has(domain)) {
+          showError(errMail, 'Gebruik een echt e-mailadres (wegwerp niet toegestaan).');
+          return;
+        }
+      }
+
+      // Toestemming
+      if (!form.toestemming.checked) {
+        msg.textContent = 'Geef toestemming om je gegevens te verwerken.';
+        msg.className = 'error';
+        return;
+      }
+
+      // Build payload
       const data = {
-        volledige_naam: form.volledige_naam.value.trim(),
-        emailadres:     form.emailadres.value.trim() || null,
-        telefoon:       form.telefoon.value.trim() || null,
+        volledige_naam: naam,
+        emailadres:     mail || null,
+        telefoon:       tel  || null,
         bron:           form.bron.value || null,
         doel:           form.doel.value.trim() || null,
         toestemming:    form.toestemming.checked,
-        praktijk_code:  code || null
+        praktijk_code:  code || null,
+        _ts:            Number(tsEl.value),
+        _hp:            '' // hoort leeg te zijn
       };
 
       try{
@@ -146,12 +297,12 @@
           return;
         }
 
-        // Geen ID tonen; alleen nette bevestiging
         msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
         msg.className = 'success';
 
         form.reset();
         hidden.value = code; // code behouden
+        resetTimestamp();    // nieuwe starttijd
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';
