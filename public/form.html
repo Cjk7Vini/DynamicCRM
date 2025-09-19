@@ -4,29 +4,18 @@
   <meta charset="utf-8" />
   <title>Aanmelden – Fysiopraktijk</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- VERSION: v-postforce-2025-09-19 -->
   <style>
     :root{
       --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-      --card:#ffffff;
-      --ink:#111827;
-      --muted:#6b7280;
-      --brand:#2563eb;
-      --cta:#f97316; /* opvallend oranje voor CTA */
-      --ok:#0a7a32;
-      --err:#b91c1c;
-      --ring: rgba(37,99,235,.35);
+      --card:#ffffff; --ink:#111827; --muted:#6b7280; --brand:#2563eb; --cta:#f97316;
+      --ok:#0a7a32; --err:#b91c1c; --ring: rgba(37,99,235,.35);
     }
     *{box-sizing:border-box}
     body{
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      background:var(--bg-gradient);
-      color:var(--ink);
-      margin:0;
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
+      background:var(--bg-gradient); color:var(--ink); margin:0; min-height:100vh;
+      display:flex; align-items:center; justify-content:center; padding:20px;
     }
     .wrap{max-width:960px;width:100%}
     .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
@@ -34,53 +23,22 @@
     h1{font-size:clamp(26px,3vw,36px);margin:0 0 8px;color:#fff}
     .sub{color:#e0f2fe;margin:0 0 20px;line-height:1.5}
     .bullets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
-    .bullet{
-      background:rgba(255,255,255,0.15);
-      color:#fff;
-      border:1px solid rgba(255,255,255,0.25);
-      border-radius:12px;
-      padding:12px;
-      font-weight:500
-    }
+    .bullet{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);
+      border-radius:12px;padding:12px;font-weight:500}
     @media (max-width:900px){.bullets{grid-template-columns:1fr}}
-    .card{
-      background:var(--card);
-      border:1px solid #e5e7eb;
-      border-radius:16px;
-      box-shadow:0 10px 30px rgba(17,24,39,.1);
-      padding:18px
-    }
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;
+      box-shadow:0 10px 30px rgba(17,24,39,.1);padding:18px}
     label{display:block;margin:12px 0 6px;font-weight:600}
-    input,select,textarea{
-      width:100%;
-      padding:12px;
-      border:1px solid #d1d5db;
-      border-radius:10px;
-      background:#fff
-    }
-    input:focus,select:focus,textarea:focus{
-      outline:none;
-      border-color:var(--brand);
-      box-shadow:0 0 0 4px var(--ring)
-    }
+    input,select,textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;background:#fff}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     @media (max-width:700px){.row{grid-template-columns:1fr}}
     .actions{margin-top:14px;display:flex;align-items:center;gap:12px}
-    button{
-      background:var(--cta);
-      color:#fff;
-      border:0;
-      border-radius:10px;
-      padding:12px 16px;
-      font-weight:700;
-      cursor:pointer;
-      transition:all 0.2s ease;
-    }
+    button{background:var(--cta);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;transition:all .2s}
     button:hover{filter:brightness(.9);transform:translateY(-1px)}
     .hint{color:var(--muted);font-size:14px}
     #msg{margin-top:12px;font-weight:700;text-align:center}
-    #msg.error{color:var(--err)}
-    #msg.success{color:var(--ok)}
+    #msg.error{color:var(--err)} #msg.success{color:var(--ok)}
     .privacy{margin-top:8px;color:var(--muted);font-size:13px}
   </style>
 </head>
@@ -97,8 +55,8 @@
         </div>
       </div>
 
-      <!-- Fallback: altijd POST naar /leads (geen data in URL) -->
-      <form id="leadForm" class="card" novalidate method="post" action="/leads" accept-charset="utf-8">
+      <!-- Fallback: ALTIJD POST naar /leads (zodat geen gegevens in URL komen) -->
+      <form id="leadForm" class="card" novalidate method="post" action="/leads" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
         <input type="hidden" name="praktijk_code" id="praktijk_code" />
         <div class="row">
           <div>
@@ -133,7 +91,8 @@
             Ik geef toestemming om mijn gegevens te verwerken
           </label>
           <span style="flex:1"></span>
-          <button type="submit">Gratis afspraak aanvragen</button>
+          <!-- Dubbele zekerheid: knop dwingt ook POST + actie af -->
+          <button type="submit" formmethod="post" formaction="/leads">Gratis afspraak aanvragen</button>
         </div>
 
         <p class="privacy">We gebruiken je gegevens alleen om je aanmelding te behandelen. Geen spam, geen verkoop aan derden.</p>
@@ -147,7 +106,7 @@
     const msg    = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
 
-    // Toon groene melding bij fallback-redirect (?ok=1)
+    // Toon melding na server-redirect (?ok=1) bij fallback zonder JS
     (function showOk(){
       try{
         const p=new URLSearchParams(location.search);
@@ -173,7 +132,7 @@
     })();
 
     form.addEventListener('submit', async (e) => {
-      // JS-pad (fetch). Browser-fallback blijft POST door form-attribuut.
+      // JS-pad (fetch). Browser-fallback blijft POST via form-attribuut.
       e.preventDefault();
       msg.textContent = '';
       msg.className = '';
@@ -208,6 +167,7 @@
         msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
         msg.className = 'success';
 
+        // reset form maar behoud code
         form.reset();
         hidden.value = code;
       }catch(err){
