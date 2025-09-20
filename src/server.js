@@ -17,7 +17,7 @@ import { withReadConnection, withWriteConnection } from './db.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
-console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0); // <— Stap 3: diagnose log
+console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0);
 
 // SMTP configuratie
 const SMTP = {
@@ -41,8 +41,7 @@ app.use(
 // 2) Basis middleware
 app.use(cors());
 app.use(express.json());
-// Belangrijk: accepteer ook klassieke form posts (fallback)
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true })); // form POST fallback
 app.use(morgan('dev'));
 
 // 3) Redirects
@@ -84,7 +83,6 @@ const leadSchema = Joi.object({
   telefoon: Joi.string().max(50).allow('', null),
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
-  // Checkbox 'on' -> true bij form POST
   toestemming: Joi.boolean().truthy('on').falsy('off').default(true),
   praktijk_code: Joi.string().max(64).allow('', null)
 });
@@ -198,3 +196,74 @@ app.post('/leads', async (req, res) => {
         await transporter.sendMail({
           from: SMTP.from,
           to: practice.email_to,
+          cc: practice.email_cc || undefined,
+          subject: `Nieuwe lead voor ${practice.naam}`,
+          text: `Er is een nieuwe lead binnengekomen.
+
+Praktijk: ${practice.naam} (${practice.code})
+Naam: ${volledige_naam}
+E-mail: ${emailadres ?? '-'}
+Telefoon: ${telefoon ?? '-'}
+Bron: ${bron ?? '-'}
+Doel: ${doel ?? '-'}
+Toestemming: ${toestemming ? 'Ja' : 'Nee'}
+Datum: ${inserted.aangemaakt_op}
+`
+        });
+
+        console.log('MAIL-SEND: OK →', practice.email_to);
+      } catch (mailErr) {
+        console.warn('MAIL-ERROR:', mailErr && mailErr.message);
+      }
+    }
+
+    // Fallback: bij klassieke form POST redirecten i.p.v. JSON
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.redirect(302, '/form.html?ok=1');
+    }
+
+    res.status(201).json({ ok: true, lead: inserted });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Database insert error', details: e.message });
+  }
+});
+
+// 10) TESTMAIL ENDPOINT
+app.post('/testmail', requireAdmin, async (req, res) => {
+  try {
+    const to = req.body?.to;
+    if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
+
+    if (!SMTP.host || !SMTP.user || !SMTP.pass) {
+      return res.status(400).json({ error: 'SMTP config ontbreekt' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: SMTP.host,
+      port: SMTP.port,
+      secure: SMTP.secure,
+      auth: { user: SMTP.user, pass: SMTP.pass },
+      logger: true,
+      debug: true
+    });
+
+    const info = await transporter.sendMail({
+      from: SMTP.from,
+      to,
+      subject: '✅ Testmail van DynamicCRM',
+      text: 'Dit is een test om te checken dat e-mail werkt.'
+    });
+
+    console.log('TESTMAIL sent →', to, 'messageId:', info && info.messageId);
+    res.json({ ok: true, messageId: info && info.messageId });
+  } catch (err) {
+    console.error('TESTMAIL failed:', err && err.message);
+    res.status(500).json({ error: 'TESTMAIL failed', details: err && err.message });
+  }
+});
+
+// 11) Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server gestart op http://localhost:${PORT}`);
+});
