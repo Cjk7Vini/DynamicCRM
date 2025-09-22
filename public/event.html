@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Events</title>
+</head>
+<body>
+  <h1>Test /events endpoint</h1>
+
+  <button onclick="sendEvent('clicked')">Send CLICK</button>
+  <button onclick="sendEvent('lead_submitted')">Send LEAD</button>
+  <button onclick="sendEvent('appointment_booked')">Send APPOINTMENT</button>
+  <button onclick="sendEvent('registered')">Send REGISTERED</button>
+
+  <pre id="output"></pre>
+
+  <script>
+    async function sendEvent(type) {
+      const res = await fetch('/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: 123,
+          practice_code: 'PRAK001',
+          event_type: type
+        })
+      });
+      const data = await res.json();
+      document.getElementById('output').textContent =
+        JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
