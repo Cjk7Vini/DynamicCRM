@@ -1,4 +1,4 @@
-// src/server.js — Postgres/Neon + NL-kolommen + praktijk_code + SMTP mail + TESTMAIL
+// src/server.js — Postgres/Neon + NL-kolommen + praktijk_code + SMTP mail + TESTMAIL + EVENTS + METRICS
 
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
@@ -12,6 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Joi from 'joi';
 import nodemailer from 'nodemailer';
+import rateLimit from 'express-rate-limit';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
@@ -44,12 +45,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // form POST fallback
 app.use(morgan('dev'));
 
+// 2.1) Rate limiting (tegen spam)
+const postLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000), // 1 minuut
+  max: Number(process.env.RATE_LIMIT_MAX || 30),             // 30 requests/min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(['/leads', '/events'], postLimiter);
+
 // 3) Redirects
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
   res.redirect(302, q ? `/form.html?${q}` : '/form.html');
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
+app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html')); // optioneel kort pad
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
   res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
@@ -95,6 +106,51 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// 7.1) Helper om funnel-events op te slaan
+// let op: lead_id is NIET verplicht (mag null zijn voor 'clicked')
+async function recordEvent({ lead_id = null, practice_code, event_type, actor = 'system', metadata = {} }) {
+  if (!practice_code || !event_type) {
+    throw new Error('Missing fields for event (practice_code, event_type)');
+  }
+  const sql = `
+    INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+    VALUES ($1, $2, $3, $4, $5::jsonb)
+    RETURNING id, occurred_at
+  `;
+  return withWriteConnection(async (client) => {
+    const res = await client.query(sql, [
+      lead_id,                    // kan null zijn (DB-kolom moet dan nullable zijn)
+      practice_code,
+      event_type,
+      actor,
+      JSON.stringify(metadata || {}),
+    ]);
+    return res.rows[0];
+  });
+}
+
+// 7.2) POST /events route
+app.post('/events', async (req, res) => {
+  try {
+    const { lead_id = null, practice_code, event_type, metadata } = req.body || {};
+    const okTypes = ['clicked', 'lead_submitted', 'appointment_booked', 'registered'];
+    if (!okTypes.includes(event_type)) {
+      return res.status(400).json({ error: 'event_type must be one of ' + okTypes.join(', ') });
+    }
+    const saved = await recordEvent({
+      lead_id: lead_id ?? null,
+      practice_code,
+      event_type,
+      actor: 'public',
+      metadata: metadata || {},
+    });
+    res.json({ ok: true, event_id: saved.id, occurred_at: saved.occurred_at });
+  } catch (e) {
+    console.error('POST /events error:', e);
+    res.status(500).json({ error: 'Failed to record event' });
+  }
+});
 
 // 8) GET /api/leads
 app.get('/api/leads', requireAdmin, async (_req, res) => {
@@ -171,6 +227,20 @@ app.post('/leads', async (req, res) => {
       return r.rows[0];
     });
 
+    // Log automatisch 'lead_submitted' voor de funnel
+    try {
+      await recordEvent({
+        lead_id: inserted.id,
+        practice_code: praktijk_code || 'UNKNOWN',
+        event_type: 'lead_submitted',
+        actor: 'system',
+        metadata: { bron: bron || null }
+      });
+    } catch (e) {
+      console.warn('recordEvent lead_submitted failed:', e?.message);
+    }
+
+    // E-mail naar praktijk
     let practice = null;
     if (praktijk_code) {
       practice = await withReadConnection(async (client) => {
@@ -260,6 +330,65 @@ app.post('/testmail', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('TESTMAIL failed:', err && err.message);
     res.status(500).json({ error: 'TESTMAIL failed', details: err && err.message });
+  }
+});
+
+// === METRICS ENDPOINTS ===
+// GET /api/metrics?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get('/api/metrics', async (req, res) => {
+  const { practice, from, to } = req.query;
+  if (!practice || !from || !to) {
+    return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
+  }
+  const sql = `
+    SELECT event_type, COUNT(*)::int AS count
+    FROM lead_events
+    WHERE practice_code = $1
+      AND occurred_at >= $2::timestamptz
+      AND occurred_at <  ($3::timestamptz + interval '1 day')
+    GROUP BY event_type
+  `;
+  try {
+    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
+      .then(r => r.rows);
+    const totals = { clicked:0, lead_submitted:0, appointment_booked:0, registered:0 };
+    for (const r of rows) totals[r.event_type] = r.count;
+    const pct = (a,b)=> b>0? Math.round((a/b)*100) : 0;
+    const funnel = {
+      click_to_lead: pct(totals.lead_submitted, totals.clicked),
+      lead_to_appt:  pct(totals.appointment_booked, totals.lead_submitted),
+      appt_to_reg:   pct(totals.registered, totals.appointment_booked),
+      click_to_reg:  pct(totals.registered, totals.clicked),
+    };
+    res.json({ practice, range:{from,to}, totals, funnel });
+  } catch (e) {
+    console.error('GET /api/metrics error:', e);
+    res.status(500).json({ error: 'Failed to compute metrics' });
+  }
+});
+
+// GET /api/series?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get('/api/series', async (req, res) => {
+  const { practice, from, to } = req.query;
+  if (!practice || !from || !to) {
+    return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
+  }
+  const sql = `
+    SELECT date_trunc('day', occurred_at)::date AS day, event_type, COUNT(*)::int AS count
+    FROM lead_events
+    WHERE practice_code = $1
+      AND occurred_at >= $2::timestamptz
+      AND occurred_at <  ($3::timestamptz + interval '1 day')
+    GROUP BY day, event_type
+    ORDER BY day ASC
+  `;
+  try {
+    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
+      .then(r => r.rows);
+    res.json({ practice, from, to, rows });
+  } catch (e) {
+    console.error('GET /api/series error:', e);
+    res.status(500).json({ error: 'Failed to compute series' });
   }
 });
 
