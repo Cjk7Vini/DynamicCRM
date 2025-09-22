@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DynamicCRM — Dashboard</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <!-- Chart.js voor de lijn-grafiek -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --accent:#60a5fa; }
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:var(--bg);color:var(--text)}
+    header{padding:16px 20px;border-bottom:1px solid #1f2937;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    header h1{margin:0 12px 0 0;font-size:18px;font-weight:600}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select,button{background:#0b1220;color:var(--text);border:1px solid #263044;border-radius:8px;padding:8px 10px;font:inherit}
+    button{cursor:pointer}
+    main{padding:20px;max-width:1200px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:14px;padding:14px}
+    .kpi-title{font-size:12px;color:var(--muted);margin:0 0 6px}
+    .kpi-value{font-size:28px;font-weight:700;margin:0}
+    .kpi-sub{font-size:12px;color:var(--muted);margin-top:6px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .grow{flex:1 1 220px}
+    canvas{background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:10px}
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    @media (max-width:900px){ .grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:600px){ .grid{grid-template-columns:1fr} header{gap:8px} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 Dashboard</h1>
+    <div class="row">
+      <div class="grow">
+        <label>Praktijk code</label>
+        <input id="practice" placeholder="bijv. PRAK001" />
+      </div>
+      <div>
+        <label>Van (YYYY-MM-DD)</label>
+        <input id="from" type="date" />
+      </div>
+      <div>
+        <label>Tot (YYYY-MM-DD)</label>
+        <input id="to" type="date" />
+      </div>
+      <div style="align-self:flex-end">
+        <button id="btnLoad">Laden</button>
+      </div>
+    </div>
+    <div class="hint">Tip: je kunt ook direct bezoeken met query: <code>/dashboard.html?practice=PRAK001</code></div>
+  </header>
+
+  <main>
+    <!-- KPI’s -->
+    <section class="grid" id="kpis">
+      <div class="card">
+        <p class="kpi-title">Clicks</p>
+        <p class="kpi-value" id="kpi-clicks">0</p>
+        <p class="kpi-sub">form.html geopend</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Leads</p>
+        <p class="kpi-value" id="kpi-leads">0</p>
+        <p class="kpi-sub">formulier ingestuurd</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Appointments</p>
+        <p class="kpi-value" id="kpi-appts">0</p>
+        <p class="kpi-sub">afspraak gemaakt</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Registered</p>
+        <p class="kpi-value" id="kpi-reg">0</p>
+        <p class="kpi-sub">ingeschreven bij praktijk</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Click → Lead</p>
+        <p class="kpi-value" id="kpi-c2l">0%</p>
+        <p class="kpi-sub">ratio</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Lead → Appointment</p>
+        <p class="kpi-value" id="kpi-l2a">0%</p>
+        <p class="kpi-sub">ratio</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Appointment → Registered</p>
+        <p class="kpi-value" id="kpi-a2r">0%</p>
+        <p class="kpi-sub">ratio</p>
+      </div>
+      <div class="card">
+        <p class="kpi-title">Click → Registered</p>
+        <p class="kpi-value" id="kpi-c2r">0%</p>
+        <p class="kpi-sub">totale conversie</p>
+      </div>
+    </section>
+
+    <!-- Grafiek -->
+    <section style="margin-top:18px" class="card">
+      <p class="kpi-title" style="margin-bottom:10px">Events per dag</p>
+      <canvas id="seriesChart" height="120"></canvas>
+    </section>
+  </main>
+
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>
