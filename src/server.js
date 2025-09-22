@@ -12,6 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Joi from 'joi';
 import nodemailer from 'nodemailer';
+import rateLimit from 'express-rate-limit';               // 🔹 NIEUW
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
@@ -43,6 +44,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // form POST fallback
 app.use(morgan('dev'));
+
+// 2.1) Rate limiting (tegen spam) 🔹 NIEUW
+const postLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60000), // 1 minuut
+  max: Number(process.env.RATE_LIMIT_MAX || 30),            // 30 requests per minuut per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(['/leads', '/events'], postLimiter);
 
 // 3) Redirects
 app.get('/', (req, res) => {
@@ -95,6 +105,50 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// 7.1) Helper om funnel-events op te slaan 🔹 NIEUW
+async function recordEvent({ lead_id, practice_code, event_type, actor = 'system', metadata = {} }) {
+  if (!lead_id || !practice_code || !event_type) {
+    throw new Error('Missing fields for event');
+  }
+  const sql = `
+    INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+    VALUES ($1, $2, $3, $4, $5::jsonb)
+    RETURNING id, occurred_at
+  `;
+  return withWriteConnection(async (client) => {
+    const res = await client.query(sql, [
+      lead_id,
+      practice_code,
+      event_type,
+      actor,
+      JSON.stringify(metadata),
+    ]);
+    return res.rows[0];
+  });
+}
+
+// 7.2) POST /events route 🔹 NIEUW
+app.post('/events', async (req, res) => {
+  try {
+    const { lead_id, practice_code, event_type, metadata } = req.body || {};
+    const okTypes = ['clicked', 'lead_submitted', 'appointment_booked', 'registered'];
+    if (!okTypes.includes(event_type)) {
+      return res.status(400).json({ error: 'event_type must be one of ' + okTypes.join(', ') });
+    }
+    const saved = await recordEvent({
+      lead_id,
+      practice_code,
+      event_type,
+      actor: 'public',
+      metadata: metadata || {},
+    });
+    res.json({ ok: true, event_id: saved.id, occurred_at: saved.occurred_at });
+  } catch (e) {
+    console.error('POST /events error:', e);
+    res.status(500).json({ error: 'Failed to record event' });
+  }
+});
 
 // 8) GET /api/leads
 app.get('/api/leads', requireAdmin, async (_req, res) => {
