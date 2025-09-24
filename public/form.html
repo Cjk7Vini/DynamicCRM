@@ -106,6 +106,19 @@
     const msg    = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
 
+    // ————— Helpers —————
+    function normalizeCode(raw){
+      if(!raw) return '';
+      return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
+    }
+    function qs(name){
+      try { return new URLSearchParams(location.search).get(name) || ''; }
+      catch(_) { return ''; }
+    }
+    function practiceFromUrl(){
+      return normalizeCode(qs('s') || qs('praktijk') || '');
+    }
+
     // Toon melding na server-redirect (?ok=1) bij fallback zonder JS
     (function showOk(){
       try{
@@ -117,27 +130,50 @@
       }catch(_){}
     })();
 
-    function normalizeCode(raw){
-      if(!raw) return '';
-      return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
-    }
-
+    // Zet hidden praktijk_code vanuit URL (als aanwezig)
     (function setPraktijkCodeFromUrl(){
-      try{
-        const p   = new URLSearchParams(location.search);
-        const raw = p.get('s') || p.get('praktijk') || '';
-        const code = normalizeCode(raw);
-        if(code) hidden.value = code;
-      }catch(_){}
+      const code = practiceFromUrl();
+      if(code) hidden.value = code;
     })();
 
+    // ————— NIEUW: event-logger —————
+    async function postEvent(payload){
+      try{
+        // Fire-and-forget als het kan (verhindert vertragingen)
+        if (navigator.sendBeacon) {
+          const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+          navigator.sendBeacon('/events', blob);
+          return;
+        }
+        // Fallback
+        await fetch('/events', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+      }catch(_){ /* events mogen NOOIT formulier blokkeren */ }
+    }
+
+    // ————— NIEUW: log 'clicked' bij openen —————
+    (function onOpenLogClick(){
+      const code = normalizeCode(hidden.value || practiceFromUrl());
+      if (!code) return; // geen code? dan loggen we niet
+      postEvent({
+        lead_id: null,                 // onbekend op dit moment
+        practice_code: code,
+        event_type: 'clicked',
+        metadata: { path: location.pathname, ts: Date.now() }
+      });
+    })();
+
+    // ————— Submit (bestond al) + NIEUW: log 'lead_submitted' —————
     form.addEventListener('submit', async (e) => {
       // JS-pad (fetch). Browser-fallback blijft POST via form-attribuut.
       e.preventDefault();
       msg.textContent = '';
       msg.className = '';
 
-      const code = normalizeCode(hidden.value);
+      const code = normalizeCode(hidden.value || practiceFromUrl());
 
       const data = {
         volledige_naam: form.volledige_naam.value.trim(),
@@ -166,6 +202,17 @@
 
         msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
         msg.className = 'success';
+
+        // ——— NIEUW: log 'lead_submitted' (met lead_id als we die terugkrijgen) ———
+        const leadId = json?.lead?.id ?? null;
+        if (code) {
+          postEvent({
+            lead_id: leadId,
+            practice_code: code,
+            event_type: 'lead_submitted',
+            metadata: { via: 'form.html', ts: Date.now() }
+          });
+        }
 
         // reset form maar behoud code
         form.reset();
