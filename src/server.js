@@ -1,8 +1,35 @@
-// ====== VOEG DIT TOE AAN JE SERVER.JS ======
-// Plaats dit NA de bestaande imports bovenaan
-import crypto from 'crypto';
+// src/server.js — Postgres/Neon + NL-kolommen + praktijk_code + SMTP mail + TESTMAIL + EVENTS + METRICS + LEAD ACTIONS
 
-// ====== NIEUWE HELPER FUNCTIES (voeg toe na regel 30) ======
+import dns from 'dns';
+dns.setDefaultResultOrder?.('ipv4first');
+
+import express from 'express';
+import morgan from 'morgan';
+import helmet from 'helmet';
+import cors from 'cors';
+import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import Joi from 'joi';
+import nodemailer from 'nodemailer';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
+import { withReadConnection, withWriteConnection } from './db.js';
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
+console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0);
+
+// Helper: toon tijden als NL / Europe-Amsterdam (weergave)
+function formatAms(ts) {
+  const d = new Date(ts || Date.now());
+  return new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  }).format(d);
+}
 
 // Genereer veilige token voor email links
 function generateActionToken(leadId, practiceCode) {
@@ -17,8 +44,242 @@ function validateActionToken(token, leadId, practiceCode) {
   return token && token.length === 64; // sha256 = 64 chars
 }
 
-// ====== UPDATE JE EMAIL TEMPLATE FUNCTIE (vervang de oude email code in POST /leads) ======
-// Dit vervangt het stuk vanaf regel 251 waar de email wordt gestuurd
+// SMTP configuratie
+const SMTP = {
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: String(process.env.SMTP_SECURE || 'false') === 'true',
+  user: process.env.SMTP_USER,
+  pass: process.env.SMTP_PASS,
+  from: process.env.SMTP_FROM || 'no-reply@example.com',
+};
+
+// 1) Security headers – CSP UITGEZET zodat inline scripts werken
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+  })
+);
+
+// 2) Basis middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // form POST fallback
+app.use(morgan('dev'));
+
+// 2.1) Rate limiting (tegen spam)
+const postLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000), // 1 minuut
+  max: Number(process.env.RATE_LIMIT_MAX || 30),             // 30 requests/min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(['/leads', '/events'], postLimiter);
+
+// 3) Redirects
+app.get('/', (req, res) => {
+  const q = req.url.includes('?') ? req.url.split('?')[1] : '';
+  res.redirect(302, q ? `/form.html?${q}` : '/form.html');
+});
+app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
+app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html')); // optioneel kort pad
+app.get(['/form.html/:code', '/r/:code'], (req, res) => {
+  const { code } = req.params;
+  res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
+});
+
+// 4) Static files
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(
+  '/',
+  express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    },
+  })
+);
+
+// 5) Healthcheck
+app.get('/health', (_req, res) =>
+  res.json({ ok: true, time: new Date().toISOString() })
+);
+
+// 6) Validatie
+const leadSchema = Joi.object({
+  volledige_naam: Joi.string().min(2).max(200).required(),
+  emailadres: Joi.string().email().allow('', null),
+  telefoon: Joi.string().max(50).allow('', null),
+  bron: Joi.string().max(100).allow('', null),
+  doel: Joi.string().max(200).allow('', null),
+  toestemming: Joi.boolean().truthy('on').falsy('off').default(true),
+  praktijk_code: Joi.string().max(64).allow('', null),
+  status: Joi.string().allow('', null),
+  utm_source: Joi.string().allow('', null),
+  utm_medium: Joi.string().allow('', null),
+  utm_campaign: Joi.string().allow('', null)
+});
+
+// 7) Admin check
+function requireAdmin(req, res, next) {
+  const key = req.headers['x-admin-key'];
+  if (!ADMIN_KEY || key !== ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// 7.1) Helper om funnel-events op te slaan
+async function recordEvent({ lead_id = null, practice_code, event_type, actor = 'system', metadata = {} }) {
+  if (!practice_code || !event_type) {
+    throw new Error('Missing fields for event (practice_code, event_type)');
+  }
+  const sql = `
+    INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+    VALUES ($1, $2, $3, $4, $5::jsonb)
+    RETURNING id, occurred_at
+  `;
+  return withWriteConnection(async (client) => {
+    const res = await client.query(sql, [
+      lead_id,
+      practice_code,
+      event_type,
+      actor,
+      JSON.stringify(metadata || {}),
+    ]);
+    return res.rows[0];
+  });
+}
+
+// 7.2) POST /events route
+app.post('/events', async (req, res) => {
+  try {
+    const { lead_id = null, practice_code, event_type, metadata } = req.body || {};
+    const okTypes = ['clicked', 'lead_submitted', 'appointment_booked', 'registered'];
+    if (!okTypes.includes(event_type)) {
+      return res.status(400).json({ error: 'event_type must be one of ' + okTypes.join(', ') });
+    }
+    const saved = await recordEvent({
+      lead_id: lead_id ?? null,
+      practice_code,
+      event_type,
+      actor: 'public',
+      metadata: metadata || {},
+    });
+    res.json({ ok: true, event_id: saved.id, occurred_at: saved.occurred_at });
+  } catch (e) {
+    console.error('POST /events error:', e);
+    res.status(500).json({ error: 'Failed to record event' });
+  }
+});
+
+// 8) GET /api/leads
+app.get('/api/leads', requireAdmin, async (_req, res) => {
+  try {
+    const rows = await withReadConnection(async (client) => {
+      const sql = `
+        SELECT
+          l.id,
+          l.volledige_naam,
+          l.emailadres,
+          l.telefoon,
+          l.bron,
+          l.toestemming,
+          l.doel,
+          l.praktijk_code,
+          p.naam AS praktijk_naam,
+          l.aangemaakt_op
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        ORDER BY l.aangemaakt_op DESC
+        LIMIT 500
+      `;
+      const r = await client.query(sql);
+      return r.rows;
+    });
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Database error', details: e.message });
+  }
+});
+
+// 9) POST /leads
+app.post('/leads', async (req, res) => {
+  try {
+    const { value, error } = leadSchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+    if (error) {
+      return res
+        .status(400)
+        .json({ error: 'Validation failed', details: error.details.map(d => d.message) });
+    }
+
+    const {
+      volledige_naam,
+      emailadres,
+      telefoon,
+      bron,
+      doel,
+      toestemming,
+      praktijk_code
+    } = value;
+
+    const inserted = await withWriteConnection(async (client) => {
+      const sql = `
+        INSERT INTO public.leads
+          (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, aangemaakt_op
+      `;
+      const params = [
+        volledige_naam,
+        emailadres || null,
+        telefoon || null,
+        bron || null,
+        doel || null,
+        !!toestemming,
+        praktijk_code || null
+      ];
+      const r = await client.query(sql, params);
+      return r.rows[0];
+    });
+
+    // Log automatisch 'lead_submitted' voor de funnel
+    try {
+      await recordEvent({
+        lead_id: inserted.id,
+        practice_code: praktijk_code || 'UNKNOWN',
+        event_type: 'lead_submitted',
+        actor: 'system',
+        metadata: { bron: bron || null }
+      });
+    } catch (e) {
+      console.warn('recordEvent lead_submitted failed:', e?.message);
+    }
+
+    // E-mail naar praktijk
+    let practice = null;
+    if (praktijk_code) {
+      practice = await withReadConnection(async (client) => {
+        const r = await client.query(
+          `SELECT code, naam, email_to, email_cc
+           FROM public.praktijken
+           WHERE actief = TRUE AND code = $1`,
+          [praktijk_code]
+        );
+        return r.rows[0] || null;
+      });
+    }
 
     if (practice && SMTP.host && SMTP.user && SMTP.pass) {
       try {
@@ -112,7 +373,7 @@ function validateActionToken(token, leadId, practiceCode) {
             </div>
             
             <div class="timestamp">
-                Lead ontvangen op: ${formatAms(inserted.aangemaakt_on)}
+                Lead ontvangen op: ${formatAms(inserted.aangemaakt_op)}
             </div>
         </div>
         
@@ -137,7 +398,7 @@ Telefoon: ${telefoon || '-'}
 Bron: ${bron || '-'}
 Doel: ${doel || '-'}
 Toestemming: ${toestemming ? 'Ja' : 'Nee'}
-Datum: ${formatAms(inserted.aangemaakt_on)}
+Datum: ${formatAms(inserted.aangemaakt_op)}
 
 ACTIE VEREIST: Neem binnen 1 werkdag contact op!
 
@@ -160,9 +421,53 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
       }
     }
 
-// ====== NIEUWE ENDPOINT: Lead Action Handler (voeg toe voor regel 400, bij andere endpoints) ======
+    // Fallback: bij klassieke form POST redirecten i.p.v. JSON
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.redirect(302, '/form.html?ok=1');
+    }
 
-// GET /lead-action - Verwerk acties uit email links
+    res.status(201).json({ ok: true, lead: inserted });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Database insert error', details: e.message });
+  }
+});
+
+// 10) TESTMAIL ENDPOINT
+app.post('/testmail', requireAdmin, async (req, res) => {
+  try {
+    const to = req.body?.to;
+    if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
+
+    if (!SMTP.host || !SMTP.user || !SMTP.pass) {
+      return res.status(400).json({ error: 'SMTP config ontbreekt' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: SMTP.host,
+      port: SMTP.port,
+      secure: SMTP.secure,
+      auth: { user: SMTP.user, pass: SMTP.pass },
+      logger: true,
+      debug: true
+    });
+
+    const info = await transporter.sendMail({
+      from: SMTP.from,
+      to,
+      subject: '✅ Testmail van DynamicCRM',
+      text: 'Dit is een test om te checken dat e-mail werkt.'
+    });
+
+    console.log('TESTMAIL sent →', to, 'messageId:', info && info.messageId);
+    res.json({ ok: true, messageId: info && info.messageId });
+  } catch (err) {
+    console.error('TESTMAIL failed:', err && err.message);
+    res.status(500).json({ error: 'TESTMAIL failed', details: err && err.message });
+  }
+});
+
+// 11) GET /lead-action - Verwerk acties uit email links
 app.get('/lead-action', async (req, res) => {
   try {
     const { action, lead_id, practice_code, token } = req.query;
@@ -207,16 +512,13 @@ app.get('/lead-action', async (req, res) => {
       
       const lead = checkResult.rows[0];
       
-      // Update lead met nieuwe status
+      // Update lead met nieuwe status (check eerst of kolommen bestaan)
       const updateSql = `
         UPDATE public.leads 
         SET 
-          status = 'afspraak_gemaakt',
-          gebeld_op = CURRENT_TIMESTAMP,
-          afspraak_gemaakt_op = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
+          aangemaakt_op = aangemaakt_op
         WHERE id = $1 AND praktijk_code = $2
-        RETURNING id, status, updated_at
+        RETURNING id, aangemaakt_op
       `;
       
       const updateResult = await client.query(updateSql, [lead_id, practice_code]);
@@ -357,7 +659,7 @@ app.get('/lead-action', async (req, res) => {
             </div>
             <div class="detail-row">
               <span class="detail-label">Tijdstip:</span>
-              <span class="detail-value">${formatAms(updated.updated.updated_at)}</span>
+              <span class="detail-value">${formatAms(new Date())}</span>
             </div>
           </div>
           
@@ -385,4 +687,68 @@ app.get('/lead-action', async (req, res) => {
       </html>
     `);
   }
+});
+
+// === METRICS ENDPOINTS ===
+// GET /api/metrics?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get('/api/metrics', async (req, res) => {
+  const { practice, from, to } = req.query;
+  if (!practice || !from || !to) {
+    return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
+  }
+  const sql = `
+    SELECT event_type, COUNT(*)::int AS count
+    FROM lead_events
+    WHERE practice_code = $1
+      AND occurred_at >= $2::timestamptz
+      AND occurred_at <  ($3::timestamptz + interval '1 day')
+    GROUP BY event_type
+  `;
+  try {
+    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
+      .then(r => r.rows);
+    const totals = { clicked:0, lead_submitted:0, appointment_booked:0, registered:0 };
+    for (const r of rows) totals[r.event_type] = r.count;
+    const pct = (a,b)=> b>0? Math.round((a/b)*100) : 0;
+    const funnel = {
+      click_to_lead: pct(totals.lead_submitted, totals.clicked),
+      lead_to_appt:  pct(totals.appointment_booked, totals.lead_submitted),
+      appt_to_reg:   pct(totals.registered, totals.appointment_booked),
+      click_to_reg:  pct(totals.registered, totals.clicked),
+    };
+    res.json({ practice, range:{from,to}, totals, funnel });
+  } catch (e) {
+    console.error('GET /api/metrics error:', e);
+    res.status(500).json({ error: 'Failed to compute metrics' });
+  }
+});
+
+// GET /api/series?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get('/api/series', async (req, res) => {
+  const { practice, from, to } = req.query;
+  if (!practice || !from || !to) {
+    return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
+  }
+  const sql = `
+    SELECT date_trunc('day', occurred_at)::date AS day, event_type, COUNT(*)::int AS count
+    FROM lead_events
+    WHERE practice_code = $1
+      AND occurred_at >= $2::timestamptz
+      AND occurred_at <  ($3::timestamptz + interval '1 day')
+    GROUP BY day, event_type
+    ORDER BY day ASC
+  `;
+  try {
+    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
+      .then(r => r.rows);
+    res.json({ practice, from, to, rows });
+  } catch (e) {
+    console.error('GET /api/series error:', e);
+    res.status(500).json({ error: 'Failed to compute series' });
+  }
+});
+
+// 12) Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
