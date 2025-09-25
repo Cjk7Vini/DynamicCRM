@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Aanmelden – Fysiopraktijk</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- VERSION: v-postforce-2025-09-19 -->
+  <!-- VERSION: v-complete-tracking-2025 -->
   <style>
     :root{
       --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
@@ -55,9 +55,12 @@
         </div>
       </div>
 
-      <!-- Fallback: ALTIJD POST naar /leads (zodat geen gegevens in URL komen) -->
       <form id="leadForm" class="card" novalidate method="post" action="/leads" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
         <input type="hidden" name="praktijk_code" id="praktijk_code" />
+        <input type="hidden" name="utm_source" id="utm_source" />
+        <input type="hidden" name="utm_medium" id="utm_medium" />
+        <input type="hidden" name="utm_campaign" id="utm_campaign" />
+        
         <div class="row">
           <div>
             <label>Volledige naam</label>
@@ -91,7 +94,6 @@
             Ik geef toestemming om mijn gegevens te verwerken
           </label>
           <span style="flex:1"></span>
-          <!-- Dubbele zekerheid: knop dwingt ook POST + actie af -->
           <button type="submit" formmethod="post" formaction="/leads">Gratis afspraak aanvragen</button>
         </div>
 
@@ -105,21 +107,40 @@
     const form   = document.getElementById('leadForm');
     const msg    = document.getElementById('msg');
     const hidden = document.getElementById('praktijk_code');
+    const utmSource = document.getElementById('utm_source');
+    const utmMedium = document.getElementById('utm_medium');
+    const utmCampaign = document.getElementById('utm_campaign');
 
     // ————— Helpers —————
     function normalizeCode(raw){
       if(!raw) return '';
       return String(raw).trim().replace(/[^A-Za-z0-9_-]/g,'');
     }
+    
     function qs(name){
       try { return new URLSearchParams(location.search).get(name) || ''; }
       catch(_) { return ''; }
     }
+    
     function practiceFromUrl(){
-      return normalizeCode(qs('s') || qs('praktijk') || '');
+      return normalizeCode(qs('s') || qs('praktijk') || qs('p') || '');
     }
 
-    // Toon melding na server-redirect (?ok=1) bij fallback zonder JS
+    // Detecteer bron automatisch
+    function detectSource() {
+      const utm = qs('utm_source');
+      const ref = document.referrer;
+      
+      if (utm) return utm;
+      if (ref.includes('instagram.com')) return 'Instagram';
+      if (ref.includes('youtube.com')) return 'YouTube';
+      if (ref.includes('facebook.com')) return 'Facebook';
+      if (ref.includes('linkedin.com')) return 'LinkedIn';
+      if (ref.includes('google.com')) return 'Google';
+      return 'Direct';
+    }
+
+    // Toon melding na server-redirect
     (function showOk(){
       try{
         const p=new URLSearchParams(location.search);
@@ -130,45 +151,73 @@
       }catch(_){}
     })();
 
-    // Zet hidden praktijk_code vanuit URL (als aanwezig)
-    (function setPraktijkCodeFromUrl(){
+    // Zet praktijk_code en UTM parameters vanuit URL
+    (function setHiddenFields(){
       const code = practiceFromUrl();
       if(code) hidden.value = code;
+      
+      // UTM tracking
+      utmSource.value = qs('utm_source') || detectSource();
+      utmMedium.value = qs('utm_medium') || 'organic';
+      utmCampaign.value = qs('utm_campaign') || '';
+      
+      // Auto-select bron dropdown als mogelijk
+      const bronSelect = form.bron;
+      const detectedSource = detectSource();
+      for(let option of bronSelect.options) {
+        if(option.value.toLowerCase() === detectedSource.toLowerCase()) {
+          option.selected = true;
+          break;
+        }
+      }
     })();
 
-    // ————— NIEUW: event-logger —————
+    // Event logger
     async function postEvent(payload){
       try{
-        // Fire-and-forget als het kan (verhindert vertragingen)
+        // Voeg altijd timestamp en sessie info toe
+        payload.metadata = {
+          ...payload.metadata,
+          timestamp: new Date().toISOString(),
+          url: location.href,
+          referrer: document.referrer || 'direct',
+          userAgent: navigator.userAgent
+        };
+
         if (navigator.sendBeacon) {
           const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
           navigator.sendBeacon('/events', blob);
           return;
         }
-        // Fallback
+        
         await fetch('/events', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify(payload)
         });
-      }catch(_){ /* events mogen NOOIT formulier blokkeren */ }
+      }catch(_){ /* events mogen nooit formulier blokkeren */ }
     }
 
-    // ————— NIEUW: log 'clicked' bij openen —————
+    // Log 'clicked' event bij openen pagina
     (function onOpenLogClick(){
       const code = normalizeCode(hidden.value || practiceFromUrl());
-      if (!code) return; // geen code? dan loggen we niet
+      if (!code) return;
+      
       postEvent({
-        lead_id: null,                 // onbekend op dit moment
+        lead_id: null,
         practice_code: code,
         event_type: 'clicked',
-        metadata: { path: location.pathname, ts: Date.now() }
+        metadata: { 
+          source: detectSource(),
+          utm_source: utmSource.value,
+          utm_medium: utmMedium.value,
+          utm_campaign: utmCampaign.value
+        }
       });
     })();
 
-    // ————— Submit (bestond al) + NIEUW: log 'lead_submitted' —————
+    // Submit handler met volledige tracking
     form.addEventListener('submit', async (e) => {
-      // JS-pad (fetch). Browser-fallback blijft POST via form-attribuut.
       e.preventDefault();
       msg.textContent = '';
       msg.className = '';
@@ -179,18 +228,36 @@
         volledige_naam: form.volledige_naam.value.trim(),
         emailadres:     form.emailadres.value.trim() || null,
         telefoon:       form.telefoon.value.trim() || null,
-        bron:           form.bron.value || null,
+        bron:           form.bron.value || detectSource(),
         doel:           form.doel.value.trim() || null,
         toestemming:    form.toestemming.checked,
-        praktijk_code:  code || null
+        praktijk_code:  code || null,
+        status:         'nieuw', // Nieuwe lead status
+        utm_source:     utmSource.value,
+        utm_medium:     utmMedium.value,
+        utm_campaign:   utmCampaign.value
       };
 
+      // Validatie
+      if (!data.volledige_naam) {
+        msg.textContent = 'Vul alstublieft uw naam in.';
+        msg.className = 'error';
+        return;
+      }
+
+      if (!data.toestemming) {
+        msg.textContent = 'U moet toestemming geven voor het verwerken van uw gegevens.';
+        msg.className = 'error';
+        return;
+      }
+
       try{
-        const res  = await fetch('/leads', {
+        const res = await fetch('/leads', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify(data)
         });
+        
         const json = await res.json().catch(()=>({}));
 
         if(!res.ok){
@@ -200,23 +267,45 @@
           return;
         }
 
-        msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
+        msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen binnen 1 werkdag contact op.';
         msg.className = 'success';
 
-        // ——— NIEUW: log 'lead_submitted' (met lead_id als we die terugkrijgen) ———
+        // Log 'lead_submitted' event
         const leadId = json?.lead?.id ?? null;
         if (code) {
           postEvent({
             lead_id: leadId,
             practice_code: code,
             event_type: 'lead_submitted',
-            metadata: { via: 'form.html', ts: Date.now() }
+            metadata: { 
+              naam: data.volledige_naam,
+              bron: data.bron,
+              utm_source: data.utm_source,
+              utm_medium: data.utm_medium,
+              utm_campaign: data.utm_campaign
+            }
           });
         }
 
-        // reset form maar behoud code
-        form.reset();
-        hidden.value = code;
+        // Track conversie in Google Analytics (als aanwezig)
+        if (typeof gtag !== 'undefined') {
+          gtag('event', 'generate_lead', {
+            'currency': 'EUR',
+            'value': 0,
+            'practice_code': code,
+            'lead_source': data.bron
+          });
+        }
+
+        // Reset form maar behoud code
+        setTimeout(() => {
+          form.reset();
+          hidden.value = code;
+          utmSource.value = qs('utm_source') || detectSource();
+          utmMedium.value = qs('utm_medium') || 'organic';
+          utmCampaign.value = qs('utm_campaign') || '';
+        }, 2000);
+        
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';
