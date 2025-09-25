@@ -20,6 +20,16 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0);
 
+// 👉 Helper: toon tijden als NL / Europe-Amsterdam (weergave)
+function formatAms(ts) {
+  const d = new Date(ts || Date.now());
+  return new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  }).format(d);
+}
+
 // SMTP configuratie
 const SMTP = {
   host: process.env.SMTP_HOST,
@@ -277,7 +287,7 @@ Telefoon: ${telefoon ?? '-'}
 Bron: ${bron ?? '-'}
 Doel: ${doel ?? '-'}
 Toestemming: ${toestemming ? 'Ja' : 'Nee'}
-Datum: ${inserted.aangemaakt_op}
+Datum: ${formatAms(inserted.aangemaakt_op)} (Europe/Amsterdam)
 `
         });
 
