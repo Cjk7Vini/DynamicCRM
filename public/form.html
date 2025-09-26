@@ -117,7 +117,7 @@
     .checkbox-group {
       display: flex;
       align-items: flex-start;
-      gap: 8px;
+      gap: 10px;
       margin: 20px 0;
     }
     
@@ -126,12 +126,16 @@
       height: 20px;
       margin-top: 2px;
       flex-shrink: 0;
+      cursor: pointer;
     }
     
     .checkbox-label {
       font-size: 14px;
       color: var(--muted);
       line-height: 1.4;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
     }
     
     button {
@@ -281,7 +285,7 @@
       
       <div class="checkbox-group">
         <input type="checkbox" id="toestemming" name="toestemming" checked />
-        <label for="toestemming" class="checkbox-label">
+        <label for="toestemming" class="checkbox-label" style="cursor: pointer;">
           Ik geef toestemming om mijn gegevens te verwerken voor het maken van een afspraak
         </label>
       </div>
@@ -345,6 +349,10 @@
       msg.textContent = '';
       msg.className = '';
       
+      // Debug logging
+      console.log('Checkbox element:', form.toestemming);
+      console.log('Checkbox checked:', form.toestemming.checked);
+      
       const submitBtn = form.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Bezig met versturen...';
@@ -363,6 +371,8 @@
         utm_campaign: utmCampaign.value
       };
 
+      console.log('Form data:', data); // Debug
+
       // Validation
       if (!data.volledige_naam) {
         msg.textContent = 'Vul alstublieft uw naam in.';
@@ -377,6 +387,8 @@
         msg.className = 'error';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Gratis afspraak aanvragen';
+        // Focus op checkbox voor duidelijkheid
+        form.toestemming.focus();
         return;
       }
 
