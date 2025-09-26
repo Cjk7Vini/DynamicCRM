@@ -79,7 +79,11 @@ const postLimiter = rateLimit({
   max: Number(process.env.RATE_LIMIT_MAX || 30),             // 30 requests/min per IP
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true // Expliciet trust proxy voor rate limiter
+  trustProxy: true, // Expliciet trust proxy voor rate limiter
+  keyGenerator: (req) => {
+    // Use x-forwarded-for if available, otherwise fall back to connection IP
+    return req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || 'unknown';
+  }
 });
 app.use(['/leads', '/events'], postLimiter);
 
@@ -291,7 +295,7 @@ app.post('/leads', async (req, res) => {
       // Start email proces ASYNC - niet wachten op resultaat
       setImmediate(async () => {
         try {
-          const transporter = nodemailer.createTransporter({
+          const transporter = nodemailer.createTransport({
             host: SMTP.host,
             port: SMTP.port,
             secure: SMTP.secure,
@@ -557,7 +561,7 @@ app.get('/lead-action', async (req, res) => {
     if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
       setImmediate(async () => {
         try {
-          const transporter = nodemailer.createTransporter({
+          const transporter = nodemailer.createTransport({
             host: SMTP.host,
             port: SMTP.port,
             secure: SMTP.secure,
