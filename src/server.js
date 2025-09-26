@@ -17,6 +17,10 @@ import crypto from 'crypto';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
+
+// Trust proxy voor Render.com - FIX voor rate limit warning
+app.set('trust proxy', true);
+
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0);
@@ -69,12 +73,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // form POST fallback
 app.use(morgan('dev'));
 
-// 2.1) Rate limiting (tegen spam)
+// 2.1) Rate limiting (tegen spam) - Nu met trust proxy fix
 const postLimiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000), // 1 minuut
   max: Number(process.env.RATE_LIMIT_MAX || 30),             // 30 requests/min per IP
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true // Expliciet trust proxy voor rate limiter
 });
 app.use(['/leads', '/events'], postLimiter);
 
@@ -539,7 +544,7 @@ app.get('/lead-action', async (req, res) => {
     // Stuur bevestiging email naar lead (optioneel)
     if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
       try {
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
           host: SMTP.host,
           port: SMTP.port,
           secure: SMTP.secure,
