@@ -286,21 +286,28 @@ app.post('/leads', async (req, res) => {
       });
     }
 
+    // CRITICAL FIX: Email verzenden in async achtergrond proces
     if (practice && SMTP.host && SMTP.user && SMTP.pass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: SMTP.host,
-          port: SMTP.port,
-          secure: SMTP.secure,
-          auth: { user: SMTP.user, pass: SMTP.pass }
-        });
+      // Start email proces ASYNC - niet wachten op resultaat
+      setImmediate(async () => {
+        try {
+          const transporter = nodemailer.createTransporter({
+            host: SMTP.host,
+            port: SMTP.port,
+            secure: SMTP.secure,
+            auth: { user: SMTP.user, pass: SMTP.pass },
+            // CRITICAL: Korte timeouts om hangende verbindingen te voorkomen
+            connectionTimeout: 5000,   // 5 seconden max voor verbinding
+            greetingTimeout: 5000,     // 5 seconden max voor greeting
+            socketTimeout: 10000       // 10 seconden max voor socket
+          });
 
-        // Genereer action token voor veilige links
-        const actionToken = generateActionToken(inserted.id, practice.code);
-        const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-        
-        // HTML email template
-        const htmlContent = `
+          // Genereer action token voor veilige links
+          const actionToken = generateActionToken(inserted.id, practice.code);
+          const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+          
+          // HTML email template
+          const htmlContent = `
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -392,8 +399,8 @@ app.post('/leads', async (req, res) => {
 </body>
 </html>`;
 
-        // Plain text versie
-        const textContent = `
+          // Plain text versie
+          const textContent = `
 Er is een nieuwe lead binnengekomen!
 
 Praktijk: ${practice.naam} (${practice.code})
@@ -411,21 +418,23 @@ Klik hier als de lead is gebeld EN een afspraak is gemaakt:
 ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}
 `;
 
-        await transporter.sendMail({
-          from: SMTP.from,
-          to: practice.email_to,
-          cc: practice.email_cc || undefined,
-          subject: `🔔 Nieuwe lead: ${volledige_naam} - ${practice.naam}`,
-          text: textContent,
-          html: htmlContent
-        });
+          await transporter.sendMail({
+            from: SMTP.from,
+            to: practice.email_to,
+            cc: practice.email_cc || undefined,
+            subject: `🔔 Nieuwe lead: ${volledige_naam} - ${practice.naam}`,
+            text: textContent,
+            html: htmlContent
+          });
 
-        console.log('MAIL-SEND: OK →', practice.email_to);
-      } catch (mailErr) {
-        console.warn('MAIL-ERROR:', mailErr && mailErr.message);
-      }
+          console.log('MAIL-SEND: OK →', practice.email_to);
+        } catch (mailErr) {
+          console.warn('MAIL-ERROR:', mailErr && mailErr.message);
+        }
+      });
     }
 
+    // CRITICAL: Stuur direct response terug ZONDER te wachten op email
     // Fallback: bij klassieke form POST redirecten i.p.v. JSON
     if (req.is('application/x-www-form-urlencoded')) {
       return res.redirect(302, '/form.html?ok=1');
@@ -448,11 +457,14 @@ app.post('/testmail', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'SMTP config ontbreekt' });
     }
 
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: SMTP.host,
       port: SMTP.port,
       secure: SMTP.secure,
       auth: { user: SMTP.user, pass: SMTP.pass },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
       logger: true,
       debug: true
     });
@@ -541,32 +553,37 @@ app.get('/lead-action', async (req, res) => {
       return { lead, updated: updateResult.rows[0] };
     });
     
-    // Stuur bevestiging email naar lead (optioneel)
+    // Stuur bevestiging email naar lead (optioneel) - ASYNC
     if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: SMTP.host,
-          port: SMTP.port,
-          secure: SMTP.secure,
-          auth: { user: SMTP.user, pass: SMTP.pass }
-        });
-        
-        await transporter.sendMail({
-          from: SMTP.from,
-          to: updated.lead.emailadres,
-          subject: '✅ Afspraak bevestiging',
-          text: `Beste ${updated.lead.volledige_naam},\n\nBedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.\n\nMet vriendelijke groet,\nUw Fysiopraktijk`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Beste ${updated.lead.volledige_naam},</h2>
-              <p>Bedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.</p>
-              <p>Met vriendelijke groet,<br>Uw Fysiopraktijk</p>
-            </div>
-          `
-        });
-      } catch (mailErr) {
-        console.warn('Bevestigingsmail mislukt:', mailErr.message);
-      }
+      setImmediate(async () => {
+        try {
+          const transporter = nodemailer.createTransporter({
+            host: SMTP.host,
+            port: SMTP.port,
+            secure: SMTP.secure,
+            auth: { user: SMTP.user, pass: SMTP.pass },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 10000
+          });
+          
+          await transporter.sendMail({
+            from: SMTP.from,
+            to: updated.lead.emailadres,
+            subject: '✅ Afspraak bevestiging',
+            text: `Beste ${updated.lead.volledige_naam},\n\nBedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.\n\nMet vriendelijke groet,\nUw Fysiopraktijk`,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Beste ${updated.lead.volledige_naam},</h2>
+                <p>Bedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.</p>
+                <p>Met vriendelijke groet,<br>Uw Fysiopraktijk</p>
+              </div>
+            `
+          });
+        } catch (mailErr) {
+          console.warn('Bevestigingsmail mislukt:', mailErr.message);
+        }
+      });
     }
     
     // Toon succespagina
