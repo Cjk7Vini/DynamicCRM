@@ -284,7 +284,7 @@
       <input type="text" id="doel" name="doel" placeholder="Bijv. rugpijn, sterker worden..." />
       
       <div class="checkbox-group">
-        <input type="checkbox" id="toestemming" name="toestemming" checked />
+        <input type="checkbox" id="toestemming" name="toestemming" />
         <label for="toestemming" class="checkbox-label" style="cursor: pointer;">
           Ik geef toestemming om mijn gegevens te verwerken voor het maken van een afspraak
         </label>
@@ -305,6 +305,7 @@
     const utmSource = document.getElementById('utm_source');
     const utmMedium = document.getElementById('utm_medium');
     const utmCampaign = document.getElementById('utm_campaign');
+    const toestemmingCheckbox = document.getElementById('toestemming');
 
     // Helper functions
     function getParam(name) {
@@ -331,6 +332,9 @@
     utmMedium.value = getParam('utm_medium') || 'organic';
     utmCampaign.value = getParam('utm_campaign') || '';
 
+    // CRITICAL FIX: Set checkbox to unchecked by default
+    toestemmingCheckbox.checked = false;
+
     // Log page view
     if (praktijkInput.value && navigator.sendBeacon) {
       const payload = {
@@ -349,13 +353,15 @@
       msg.textContent = '';
       msg.className = '';
       
-      // Debug logging
-      console.log('Checkbox element:', form.toestemming);
-      console.log('Checkbox checked:', form.toestemming.checked);
-      
       const submitBtn = form.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Bezig met versturen...';
+
+      // CRITICAL FIX: Get checkbox value directly from DOM
+      const isToestemmingChecked = toestemmingCheckbox.checked;
+      
+      console.log('Checkbox element:', toestemmingCheckbox);
+      console.log('Checkbox checked:', isToestemmingChecked);
 
       const data = {
         volledige_naam: form.volledige_naam.value.trim(),
@@ -363,7 +369,7 @@
         telefoon: form.telefoon.value.trim() || null,
         bron: form.bron.value || detectSource(),
         doel: form.doel.value.trim() || null,
-        toestemming: form.toestemming.checked,
+        toestemming: isToestemmingChecked,  // Use the direct variable
         praktijk_code: praktijkInput.value || null,
         status: 'nieuw',
         utm_source: utmSource.value,
@@ -371,24 +377,42 @@
         utm_campaign: utmCampaign.value
       };
 
-      console.log('Form data:', data); // Debug
+      console.log('Form data:', data);
 
-      // Validation
-      if (!data.volledige_naam) {
-        msg.textContent = 'Vul alstublieft uw naam in.';
+      // CRITICAL FIX: Better validation logic
+      if (!data.volledige_naam || data.volledige_naam.length < 2) {
+        msg.textContent = 'Vul alstublieft uw volledige naam in (minimaal 2 karakters).';
         msg.className = 'error';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Gratis afspraak aanvragen';
+        document.getElementById('volledige_naam').focus();
         return;
       }
 
-      if (!data.toestemming) {
+      if (!isToestemmingChecked) {
         msg.textContent = 'U moet toestemming geven voor het verwerken van uw gegevens.';
         msg.className = 'error';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Gratis afspraak aanvragen';
-        // Focus op checkbox voor duidelijkheid
-        form.toestemming.focus();
+        
+        // Scroll to checkbox and highlight it
+        toestemmingCheckbox.focus();
+        toestemmingCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Add visual feedback
+        const checkboxGroup = toestemmingCheckbox.closest('.checkbox-group');
+        checkboxGroup.style.border = '2px solid #b91c1c';
+        checkboxGroup.style.borderRadius = '8px';
+        checkboxGroup.style.padding = '10px';
+        checkboxGroup.style.backgroundColor = '#fee2e2';
+        
+        setTimeout(() => {
+          checkboxGroup.style.border = '';
+          checkboxGroup.style.borderRadius = '';
+          checkboxGroup.style.padding = '';
+          checkboxGroup.style.backgroundColor = '';
+        }, 3000);
+        
         return;
       }
 
@@ -402,7 +426,8 @@
         const result = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          msg.textContent = 'Er ging iets mis. Probeer het opnieuw.';
+          const errorMsg = result?.details?.join(', ') || result?.error || 'Er ging iets mis.';
+          msg.textContent = errorMsg + ' Probeer het opnieuw.';
           msg.className = 'error';
           return;
         }
@@ -426,15 +451,35 @@
         setTimeout(() => {
           form.reset();
           praktijkInput.value = getParam('s') || getParam('praktijk') || getParam('p') || '';
-          form.toestemming.checked = true;
+          toestemmingCheckbox.checked = false; // Explicitly set to unchecked
         }, 3000);
         
       } catch (error) {
-        msg.textContent = 'Er ging iets mis. Probeer het opnieuw.';
+        console.error('Submit error:', error);
+        msg.textContent = 'Er ging iets mis. Controleer je internetverbinding en probeer het opnieuw.';
         msg.className = 'error';
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Gratis afspraak aanvragen';
+      }
+    });
+
+    // Add visual feedback when checkbox is clicked
+    toestemmingCheckbox.addEventListener('change', function() {
+      console.log('Checkbox changed to:', this.checked);
+      
+      // Clear any error styling when checkbox is checked
+      if (this.checked) {
+        const checkboxGroup = this.closest('.checkbox-group');
+        checkboxGroup.style.border = '';
+        checkboxGroup.style.borderRadius = '';
+        checkboxGroup.style.padding = '';
+        checkboxGroup.style.backgroundColor = '';
+        
+        if (msg.className === 'error' && msg.textContent.includes('toestemming')) {
+          msg.textContent = '';
+          msg.className = '';
+        }
       }
     });
   </script>
