@@ -1,4 +1,4 @@
-// src/server.js — Postgres/Neon + NL-kolommen + praktijk_code + SMTP mail + TESTMAIL + EVENTS + METRICS + LEAD ACTIONS
+// src/server.js — Postgres/Neon + SMTP + Events + Metrics + Lead Actions (fixes)
 
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
@@ -17,15 +17,14 @@ import crypto from 'crypto';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
-
-// Trust proxy voor Render.com - FIX voor rate limit warning
-app.set('trust proxy', true);
+app.set('trust proxy', true); // Render proxy
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 console.log('[ADMIN] key length =', ADMIN_KEY?.length || 0);
 
-// Helper: toon tijden als NL / Europe-Amsterdam (weergave)
+// Helper: NL tijd voor weergave
 function formatAms(ts) {
   const d = new Date(ts || Date.now());
   return new Intl.DateTimeFormat('nl-NL', {
@@ -35,20 +34,17 @@ function formatAms(ts) {
   }).format(d);
 }
 
-// Genereer veilige token voor email links
+// Actie-token (demo)
 function generateActionToken(leadId, practiceCode) {
-  const secret = process.env.ACTION_TOKEN_SECRET || 'your-secret-key-change-this';
+  const secret = process.env.ACTION_TOKEN_SECRET || 'change-me';
   const data = `${leadId}-${practiceCode}-${Date.now()}`;
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
-
-// Valideer action token (max 7 dagen geldig)
-function validateActionToken(token, leadId, practiceCode) {
-  // Voor nu simpele validatie, in productie: bewaar tokens in DB
-  return token && token.length === 64; // sha256 = 64 chars
+function validateActionToken(token) {
+  return typeof token === 'string' && token.length === 64;
 }
 
-// SMTP configuratie
+// SMTP
 const SMTP = {
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT || 587),
@@ -58,48 +54,47 @@ const SMTP = {
   from: process.env.SMTP_FROM || 'no-reply@example.com',
 };
 
-// 1) Security headers – CSP UITGEZET zodat inline scripts werken
+// Security headers (CSP uit voor inline)
 app.use(
   helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   })
 );
 
-// 2) Basis middleware
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // form POST fallback
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// 2.1) Rate limiting (tegen spam) - Nu met trust proxy fix
+// Rate limit
 const postLimiter = rateLimit({
-  windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000), // 1 minuut
-  max: Number(process.env.RATE_LIMIT_MAX || 30),             // 30 requests/min per IP
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000),
+  max: Number(process.env.RATE_LIMIT_MAX || 30),
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true, // Expliciet trust proxy voor rate limiter
-  keyGenerator: (req) => {
-    // Use x-forwarded-for if available, otherwise fall back to connection IP
-    return req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || 'unknown';
-  }
+  keyGenerator: (req) =>
+    req.headers['x-forwarded-for']?.split(',')[0] ||
+    req.ip ||
+    req.connection?.remoteAddress ||
+    'unknown',
 });
 app.use(['/leads', '/events'], postLimiter);
 
-// 3) Redirects
+// Redirects
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
   res.redirect(302, q ? `/form.html?${q}` : '/form.html');
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
-app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html')); // optioneel kort pad
+app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html'));
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
-  const { code } = req.params;
-  res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
+  res.redirect(302, `/form.html?s=${encodeURIComponent(req.params.code)}`);
 });
 
-// 4) Static files
+// Static
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(
@@ -115,27 +110,32 @@ app.use(
   })
 );
 
-// 5) Healthcheck
+// Health
 app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
-// 6) Validatie
+// Validatie — toestemming moet TRUE zijn
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().allow('', null),
   telefoon: Joi.string().max(50).allow('', null),
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
-  toestemming: Joi.boolean().truthy('on').falsy('off').default(true),
+  // ⬇️ verplicht true; map 'on' → true en 'off'/''/null → false
+  toestemming: Joi.boolean()
+    .truthy('on', 'true', true, 1)
+    .falsy('off', 'false', false, 0, '', null)
+    .valid(true)
+    .required(),
   praktijk_code: Joi.string().max(64).allow('', null),
   status: Joi.string().allow('', null),
   utm_source: Joi.string().allow('', null),
   utm_medium: Joi.string().allow('', null),
-  utm_campaign: Joi.string().allow('', null)
+  utm_campaign: Joi.string().allow('', null),
 });
 
-// 7) Admin check
+// Admin check
 function requireAdmin(req, res, next) {
   const key = req.headers['x-admin-key'];
   if (!ADMIN_KEY || key !== ADMIN_KEY) {
@@ -144,8 +144,14 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// 7.1) Helper om funnel-events op te slaan
-async function recordEvent({ lead_id = null, practice_code, event_type, actor = 'system', metadata = {} }) {
+// Events helper
+async function recordEvent({
+  lead_id = null,
+  practice_code,
+  event_type,
+  actor = 'system',
+  metadata = {},
+}) {
   if (!practice_code || !event_type) {
     throw new Error('Missing fields for event (practice_code, event_type)');
   }
@@ -166,13 +172,15 @@ async function recordEvent({ lead_id = null, practice_code, event_type, actor = 
   });
 }
 
-// 7.2) POST /events route
+// POST /events
 app.post('/events', async (req, res) => {
   try {
     const { lead_id = null, practice_code, event_type, metadata } = req.body || {};
     const okTypes = ['clicked', 'lead_submitted', 'appointment_booked', 'registered'];
     if (!okTypes.includes(event_type)) {
-      return res.status(400).json({ error: 'event_type must be one of ' + okTypes.join(', ') });
+      return res
+        .status(400)
+        .json({ error: 'event_type must be one of ' + okTypes.join(', ') });
     }
     const saved = await recordEvent({
       lead_id: lead_id ?? null,
@@ -188,22 +196,14 @@ app.post('/events', async (req, res) => {
   }
 });
 
-// 8) GET /api/leads
+// GET /api/leads
 app.get('/api/leads', requireAdmin, async (_req, res) => {
   try {
     const rows = await withReadConnection(async (client) => {
       const sql = `
         SELECT
-          l.id,
-          l.volledige_naam,
-          l.emailadres,
-          l.telefoon,
-          l.bron,
-          l.toestemming,
-          l.doel,
-          l.praktijk_code,
-          p.naam AS praktijk_naam,
-          l.aangemaakt_op
+          l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.toestemming,
+          l.doel, l.praktijk_code, p.naam AS praktijk_naam, l.aangemaakt_op
         FROM public.leads l
         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
         ORDER BY l.aangemaakt_op DESC
@@ -219,17 +219,18 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
   }
 });
 
-// 9) POST /leads
+// POST /leads
 app.post('/leads', async (req, res) => {
   try {
     const { value, error } = leadSchema.validate(req.body, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (error) {
-      return res
-        .status(400)
-        .json({ error: 'Validation failed', details: error.details.map(d => d.message) });
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.details.map((d) => d.message),
+      });
     }
 
     const {
@@ -239,15 +240,19 @@ app.post('/leads', async (req, res) => {
       bron,
       doel,
       toestemming,
-      praktijk_code
+      praktijk_code,
+      utm_source,
+      utm_medium,
+      utm_campaign,
     } = value;
 
     const inserted = await withWriteConnection(async (client) => {
       const sql = `
         INSERT INTO public.leads
-          (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code)
+          (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code,
+           utm_source, utm_medium, utm_campaign)
         VALUES
-          ($1, $2, $3, $4, $5, $6, $7)
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id, aangemaakt_op
       `;
       const params = [
@@ -257,26 +262,29 @@ app.post('/leads', async (req, res) => {
         bron || null,
         doel || null,
         !!toestemming,
-        praktijk_code || null
+        praktijk_code || null,
+        utm_source || null,
+        utm_medium || null,
+        utm_campaign || null,
       ];
       const r = await client.query(sql, params);
       return r.rows[0];
     });
 
-    // Log automatisch 'lead_submitted' voor de funnel
+    // Funnel event
     try {
       await recordEvent({
         lead_id: inserted.id,
         practice_code: praktijk_code || 'UNKNOWN',
         event_type: 'lead_submitted',
         actor: 'system',
-        metadata: { bron: bron || null }
+        metadata: { bron: bron || null },
       });
     } catch (e) {
       console.warn('recordEvent lead_submitted failed:', e?.message);
     }
 
-    // E-mail naar praktijk
+    // E-mail lookup
     let practice = null;
     if (praktijk_code) {
       practice = await withReadConnection(async (client) => {
@@ -290,275 +298,8 @@ app.post('/leads', async (req, res) => {
       });
     }
 
-    // CRITICAL FIX: Email verzenden in async achtergrond proces
+    // E-mail — async fire-and-forget
     if (practice && SMTP.host && SMTP.user && SMTP.pass) {
-      // Start email proces ASYNC - niet wachten op resultaat
-      setImmediate(async () => {
-        try {
-          const transporter = nodemailer.createTransport({
-            host: SMTP.host,
-            port: SMTP.port,
-            secure: SMTP.secure,
-            auth: { user: SMTP.user, pass: SMTP.pass },
-            // CRITICAL: Korte timeouts om hangende verbindingen te voorkomen
-            connectionTimeout: 5000,   // 5 seconden max voor verbinding
-            greetingTimeout: 5000,     // 5 seconden max voor greeting
-            socketTimeout: 10000       // 10 seconden max voor socket
-          });
-
-          // Genereer action token voor veilige links
-          const actionToken = generateActionToken(inserted.id, practice.code);
-          const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-          
-          // HTML email template
-          const htmlContent = `
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7fa; margin: 0; padding: 0; }
-        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-        .header { background: linear-gradient(135deg, #2563eb 0%, #10b981 100%); padding: 30px 40px; text-align: center; }
-        .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; }
-        .alert-badge { display: inline-block; background-color: #f97316; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; margin-bottom: 15px; }
-        .content { padding: 40px; }
-        .lead-info { background-color: #f8fafc; border-radius: 12px; padding: 25px; margin-bottom: 30px; border: 1px solid #e2e8f0; }
-        .info-row { margin-bottom: 15px; font-size: 15px; }
-        .info-row:last-child { margin-bottom: 0; }
-        .label { font-weight: 600; color: #475569; display: inline-block; min-width: 120px; }
-        .value { color: #1e293b; }
-        .action-section { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 25px; margin: 30px 0; text-align: center; border: 2px solid #fbbf24; }
-        .action-title { font-size: 18px; font-weight: 600; color: #92400e; margin-bottom: 15px; }
-        .action-subtitle { font-size: 14px; color: #78350f; margin-bottom: 20px; }
-        .action-button { display: inline-block; padding: 14px 28px; margin: 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; background-color: #10b981; color: #ffffff; }
-        .footer { background-color: #f8fafc; padding: 25px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
-        .footer-text { color: #64748b; font-size: 13px; line-height: 20px; }
-        .timestamp { color: #94a3b8; font-size: 12px; margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <div class="alert-badge">🔔 NIEUWE LEAD</div>
-            <h1>Er is een nieuwe lead binnengekomen!</h1>
-        </div>
-        
-        <div class="content">
-            <div class="lead-info">
-                <div class="info-row">
-                    <span class="label">👤 Naam:</span>
-                    <span class="value"><strong>${volledige_naam}</strong></span>
-                </div>
-                <div class="info-row">
-                    <span class="label">📧 Email:</span>
-                    <span class="value">${emailadres || '-'}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">📱 Telefoon:</span>
-                    <span class="value">${telefoon || '-'}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">🎯 Doel/Klacht:</span>
-                    <span class="value">${doel || '-'}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">📍 Bron:</span>
-                    <span class="value">${bron || '-'}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">🏥 Praktijk:</span>
-                    <span class="value">${practice.naam} (${practice.code})</span>
-                </div>
-            </div>
-            
-            <div class="action-section">
-                <div class="action-title">⚡ Actie Vereist</div>
-                <div class="action-subtitle">Neem binnen 1 werkdag contact op met deze lead!</div>
-                
-                <div style="margin: 20px 0;">
-                    <a href="${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}" 
-                       style="display: inline-block; padding: 16px 32px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                        ✅ Lead is gebeld & Afspraak is gemaakt
-                    </a>
-                </div>
-                
-                <div style="margin-top: 15px; font-size: 13px; color: #92400e;">
-                    💡 <strong>Tip:</strong> Klik op deze button zodra je de lead hebt gebeld EN een afspraak hebt ingepland.
-                </div>
-            </div>
-            
-            <div class="timestamp">
-                Lead ontvangen op: ${formatAms(inserted.aangemaakt_op)}
-            </div>
-        </div>
-        
-        <div class="footer">
-            <div class="footer-text">
-                Deze email is automatisch verstuurd door het Lead Management Systeem.<br>
-                Voor vragen of support: <a href="mailto:${SMTP.from}" style="color: #2563eb;">${SMTP.from}</a>
-            </div>
-        </div>
-    </div>
-</body>
-</html>`;
-
-          // Plain text versie
-          const textContent = `
-Er is een nieuwe lead binnengekomen!
-
-Praktijk: ${practice.naam} (${practice.code})
-Naam: ${volledige_naam}
-E-mail: ${emailadres || '-'}
-Telefoon: ${telefoon || '-'}
-Bron: ${bron || '-'}
-Doel: ${doel || '-'}
-Toestemming: ${toestemming ? 'Ja' : 'Nee'}
-Datum: ${formatAms(inserted.aangemaakt_op)}
-
-ACTIE VEREIST: Neem binnen 1 werkdag contact op!
-
-Klik hier als de lead is gebeld EN een afspraak is gemaakt:
-${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}
-`;
-
-          await transporter.sendMail({
-            from: SMTP.from,
-            to: practice.email_to,
-            cc: practice.email_cc || undefined,
-            subject: `🔔 Nieuwe lead: ${volledige_naam} - ${practice.naam}`,
-            text: textContent,
-            html: htmlContent
-          });
-
-          console.log('MAIL-SEND: OK →', practice.email_to);
-        } catch (mailErr) {
-          console.warn('MAIL-ERROR:', mailErr && mailErr.message);
-        }
-      });
-    }
-
-    // CRITICAL: Stuur direct response terug ZONDER te wachten op email
-    // Fallback: bij klassieke form POST redirecten i.p.v. JSON
-    if (req.is('application/x-www-form-urlencoded')) {
-      return res.redirect(302, '/form.html?ok=1');
-    }
-
-    res.status(201).json({ ok: true, lead: inserted });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Database insert error', details: e.message });
-  }
-});
-
-// 10) TESTMAIL ENDPOINT
-app.post('/testmail', requireAdmin, async (req, res) => {
-  try {
-    const to = req.body?.to;
-    if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
-
-    if (!SMTP.host || !SMTP.user || !SMTP.pass) {
-      return res.status(400).json({ error: 'SMTP config ontbreekt' });
-    }
-
-    const transporter = nodemailer.createTransporter({
-      host: SMTP.host,
-      port: SMTP.port,
-      secure: SMTP.secure,
-      auth: { user: SMTP.user, pass: SMTP.pass },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-      logger: true,
-      debug: true
-    });
-
-    const info = await transporter.sendMail({
-      from: SMTP.from,
-      to,
-      subject: '✅ Testmail van DynamicCRM',
-      text: 'Dit is een test om te checken dat e-mail werkt.'
-    });
-
-    console.log('TESTMAIL sent →', to, 'messageId:', info && info.messageId);
-    res.json({ ok: true, messageId: info && info.messageId });
-  } catch (err) {
-    console.error('TESTMAIL failed:', err && err.message);
-    res.status(500).json({ error: 'TESTMAIL failed', details: err && err.message });
-  }
-});
-
-// 11) GET /lead-action - Verwerk acties uit email links
-app.get('/lead-action', async (req, res) => {
-  try {
-    const { action, lead_id, practice_code, token } = req.query;
-    
-    // Valideer parameters
-    if (!action || !lead_id || !practice_code || !token) {
-      return res.status(400).send(`
-        <html>
-          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h2 style="color: #dc2626;">❌ Ongeldige link</h2>
-            <p>Deze link is niet geldig of verlopen.</p>
-          </body>
-        </html>
-      `);
-    }
-    
-    // Valideer token
-    if (!validateActionToken(token, lead_id, practice_code)) {
-      return res.status(401).send(`
-        <html>
-          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h2 style="color: #dc2626;">❌ Verlopen link</h2>
-            <p>Deze link is verlopen. Neem contact op met support.</p>
-          </body>
-        </html>
-      `);
-    }
-    
-    // Update lead status in database
-    const updated = await withWriteConnection(async (client) => {
-      // Check of lead bestaat
-      const checkSql = `
-        SELECT id, volledige_naam, emailadres 
-        FROM public.leads 
-        WHERE id = $1 AND praktijk_code = $2
-      `;
-      const checkResult = await client.query(checkSql, [lead_id, practice_code]);
-      
-      if (checkResult.rows.length === 0) {
-        throw new Error('Lead niet gevonden');
-      }
-      
-      const lead = checkResult.rows[0];
-      
-      // Update lead met nieuwe status (check eerst of kolommen bestaan)
-      const updateSql = `
-        UPDATE public.leads 
-        SET 
-          aangemaakt_op = aangemaakt_op
-        WHERE id = $1 AND praktijk_code = $2
-        RETURNING id, aangemaakt_op
-      `;
-      
-      const updateResult = await client.query(updateSql, [lead_id, practice_code]);
-      
-      // Log event
-      await client.query(`
-        INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
-        VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)
-      `, [lead_id, practice_code, JSON.stringify({ 
-        action: 'afspraak_gemaakt',
-        via: 'email_button',
-        naam: lead.volledige_naam 
-      })]);
-      
-      return { lead, updated: updateResult.rows[0] };
-    });
-    
-    // Stuur bevestiging email naar lead (optioneel) - ASYNC
-    if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
       setImmediate(async () => {
         try {
           const transporter = nodemailer.createTransport({
@@ -568,155 +309,154 @@ app.get('/lead-action', async (req, res) => {
             auth: { user: SMTP.user, pass: SMTP.pass },
             connectionTimeout: 5000,
             greetingTimeout: 5000,
-            socketTimeout: 10000
+            socketTimeout: 10000,
           });
-          
+
+          const actionToken = generateActionToken(inserted.id, practice.code);
+
+          const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif">
+  <div style="padding:24px;background:#f4f7fa">
+    <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+      <div style="padding:24px;background:linear-gradient(135deg,#2563eb,#10b981);color:#fff">
+        <div style="font-weight:700;font-size:18px">🔔 Nieuwe lead</div>
+        <div style="opacity:.9;margin-top:6px">${practice.naam} (${practice.code})</div>
+      </div>
+      <div style="padding:24px">
+        <p><b>Naam:</b> ${volledige_naam}</p>
+        <p><b>Email:</b> ${emailadres || '-'}</p>
+        <p><b>Telefoon:</b> ${telefoon || '-'}</p>
+        <p><b>Bron:</b> ${bron || '-'}</p>
+        <p><b>Doel/Klacht:</b> ${doel || '-'}</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0" />
+        <p style="margin:0 0 8px"><b>Actie:</b> Neem binnen 1 werkdag contact op.</p>
+        <p style="margin:0 0 16px">Klik wanneer afspraak is gemaakt:</p>
+        <p><a href="${BASE_URL}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
+              style="display:inline-block;background:#10b981;color:#fff;padding:12px 16px;border-radius:8px;text-decoration:none;font-weight:700">✅ Afspraak gemaakt</a></p>
+        <p style="font-size:12px;color:#6b7280;margin-top:16px">Ontvangen: ${formatAms(inserted.aangemaakt_op)}</p>
+      </div>
+    </div>
+  </div>
+</body></html>`;
+
+          const text = `Nieuwe lead voor ${practice.naam} (${practice.code})
+
+Naam: ${volledige_naam}
+E-mail: ${emailadres || '-'}
+Telefoon: ${telefoon || '-'}
+Bron: ${bron || '-'}
+Doel: ${doel || '-'}
+
+Actie: Neem binnen 1 werkdag contact op.
+Afspraak gemaakt (klik):
+${BASE_URL}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}
+
+Ontvangen: ${formatAms(inserted.aangemaakt_op)}
+`;
+
           await transporter.sendMail({
             from: SMTP.from,
-            to: updated.lead.emailadres,
-            subject: '✅ Afspraak bevestiging',
-            text: `Beste ${updated.lead.volledige_naam},\n\nBedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.\n\nMet vriendelijke groet,\nUw Fysiopraktijk`,
-            html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>Beste ${updated.lead.volledige_naam},</h2>
-                <p>Bedankt voor uw aanmelding! We hebben uw aanvraag ontvangen en zullen spoedig contact met u opnemen om de afspraak definitief in te plannen.</p>
-                <p>Met vriendelijke groet,<br>Uw Fysiopraktijk</p>
-              </div>
-            `
+            to: practice.email_to,
+            cc: practice.email_cc || undefined,
+            subject: `🔔 Nieuwe lead – ${volledige_naam}`,
+            text,
+            html,
           });
+          console.log('MAIL-SEND OK →', practice.email_to);
         } catch (mailErr) {
-          console.warn('Bevestigingsmail mislukt:', mailErr.message);
+          console.warn('MAIL-ERROR:', mailErr?.message);
         }
       });
     }
-    
-    // Toon succespagina
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="nl">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Actie Bevestigd</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            padding: 20px;
-          }
-          .success-card {
-            background: white;
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-            text-align: center;
-            max-width: 500px;
-          }
-          .checkmark {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-            background: #10b981;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            color: white;
-          }
-          h1 {
-            color: #1e293b;
-            margin: 20px 0;
-          }
-          p {
-            color: #64748b;
-            line-height: 1.6;
-            margin: 15px 0;
-          }
-          .lead-details {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            text-align: left;
-          }
-          .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #e2e8f0;
-          }
-          .detail-row:last-child {
-            border-bottom: none;
-          }
-          .detail-label {
-            font-weight: 600;
-            color: #475569;
-          }
-          .detail-value {
-            color: #1e293b;
-          }
-          .footer-text {
-            margin-top: 30px;
-            font-size: 14px;
-            color: #94a3b8;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="success-card">
-          <div class="checkmark">✓</div>
-          <h1>Actie Succesvol Geregistreerd!</h1>
-          <p>De status van de lead is bijgewerkt naar: <strong>Afspraak Gemaakt</strong></p>
-          
-          <div class="lead-details">
-            <div class="detail-row">
-              <span class="detail-label">Lead:</span>
-              <span class="detail-value">${updated.lead.volledige_naam}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Status:</span>
-              <span class="detail-value">✅ Gebeld & Afspraak gemaakt</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Tijdstip:</span>
-              <span class="detail-value">${formatAms(new Date())}</span>
-            </div>
-          </div>
-          
-          <p><strong>Wat nu?</strong><br>
-          De lead heeft ${updated.lead.emailadres ? 'een bevestigingsmail ontvangen' : 'geen emailadres opgegeven'}. 
-          Vergeet niet de afspraak in uw agenda te zetten!</p>
-          
-          <div class="footer-text">
-            U kunt dit venster nu sluiten.
-          </div>
-        </div>
-      </body>
-      </html>
-    `);
-    
-  } catch (error) {
-    console.error('Lead action error:', error);
-    res.status(500).send(`
-      <html>
-        <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-          <h2 style="color: #dc2626;">❌ Er ging iets mis</h2>
-          <p>Er is een fout opgetreden: ${error.message}</p>
-          <p>Neem contact op met support.</p>
-        </body>
-      </html>
-    `);
+
+    // Fallback redirect bij klassieke POST
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.redirect(302, '/form.html?ok=1');
+    }
+    res.status(201).json({ ok: true, lead: inserted });
+  } catch (e) {
+    console.error(e);
+    res
+      .status(500)
+      .json({ error: 'Database insert error', details: e.message });
   }
 });
 
-// === METRICS ENDPOINTS ===
-// GET /api/metrics?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
+// TESTMAIL (typo gefixed)
+app.post('/testmail', requireAdmin, async (req, res) => {
+  try {
+    const to = req.body?.to;
+    if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
+    if (!SMTP.host || !SMTP.user || !SMTP.pass) {
+      return res.status(400).json({ error: 'SMTP config ontbreekt' });
+    }
+    const transporter = nodemailer.createTransport({
+      host: SMTP.host,
+      port: SMTP.port,
+      secure: SMTP.secure,
+      auth: { user: SMTP.user, pass: SMTP.pass },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      logger: true,
+      debug: true,
+    });
+    const info = await transporter.sendMail({
+      from: SMTP.from,
+      to,
+      subject: '✅ Testmail van DynamicCRM',
+      text: 'Dit is een test om te checken dat e-mail werkt.',
+    });
+    res.json({ ok: true, messageId: info?.messageId });
+  } catch (err) {
+    console.error('TESTMAIL failed:', err?.message);
+    res.status(500).json({ error: 'TESTMAIL failed', details: err?.message });
+  }
+});
+
+// Lead-action (ongewijzigd op kleine details na)
+app.get('/lead-action', async (req, res) => {
+  try {
+    const { action, lead_id, practice_code, token } = req.query;
+    if (!action || !lead_id || !practice_code || !token) {
+      return res.status(400).send('<h3>❌ Ongeldige link</h3>');
+    }
+    if (!validateActionToken(token)) {
+      return res.status(401).send('<h3>❌ Verlopen of ongeldige link</h3>');
+    }
+
+    const updated = await withWriteConnection(async (client) => {
+      const check = await client.query(
+        `SELECT id, volledige_naam, emailadres
+         FROM public.leads WHERE id=$1 AND praktijk_code=$2`,
+        [lead_id, practice_code]
+      );
+      if (check.rows.length === 0) throw new Error('Lead niet gevonden');
+      const lead = check.rows[0];
+
+      await client.query(
+        `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+         VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)`,
+        [
+          lead_id,
+          practice_code,
+          JSON.stringify({ action: 'afspraak_gemaakt', via: 'email_button' }),
+        ]
+      );
+      return { lead };
+    });
+
+    res.send(
+      `<div style="font-family:sans-serif;padding:40px"><h2>✅ Actie geregistreerd</h2>
+       <p>Afspraak is gemarkeerd als gemaakt voor <b>${updated.lead.volledige_naam}</b>.</p>
+       <p>${formatAms(new Date())}</p></div>`
+    );
+  } catch (e) {
+    console.error('Lead-action error:', e);
+    res.status(500).send('<h3>❌ Er ging iets mis</h3>');
+  }
+});
+
+// === Metrics ===
 app.get('/api/metrics', async (req, res) => {
   const { practice, from, to } = req.query;
   if (!practice || !from || !to) {
@@ -731,25 +471,30 @@ app.get('/api/metrics', async (req, res) => {
     GROUP BY event_type
   `;
   try {
-    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
-      .then(r => r.rows);
-    const totals = { clicked:0, lead_submitted:0, appointment_booked:0, registered:0 };
+    const rows = await withReadConnection((c) =>
+      c.query(sql, [practice, from, to])
+    ).then((r) => r.rows);
+    const totals = {
+      clicked: 0,
+      lead_submitted: 0,
+      appointment_booked: 0,
+      registered: 0,
+    };
     for (const r of rows) totals[r.event_type] = r.count;
-    const pct = (a,b)=> b>0? Math.round((a/b)*100) : 0;
+    const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
     const funnel = {
       click_to_lead: pct(totals.lead_submitted, totals.clicked),
-      lead_to_appt:  pct(totals.appointment_booked, totals.lead_submitted),
-      appt_to_reg:   pct(totals.registered, totals.appointment_booked),
-      click_to_reg:  pct(totals.registered, totals.clicked),
+      lead_to_appt: pct(totals.appointment_booked, totals.lead_submitted),
+      appt_to_reg: pct(totals.registered, totals.appointment_booked),
+      click_to_reg: pct(totals.registered, totals.clicked),
     };
-    res.json({ practice, range:{from,to}, totals, funnel });
+    res.json({ practice, range: { from, to }, totals, funnel });
   } catch (e) {
     console.error('GET /api/metrics error:', e);
     res.status(500).json({ error: 'Failed to compute metrics' });
   }
 });
 
-// GET /api/series?practice=CODE&from=YYYY-MM-DD&to=YYYY-MM-DD
 app.get('/api/series', async (req, res) => {
   const { practice, from, to } = req.query;
   if (!practice || !from || !to) {
@@ -765,8 +510,9 @@ app.get('/api/series', async (req, res) => {
     ORDER BY day ASC
   `;
   try {
-    const rows = await withReadConnection(c => c.query(sql, [practice, from, to]))
-      .then(r => r.rows);
+    const rows = await withReadConnection((c) =>
+      c.query(sql, [practice, from, to])
+    ).then((r) => r.rows);
     res.json({ practice, from, to, rows });
   } catch (e) {
     console.error('GET /api/series error:', e);
@@ -774,7 +520,7 @@ app.get('/api/series', async (req, res) => {
   }
 });
 
-// 12) Start server
+// Start
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
