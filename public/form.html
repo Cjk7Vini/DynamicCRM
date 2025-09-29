@@ -23,8 +23,10 @@
     input,select,textarea{ width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; background:#fff; font-size:16px; -webkit-appearance:none }
     input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--ring) }
     select{ background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px }
-    .checkbox-group{ display:flex; align-items:flex-start; gap:10px; margin:20px 0 }
-    input[type="checkbox"]{ width:20px; height:20px; margin-top:2px; cursor:pointer }
+    .checkbox-group{ display:flex; align-items:flex-start; gap:10px; margin:20px 0; padding:12px; border-radius:8px; transition:all 0.2s }
+    .checkbox-group.error{ background:#fee2e2; border:2px solid var(--err) }
+    input[type="checkbox"]{ width:20px; height:20px; margin-top:2px; cursor:pointer; flex-shrink:0 }
+    input[type="checkbox"]:focus{ outline:2px solid var(--brand); outline-offset:2px }
     .checkbox-label{ font-size:14px; color:var(--muted); line-height:1.4; cursor:pointer }
     button{ width:100%; background:var(--cta); color:#fff; border:0; border-radius:10px; padding:14px 20px; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; margin-top:20px }
     button:hover{ filter:brightness(.9); transform:translateY(-1px) }
@@ -77,7 +79,7 @@
       <label for="doel">Wat is je doel of klacht?</label>
       <input type="text" id="doel" name="doel" placeholder="Bijv. rugpijn, sterker worden..." />
       
-      <div class="checkbox-group">
+      <div class="checkbox-group" id="toestemming-group">
         <input type="checkbox" id="toestemming" name="toestemming" />
         <label for="toestemming" class="checkbox-label">
           Ik geef toestemming om mijn gegevens te verwerken voor het maken van een afspraak
@@ -98,6 +100,7 @@
     const utmMedium = document.getElementById('utm_medium');
     const utmCampaign = document.getElementById('utm_campaign');
     const toestemmingCheckbox = document.getElementById('toestemming');
+    const toestemmingGroup = document.getElementById('toestemming-group');
 
     function getParam(n){ return new URLSearchParams(location.search).get(n) || ''; }
     function detectSource(){
@@ -121,9 +124,29 @@
       navigator.sendBeacon('/events', blob);
     }
 
+    // Remove error styling when checkbox is checked
+    toestemmingCheckbox.addEventListener('change', () => {
+      if (toestemmingCheckbox.checked) {
+        toestemmingGroup.classList.remove('error');
+        msg.textContent = '';
+        msg.className = '';
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       msg.textContent=''; msg.className='';
+      toestemmingGroup.classList.remove('error');
+      
+      // VALIDATIE: Check of toestemming is gegeven
+      if (!toestemmingCheckbox.checked) {
+        toestemmingGroup.classList.add('error');
+        msg.textContent = '⚠️ Je moet toestemming geven om je gegevens te verwerken voordat je kunt doorgaan.';
+        msg.className = 'error';
+        toestemmingCheckbox.focus();
+        return;
+      }
+
       const submitBtn = form.querySelector('button[type="submit"]');
       submitBtn.disabled = true; submitBtn.textContent = 'Bezig met versturen…';
 
@@ -133,7 +156,7 @@
         telefoon: document.getElementById('telefoon').value.trim() || null,
         bron: document.getElementById('bron').value || utmSource.value,
         doel: document.getElementById('doel').value.trim() || null,
-        toestemming: !!toestemmingCheckbox.checked,
+        toestemming: true, // We weten nu zeker dat het checked is
         praktijk_code: praktijkInput.value || null,
         utm_source: utmSource.value,
         utm_medium: utmMedium.value,
