@@ -296,22 +296,148 @@ app.post('/leads', async (req, res) => {
         const actionToken = generateActionToken(inserted.id, practice.code);
 
         const html = `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-            <h2>🔔 Nieuwe lead voor ${practice.naam}</h2>
-            <p><b>Naam:</b> ${volledige_naam}<br/>
-               <b>Email:</b> ${emailadres || '-'}<br/>
-               <b>Tel:</b> ${telefoon || '-'}<br/>
-               <b>Bron:</b> ${bron || '-'}<br/>
-               <b>Doel:</b> ${doel || '-'}<br/>
-               <b>Toestemming:</b> ${toestemming ? 'Ja' : 'Nee'}<br/>
-               <b>Ontvangen:</b> ${formatAms(inserted.aangemaakt_op)}</p>
-            <p>
-              <a href="${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
-                 style="display:inline-block;padding:12px 16px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px">
-                ✅ Afspraak gemaakt
-              </a>
-            </p>
-          </div>`;
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:20px 0">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+                    <!-- Header met gradient -->
+                    <tr>
+                      <td style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:16px 16px 0 0;padding:30px 20px;text-align:center">
+                        <div style="background:#f97316;display:inline-block;padding:8px 16px;border-radius:20px;margin-bottom:16px">
+                          <span style="color:#fff;font-weight:700;font-size:14px">🔔 NIEUWE LEAD</span>
+                        </div>
+                        <h1 style="color:#fff;font-size:24px;margin:0;font-weight:700">Er is een nieuwe lead binnengekomen!</h1>
+                      </td>
+                    </tr>
+                    <!-- Witte card met lead info -->
+                    <tr>
+                      <td style="background:#fff;padding:30px;border-radius:0 0 16px 16px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:20px">
+                          <tr>
+                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">👤</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Naam:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${volledige_naam}</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">📧</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Email:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${emailadres || '-'}</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">📱</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Telefoon:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${telefoon || '-'}</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">🎯</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Doel/Klacht:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${doel || 'Vet loss'}</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">💡</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Bron:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${bron || '-'}</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0">
+                              <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                  <td width="30" valign="top">
+                                    <span style="color:#2563eb;font-size:18px">🏢</span>
+                                  </td>
+                                  <td>
+                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Praktijk:</span>
+                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${practice.naam} (${practice.code})</div>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                        
+                        <!-- Gele actie box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;background:#fef3c7;border:2px solid #fbbf24;border-radius:12px;padding:20px">
+                          <tr>
+                            <td align="center">
+                              <div style="color:#92400e;font-size:18px;font-weight:700;margin-bottom:12px">⚡ Actie Vereist</div>
+                              <p style="color:#78350f;font-size:14px;margin:0 0 16px 0;line-height:1.5">Neem binnen 1 werkdag contact op met deze lead!</p>
+                              <a href="${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}" 
+                                 style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:700;font-size:15px">
+                                ✅ Lead is gebeld & Afspraak is gemaakt
+                              </a>
+                              <p style="color:#92400e;font-size:12px;margin:16px 0 0 0">💡 Tip: Klik op deze button zodra je de lead hebt gebeld EN een afspraak hebt ingepland.</p>
+                            </td>
+                          </tr>
+                        </table>
+                        
+                        <p style="color:#6b7280;font-size:12px;text-align:center;margin-top:20px;padding-top:20px;border-top:1px solid #e5e7eb">
+                          Lead ontvangen op ${formatAms(inserted.aangemaakt_op)}
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>`;
 
         const text = `
 Nieuwe lead voor ${practice.naam}
