@@ -512,7 +512,7 @@ app.get('/lead-action', async (req, res) => {
     }
     const updated = await withWriteConnection(async (client) => {
       const check = await client.query(
-        `SELECT l.id, l.volledige_naam, l.emailadres, p.naam as praktijk_naam
+        `SELECT l.id, l.volledige_naam, l.emailadres, p.naam as praktijk_naam, p.email_to as praktijk_email
            FROM public.leads l
            LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
            WHERE l.id = $1 AND l.praktijk_code = $2`,
@@ -526,6 +526,59 @@ app.get('/lead-action', async (req, res) => {
          VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)`,
         [lead_id, practice_code, JSON.stringify({ action, via: 'email_button', naam: lead.volledige_naam })]
       );
+      
+      // Stuur bevestiging naar klant
+      if (lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
+        (async () => {
+          try {
+            const html = `
+              <!DOCTYPE html>
+              <html>
+              <head><meta charset="utf-8"></head>
+              <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                  <tr>
+                    <td style="text-align:center">
+                      <div style="width:80px;height:80px;background:#10b981;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px">
+                        <span style="color:#fff;font-size:40px">✓</span>
+                      </div>
+                      <h1 style="color:#111827;font-size:24px;margin:0 0 16px 0">Je afspraak is bevestigd!</h1>
+                      <p style="color:#6b7280;font-size:16px;line-height:1.6">
+                        Beste ${lead.volledige_naam},<br/><br/>
+                        Bedankt voor je aanmelding bij <strong>${lead.praktijk_naam}</strong>. 
+                        We hebben je aanvraag ontvangen en zullen binnen één werkdag contact met je opnemen om een afspraak in te plannen.
+                      </p>
+                      <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:24px 0;text-align:left">
+                        <p style="color:#374151;font-size:14px;margin:0"><strong>Wat gebeurt er nu?</strong></p>
+                        <ul style="color:#6b7280;font-size:14px;line-height:1.8;margin:8px 0 0 20px">
+                          <li>We nemen binnen 1 werkdag telefonisch contact met je op</li>
+                          <li>Je krijgt een passend behandelvoorstel</li>
+                          <li>Samen plannen we een afspraak in</li>
+                        </ul>
+                      </div>
+                      <p style="color:#9ca3af;font-size:12px;margin-top:24px">
+                        Heb je vragen? Neem gerust contact met ons op via ${lead.praktijk_email}
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </body>
+              </html>`;
+            
+            await sendMailResilient({
+              from: SMTP.from,
+              to: lead.emailadres,
+              subject: `✅ Je afspraak bij ${lead.praktijk_naam} is bevestigd`,
+              html,
+              text: `Beste ${lead.volledige_naam},\n\nJe afspraak bij ${lead.praktijk_naam} is bevestigd. We nemen binnen één werkdag contact met je op.\n\nMet vriendelijke groet,\n${lead.praktijk_naam}`
+            });
+            console.log('Bevestiging email naar klant verstuurd:', lead.emailadres);
+          } catch (mailErr) {
+            console.warn('BEVESTIGING EMAIL ERROR:', mailErr?.message);
+          }
+        })();
+      }
+      
       return { lead };
     });
 
