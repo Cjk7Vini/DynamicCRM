@@ -508,6 +508,182 @@ app.get('/lead-action', async (req, res) => {
       return res.status(400).send('<h2>❌ Ongeldige link</h2>');
     }
     if (!validateActionToken(token)) {
+      return res.status(401).send('<h2>❌ Verlopen of ongeldige token</h2>');
+    }
+    
+    res.redirect(302, `/appointment-form.html?lead_id=${lead_id}&practice_code=${practice_code}&token=${token}`);
+  } catch (error) {
+    console.error('Lead action error:', error);
+    res.status(500).send(`<h2>❌ Er ging iets mis: ${error.message}</h2>`);
+  }
+});
+
+app.get('/api/lead-info', async (req, res) => {
+  try {
+    const { lead_id, practice_code, token } = req.query;
+    
+    if (!lead_id || !practice_code || !token) {
+      return res.status(400).json({ error: 'Ontbrekende parameters' });
+    }
+    
+    if (!validateActionToken(token)) {
+      return res.status(401).json({ error: 'Ongeldige token' });
+    }
+
+    const lead = await withReadConnection(async (client) => {
+      const r = await client.query(
+        `SELECT volledige_naam, emailadres, telefoon 
+         FROM public.leads 
+         WHERE id = $1 AND praktijk_code = $2`,
+        [lead_id, practice_code]
+      );
+      return r.rows[0] || null;
+    });
+
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead niet gevonden' });
+    }
+
+    res.json(lead);
+  } catch (error) {
+    console.error('Get lead info error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/confirm-appointment', async (req, res) => {
+  try {
+    const { lead_id, practice_code, token, date, time, notes } = req.body;
+
+    if (!lead_id || !practice_code || !token || !date || !time) {
+      return res.status(400).json({ error: 'Ontbrekende velden' });
+    }
+
+    if (!validateActionToken(token)) {
+      return res.status(401).json({ error: 'Ongeldige token' });
+    }
+
+    const updated = await withWriteConnection(async (client) => {
+      const check = await client.query(
+        `SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, p.naam as praktijk_naam, p.email_to as praktijk_email
+         FROM public.leads l
+         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+         WHERE l.id = $1 AND l.praktijk_code = $2`,
+        [lead_id, practice_code]
+      );
+      
+      if (check.rows.length === 0) throw new Error('Lead niet gevonden');
+      const lead = check.rows[0];
+
+      await client.query(
+        `UPDATE public.leads 
+         SET appointment_date = $1, appointment_time = $2 
+         WHERE id = $3`,
+        [date, time, lead_id]
+      );
+
+      await client.query(
+        `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+         VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)`,
+        [lead_id, practice_code, JSON.stringify({ via: 'appointment_form', date, time, notes: notes || null })]
+      );
+
+      return { lead, date, time, notes };
+    });
+
+    const dateObj = new Date(updated.date + 'T' + updated.time);
+    const formattedDate = new Intl.DateTimeFormat('nl-NL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(dateObj);
+    const formattedTime = updated.time.substring(0, 5);
+
+    if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
+      (async () => {
+        try {
+          const html = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                <tr>
+                  <td style="text-align:center">
+                    <div style="width:80px;height:80px;background:#10b981;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px">
+                      <span style="color:#fff;font-size:40px">✓</span>
+                    </div>
+                    <h1 style="color:#111827;font-size:24px;margin:0 0 16px 0">Je afspraak is ingepland!</h1>
+                    <p style="color:#6b7280;font-size:16px;line-height:1.6;margin-bottom:24px">
+                      Beste ${updated.lead.volledige_naam},<br/><br/>
+                      Je afspraak bij <strong>${updated.lead.praktijk_naam}</strong> is bevestigd!
+                    </p>
+                    
+                    <div style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:12px;padding:24px;margin:24px 0;color:#fff">
+                      <div style="font-size:14px;opacity:0.9;margin-bottom:8px">📅 AFSPRAAK DETAILS</div>
+                      <div style="font-size:20px;font-weight:700;margin-bottom:4px">${formattedDate}</div>
+                      <div style="font-size:24px;font-weight:700">🕐 ${formattedTime}</div>
+                    </div>
+
+                    ${updated.notes ? `
+                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:24px 0;text-align:left">
+                      <p style="color:#374151;font-size:14px;margin:0 0 8px 0"><strong>📝 Opmerkingen:</strong></p>
+                      <p style="color:#6b7280;font-size:14px;margin:0;line-height:1.6">${updated.notes}</p>
+                    </div>
+                    ` : ''}
+
+                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:24px 0;text-align:left">
+                      <p style="color:#374151;font-size:14px;margin:0 0 8px 0"><strong>Wat moet je meenemen?</strong></p>
+                      <ul style="color:#6b7280;font-size:14px;line-height:1.8;margin:0;padding-left:20px">
+                        <li>Je legitimatie</li>
+                        <li>Eventuele verwijzing van je huisarts</li>
+                        <li>Sportkleding (indien van toepassing)</li>
+                      </ul>
+                    </div>
+
+                    <p style="color:#9ca3af;font-size:12px;margin-top:24px">
+                      Kun je niet op deze tijd? Neem contact met ons op via ${updated.lead.praktijk_email || 'de praktijk'}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>`;
+
+          await sendMailResilient({
+            from: SMTP.from,
+            to: updated.lead.emailadres,
+            subject: `📅 Je afspraak bij ${updated.lead.praktijk_naam} op ${formattedDate}`,
+            html,
+            text: `Beste ${updated.lead.volledige_naam},\n\nJe afspraak bij ${updated.lead.praktijk_naam} is ingepland!\n\nDatum: ${formattedDate}\nTijd: ${formattedTime}\n\n${updated.notes ? 'Opmerkingen: ' + updated.notes + '\n\n' : ''}Kun je niet? Neem contact met ons op.\n\nMet vriendelijke groet,\n${updated.lead.praktijk_naam}`
+          });
+          console.log('AFSPRAAK BEVESTIGING verstuurd naar:', updated.lead.emailadres);
+        } catch (mailErr) {
+          console.error('AFSPRAAK BEVESTIGING ERROR:', mailErr);
+        }
+      })();
+    }
+
+    res.json({ 
+      ok: true, 
+      lead_name: updated.lead.volledige_naam,
+      practice_name: updated.lead.praktijk_naam
+    });
+
+  } catch (error) {
+    console.error('Confirm appointment error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/lead-action', async (req, res) => {
+  try {
+    const { action, lead_id, practice_code, token } = req.query;
+    if (!action || !lead_id || !practice_code || !token) {
+      return res.status(400).send('<h2>❌ Ongeldige link</h2>');
+    }
+    if (!validateActionToken(token)) {
       return res.status(401).send('<h2>❌ Verlopen link</h2>');
     }
     const updated = await withWriteConnection(async (client) => {
