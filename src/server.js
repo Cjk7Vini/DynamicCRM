@@ -512,8 +512,10 @@ app.get('/lead-action', async (req, res) => {
     }
     const updated = await withWriteConnection(async (client) => {
       const check = await client.query(
-        `SELECT id, volledige_naam, emailadres 
-           FROM public.leads WHERE id = $1 AND praktijk_code = $2`,
+        `SELECT l.id, l.volledige_naam, l.emailadres, p.naam as praktijk_naam
+           FROM public.leads l
+           LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+           WHERE l.id = $1 AND l.praktijk_code = $2`,
         [lead_id, practice_code]
       );
       if (check.rows.length === 0) throw new Error('Lead niet gevonden');
@@ -528,7 +530,8 @@ app.get('/lead-action', async (req, res) => {
     });
 
     const nameEncoded = encodeURIComponent(updated.lead.volledige_naam);
-    res.redirect(302, `/success.html?name=${nameEncoded}&lead_id=${lead_id}&practice_code=${practice_code}`);
+    const praktijkNaamEncoded = encodeURIComponent(updated.lead.praktijk_naam || practice_code);
+    res.redirect(302, `/success.html?name=${nameEncoded}&lead_id=${lead_id}&practice_code=${practice_code}&practice_name=${praktijkNaamEncoded}`);
   } catch (error) {
     console.error('Lead action error:', error);
     res.status(500).send(`<h2>❌ Er ging iets mis: ${error.message}</h2>`);

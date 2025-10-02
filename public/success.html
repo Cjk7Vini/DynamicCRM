@@ -169,11 +169,12 @@
     const leadName = params.get('name') || 'Naam onbekend';
     const leadId = params.get('lead_id') || '-';
     const practiceCode = params.get('practice_code') || '-';
+    const practiceName = params.get('practice_name') || practiceCode;
     
     // Update page content
     document.getElementById('leadName').textContent = leadName;
     document.getElementById('leadIdDisplay').textContent = `#${leadId}`;
-    document.getElementById('practiceCode').textContent = practiceCode;
+    document.getElementById('practiceCode').textContent = practiceName;
     
     // Format timestamp
     const now = new Date();
