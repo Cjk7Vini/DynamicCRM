@@ -418,11 +418,11 @@ app.post('/leads', async (req, res) => {
                             <td align="center">
                               <div style="color:#92400e;font-size:18px;font-weight:700;margin-bottom:12px">⚡ Actie Vereist</div>
                               <p style="color:#78350f;font-size:14px;margin:0 0 16px 0;line-height:1.5">Neem binnen 1 werkdag contact op met deze lead!</p>
-                              <a href="${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}" 
+                              <a href="${baseUrl}/appointment-form.html?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}" 
                                  style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:700;font-size:15px">
-                                ✅ Lead is gebeld & Afspraak is gemaakt
+                                📅 Plan Afspraak
                               </a>
-                              <p style="color:#92400e;font-size:12px;margin:16px 0 0 0">💡 Tip: Klik op deze button zodra je de lead hebt gebeld EN een afspraak hebt ingepland.</p>
+                              <p style="color:#92400e;font-size:12px;margin:16px 0 0 0">💡 Tip: Klik op deze button om een datum en tijd in te plannen. De klant ontvangt automatisch een bevestiging.</p>
                             </td>
                           </tr>
                         </table>
@@ -570,7 +570,7 @@ app.get('/lead-action', async (req, res) => {
               to: lead.emailadres,
               subject: `✅ Je afspraak bij ${lead.praktijk_naam} is bevestigd`,
               html,
-              text: `Beste ${lead.volledige_naam},\n\nJe afspraak bij ${lead.praktijk_naam} is bevestigd. We nemen binnen één werkdag contact met je op.\n\nMet vriendelijke groet,\n${lead.praktijk_naam}`
+              text: `Beste ${lead.volledige_naam},\n\nGoed nieuws! Je afspraak bij ${lead.praktijk_naam} is bevestigd en ingepland. Je ontvangt binnenkort meer informatie over de datum en tijd.\n\nVragen of wijzigingen? Neem contact met ons op.\n\nMet vriendelijke groet,\n${lead.praktijk_naam}`
             });
             console.log('Bevestiging email naar klant verstuurd:', lead.emailadres);
           } catch (mailErr) {
