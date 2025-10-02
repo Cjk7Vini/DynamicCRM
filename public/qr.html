@@ -111,8 +111,8 @@
       <input 
         type="text" 
         id="urlInput" 
-        value="https://dynamiccrm.onrender.com/form.html?s=L8D6QA"
-        placeholder="Voer een URL in"
+        value=""
+        placeholder="https://dynamiccrm.onrender.com/form.html?s=..."
       />
     </div>
     
@@ -179,8 +179,8 @@
       });
     }
 
-    // Generate QR code on page load
-    window.addEventListener('load', generateQR);
+    // Don't generate QR code on page load - wait for user input
+    // window.addEventListener('load', generateQR);
   </script>
 </body>
 </html>
