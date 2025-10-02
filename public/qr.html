@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      color: #111827;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #6b7280;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .input-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    label {
+      display: block;
+      color: #374151;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: border 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    #qrcode {
+      margin: 30px auto;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 16px;
+      display: inline-block;
+    }
+    .download-btn {
+      background: #10b981;
+      margin-top: 20px;
+    }
+    .download-btn:hover {
+      background: #059669;
+    }
+    .info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+      text-align: left;
+      font-size: 13px;
+      color: #1e40af;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QR Code Generator</h1>
+    <p class="subtitle">Genereer een QR code voor je formulier link</p>
+    
+    <div class="input-group">
+      <label for="urlInput">Formulier URL</label>
+      <input 
+        type="text" 
+        id="urlInput" 
+        value="https://dynamiccrm.onrender.com/form.html?s=L8D6QA"
+        placeholder="Voer een URL in"
+      />
+    </div>
+    
+    <button onclick="generateQR()">Genereer QR Code</button>
+    
+    <div id="qrcode"></div>
+    
+    <button class="download-btn" id="downloadBtn" style="display:none;" onclick="downloadQR()">
+      Download QR Code
+    </button>
+    
+    <div class="info">
+      <strong>Tip:</strong> Gebruik deze QR code op flyers, posters, visitekaartjes of social media. Mensen kunnen scannen met hun telefoon om direct naar je aanmeldformulier te gaan.
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    let qrCodeInstance = null;
+
+    function generateQR() {
+      const url = document.getElementById('urlInput').value.trim();
+      
+      if (!url) {
+        alert('Voer een geldige URL in');
+        return;
+      }
+
+      // Clear previous QR code
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+
+      // Generate new QR code
+      qrCodeInstance = new QRCode(qrContainer, {
+        text: url,
+        width: 300,
+        height: 300,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      // Show download button
+      document.getElementById('downloadBtn').style.display = 'inline-block';
+    }
+
+    function downloadQR() {
+      const canvas = document.querySelector('#qrcode canvas');
+      if (!canvas) {
+        alert('Genereer eerst een QR code');
+        return;
+      }
+
+      // Convert canvas to blob and download
+      canvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'qr-code-formulier.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    // Generate QR code on page load
+    window.addEventListener('load', generateQR);
+  </script>
+</body>
+</html>
