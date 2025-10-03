@@ -303,7 +303,7 @@
       <div class="controls">
         <div class="control-group">
           <label for="practice">Praktijk Code</label>
-          <input type="text" id="practice" placeholder="K9X3QY" value="K9X3QY" />
+          <input type="text" id="practice" placeholder="K9X3QY" value="" />
         </div>
         <div class="control-group">
           <label for="from">Van</label>
@@ -467,7 +467,7 @@
       const to = document.getElementById('to').value;
       
       if (!practice || !from || !to) {
-        alert('Vul alle velden in');
+        alert('Vul alle velden in (Praktijk Code, Van en Tot datum)');
         return;
       }
       
@@ -592,8 +592,8 @@
     
     document.getElementById('btnLoad').addEventListener('click', loadDashboard);
     
-    // Auto-load on page load
-    window.addEventListener('load', loadDashboard);
+    // Don't auto-load - wait for user to enter data and click button
+    // window.addEventListener('load', loadDashboard);
   </script>
 </body>
 </html>
