@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     :root { 
-      --bg: #f1f5f9;
+      --bg: linear-gradient(135deg, #1e40af 0%, #0891b2 100%);
       --card: #ffffff;
       --text: #0f172a;
       --muted: #64748b;
@@ -27,6 +27,7 @@
       color: var(--text);
       line-height: 1.5;
       padding: 20px;
+      min-height: 100vh;
     }
     
     .container {
@@ -97,13 +98,23 @@
       font-weight: 600;
       font-size: 14px;
       transition: all 0.2s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
     }
     
     button:hover {
       background: #2563eb;
       transform: translateY(-1px);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+    }
+    
+    button.secondary {
+      background: var(--success);
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+    }
+    
+    button.secondary:hover {
+      background: #059669;
+      box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
     }
     
     button:disabled {
@@ -316,6 +327,10 @@
           <label>&nbsp;</label>
           <button id="btnLoad">Laden</button>
         </div>
+        <div class="control-group">
+          <label>&nbsp;</label>
+          <button id="btnExport" class="secondary" style="display:none;">Exporteer Rapportage</button>
+        </div>
       </div>
     </header>
 
@@ -482,11 +497,15 @@
         const seriesRes = await fetch(`/api/series?practice=${practice}&from=${from}&to=${to}`);
         const series = await seriesRes.json();
         
+        // Store data for export
+        currentData = { metrics, series };
+        
         updateMetrics(metrics);
         updateCharts(series);
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
+        document.getElementById('btnExport').style.display = 'inline-block';
       } catch (err) {
         console.error(err);
         alert('Fout bij laden van dashboard');
@@ -590,6 +609,62 @@
     }
     
     document.getElementById('btnLoad').addEventListener('click', loadDashboard);
+    
+    document.getElementById('btnExport').addEventListener('click', exportReport);
+    
+    let currentData = null;
+    
+    function exportReport() {
+      if (!currentData) {
+        alert('Geen data beschikbaar. Laad eerst data.');
+        return;
+      }
+      
+      const practice = document.getElementById('practice').value;
+      const from = document.getElementById('from').value;
+      const to = document.getElementById('to').value;
+      
+      // Create CSV content
+      let csv = 'Conversie Rapportage\n';
+      csv += `Praktijk: ${practice}\n`;
+      csv += `Periode: ${from} tot ${to}\n\n`;
+      
+      csv += 'Metric,Waarde,Percentage\n';
+      csv += `Clicks,${currentData.metrics.totals.clicked},100%\n`;
+      csv += `Leads,${currentData.metrics.totals.lead_submitted},${currentData.metrics.funnel.click_to_lead}%\n`;
+      csv += `Afspraken,${currentData.metrics.totals.appointment_booked},${currentData.metrics.funnel.lead_to_appt}%\n`;
+      csv += `Registraties,${currentData.metrics.totals.registered},${currentData.metrics.funnel.click_to_reg}%\n\n`;
+      
+      csv += 'Conversie Funnel\n';
+      csv += `Click naar Lead,${currentData.metrics.funnel.click_to_lead}%\n`;
+      csv += `Lead naar Afspraak,${currentData.metrics.funnel.lead_to_appt}%\n`;
+      csv += `Afspraak naar Registratie,${currentData.metrics.funnel.appt_to_reg}%\n`;
+      csv += `Totaal Click naar Registratie,${currentData.metrics.funnel.click_to_reg}%\n\n`;
+      
+      csv += 'Dagelijkse Data\n';
+      csv += 'Datum,Clicks,Leads,Afspraken,Registraties\n';
+      
+      const days = {};
+      currentData.series.rows.forEach(r => {
+        if (!days[r.day]) days[r.day] = { clicked: 0, lead_submitted: 0, appointment_booked: 0, registered: 0 };
+        days[r.day][r.event_type] = r.count;
+      });
+      
+      Object.keys(days).sort().forEach(day => {
+        csv += `${day},${days[day].clicked},${days[day].lead_submitted},${days[day].appointment_booked},${days[day].registered}\n`;
+      });
+      
+      // Download CSV
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `rapportage-${practice}-${from}-${to}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
     
     // Don't auto-load - wait for user to enter data and click button
     // window.addEventListener('load', loadDashboard);
