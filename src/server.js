@@ -652,25 +652,6 @@ app.post('/api/confirm-appointment', async (req, res) => {
                     ` : ''}
 
                     <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
-                      <p style="color:#374151;font-size:15px;margin:0 0 12px 0;font-weight:600">Wat kun je verwachten?</p>
-                      <p style="color:#6b7280;font-size:14px;line-height:1.8;margin:0">
-                        Bij binnenkomst word je ontvangen door een van onze fitcoaches of fysiotherapeuten. 
-                        Zij laten je kennismaken met de slimme toestellen van Technogym en geven uitleg over hoe de vitaliteitscheck werkt.
-                      </p>
-                      <p style="color:#6b7280;font-size:14px;line-height:1.8;margin:12px 0 0 0">
-                        Aan de hand van deze meting laten we zien hoe wij jou helpen om jouw gezondheidsdoelen te bereiken – met een plan dat volledig op jou is afgestemd.
-                      </p>
-                      <p style="color:#6b7280;font-size:14px;line-height:1.8;margin:12px 0 0 0">
-                        Na de check ontvang je een persoonlijk Technogym-polsbandje. Hierop staat jouw bewegingsplan opgeslagen. 
-                        Met dit polsbandje kun je je eenvoudig aanmelden op elk toestel, waarna de instellingen, weerstand en oefeningen automatisch aan jouw niveau worden aangepast. 
-                        Zo train je veilig, efficiënt en met optimaal resultaat.
-                      </p>
-                      <p style="color:#6b7280;font-size:14px;line-height:1.8;margin:12px 0 0 0">
-                        Via de Technogym App houd je jouw voortgang bij, krijg je persoonlijke tips en blijf je gemotiveerd om het beste uit jezelf te halen – ook buiten de oefenruimte.
-                      </p>
-                    </div>
-
-                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
                       <p style="color:#374151;font-size:15px;margin:0 0 12px 0;font-weight:600">Onze aanpak</p>
                       <div style="margin:8px 0">
                         <span style="color:#10b981;font-weight:bold;margin-right:8px">✓</span>
