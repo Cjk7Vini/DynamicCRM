@@ -637,10 +637,10 @@ app.post('/api/confirm-appointment', async (req, res) => {
                     </p>
                     
                     <div style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:12px;padding:24px;margin:24px 0;color:#fff;text-align:center">
-                      <div style="font-size:14px;opacity:0.9;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">📅 AFSPRAAK DETAILS</div>
+                      <div style="font-size:14px;opacity:0.9;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">AFSPRAAK DETAILS</div>
                       <div style="font-size:20px;font-weight:700;margin-bottom:8px">${formattedDate}</div>
-                      <div style="font-size:28px;font-weight:700;margin-bottom:4px">🕐 ${formattedTime}</div>
-                      <div style="font-size:14px;opacity:0.9;margin-top:8px">📍 ${updated.lead.praktijk_naam}</div>
+                      <div style="font-size:28px;font-weight:700;margin-bottom:4px">${formattedTime}</div>
+                      <div style="font-size:14px;opacity:0.9;margin-top:8px">${updated.lead.praktijk_naam}</div>
                     </div>
 
                     ${updated.notes ? `
