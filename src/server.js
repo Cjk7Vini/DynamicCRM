@@ -602,8 +602,8 @@ app.post('/api/confirm-appointment', async (req, res) => {
     
     // Format appointment type for display
     const appointmentTypeDisplay = updated.type === 'vitaliteitscheck' 
-      ? 'vitaliteitscheck' 
-      : 'rondleiding';
+      ? 'Vitaliteitscheck (gratis) – Ontdek in 60 minuten waar jouw verbeterpunten liggen' 
+      : 'Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)';
 
     if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
       (async () => {
@@ -639,8 +639,9 @@ app.post('/api/confirm-appointment', async (req, res) => {
                     <div style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:12px;padding:24px;margin:24px 0;color:#fff;text-align:center">
                       <div style="font-size:14px;opacity:0.9;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">AFSPRAAK DETAILS</div>
                       <div style="font-size:20px;font-weight:700;margin-bottom:8px">${formattedDate}</div>
-                      <div style="font-size:28px;font-weight:700;margin-bottom:4px">${formattedTime}</div>
+                      <div style="font-size:28px;font-weight:700;margin-bottom:8px">${formattedTime}</div>
                       <div style="font-size:14px;opacity:0.9;margin-top:8px">${updated.lead.praktijk_naam}</div>
+                      <div style="font-size:14px;opacity:0.95;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.3);line-height:1.4">${appointmentTypeDisplay}</div>
                     </div>
 
                     ${updated.notes ? `
