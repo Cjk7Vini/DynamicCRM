@@ -700,7 +700,8 @@ app.post('/api/confirm-appointment', async (req, res) => {
                       Tot snel bij <strong>${updated.lead.praktijk_naam}</strong>
                     </p>
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin-top:16px">
-                      Met vriendelijke groet,
+                      Met vriendelijke groet,<br/>
+                      Team ${updated.lead.praktijk_naam}
                     </p>
                     
                     <p style="color:#9ca3af;font-size:12px;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb">
