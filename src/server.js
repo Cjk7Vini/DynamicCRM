@@ -247,7 +247,6 @@ console.log('[PRACTICE LOGIN] Auth found:', !!auth);
   console.log('[PRACTICE LOGIN] No auth entry found');
   return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
 }
-    }
 
     const isValid = await bcrypt.compare(password, auth.password_hash);
 	console.log('[PRACTICE LOGIN] Password valid:', isValid);
@@ -256,7 +255,6 @@ console.log('[PRACTICE LOGIN] Auth found:', !!auth);
   console.log('[PRACTICE LOGIN] Password mismatch');
   return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
 }
-    }
 
     const token = jwt.sign(
       { code: auth.code, type: 'practice' },
