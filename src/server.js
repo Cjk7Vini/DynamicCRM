@@ -232,11 +232,7 @@ app.post('/api/practice/login', practiceLoginLimiter, async (req, res) => {
 	if (!code || !password) {
   console.log('[PRACTICE LOGIN] Missing code or password');
   return res.status(400).json({ error: 'Praktijkcode en wachtwoord zijn verplicht' });
-}
 
-    if (!code || !password) {
-      return res.status(400).json({ error: 'Praktijkcode en wachtwoord zijn verplicht' });
-    }
 
     const auth = await withReadConnection(async (client) => {
       const result = await client.query(
