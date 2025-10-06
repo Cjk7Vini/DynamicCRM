@@ -106,14 +106,6 @@ const postLimiter = rateLimit({
 });
 app.use(['/leads', '/events'], postLimiter);
 
-const practiceLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'Te veel login pogingen. Probeer het over 15 minuten opnieuw.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
   res.redirect(302, q ? `/form.html?${q}` : '/form.html');
