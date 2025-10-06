@@ -228,6 +228,11 @@ app.post('/events', async (req, res) => {
 app.post('/api/practice/login', practiceLoginLimiter, async (req, res) => {
   try {
     const { code, password } = req.body;
+	console.log('[PRACTICE LOGIN] Attempt for code:', code);
+	if (!code || !password) {
+  console.log('[PRACTICE LOGIN] Missing code or password');
+  return res.status(400).json({ error: 'Praktijkcode en wachtwoord zijn verplicht' });
+}
 
     if (!code || !password) {
       return res.status(400).json({ error: 'Praktijkcode en wachtwoord zijn verplicht' });
@@ -241,14 +246,20 @@ app.post('/api/practice/login', practiceLoginLimiter, async (req, res) => {
       return result.rows[0] || null;
     });
 
+console.log('[PRACTICE LOGIN] Auth found:', !!auth);
     if (!auth) {
-      return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
+  console.log('[PRACTICE LOGIN] No auth entry found');
+  return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
+}
     }
 
     const isValid = await bcrypt.compare(password, auth.password_hash);
+	console.log('[PRACTICE LOGIN] Password valid:', isValid);
     
-    if (!isValid) {
-      return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
+     if (!isValid) {
+  console.log('[PRACTICE LOGIN] Password mismatch');
+  return res.status(401).json({ error: 'Ongeldige praktijkcode of wachtwoord' });
+}
     }
 
     const token = jwt.sign(
@@ -256,11 +267,11 @@ app.post('/api/practice/login', practiceLoginLimiter, async (req, res) => {
       JWT_SECRET,
       { expiresIn: '8h' }
     );
-
+  console.log('[PRACTICE LOGIN] Success! Token generated');
     res.json({ ok: true, token, code: auth.code });
 
   } catch (error) {
-    console.error('Practice login error:', error);
+    console.error('[PRACTICE LOGIN ERROR]:', error);
     res.status(500).json({ error: 'Server error bij inloggen' });
   }
 });
