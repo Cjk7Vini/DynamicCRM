@@ -277,17 +277,77 @@ app.get('/api/lead-info', async (req, res) => {
 app.post('/api/confirm-appointment', async (req, res) => {
   try {
     const { lead_id, practice_code, token, date, time, type, notes } = req.body;
-    if (!lead_id || !practice_code || !token || !date || !time || !type) return res.status(400).json({ error: 'Ontbrekende velden' });
-    if (!validateActionToken(token)) return res.status(401).json({ error: 'Ongeldige token' });
+    if (!lead_id || !practice_code || !token || !date || !time || !type) {
+      return res.status(400).json({ error: 'Ontbrekende velden' });
+    }
+    if (!validateActionToken(token)) {
+      return res.status(401).json({ error: 'Ongeldige token' });
+    }
+
     const updated = await withWriteConnection(async (client) => {
-      const check = await client.query(`SELECT l.id, l.volledige_naam, l.emailadres, p.naam as praktijk_naam FROM public.leads l LEFT JOIN public.praktijken p ON p.code = l.praktijk_code WHERE l.id = $1 AND l.praktijk_code = $2`, [lead_id, practice_code]);
+      const check = await client.query(
+        `SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, p.naam as praktijk_naam, p.email_to as praktijk_email
+         FROM public.leads l
+         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+         WHERE l.id = $1 AND l.praktijk_code = $2`,
+        [lead_id, practice_code]
+      );
+      
       if (check.rows.length === 0) throw new Error('Lead niet gevonden');
       const lead = check.rows[0];
-      await client.query(`UPDATE public.leads SET appointment_date = $1, appointment_time = $2 WHERE id = $3`, [date, time, lead_id]);
-      await client.query(`INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata) VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)`, [lead_id, practice_code, JSON.stringify({ via: 'form', date, time, type, notes: notes || null })]);
+
+      await client.query(
+        `UPDATE public.leads SET appointment_date = $1, appointment_time = $2 WHERE id = $3`,
+        [date, time, lead_id]
+      );
+
+      await client.query(
+        `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+         VALUES ($1, $2, 'appointment_booked', 'email_action', $3::jsonb)`,
+        [lead_id, practice_code, JSON.stringify({ via: 'appointment_form', date, time, type, notes: notes || null })]
+      );
+
       return { lead, date, time, type, notes };
     });
-    res.json({ ok: true, lead_name: updated.lead.volledige_naam, practice_name: updated.lead.praktijk_naam });
+
+    const dateObj = new Date(updated.date + 'T' + updated.time);
+    const formattedDate = new Intl.DateTimeFormat('nl-NL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(dateObj);
+    const formattedTime = updated.time.substring(0, 5);
+    
+    const appointmentTypeDisplay = updated.type === 'vitaliteitscheck' 
+      ? 'Vitaliteitscheck (gratis) – Ontdek in 60 minuten waar jouw verbeterpunten liggen' 
+      : 'Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)';
+
+    if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
+      (async () => {
+        try {
+          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)"><tr><td style="text-align:center"><div style="width:80px;height:80px;background:#10b981;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px"><span style="color:#fff;font-size:40px">✓</span></div><h1 style="color:#111827;font-size:24px;margin:0 0 16px 0">Je afspraak is ingepland!</h1></td></tr><tr><td style="padding:20px 0"><p style="color:#6b7280;font-size:14px;margin-bottom:8px"><strong>Onderwerp:</strong> Afspraakbevestiging</p><p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">Beste ${updated.lead.volledige_naam},</p><p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">Wat leuk dat je interesse hebt getoond in <strong>${updated.lead.praktijk_naam}</strong>!<br/>Je afspraak voor een <strong>${appointmentTypeDisplay}</strong> is hierbij bevestigd.</p><div style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:12px;padding:24px;margin:24px 0;color:#fff;text-align:center"><div style="font-size:14px;opacity:0.9;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">AFSPRAAK DETAILS</div><div style="font-size:20px;font-weight:700;margin-bottom:8px">${formattedDate}</div><div style="font-size:28px;font-weight:700;margin-bottom:8px">${formattedTime}</div><div style="font-size:14px;opacity:0.9;margin-top:8px">${updated.lead.praktijk_naam}</div><div style="font-size:14px;opacity:0.95;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.3);line-height:1.4">${appointmentTypeDisplay}</div></div>${updated.notes ? `<div style="background:#fef3c7;border-radius:12px;padding:16px;margin:20px 0;border-left:4px solid #f59e0b"><p style="color:#92400e;font-size:14px;margin:0"><strong>📝 Extra informatie:</strong></p><p style="color:#78350f;font-size:14px;margin:8px 0 0 0;line-height:1.6">${updated.notes}</p></div>` : ''}<p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0">We kijken ernaar uit je te ontvangen en samen te werken aan jouw gezondheid.</p><p style="color:#111827;font-size:15px;line-height:1.6;margin:0">Tot snel bij <strong>${updated.lead.praktijk_naam}</strong></p><p style="color:#111827;font-size:15px;line-height:1.6;margin-top:16px">Met vriendelijke groet,<br/>Team ${updated.lead.praktijk_naam}</p><p style="color:#9ca3af;font-size:12px;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb">Kun je niet op deze tijd? Neem contact met ons op via ${updated.lead.praktijk_email || 'de praktijk'}</p></td></tr></table></body></html>`;
+          
+          await sendMailResilient({
+            from: SMTP.from,
+            to: updated.lead.emailadres,
+            subject: `Afspraakbevestiging bij ${updated.lead.praktijk_naam} - ${formattedDate} om ${formattedTime}`,
+            html,
+            text: `Beste ${updated.lead.volledige_naam},\n\nWat leuk dat je interesse hebt getoond in ${updated.lead.praktijk_naam}!\nJe afspraak is bevestigd.\n\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nLocatie: ${updated.lead.praktijk_naam}\n\n${updated.notes ? 'Extra informatie: ' + updated.notes + '\n\n' : ''}We kijken ernaar uit je te ontvangen.\n\nMet vriendelijke groet,\nTeam ${updated.lead.praktijk_naam}`
+          });
+          console.log('AFSPRAAK BEVESTIGING verstuurd naar:', updated.lead.emailadres);
+        } catch (mailErr) {
+          console.error('AFSPRAAK BEVESTIGING ERROR:', mailErr);
+        }
+      })();
+    }
+
+    res.json({ 
+      ok: true, 
+      lead_name: updated.lead.volledige_naam,
+      practice_name: updated.lead.praktijk_naam
+    });
+
   } catch (error) {
     console.error('Confirm appointment error:', error);
     res.status(500).json({ error: error.message });
