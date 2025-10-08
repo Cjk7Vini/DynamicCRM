@@ -460,7 +460,7 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
               from: SMTP.from,
               to: practice.email_to,
               cc: practice.email_cc || undefined,
-              subject: `🔔 Nieuwe lead: ${volledige_naam} - ${practice.naam}`,
+              subject: `✅ Er is een nieuwe lead binnengekomen!`,
               text,
               html,
             });
