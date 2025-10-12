@@ -2,254 +2,206 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <title>Aanmelden – Fysiopraktijk</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <title>Gebruikersvoorwaarden en Privacy Beleid</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
-      --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-      --card:#ffffff; --ink:#111827; --muted:#6b7280; --brand:#2563eb; --cta:#f97316;
-      --ok:#0a7a32; --err:#b91c1c; --ring: rgba(37,99,235,.35);
-    }
-    *{ box-sizing:border-box; margin:0; padding:0 }
-    body{ font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg-gradient); color:var(--ink); min-height:100vh; padding:15px }
-    .container{ max-width:500px; margin:0 auto }
-    .header{ color:#fff; text-align:center; margin-bottom:20px; padding:20px 0 }
-    h1{ font-size:clamp(20px,5vw,28px); margin-bottom:10px; line-height:1.3 }
-    .subtitle{ color:#e0f2fe; font-size:14px; line-height:1.5; margin-bottom:15px }
-    .bullets{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:20px }
-    .bullet{ background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:20px; padding:6px 12px; font-size:13px; font-weight:500; white-space:nowrap }
-    .card{ background:var(--card); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 10px 30px rgba(17,24,39,.1); padding:20px }
-    label{ display:block; margin:15px 0 6px; font-weight:600; font-size:14px }
-    input,select,textarea{ width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; background:#fff; font-size:16px; -webkit-appearance:none }
-    input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--ring) }
-    select{ background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px }
-    .checkbox-group{ display:flex; align-items:flex-start; gap:12px; margin:20px 0; padding:12px; border-radius:8px; transition:all 0.2s }
-    .checkbox-group.error{ background:#fee2e2; border:2px solid var(--err) }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f8f9fa; color: #212529; line-height: 1.6; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
     
-    input[type="checkbox"]{ 
-      position: absolute;
-      opacity: 0;
-      cursor: pointer;
-      height: 0;
-      width: 0;
-    }
+    /* Tab Navigation */
+    .tabs { display: flex; border-bottom: 1px solid #dee2e6; background: #f8f9fa; }
+    .tab { padding: 15px 30px; cursor: pointer; border: none; background: transparent; font-size: 15px; font-weight: 500; color: #6c757d; border-bottom: 3px solid transparent; transition: all 0.2s; }
+    .tab:hover { color: #495057; background: #e9ecef; }
+    .tab.active { color: #007bff; border-bottom-color: #007bff; background: #fff; }
     
-    .checkbox-wrapper {
-      position: relative;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      width: 100%;
-    }
+    /* Content */
+    .tab-content { display: none; padding: 40px; }
+    .tab-content.active { display: block; }
     
-    .custom-checkbox {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      border: 2px solid #d1d5db;
-      border-radius: 6px;
-      background: #fff;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-      margin-top: 2px;
-    }
+    h1 { font-size: 28px; margin-bottom: 20px; color: #212529; }
+    h2 { font-size: 22px; margin: 30px 0 15px; color: #212529; padding-bottom: 8px; border-bottom: 2px solid #e9ecef; }
+    h3 { font-size: 18px; margin: 20px 0 10px; color: #495057; }
+    p { margin-bottom: 15px; color: #6c757d; }
+    ul, ol { margin: 15px 0 15px 25px; }
+    li { margin-bottom: 8px; color: #6c757d; }
+    strong { color: #212529; }
+    a { color: #007bff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
     
-    .custom-checkbox:hover {
-      border-color: var(--brand);
-    }
+    .quote { background: #e7f3ff; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    .highlight { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
     
-    input[type="checkbox"]:checked + .custom-checkbox {
-      background: var(--brand);
-      border-color: var(--brand);
+    @media (max-width: 768px) {
+      .container { border-radius: 0; }
+      .tab-content { padding: 20px; }
+      .tab { padding: 12px 15px; font-size: 14px; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
     }
-    
-    input[type="checkbox"]:checked + .custom-checkbox::after {
-      content: '✓';
-      color: white;
-      font-size: 16px;
-      font-weight: bold;
-    }
-    
-    input[type="checkbox"]:focus + .custom-checkbox {
-      outline: 2px solid var(--ring);
-      outline-offset: 2px;
-    }
-    
-    .checkbox-label{ font-size:14px; color:var(--ink); line-height:1.5; cursor:pointer; flex:1 }
-    .checkbox-label a{ color:var(--brand); text-decoration:underline; font-weight:600 }
-    .checkbox-label a:hover{ color:#1e40af }
-    button{ width:100%; background:var(--cta); color:#fff; border:0; border-radius:10px; padding:14px 20px; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; margin-top:20px }
-    button:hover{ filter:brightness(.9); transform:translateY(-1px) }
-    button:active{ transform:translateY(0) }
-    button:disabled{ opacity:.6; cursor:not-allowed }
-    .privacy{ margin-top:12px; color:var(--muted); font-size:12px; text-align:center; line-height:1.4 }
-    #msg{ margin-top:15px; padding:12px; border-radius:8px; font-size:14px; text-align:center; font-weight:500 }
-    #msg.error{ background:#fee2e2; color:var(--err); border:1px solid #fecaca }
-    #msg.success{ background:#dcfce7; color:var(--ok); border:1px solid #86efac }
-    @media (max-width:480px){ body{padding:10px} .card{padding:15px} h1{font-size:22px} .bullets{flex-direction:column; align-items:center} .bullet{width:100%; max-width:250px; text-align:center} }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1>Plan je eerste afspraak</h1>
-      <h2 style="font-size:20px;font-weight:600;margin:16px 0 8px 0;color:#fff;">Ontdek hoe goed bewegen écht voelt</h2>
-      <p style="font-size:15px;font-weight:500;margin-bottom:12px;color:#e0f2fe;">Plan jouw gratis vitaliteitscheck of rondleiding</p>
-      <p class="subtitle" style="max-width:450px;margin:0 auto 20px;">
-        Bij onze praktijk geloven we dat iedereen, ongeacht leeftijd of klachten, zich fitter, sterker en energieker kan voelen. 
-        Onze oefenruimte is ingericht om jou te laten bewegen met plezier én zichtbaar resultaat.
-      </p>
-      <div class="bullets">
-        <div class="bullet">✅ Persoonlijk plan</div>
-        <div class="bullet">⏱️ Snel ingepland</div>
-      </div>
+    <!-- Tab Navigation -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab(event, 'terms')">Gebruikersvoorwaarden</button>
+      <button class="tab" onclick="switchTab(event, 'privacy')">Privacy Beleid</button>
     </div>
 
-    <form id="leadForm" class="card" novalidate method="post" action="/leads">
-      <input type="hidden" name="praktijk_code" id="praktijk_code" />
-      <input type="hidden" name="utm_source" id="utm_source" />
-      <input type="hidden" name="utm_medium" id="utm_medium" />
-      <input type="hidden" name="utm_campaign" id="utm_campaign" />
+    <!-- Terms of Use Content -->
+    <div id="terms" class="tab-content active">
+      <h1>Gebruikersvoorwaarden</h1>
       
-      <label for="volledige_naam">Volledige naam</label>
-      <input type="text" id="volledige_naam" name="volledige_naam" placeholder="Voor- en achternaam" required autocomplete="name" />
-      
-      <label for="telefoon">Telefoon</label>
-      <input type="tel" id="telefoon" name="telefoon" placeholder="06 12345678" autocomplete="tel" />
-      
-      <label for="emailadres">Emailadres</label>
-      <input type="email" id="emailadres" name="emailadres" placeholder="jij@example.com" autocomplete="email" />
-      
-      <label for="bron">Waar ken je ons van?</label>
-      <select id="bron" name="bron">
-        <option value="">(kies)</option>
-        <option value="Voucher">Voucher</option>
-        <option value="Facebook">Facebook</option>
-        <option value="Instagram">Instagram</option>
-        <option value="LinkedIn">LinkedIn</option>
-      </select>
-      
-      <label for="doel">Wat is je doel?</label>
-      <select id="doel" name="doel">
-        <option value="">(kies je doel)</option>
-        <option value="Mobiliteit verbeteren">Mobiliteit verbeteren</option>
-        <option value="Gewicht verliezen">Gewicht verliezen</option>
-        <option value="Fitter worden">Fitter worden</option>
-        <option value="Conditie verbeteren">Conditie verbeteren</option>
-        <option value="Klachten voorkomen">Klachten voorkomen</option>
-        <option value="Fitheid behouden">Fitheid behouden</option>
-      </select>
-      
-      <div class="checkbox-group" id="toestemming-group">
-        <div class="checkbox-wrapper">
-          <input type="checkbox" id="toestemming" name="toestemming" />
-          <label for="toestemming" class="custom-checkbox"></label>
-          <label for="toestemming" class="checkbox-label">
-            Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">Gebruikersvoorwaarden en Privacy beleid</a> en sta toe dat ik belangrijke mededelingen elektronisch ontvang.
-          </label>
-        </div>
+      <h2>Definities</h2>
+      <p>De volgende gedefinieerde termen verschijnen in deze Gebruikersvoorwaarden:</p>
+      <ul>
+        <li><strong>"U" of "gebruiker":</strong> Een persoon die zich aanmeldt voor, registreert om te gebruiken, of gebruikt, de Service van ons bedrijf.</li>
+        <li><strong>"Account" of "gebruikersaccount":</strong> Een account, met persoonlijke gegevens, geeft een persoon toegang tot de Service.</li>
+        <li><strong>"Service":</strong> Het lead management en afspraakplanningsysteem, zoals beschreven in deze Gebruikersvoorwaarden.</li>
+        <li><strong>"Wij", of "ons":</strong> Dynamic Health Consultancy en CAP-IT Software, de aanbieders van de Service.</li>
+      </ul>
+
+      <h2>Uw verantwoordelijkheden</h2>
+      <p>U erkent en begrijpt dat u verantwoordelijk bent voor het behouden van de vertrouwelijkheid van wachtwoorden die horen bij uw account die u gebruikt om toegang te krijgen tot de Services. Dienovereenkomstig stemt u ermee in dat u uitsluitend verantwoordelijk zult zijn voor alle activiteiten die plaatsvinden onder uw gebruikersaccounts en zult voldoen aan alle toepasselijke nationale of internationale verdragen en regelgeving in verband met uw gebruik van de Service, inclusief die met betrekking tot gegevensprivacy, internationale communicaties en de overdracht van technische of persoonlijke gegevens. U moet:</p>
+      <ol>
+        <li>Ons onmiddellijk op de hoogte stellen van ongeautoriseerd gebruik van enig wachtwoord of account of enig ander bekend of vermoed dat u onmiddellijk redelijke inspanningen stopt om onmiddellijk kopiëren of distributie van Content die bekend is of vermoed wordt door u.</li>
+        <li>Zich niet voordoen als een andere gebruiker of valse identiteitsinformatie verstrekken om toegang te krijgen tot of de Service te gebruiken.</li>
+      </ol>
+
+      <h2>Internet vertragingen</h2>
+      <p>Onze services kunnen onderhevig zijn aan beperkingen, vertragingen en andere problemen die inherent zijn aan het gebruik van het internet en elektronische communicatie. Ons bedrijf is niet verantwoordelijk voor vertragingen, leverings mislukkingen of andere schade die voortvloeit uit dergelijke problemen.</p>
+
+      <h2>Content in de Services</h2>
+      <ul>
+        <li>U begrijpt dat alle informatie (zoals databestanden, geschreven tekst, computersoftware, muziek, audiobestanden of andere geluiden, foto's, video's of andere afbeeldingen) waartoe u toegang heeft als onderdeel van, of via uw gebruik van, de Services de exclusieve verantwoordelijkheid zijn van de persoon van wie dergelijke content afkomstig is. Alle dergelijke informatie wordt hieronder aangeduid als de "Content".</li>
+        <li>U moet zich ervan bewust zijn dat Content die aan u wordt gepresenteerd als onderdeel van de Services wordt beschermd door intellectuele eigendomsrechten die eigendom zijn van ons bedrijf.</li>
+      </ul>
+
+      <h2>Content van u</h2>
+      <ul>
+        <li>U behoudt auteursrecht en alle andere rechten die u al bezit in Content die u indient, post of weergeeft op of via de Services. Door het indienen, posten of weergeven van de content geeft u ons bedrijf een perpetuele, wereldwijde, royalty-vrije en niet-exclusieve licentie om te reproduceren, aan te passen, aan te passen, te vertalen, te publiceren, openbaar uit te voeren, publiekelijk weer te geven en te distribueren elke Content die u indient, post of weergeeft op of via de Services.</li>
+        <li>U stemt ermee in dat deze licentie een recht voor ons bedrijf omvat om dergelijke Content beschikbaar te stellen aan andere bedrijven, organisaties of personen met wie ons bedrijf relaties heeft voor de levering van gesyndiseerde diensten, en om dergelijke Content te gebruiken in verband met de levering van die diensten.</li>
+        <li>U begrijpt dat wij, bij het uitvoeren van de vereiste technische stappen om de Services aan onze gebruikers te bieden, (a) uw Content kunnen verzenden of distribueren via verschillende openbare netwerken en in verschillende media; en (b) dergelijke wijzigingen aan uw Content kunnen aanbrengen die nodig zijn om zich aan te passen aan de technische vereisten van het aansluiten van netwerken, apparaten, services of media. U stemt ermee in dat deze licentie ons bedrijf toestaat om deze acties te ondernemen.</li>
+        <li>U bevestigt en garandeert aan ons bedrijf dat u alle rechten, macht en autoriteit heeft die nodig zijn om de bovenstaande licentie te verlenen.</li>
+      </ul>
+
+      <h2>Beperking van aansprakelijkheid</h2>
+      <ul>
+        <li>Niets in deze Voorwaarden sluit of beperkt onze aansprakelijkheid voor verliezen die niet wettig kunnen worden uitgesloten of beperkt door toepasselijk recht.</li>
+        <li>Behoudens de algemene bepaling in bovenstaande alinea, zullen ons bedrijf, zijn dochterondernemingen en gelieerde ondernemingen, en zijn licentiegevers niet aansprakelijk zijn voor u voor:
+          <ul>
+            <li>eventuele indirecte of gevolgschade die u zou kunnen oplopen. Dit omvat elk verlies van winst (hetzij direct of indirect opgelopen), elk verlies van goodwill of zakelijke reputatie, of enig verlies van gegevens dat door u wordt geleden;</li>
+            <li>enig verlies of schade die door u zou kunnen worden opgelopen als gevolg van:
+              <ul>
+                <li>eventuele wijzigingen die wij kunnen aanbrengen aan de Services, of voor elke permanente of tijdelijke stopzetting in de levering van de Services (of enige functies binnen de Services);</li>
+                <li>het verwijderen, corruptie van of falen om op te slaan, enige Content en andere communicatiegegevens die worden onderhouden of verzonden door of via uw gebruik van de Services;</li>
+                <li>uw falen om ons bedrijf te voorzien van nauwkeurige accountinformatie;</li>
+                <li>uw falen om uw wachtwoord of accountgegevens veilig en vertrouwelijk te houden;</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+      <h2>Disclaimer van garanties</h2>
+      <p>Ons bedrijf en zijn licentiegevers geven geen verklaring, garantie of garantie over de betrouwbaarheid, tijdigheid, kwaliteit, geschiktheid, waarheid, beschikbaarheid, nauwkeurigheid of volledigheid van de service of enige content. Ons bedrijf en zijn licentiegevers vertegenwoordigen of garanderen niet dat:</p>
+      <ul>
+        <li>Het gebruik van de service zal veilig zijn, tijdig, ononderbroken of foutloos of werken in combinatie met andere hardware, software, systeem of gegevens, of</li>
+        <li>De service zal voldoen aan uw vereisten of verwachtingen, of</li>
+        <li>Enige opgeslagen gegevens nauwkeurig of betrouwbaar zullen zijn, of</li>
+        <li>De kwaliteit van producten, diensten, informatie of ander materiaal dat door u is gekocht of verkregen via de Service zal voldoen aan uw vereisten, of</li>
+        <li>Fouten of defecten zullen worden gecorrigeerd, of</li>
+        <li>De service of de server(s) die de service beschikbaar maken vrij zijn van virussen of andere schadelijke componenten.</li>
+      </ul>
+      <p>De service en alle content worden aan u verstrekt op een "as is" basis. Alle voorwaarden, verklaringen en garanties, expliciet, impliciet, statutair of anderszins, inclusief, zonder beperking, enige impliciete garantie van verkoopbaarheid, geschiktheid voor een bepaald doel of niet-inbreuk op rechten van derden, worden hierbij uitgesloten in de maximale mate toegestaan door toepasselijk recht door ons bedrijf en zijn licentiegevers.</p>
+
+      <h2>Eigendomsrechten</h2>
+      <ul>
+        <li>U erkent en stemt ermee in dat ons bedrijf alle wettelijke rechten, titels en belangen bezit in en aan de Services, inclusief alle intellectuele eigendomsrechten die in de Services bestaan (ongeacht of die rechten al dan niet geregistreerd zijn, en waar ook ter wereld die rechten bestaan). U erkent verder dat de Services informatie kunnen bevatten die is aangewezen als vertrouwelijk door ons bedrijf en dat u dergelijke informatie niet zonder voorafgaande schriftelijke toestemming zult openbaar maken.</li>
+        <li>U stemt ermee in dat u geen eigendomsrechten kennisgevingen (inclusief maar niet beperkt tot copyright- en handelsmerkkennisgevingen) die kunnen worden aangehecht aan of opgenomen in de Services zult verwijderen, verbergen of wijzigen.</li>
+      </ul>
+
+      <h2>Licentie van ons bedrijf</h2>
+      <ul>
+        <li>Wij geven u een persoonlijke, wereldwijde, royalty-vrije, niet-overdraagbare en niet-exclusieve licentie om de Services te gebruiken die door ons bedrijf aan u worden verstrekt als onderdeel van de Services zoals door ons bedrijf aan u wordt verstrekt (hierna aangeduid als de "Software"). Deze licentie is uitsluitend bedoeld om u in staat te stellen het voordeel van de Services te gebruiken en te genieten zoals door ons bedrijf wordt verstrekt, op de wijze die is toegestaan door de Voorwaarden.</li>
+        <li>U mag (en u mag niemand anders toestaan om) te kopiëren, wijzigen, een afgeleid werk van creëren, reverse engineer, decompileren of anderszins proberen om de broncode van de Software of enig deel daarvan te extraheren.</li>
+      </ul>
+    </div>
+
+    <!-- Privacy Policy Content -->
+    <div id="privacy" class="tab-content">
+      <h1>Privacy Beleid</h1>
+
+      <h2>Definities</h2>
+      <p>De volgende gedefinieerde termen verschijnen in deze Gebruikersvoorwaarden:</p>
+      <ul>
+        <li><strong>"U" of "gebruiker":</strong> Een persoon die zich aanmeldt voor, registreert om te gebruiken, of gebruikt, de Service van ons bedrijf.</li>
+        <li><strong>"Persoonlijke informatie":</strong> betekent alle informatie die kan worden gebruikt om een individu te identificeren.</li>
+        <li><strong>"Account" of "gebruikersaccount":</strong> Een account, met persoonlijke gegevens, geeft een persoon toegang tot de Service.</li>
+        <li><strong>"Service":</strong> Het lead management en afspraakplanningsysteem, zoals beschreven in deze Gebruikersvoorwaarden.</li>
+        <li><strong>"Wij", of "ons":</strong> Dynamic Health Consultancy en CAP-IT Software, de aanbieders van de Service.</li>
+      </ul>
+
+      <h2>Informatie die wij verzamelen en hoe wij deze gebruiken</h2>
+      <p>Wij respecteren uw privacy en zijn toegewijd aan het beschermen van de persoonlijke informatie die u met ons deelt.</p>
+
+      <h3>Informatie verzameling</h3>
+      <p>Wij verzamelen persoonlijke informatie wanneer u zich registreert voor een gebruikersaccount of de Service gebruikt, of wanneer u uw informatie indient bij de Service. Wij gebruiken alleen dergelijke informatie als deze is verzameld in overeenstemming met aanvaardbare privacypraktijken die consistent zijn met dit Beleid en toepasselijke wetgeving.</p>
+      <p>Als wij voorstellen om persoonlijke informatie te gebruiken voor andere doeleinden dan die welke in dit Beleid worden beschreven en/of in de specifieke servicemeldingen, zullen wij u een effectieve manier bieden om u af te melden voor het gebruik van persoonlijke informatie voor die andere doeleinden. Wij verzamelen of gebruiken geen gevoelige informatie voor andere doeleinden dan die welke in dit Beleid worden beschreven en/of in de specifieke servicemeldingen, tenzij wij uw voorafgaande toestemming hebben verkregen.</p>
+
+      <h3>Kennisgeving</h3>
+      <p>Wanneer persoonlijke informatie wordt verzameld, zullen wij u op het moment van verzameling informeren over het doel van de verzameling. Wij zijn niet van plan uw persoonlijke informatie over te dragen aan derden zonder uw toestemming, behalve onder de beperkte voorwaarden die worden beschreven in de discussie getiteld Informatie delen en openbaarmaken hieronder. Als u ervoor kiest om ons uw persoonlijke informatie te verstrekken, kunnen wij die informatie overdragen binnen ons bedrijf of aan onze externe serviceproviders.</p>
+
+      <h3>Hoe wij verzamelde informatie gebruiken</h3>
+      <p>Wij gebruiken informatie voor verschillende algemene doeleinden: om uw verzoeken voor bepaalde producten en diensten te vervullen, om uw ervaring binnen de Service te personaliseren, om u op de hoogte te houden van de nieuwste productaankondigingen, software-updates, speciale aanbiedingen of andere informatie waarvan wij denken dat u deze graag wilt horen van ons of van onze zakelijke partners, en om u beter te begrijpen en te voorzien van betere diensten. Als wij voorstellen om persoonlijke informatie te gebruiken voor andere doeleinden dan die welke in dit Beleid worden beschreven en/of in de specifieke servicemeldingen, zullen wij u een effectieve manier bieden om u af te melden voor het gebruik van persoonlijke informatie voor die andere doeleinden. Wij verzamelen of gebruiken geen gevoelige informatie voor andere doeleinden dan die welke in dit Beleid worden beschreven en/of in de specifieke servicemeldingen, tenzij wij uw voorafgaande toestemming hebben verkregen.</p>
+
+      <h3>Informatie delen en openbaarmaken</h3>
+      <p>Uw persoonlijke informatie wordt nooit buiten ons bedrijf gedeeld zonder uw toestemming, behalve onder onderstaande voorwaarden. Wij kunnen uw persoonlijke informatie verzenden naar andere bedrijven of personen wanneer wij uw toestemming hebben om de informatie te delen; wij moeten de informatie verzenden naar bedrijven die namens ons bedrijf werken om een product of dienst aan u te leveren (wij zullen die bedrijven alleen de informatie verstrekken die zij nodig hebben om de dienst te leveren, en zij mogen die informatie niet voor enig ander doel gebruiken); om u op de hoogte te houden van de nieuwste productaankondigingen, software-updates, speciale aanbiedingen of andere informatie waarvan wij denken dat u deze graag wilt horen van ons of van onze zakelijke partners. Deze individuen zijn gebonden aan vertrouwelijkheidsverplichtingen en kunnen onderworpen zijn aan discipline, inclusief beëindiging en strafrechtelijke vervolging, als zij deze verplichtingen niet nakomen.</p>
+      <p>Wij zullen uw persoonlijke informatie ook openbaar maken indien vereist om dit te doen door de wet, om onze Gebruikersvoorwaarden af te dwingen, of in dringende omstandigheden, om persoonlijke veiligheid, het publiek of onze diensten te beschermen.</p>
+
+      <h2>Informatiebeveiliging</h2>
+      <p>Wij nemen passende beveiligingsmaatregelen om te beschermen tegen ongeautoriseerde toegang tot of ongeautoriseerde wijziging, openbaarmaking of vernietiging van gegevens. Deze omvatten interne beoordelingen van ons opslag- en verwerkingspraktijken en beveiligingsmaatregelen, evenals fysieke beveiligingsmaatregelen om te beschermen tegen ongeautoriseerde toegang tot systemen waar wij persoonlijke gegevens opslaan.</p>
+
+      <h2>Gegevensintegriteit</h2>
+      <p>Wij verwerken persoonlijke informatie alleen voor de doeleinden waarvoor deze is verzameld en in overeenstemming met dit Beleid of enige toepasselijke servicespecifieke privacymelding. Wij herzien onze gegevensverzamelingspraktijken om ervoor te zorgen dat wij alleen de persoonlijke informatie verzamelen, opslaan en verwerken die nodig is om de dienst te leveren of te verbeteren. Wij nemen redelijke stappen om ervoor te zorgen dat de persoonlijke informatie die wij verwerken nauwkeurig, volledig en actueel is, maar wij zijn afhankelijk van onze gebruikers om hun persoonlijke informatie bij te werken of te corrigeren wanneer dat nodig is.</p>
+
+      <h2>Cookies</h2>
+      <p>Wanneer u de Service bezoekt, sturen wij één of meer cookies - een klein bestand met een reeks tekens - naar uw computer die uw browser uniek identificeert. Wij gebruiken cookies om de kwaliteit van onze service te verbeteren door gebruikersvoorkeuren op te slaan en gebruikerstrends te volgen, zoals hoe mensen zoeken. De meeste browsers zijn in eerste instantie ingesteld om cookies te accepteren, maar u kunt uw browser instellen om alle cookies te weigeren of om aan te geven wanneer een cookie wordt verzonden.</p>
+
+      <h2>Loginformatie</h2>
+      <p>Wanneer u de Services gebruikt, zullen servers automatisch informatie vastleggen die uw browser verzendt wanneer u een website bezoekt. Deze serverlogboeken kunnen informatie bevatten zoals uw webverzoek, Internet Protocol-adres, browsertype, browsertaal, de datum en tijd van uw verzoek en één of meer cookies die uw browser uniek kunnen identificeren.</p>
+
+      <h2>Handhaving</h2>
+      <p>Wij herzien regelmatig onze naleving van dit Beleid. Voel u vrij om eventuele vragen of zorgen met betrekking tot dit Beleid of onze behandeling van persoonlijke informatie rechtstreeks aan ons te stellen via de contactinformatie van de Service.</p>
+
+      <h2>Wijzigingen in dit beleid</h2>
+      <p>Houd er rekening mee dat dit Privacy Beleid van tijd tot tijd kan veranderen. Wij zullen uw rechten onder dit Beleid niet verminderen zonder uw expliciete toestemming, en wij verwachten dat de meeste van dergelijke wijzigingen klein zullen zijn. Ongeacht dit, zullen wij eventuele beleidswijzigingen op deze pagina plaatsen en, als de wijzigingen aanzienlijk zijn, zullen wij een meer prominente melding geven (inclusief e-mailmelding van beleidswijzigingen voor sommige diensten).</p>
+
+      <div class="highlight">
+        <p><strong>Contact:</strong> Voor vragen over dit Privacy Beleid of uw persoonlijke gegevens, kunt u contact met ons opnemen via <a href="mailto:info@cap-it.eu">info@cap-it.eu</a></p>
       </div>
-      
-      <button type="submit">Gratis afspraak aanvragen</button>
-      <p class="privacy">We gebruiken je gegevens alleen om je aanmelding te behandelen. Geen spam, geen verkoop aan derden.</p>
-      <div id="msg"></div>
-    </form>
+    </div>
   </div>
 
   <script>
-    const form = document.getElementById('leadForm');
-    const msg = document.getElementById('msg');
-    const praktijkInput = document.getElementById('praktijk_code');
-    const utmSource = document.getElementById('utm_source');
-    const utmMedium = document.getElementById('utm_medium');
-    const utmCampaign = document.getElementById('utm_campaign');
-    const toestemmingCheckbox = document.getElementById('toestemming');
-    const toestemmingGroup = document.getElementById('toestemming-group');
-
-    function getParam(n){ return new URLSearchParams(location.search).get(n) || ''; }
-    function detectSource(){
-      const utm = getParam('utm_source'); const ref = document.referrer || '';
-      if(utm) return utm;
-      if(ref.includes('instagram.com')) return 'Instagram';
-      if(ref.includes('youtube.com')) return 'YouTube';
-      if(ref.includes('facebook.com')) return 'Facebook';
-      if(ref.includes('linkedin.com')) return 'LinkedIn';
-      if(ref.includes('google.com')) return 'Google';
-      return 'Direct';
-    }
-    praktijkInput.value = getParam('s') || getParam('praktijk') || getParam('p') || '';
-    utmSource.value = getParam('utm_source') || detectSource();
-    utmMedium.value = getParam('utm_medium') || 'organic';
-    utmCampaign.value = getParam('utm_campaign') || '';
-
-    if (praktijkInput.value && navigator.sendBeacon) {
-      const payload = { practice_code: praktijkInput.value, event_type: 'clicked', metadata: { source: utmSource.value } };
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      navigator.sendBeacon('/events', blob);
-    }
-
-    toestemmingCheckbox.addEventListener('change', () => {
-      if (toestemmingCheckbox.checked) {
-        toestemmingGroup.classList.remove('error');
-        msg.textContent = '';
-        msg.className = '';
+    function switchTab(evt, tabName) {
+      // Hide all tab contents
+      const contents = document.getElementsByClassName('tab-content');
+      for (let i = 0; i < contents.length; i++) {
+        contents[i].classList.remove('active');
       }
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msg.textContent=''; msg.className='';
-      toestemmingGroup.classList.remove('error');
       
-      if (!toestemmingCheckbox.checked) {
-        toestemmingGroup.classList.add('error');
-        msg.textContent = '⚠️ Je moet akkoord gaan met de voorwaarden om door te kunnen gaan.';
-        msg.className = 'error';
-        toestemmingCheckbox.focus();
-        return;
+      // Remove active class from all tabs
+      const tabs = document.getElementsByClassName('tab');
+      for (let i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
       }
-
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true; submitBtn.textContent = 'Bezig met versturen…';
-
-      const data = {
-        volledige_naam: document.getElementById('volledige_naam').value.trim(),
-        emailadres: document.getElementById('emailadres').value.trim() || null,
-        telefoon: document.getElementById('telefoon').value.trim() || null,
-        bron: document.getElementById('bron').value || utmSource.value,
-        doel: document.getElementById('doel').value.trim() || null,
-        toestemming: true,
-        praktijk_code: praktijkInput.value || null,
-        utm_source: utmSource.value,
-        utm_medium: utmMedium.value,
-        utm_campaign: utmCampaign.value
-      };
-
-      try{
-        const res = await fetch('/leads', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
-        const result = await res.json().catch(()=> ({}));
-        if(!res.ok){
-          msg.textContent = (result?.details?.join(', ') || result?.error || 'Er ging iets mis.') + ' Probeer het opnieuw.';
-          msg.className = 'error';
-        }else{
-          msg.textContent = '✅ Bedankt! Je aanmelding is verstuurd. We nemen binnen 1 werkdag contact op.';
-          msg.className = 'success';
-          if (praktijkInput.value && navigator.sendBeacon) {
-            const payload = { lead_id: result?.lead?.id || null, practice_code: praktijkInput.value, event_type: 'lead_submitted', metadata: { bron: data.bron } };
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-            navigator.sendBeacon('/events', blob);
-          }
-          setTimeout(()=> form.reset(), 1200);
-        }
-      }catch(err){
-        msg.textContent = 'Er ging iets mis. Controleer je internet en probeer opnieuw.'; msg.className='error';
-      }finally{
-        submitBtn.disabled = false; submitBtn.textContent = 'Gratis afspraak aanvragen';
-      }
-    });
+      
+      // Show current tab and mark as active
+      document.getElementById(tabName).classList.add('active');
+      evt.currentTarget.classList.add('active');
+    }
   </script>
 </body>
 </html>
