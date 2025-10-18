@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teststraat Resultaten</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+
+        input[type="date"],
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .info-box {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        hr {
+            margin: 25px 0;
+            border: none;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        /* Test Categories Grid */
+        .test-categories {
+            margin-bottom: 25px;
+        }
+
+        .category-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .test-card {
+            background: #f8f9ff;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .test-card:hover {
+            border-color: #667eea;
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .test-card.selected {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        .test-card.selected:hover {
+            background: #5568d3;
+        }
+
+        .test-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .test-duration {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .test-card.selected .test-duration {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .result-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .input-with-unit {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-with-unit input {
+            flex: 1;
+        }
+
+        .input-with-unit .unit-label {
+            min-width: 50px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .meetmoment-select {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .meetmoment-select label {
+            color: #d4a017;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            .form-row, .form-row-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏋️ Fit & Leefstijl Teststraat</h1>
+        <p class="subtitle">40+ doelgroep - Snelle testinvoer</p>
+
+        <div class="success-message" id="successMessage">
+            ✓ Opgeslagen!
+        </div>
+
+        <div class="info-box">
+            ⚡ Datum/tijd automatisch vastgelegd. Selecteer meetmoment en klik op een test.
+        </div>
+
+        <form id="trainingForm">
+            <input type="hidden" id="testDate" name="testDate">
+            <input type="hidden" id="testTime" name="testTime">
+            <input type="hidden" id="testType" name="testType">
+
+            <!-- Patiënt Info -->
+            <div class="form-group">
+                <label for="patientName">Naam Patiënt <span class="required">*</span></label>
+                <input type="text" id="patientName" name="patientName" placeholder="Voor- en achternaam" required autofocus>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="birthDate">Geboortedatum <span class="required">*</span></label>
+                    <input type="date" id="birthDate" name="birthDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="gender">Geslacht <span class="required">*</span></label>
+                    <select id="gender" name="gender" required>
+                        <option value="">-- Selecteer --</option>
+                        <option value="M">Man</option>
+                        <option value="V">Vrouw</option>
+                        <option value="X">Anders/Onbekend</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Meetmoment -->
+            <div class="meetmoment-select">
+                <label for="measurementPhase">Meetmoment <span class="required">*</span></label>
+                <select id="measurementPhase" name="measurementPhase" required>
+                    <option value="">-- Selecteer meetmoment --</option>
+                    <option value="week0">Week 0 - Nulmeting</option>
+                    <option value="week6">Week 6 - Voortgang</option>
+                    <option value="week12">Week 12 - Evaluatie</option>
+                </select>
+            </div>
+
+            <hr>
+
+            <!-- Test Selection Cards -->
+            <div class="test-categories">
+                <div class="category-title">1️⃣ Lichaamssamenstelling</div>
+                <div class="test-grid">
+                    <div class="test-card" data-test="bia">
+                        <div class="test-name">BIA</div>
+                        <div class="test-duration">Vetpercentage & spiermassa • 2 min</div>
+                    </div>
+                    <div class="test-card" data-test="weight_bmi">
+                        <div class="test-name">Gewicht / BMI</div>
+                        <div class="test-duration">Basis parameters • 1 min</div>
+                    </div>
+                </div>
+
+                <div class="category-title">2️⃣ Spierkracht</div>
+                <div class="test-grid">
+                    <div class="test-card" data-test="handgrip">
+                        <div class="test-name">Handknijpkracht</div>
+                        <div class="test-duration">Algemene kracht • 2 min</div>
+                    </div>
+                    <div class="test-card" data-test="chair_stand">
+                        <div class="test-name">30-sec Chair Stand</div>
+                        <div class="test-duration">Beenspierkracht • 2 min</div>
+                    </div>
+                    <div class="test-card" data-test="arm_curl">
+                        <div class="test-name">Arm Curl</div>
+                        <div class="test-duration">Armkracht • 2 min</div>
+                    </div>
+                </div>
+
+                <div class="category-title">3️⃣ Balans & Flexibiliteit</div>
+                <div class="test-grid">
+                    <div class="test-card" data-test="one_leg_stand">
+                        <div class="test-name">Eén-been-stand</div>
+                        <div class="test-duration">Evenwicht • 1 min</div>
+                    </div>
+                    <div class="test-card" data-test="sit_reach">
+                        <div class="test-name">Sit & Reach</div>
+                        <div class="test-duration">Lenigheid • 2 min</div>
+                    </div>
+                    <div class="test-card" data-test="shoulder_mobility">
+                        <div class="test-name">Schoudermobiliteit</div>
+                        <div class="test-duration">ROM bovenlichaam • 2 min</div>
+                    </div>
+                </div>
+
+                <div class="category-title">4️⃣ Uithoudingsvermogen</div>
+                <div class="test-grid">
+                    <div class="test-card" data-test="walk_6min">
+                        <div class="test-name">6-Min Wandeltest</div>
+                        <div class="test-duration">Aerobe capaciteit • 8 min</div>
+                    </div>
+                    <div class="test-card" data-test="step_2min">
+                        <div class="test-name">2-Min Step-test</div>
+                        <div class="test-duration">Alternatief 6MWT • 3 min</div>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- Dynamic Result Sections -->
+            <div id="resultSections"></div>
+
+            <div class="form-group" id="notesSection" style="display: none;">
+                <label for="notes">Opmerking (optioneel)</label>
+                <textarea id="notes" name="notes" rows="2" placeholder="Bijv. pijnklachten, eerste keer..."></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn" style="display: none;">✓ Opslaan & Volgende</button>
+        </form>
+    </div>
+
+    <script>
+        // Datum en tijd automatisch vastleggen
+        const pageLoadTime = new Date();
+        document.getElementById('testDate').value = pageLoadTime.toISOString().split('T')[0];
+        document.getElementById('testTime').value = pageLoadTime.toTimeString().slice(0,5);
+
+        // Test configuraties met specifieke velden
+        const testConfigs = {
+            bia: {
+                fields: [
+                    { name: 'gewicht', label: 'Gewicht', unit: 'kg' },
+                    { name: 'vetpercentage', label: 'Vetpercentage', unit: '%' },
+                    { name: 'spiermassa', label: 'Spiermassa', unit: 'kg' },
+                    { name: 'basale_stofwisseling', label: 'Basale Stofwisseling', unit: 'kcal' }
+                ]
+            },
+            weight_bmi: {
+                fields: [
+                    { name: 'gewicht', label: 'Gewicht', unit: 'kg' },
+                    { name: 'lengte', label: 'Lengte', unit: 'cm' }
+                ]
+            },
+            handgrip: {
+                fields: [
+                    { name: 'links', label: 'Links', unit: 'kg' },
+                    { name: 'rechts', label: 'Rechts', unit: 'kg' }
+                ]
+            },
+            chair_stand: {
+                fields: [
+                    { name: 'herhalingen', label: 'Aantal herhalingen', unit: 'x' }
+                ]
+            },
+            arm_curl: {
+                fields: [
+                    { name: 'herhalingen', label: 'Aantal herhalingen', unit: 'x' }
+                ]
+            },
+            one_leg_stand: {
+                fields: [
+                    { name: 'tijd', label: 'Tijd volgehouden', unit: 'sec' }
+                ]
+            },
+            sit_reach: {
+                fields: [
+                    { name: 'afstand', label: 'Afstand', unit: 'cm' }
+                ]
+            },
+            shoulder_mobility: {
+                fields: [
+                    { name: 'afstand', label: 'Afstand', unit: 'cm' }
+                ]
+            },
+            walk_6min: {
+                fields: [
+                    { name: 'afstand', label: 'Afstand', unit: 'm' }
+                ]
+            },
+            step_2min: {
+                fields: [
+                    { name: 'herhalingen', label: 'Aantal herhalingen', unit: 'x' }
+                ]
+            }
+        };
+
+        // Test card selection
+        const testCards = document.querySelectorAll('.test-card');
+        const resultSectionsContainer = document.getElementById('resultSections');
+        const testTypeInput = document.getElementById('testType');
+        const notesSection = document.getElementById('notesSection');
+        const submitBtn = document.getElementById('submitBtn');
+
+        testCards.forEach(card => {
+            card.addEventListener('click', function() {
+                // Remove selected from all cards
+                testCards.forEach(c => c.classList.remove('selected'));
+                
+                // Add selected to clicked card
+                this.classList.add('selected');
+                
+                // Set test type
+                const testType = this.getAttribute('data-test');
+                testTypeInput.value = testType;
+                
+                // Generate dynamic fields
+                generateResultFields(testType);
+                
+                // Show notes and submit button
+                notesSection.style.display = 'block';
+                submitBtn.style.display = 'block';
+            });
+        });
+
+        function generateResultFields(testType) {
+            const config = testConfigs[testType];
+            let html = '<div class="result-section active">';
+            
+            config.fields.forEach(field => {
+                html += `
+                    <div class="form-group">
+                        <label for="${field.name}">${field.label} <span class="required">*</span></label>
+                        <div class="input-with-unit">
+                            <input type="number" 
+                                   id="${field.name}" 
+                                   name="${field.name}" 
+                                   step="0.1" 
+                                   placeholder="Voer waarde in" 
+                                   required>
+                            <span class="unit-label">${field.unit}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            resultSectionsContainer.innerHTML = html;
+            
+            // Focus op eerste veld
+            const firstInput = resultSectionsContainer.querySelector('input');
+            if (firstInput) firstInput.focus();
+        }
+
+        // Form submit
+        document.getElementById('trainingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Verzamel basis data
+            const formData = {
+                date: document.getElementById('testDate').value,
+                time: document.getElementById('testTime').value,
+                patientName: document.getElementById('patientName').value,
+                birthDate: document.getElementById('birthDate').value,
+                gender: document.getElementById('gender').value,
+                measurementPhase: document.getElementById('measurementPhase').value,
+                testType: document.getElementById('testType').value,
+                notes: document.getElementById('notes').value,
+                results: {}
+            };
+
+            // Verzamel alle dynamische resultatenvelden
+            const config = testConfigs[formData.testType];
+            config.fields.forEach(field => {
+                const input = document.getElementById(field.name);
+                if (input) {
+                    formData.results[field.name] = {
+                        value: input.value,
+                        unit: field.unit
+                    };
+                }
+            });
+
+            try {
+                // API call komt hier
+                // const response = await fetch('/api/training-results', {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify(formData)
+                // });
+
+                console.log('Training data:', formData);
+                
+                // Success message
+                const successMsg = document.getElementById('successMessage');
+                successMsg.style.display = 'block';
+                
+                // Reset form
+                this.reset();
+                
+                // Clear test selection
+                testCards.forEach(c => c.classList.remove('selected'));
+                resultSectionsContainer.innerHTML = '';
+                notesSection.style.display = 'none';
+                submitBtn.style.display = 'none';
+                
+                // Focus terug naar naam
+                document.getElementById('patientName').focus();
+                
+                // Hide success message
+                setTimeout(() => {
+                    successMsg.style.display = 'none';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Er is een fout opgetreden bij het opslaan.');
+            }
+        });
+    </script>
+</body>
+</html>
