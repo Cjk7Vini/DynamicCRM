@@ -463,7 +463,6 @@
                 <textarea id="notes" name="notes" rows="3" placeholder="Bijv. algemene conditie, bijzonderheden..."></textarea>
             </div>
 
-            <button type="button" id="addTestBtn" class="btn-secondary" style="display: none;">+ Test Toevoegen</button>
             <button type="submit" id="submitBtn" style="display: none;">💾 Alle Tests Opslaan</button>
         </form>
     </div>
@@ -607,7 +606,6 @@
         const testCards = document.querySelectorAll('.test-card');
         const resultSectionsContainer = document.getElementById('resultSections');
         const submitBtn = document.getElementById('submitBtn');
-        const addTestBtn = document.getElementById('addTestBtn');
         const testSummary = document.getElementById('testSummary');
         const summaryContent = document.getElementById('summaryContent');
 
@@ -666,8 +664,7 @@
             const firstInput = resultSectionsContainer.querySelector('input');
             if (firstInput) firstInput.focus();
             
-            // Show buttons
-            addTestBtn.style.display = 'block';
+            // Show submit button
             submitBtn.style.display = 'block';
         }
 
@@ -722,13 +719,10 @@
             // Clear form
             resultSectionsContainer.innerHTML = '';
             testCards.forEach(c => c.classList.remove('active'));
-        };
-
-        addTestBtn.addEventListener('click', () => {
-            resultSectionsContainer.innerHTML = '';
-            testCards.forEach(c => c.classList.remove('active'));
+            
+            // Scroll naar boven voor volgende test
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
+        };
 
         function updateSummary() {
             if (Object.keys(savedTests).length === 0) {
@@ -821,7 +815,6 @@
                 resultSectionsContainer.innerHTML = '';
                 testSummary.style.display = 'none';
                 submitBtn.style.display = 'none';
-                addTestBtn.style.display = 'none';
                 
                 submitBtn.disabled = false;
                 submitBtn.textContent = '💾 Alle Tests Opslaan';
