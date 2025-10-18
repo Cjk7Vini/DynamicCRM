@@ -113,6 +113,18 @@
             font-weight: 600;
         }
 
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+            text-align: center;
+            font-weight: 600;
+        }
+
         hr {
             margin: 25px 0;
             border: none;
@@ -227,13 +239,18 @@
             margin-top: 10px;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
 
         button:active {
             transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .meetmoment-select {
@@ -274,6 +291,10 @@
 
         <div class="success-message" id="successMessage">
             ✓ Opgeslagen!
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            ❌ Er ging iets mis bij het opslaan
         </div>
 
         <div class="info-box">
@@ -520,6 +541,14 @@
         document.getElementById('trainingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const submitBtn = document.getElementById('submitBtn');
+            const successMsg = document.getElementById('successMessage');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            // Disable button tijdens submit
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Bezig met opslaan...';
+            
             // Verzamel basis data
             const formData = {
                 date: document.getElementById('testDate').value,
@@ -546,18 +575,22 @@
             });
 
             try {
-                // API call komt hier
-                // const response = await fetch('/api/training-results', {
-                //     method: 'POST',
-                //     headers: { 'Content-Type': 'application/json' },
-                //     body: JSON.stringify(formData)
-                // });
+                const response = await fetch('/api/training-results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
 
-                console.log('Training data:', formData);
+                if (!response.ok) {
+                    throw new Error('Server error: ' + response.status);
+                }
+
+                const result = await response.json();
+                console.log('✅ Opgeslagen:', result);
                 
                 // Success message
-                const successMsg = document.getElementById('successMessage');
                 successMsg.style.display = 'block';
+                errorMsg.style.display = 'none';
                 
                 // Reset form
                 this.reset();
@@ -568,17 +601,34 @@
                 notesSection.style.display = 'none';
                 submitBtn.style.display = 'none';
                 
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✓ Opslaan & Volgende';
+                
                 // Focus terug naar naam
                 document.getElementById('patientName').focus();
                 
                 // Hide success message
                 setTimeout(() => {
                     successMsg.style.display = 'none';
-                }, 2000);
+                }, 3000);
 
             } catch (error) {
-                console.error('Error:', error);
-                alert('Er is een fout opgetreden bij het opslaan.');
+                console.error('❌ Error:', error);
+                
+                // Error message
+                errorMsg.textContent = '❌ ' + error.message;
+                errorMsg.style.display = 'block';
+                successMsg.style.display = 'none';
+                
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✓ Opslaan & Volgende';
+                
+                // Hide error after 5 seconds
+                setTimeout(() => {
+                    errorMsg.style.display = 'none';
+                }, 5000);
             }
         });
     </script>
