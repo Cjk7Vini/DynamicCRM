@@ -394,6 +394,10 @@
 
             <hr>
 
+            <button type="button" id="startTestsBtn" style="background: #10b981; margin-bottom: 30px; font-size: 18px;">
+                🚀 Start Alle Tests
+            </button>
+
             <!-- Test Selection Cards - NU ALLEEN VOOR REFERENTIE -->
             <div class="test-categories">
                 <p style="text-align: center; color: #6b7280; margin-bottom: 20px;">
@@ -452,10 +456,6 @@
                     </div>
                 </div>
             </div>
-
-            <button type="button" id="startTestsBtn" style="background: #10b981; margin-top: 20px;">
-                🚀 Start Alle Tests
-            </button>
 
             <!-- Dynamic Result Sections -->
             <div id="resultSections"></div>
@@ -634,14 +634,25 @@
         const progressIndicator = document.getElementById('progressIndicator');
         const startTestsBtn = document.getElementById('startTestsBtn');
 
-        // Disable manual test selection
+        // Disable manual test selection initially
         testCards.forEach(card => {
-            card.style.cursor = 'not-allowed';
-            card.style.opacity = '0.6';
+            card.style.pointerEvents = 'none';
         });
 
         // Start button
         startTestsBtn.addEventListener('click', () => {
+            // Check if patient info is filled
+            const patientName = document.getElementById('patientName').value;
+            const birthDate = document.getElementById('birthDate').value;
+            const gender = document.getElementById('gender').value;
+            const measurementPhase = document.getElementById('measurementPhase').value;
+            
+            if (!patientName || !birthDate || !gender || !measurementPhase) {
+                alert('⚠️ Vul eerst alle patiëntgegevens en meetmoment in bovenaan het formulier');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            
             currentTestIndex = 0;
             startTestsBtn.style.display = 'none';
             loadNextTest();
