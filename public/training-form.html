@@ -394,41 +394,12 @@
 
             <hr>
 
-            <!-- Start Button - GROOT EN DUIDELIJK -->
-            <div style="text-align: center; margin: 30px 0;">
-                <button type="button" id="startTestsBtn" style="
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: white;
-                    font-size: 20px;
-                    padding: 20px 40px;
-                    border: none;
-                    border-radius: 12px;
-                    cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-                    font-weight: 700;
-                    display: block;
-                    width: 100%;
-                    max-width: 500px;
-                    margin: 0 auto;
-                ">
-                    🚀 Start Teststraat
-                </button>
-                <p style="color: #6b7280; margin-top: 12px; font-size: 14px;">
-                    Klik hier om alle tests in volgorde te doorlopen
-                </p>
-            </div>
-
-            <hr style="margin: 30px 0;">
-
-            <!-- Test Selection Cards - ALLEEN VOOR OVERZICHT -->
-            <div class="test-categories" id="testOverview">
-                <p style="text-align: center; color: #6b7280; margin-bottom: 20px; font-weight: 600;">
-                    📋 Testoverzicht (9 tests totaal)
-                </p>
+            <!-- Test Selection Cards - CLICKABLE -->
+            <div class="test-categories">
                 
                 <div class="category-title">1️⃣ Lichaamssamenstelling</div>
                 <div class="test-grid">
-                    <div class="test-card" data-test="bia" data-order="1">
+                    <div class="test-card" data-test="bia">
                         <div class="test-name">BIA</div>
                         <div class="test-duration">Complete body analyse • 3 min</div>
                     </div>
@@ -436,15 +407,15 @@
 
                 <div class="category-title">2️⃣ Spierkracht</div>
                 <div class="test-grid">
-                    <div class="test-card" data-test="handgrip" data-order="2">
+                    <div class="test-card" data-test="handgrip">
                         <div class="test-name">Handknijpkracht</div>
                         <div class="test-duration">Algemene kracht • 2 min</div>
                     </div>
-                    <div class="test-card" data-test="chair_stand" data-order="3">
+                    <div class="test-card" data-test="chair_stand">
                         <div class="test-name">30-sec Chair Stand</div>
                         <div class="test-duration">Beenspierkracht • 2 min</div>
                     </div>
-                    <div class="test-card" data-test="arm_curl" data-order="4">
+                    <div class="test-card" data-test="arm_curl">
                         <div class="test-name">Arm Curl</div>
                         <div class="test-duration">Armkracht • 2 min</div>
                     </div>
@@ -452,15 +423,15 @@
 
                 <div class="category-title">3️⃣ Balans & Flexibiliteit</div>
                 <div class="test-grid">
-                    <div class="test-card" data-test="one_leg_stand" data-order="5">
+                    <div class="test-card" data-test="one_leg_stand">
                         <div class="test-name">Eén-been-stand</div>
                         <div class="test-duration">Evenwicht • 1 min</div>
                     </div>
-                    <div class="test-card" data-test="sit_reach" data-order="6">
+                    <div class="test-card" data-test="sit_reach">
                         <div class="test-name">Sit & Reach</div>
                         <div class="test-duration">Lenigheid • 2 min</div>
                     </div>
-                    <div class="test-card" data-test="shoulder_mobility" data-order="7">
+                    <div class="test-card" data-test="shoulder_mobility">
                         <div class="test-name">Schoudermobiliteit</div>
                         <div class="test-duration">ROM bovenlichaam • 2 min</div>
                     </div>
@@ -468,11 +439,11 @@
 
                 <div class="category-title">4️⃣ Uithoudingsvermogen</div>
                 <div class="test-grid">
-                    <div class="test-card" data-test="walk_6min" data-order="8">
+                    <div class="test-card" data-test="walk_6min">
                         <div class="test-name">6-Min Wandeltest</div>
                         <div class="test-duration">Aerobe capaciteit • 8 min</div>
                     </div>
-                    <div class="test-card" data-test="step_2min" data-order="9">
+                    <div class="test-card" data-test="step_2min">
                         <div class="test-name">2-Min Step-test</div>
                         <div class="test-duration">Alternatief 6MWT • 3 min</div>
                     </div>
@@ -653,103 +624,28 @@
         const submitBtn = document.getElementById('submitBtn');
         const testSummary = document.getElementById('testSummary');
         const summaryContent = document.getElementById('summaryContent');
-        const progressIndicator = document.getElementById('progressIndicator');
-        const startTestsBtn = document.getElementById('startTestsBtn');
-        const testOverview = document.getElementById('testOverview');
 
-        console.log('Start button:', startTestsBtn); // Debug
-
-        // Start button click handler
-        if (startTestsBtn) {
-            startTestsBtn.addEventListener('click', function() {
-                console.log('Start button clicked!'); // Debug
+        // Make cards clickable
+        testCards.forEach(card => {
+            card.addEventListener('click', function() {
+                const testType = this.getAttribute('data-test');
                 
-                // Check if patient info is filled
-                const patientName = document.getElementById('patientName').value;
-                const birthDate = document.getElementById('birthDate').value;
-                const gender = document.getElementById('gender').value;
-                const measurementPhase = document.getElementById('measurementPhase').value;
+                // Remove active from all cards
+                testCards.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
                 
-                if (!patientName || !birthDate || !gender || !measurementPhase) {
-                    alert('⚠️ Vul eerst alle patiëntgegevens en meetmoment in bovenaan het formulier');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                    return;
-                }
+                // Generate form
+                generateResultFields(testType);
                 
-                // Hide start button and overview
-                startTestsBtn.style.display = 'none';
-                testOverview.style.display = 'none';
-                
-                // Start first test
-                currentTestIndex = 0;
-                loadNextTest();
+                // Scroll to form
+                setTimeout(() => {
+                    resultSectionsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
             });
-        } else {
-            console.error('Start button not found!');
-        }
-
-        function loadNextTest() {
-            console.log('Loading test index:', currentTestIndex); // Debug
-            
-            if (currentTestIndex >= testOrder.length) {
-                // Alle tests gedaan
-                showFinalScreen();
-                return;
-            }
-            
-            const testType = testOrder[currentTestIndex];
-            console.log('Loading test type:', testType); // Debug
-            
-            const card = document.querySelector(`[data-test="${testType}"]`);
-            
-            // Update progress
-            progressIndicator.innerHTML = `📍 Test ${currentTestIndex + 1} van ${testOrder.length}: <strong>${getTestName(testType)}</strong>`;
-            progressIndicator.style.display = 'block';
-            
-            // Highlight current card
-            testCards.forEach(c => c.classList.remove('active'));
-            if (card) {
-                card.classList.add('active');
-                card.style.opacity = '1';
-            }
-            
-            // Generate form
-            generateResultFields(testType);
-            
-            // Show submit button for later
-            submitBtn.style.display = 'none'; // Nog niet tonen
-            
-            // Scroll to form
-            setTimeout(() => {
-                resultSectionsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 300);
-        }
-
-        function showFinalScreen() {
-            resultSectionsContainer.innerHTML = `
-                <div style="background: #f0fdf4; border: 2px solid #10b981; border-radius: 16px; padding: 30px; text-align: center;">
-                    <div style="font-size: 64px; margin-bottom: 16px;">🎉</div>
-                    <h2 style="color: #065f46; margin-bottom: 16px;">Alle tests voltooid!</h2>
-                    <p style="color: #047857; margin-bottom: 24px;">
-                        Je hebt ${Object.keys(savedTests).length} tests ingevuld. Klik op de knop hieronder om alles op te slaan.
-                    </p>
-                </div>
-            `;
-            
-            progressIndicator.innerHTML = `✅ <strong>Alle ${testOrder.length} tests voltooid!</strong>`;
-            submitBtn.style.display = 'block';
-            submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        });
 
         function generateResultFields(testType) {
-            console.log('Generating fields for:', testType); // Debug
-            
             const config = testConfigs[testType];
-            if (!config) {
-                console.error('No config found for test type:', testType);
-                return;
-            }
-            
             let html = `<div class="result-section active" data-test="${testType}">
                 <h3 style="color: #667eea; margin-bottom: 15px;">📝 ${getTestName(testType)}</h3>`;
             
@@ -775,23 +671,17 @@
                 `;
             });
             
-            const isLastTest = currentTestIndex === testOrder.length - 1;
-            const buttonText = isLastTest ? 'Opslaan' : 'Opslaan & Volgende';
-            
             html += `
                 <button type="button" class="btn-secondary" onclick="saveCurrentTest('${testType}')">
-                    ✓ ${getTestName(testType)} ${buttonText}
+                    ✓ ${getTestName(testType)} Opslaan
                 </button>
             </div>`;
             
             resultSectionsContainer.innerHTML = html;
-            console.log('Fields generated, HTML length:', html.length); // Debug
             
             // Focus op eerste veld
             const firstInput = resultSectionsContainer.querySelector('input');
-            if (firstInput) {
-                setTimeout(() => firstInput.focus(), 400);
-            }
+            if (firstInput) firstInput.focus();
         }
 
         function getTestName(testType) {
@@ -842,9 +732,11 @@
             
             updateSummary();
             
-            // Auto-advance to next test
-            currentTestIndex++;
-            loadNextTest();
+            // Clear form and scroll to top for next test
+            resultSectionsContainer.innerHTML = '';
+            testCards.forEach(c => c.classList.remove('active'));
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         function updateSummary() {
