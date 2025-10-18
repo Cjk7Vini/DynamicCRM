@@ -23,7 +23,7 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
@@ -85,12 +85,6 @@
             gap: 15px;
         }
 
-        .form-row-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 15px;
-        }
-
         .info-box {
             background: #f8f9ff;
             border-left: 4px solid #667eea;
@@ -101,28 +95,26 @@
             color: #555;
         }
 
-        .success-message {
+        .success-message,
+        .error-message {
             display: none;
-            background: #d4edda;
-            color: #155724;
             padding: 12px;
             border-radius: 10px;
             margin-bottom: 20px;
-            border: 1px solid #c3e6cb;
             text-align: center;
             font-weight: 600;
         }
 
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
         .error-message {
-            display: none;
             background: #f8d7da;
             color: #721c24;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
             border: 1px solid #f5c6cb;
-            text-align: center;
-            font-weight: 600;
         }
 
         hr {
@@ -131,7 +123,6 @@
             border-top: 2px solid #f0f0f0;
         }
 
-        /* Test Categories Grid */
         .test-categories {
             margin-bottom: 25px;
         }
@@ -160,6 +151,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             text-align: center;
+            position: relative;
         }
 
         .test-card:hover {
@@ -169,14 +161,31 @@
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
         }
 
-        .test-card.selected {
+        .test-card.completed {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .test-card.completed .test-duration {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .test-card.active {
             background: #667eea;
             border-color: #667eea;
             color: white;
         }
 
-        .test-card.selected:hover {
-            background: #5568d3;
+        .test-card.active .test-duration {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .checkmark {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 18px;
         }
 
         .test-name {
@@ -190,13 +199,13 @@
             color: #666;
         }
 
-        .test-card.selected .test-duration {
-            color: rgba(255, 255, 255, 0.8);
-        }
-
         .result-section {
             display: none;
             animation: fadeIn 0.3s ease;
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
         }
 
         .result-section.active {
@@ -253,6 +262,14 @@
             cursor: not-allowed;
         }
 
+        .btn-secondary {
+            background: #6b7280;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            box-shadow: 0 10px 25px rgba(107, 114, 128, 0.3);
+        }
+
         .meetmoment-select {
             background: #fff9e6;
             border: 2px solid #ffd700;
@@ -265,12 +282,38 @@
             color: #d4a017;
         }
 
+        .test-summary {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-summary h3 {
+            color: #065f46;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .test-summary-item {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .test-summary-item strong {
+            color: #667eea;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
             }
 
-            .form-row, .form-row-3 {
+            .form-row {
                 grid-template-columns: 1fr;
             }
 
@@ -287,10 +330,10 @@
 <body>
     <div class="container">
         <h1>🏋️ Fit & Leefstijl Teststraat</h1>
-        <p class="subtitle">40+ doelgroep - Snelle testinvoer</p>
+        <p class="subtitle">40+ doelgroep - Multi-test invoer</p>
 
         <div class="success-message" id="successMessage">
-            ✓ Opgeslagen!
+            ✓ Alle tests succesvol opgeslagen!
         </div>
 
         <div class="error-message" id="errorMessage">
@@ -298,13 +341,12 @@
         </div>
 
         <div class="info-box">
-            ⚡ Datum/tijd automatisch vastgelegd. Selecteer meetmoment en klik op een test.
+            ⚡ Vul meerdere tests in en sla alles in één keer op. Klik op een test om te beginnen.
         </div>
 
         <form id="trainingForm">
             <input type="hidden" id="testDate" name="testDate">
             <input type="hidden" id="testTime" name="testTime">
-            <input type="hidden" id="testType" name="testType">
 
             <!-- Patiënt Info -->
             <div class="form-group">
@@ -329,6 +371,16 @@
                 </div>
             </div>
 
+            <!-- Praktijk Info -->
+            <div class="form-group" id="practiceSection">
+                <label for="practiceDisplay">Praktijk <span class="required">*</span></label>
+                <input type="text" id="practiceDisplay" readonly style="background: #f3f4f6; cursor: not-allowed; font-weight: 600; color: #667eea;">
+                <input type="hidden" id="practiceCode" name="practiceCode" required>
+                <small style="color: #10b981; font-size: 12px; margin-top: 4px; display: block;" id="practiceHint">
+                    ✓ Praktijk automatisch herkend
+                </small>
+            </div>
+
             <!-- Meetmoment -->
             <div class="meetmoment-select">
                 <label for="measurementPhase">Meetmoment <span class="required">*</span></label>
@@ -348,11 +400,7 @@
                 <div class="test-grid">
                     <div class="test-card" data-test="bia">
                         <div class="test-name">BIA</div>
-                        <div class="test-duration">Vetpercentage & spiermassa • 2 min</div>
-                    </div>
-                    <div class="test-card" data-test="weight_bmi">
-                        <div class="test-name">Gewicht / BMI</div>
-                        <div class="test-duration">Basis parameters • 1 min</div>
+                        <div class="test-duration">Complete body analyse • 3 min</div>
                     </div>
                 </div>
 
@@ -401,17 +449,22 @@
                 </div>
             </div>
 
-            <hr>
-
             <!-- Dynamic Result Sections -->
             <div id="resultSections"></div>
 
-            <div class="form-group" id="notesSection" style="display: none;">
-                <label for="notes">Opmerking (optioneel)</label>
-                <textarea id="notes" name="notes" rows="2" placeholder="Bijv. pijnklachten, eerste keer..."></textarea>
+            <!-- Test Summary -->
+            <div class="test-summary" id="testSummary" style="display: none;">
+                <h3>✓ Ingevulde Tests</h3>
+                <div id="summaryContent"></div>
             </div>
 
-            <button type="submit" id="submitBtn" style="display: none;">✓ Opslaan & Volgende</button>
+            <div class="form-group">
+                <label for="notes">Algemene Opmerking (optioneel)</label>
+                <textarea id="notes" name="notes" rows="3" placeholder="Bijv. algemene conditie, bijzonderheden..."></textarea>
+            </div>
+
+            <button type="button" id="addTestBtn" class="btn-secondary" style="display: none;">+ Test Toevoegen</button>
+            <button type="submit" id="submitBtn" style="display: none;">💾 Alle Tests Opslaan</button>
         </form>
     </div>
 
@@ -421,20 +474,88 @@
         document.getElementById('testDate').value = pageLoadTime.toISOString().split('T')[0];
         document.getElementById('testTime').value = pageLoadTime.toTimeString().slice(0,5);
 
-        // Test configuraties met specifieke velden
+        // Lees praktijkcode uit URL (?p=CODE of ?s=CODE)
+        function getPracticeCodeFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('p') || urlParams.get('s') || null;
+        }
+
+        // Laad praktijken uit database
+        async function loadPractices() {
+            const urlPracticeCode = getPracticeCodeFromURL();
+            
+            // GEEN PRAKTIJKCODE IN URL = GEEN TOEGANG
+            if (!urlPracticeCode) {
+                document.getElementById('practiceSection').innerHTML = `
+                    <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 12px; padding: 20px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+                        <h3 style="color: #991b1b; margin-bottom: 12px;">Geen toegang</h3>
+                        <p style="color: #7f1d1d; margin-bottom: 16px;">
+                            Deze pagina is alleen toegankelijk via een unieke praktijklink.
+                        </p>
+                        <p style="color: #7f1d1d; font-size: 14px;">
+                            Neem contact op met je praktijkbeheerder voor de juiste link.
+                        </p>
+                    </div>
+                `;
+                
+                // Disable hele form
+                document.getElementById('trainingForm').style.pointerEvents = 'none';
+                document.getElementById('trainingForm').style.opacity = '0.5';
+                return;
+            }
+            
+            try {
+                // Haal praktijken op via API endpoint
+                const response = await fetch('/api/practices');
+                
+                if (!response.ok) {
+                    throw new Error('Kon praktijken niet laden');
+                }
+                
+                const practices = await response.json();
+                const practice = practices.find(p => p.code === urlPracticeCode);
+                
+                if (practice) {
+                    // Praktijk gevonden - toon naam
+                    document.getElementById('practiceDisplay').value = `${practice.naam} (${practice.code})`;
+                    document.getElementById('practiceCode').value = practice.code;
+                    document.getElementById('practiceHint').innerHTML = '✓ Praktijk automatisch herkend';
+                    document.getElementById('practiceHint').style.color = '#10b981';
+                } else {
+                    // Code niet gevonden in database
+                    document.getElementById('practiceDisplay').value = `⚠️ Onbekende praktijkcode: ${urlPracticeCode}`;
+                    document.getElementById('practiceCode').value = urlPracticeCode;
+                    document.getElementById('practiceHint').innerHTML = '⚠️ Deze praktijkcode bestaat niet in het systeem';
+                    document.getElementById('practiceHint').style.color = '#ef4444';
+                    
+                    // Disable form
+                    document.getElementById('trainingForm').style.pointerEvents = 'none';
+                    document.getElementById('trainingForm').style.opacity = '0.5';
+                }
+                
+            } catch (error) {
+                console.error('Fout bij laden praktijken:', error);
+                
+                // API faalde, maar we hebben wel een code uit URL
+                document.getElementById('practiceDisplay').value = `Praktijk ${urlPracticeCode}`;
+                document.getElementById('practiceCode').value = urlPracticeCode;
+                document.getElementById('practiceHint').innerHTML = '⚠️ Kon praktijknaam niet laden, maar code is ingevuld';
+                document.getElementById('practiceHint').style.color = '#f59e0b';
+            }
+        }
+
+        loadPractices();
+
+        // Test configuraties - BIA nu met gewicht en lengte
         const testConfigs = {
             bia: {
                 fields: [
                     { name: 'gewicht', label: 'Gewicht', unit: 'kg' },
+                    { name: 'lengte', label: 'Lengte', unit: 'cm' },
                     { name: 'vetpercentage', label: 'Vetpercentage', unit: '%' },
                     { name: 'spiermassa', label: 'Spiermassa', unit: 'kg' },
                     { name: 'basale_stofwisseling', label: 'Basale Stofwisseling', unit: 'kcal' }
-                ]
-            },
-            weight_bmi: {
-                fields: [
-                    { name: 'gewicht', label: 'Gewicht', unit: 'kg' },
-                    { name: 'lengte', label: 'Lengte', unit: 'cm' }
                 ]
             },
             handgrip: {
@@ -480,48 +601,54 @@
             }
         };
 
-        // Test card selection
+        // Opgeslagen test data
+        const savedTests = {};
+
         const testCards = document.querySelectorAll('.test-card');
         const resultSectionsContainer = document.getElementById('resultSections');
-        const testTypeInput = document.getElementById('testType');
-        const notesSection = document.getElementById('notesSection');
         const submitBtn = document.getElementById('submitBtn');
+        const addTestBtn = document.getElementById('addTestBtn');
+        const testSummary = document.getElementById('testSummary');
+        const summaryContent = document.getElementById('summaryContent');
 
         testCards.forEach(card => {
             card.addEventListener('click', function() {
-                // Remove selected from all cards
-                testCards.forEach(c => c.classList.remove('selected'));
-                
-                // Add selected to clicked card
-                this.classList.add('selected');
-                
-                // Set test type
                 const testType = this.getAttribute('data-test');
-                testTypeInput.value = testType;
                 
-                // Generate dynamic fields
+                // Toggle active state
+                testCards.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Genereer of toon saved fields
                 generateResultFields(testType);
                 
-                // Show notes and submit button
-                notesSection.style.display = 'block';
-                submitBtn.style.display = 'block';
+                // Scroll naar resultaten
+                setTimeout(() => {
+                    resultSectionsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
             });
         });
 
         function generateResultFields(testType) {
             const config = testConfigs[testType];
-            let html = '<div class="result-section active">';
+            let html = `<div class="result-section active" data-test="${testType}">
+                <h3 style="color: #667eea; margin-bottom: 15px;">${getTestName(testType)}</h3>`;
             
             config.fields.forEach(field => {
+                const savedValue = savedTests[testType]?.[field.name] || '';
                 html += `
                     <div class="form-group">
-                        <label for="${field.name}">${field.label} <span class="required">*</span></label>
+                        <label for="${testType}_${field.name}">${field.label} <span class="required">*</span></label>
                         <div class="input-with-unit">
                             <input type="number" 
-                                   id="${field.name}" 
-                                   name="${field.name}" 
+                                   id="${testType}_${field.name}" 
+                                   name="${testType}_${field.name}" 
                                    step="0.1" 
-                                   placeholder="Voer waarde in" 
+                                   placeholder="Voer waarde in"
+                                   value="${savedValue}"
+                                   data-test="${testType}"
+                                   data-field="${field.name}"
+                                   data-unit="${field.unit}"
                                    required>
                             <span class="unit-label">${field.unit}</span>
                         </div>
@@ -529,103 +656,192 @@
                 `;
             });
             
-            html += '</div>';
+            html += `
+                <button type="button" class="btn-secondary" onclick="saveCurrentTest('${testType}')">✓ ${getTestName(testType)} Opslaan</button>
+            </div>`;
+            
             resultSectionsContainer.innerHTML = html;
             
             // Focus op eerste veld
             const firstInput = resultSectionsContainer.querySelector('input');
             if (firstInput) firstInput.focus();
+            
+            // Show buttons
+            addTestBtn.style.display = 'block';
+            submitBtn.style.display = 'block';
         }
 
-        // Form submit
+        function getTestName(testType) {
+            const names = {
+                bia: 'BIA',
+                handgrip: 'Handknijpkracht',
+                chair_stand: '30-sec Chair Stand',
+                arm_curl: 'Arm Curl',
+                one_leg_stand: 'Eén-been-stand',
+                sit_reach: 'Sit & Reach',
+                shoulder_mobility: 'Schoudermobiliteit',
+                walk_6min: '6-Min Wandeltest',
+                step_2min: '2-Min Step-test'
+            };
+            return names[testType] || testType;
+        }
+
+        window.saveCurrentTest = function(testType) {
+            const config = testConfigs[testType];
+            const testData = {};
+            let allFilled = true;
+            
+            config.fields.forEach(field => {
+                const input = document.getElementById(`${testType}_${field.name}`);
+                if (input && input.value) {
+                    testData[field.name] = input.value;
+                } else {
+                    allFilled = false;
+                }
+            });
+            
+            if (!allFilled) {
+                alert('Vul alle velden in voordat je opslaat');
+                return;
+            }
+            
+            savedTests[testType] = testData;
+            
+            // Mark card as completed
+            const card = document.querySelector(`[data-test="${testType}"]`);
+            if (card) {
+                card.classList.remove('active');
+                card.classList.add('completed');
+                if (!card.querySelector('.checkmark')) {
+                    card.innerHTML = '<span class="checkmark">✓</span>' + card.innerHTML;
+                }
+            }
+            
+            updateSummary();
+            
+            // Clear form
+            resultSectionsContainer.innerHTML = '';
+            testCards.forEach(c => c.classList.remove('active'));
+        };
+
+        addTestBtn.addEventListener('click', () => {
+            resultSectionsContainer.innerHTML = '';
+            testCards.forEach(c => c.classList.remove('active'));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        function updateSummary() {
+            if (Object.keys(savedTests).length === 0) {
+                testSummary.style.display = 'none';
+                return;
+            }
+            
+            testSummary.style.display = 'block';
+            let html = '';
+            
+            for (const [testType, data] of Object.entries(savedTests)) {
+                html += `<div class="test-summary-item">
+                    <strong>${getTestName(testType)}:</strong> ${Object.values(data).length} metingen
+                </div>`;
+            }
+            
+            summaryContent.innerHTML = html;
+        }
+
+        // Form submit - save ALL tests
         document.getElementById('trainingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            if (Object.keys(savedTests).length === 0) {
+                alert('Vul minimaal één test in voordat je opslaat');
+                return;
+            }
             
             const submitBtn = document.getElementById('submitBtn');
             const successMsg = document.getElementById('successMessage');
             const errorMsg = document.getElementById('errorMessage');
             
-            // Disable button tijdens submit
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳ Bezig met opslaan...';
             
-            // Verzamel basis data
-            const formData = {
+            const baseData = {
                 date: document.getElementById('testDate').value,
                 time: document.getElementById('testTime').value,
                 patientName: document.getElementById('patientName').value,
                 birthDate: document.getElementById('birthDate').value,
                 gender: document.getElementById('gender').value,
+                practiceCode: document.getElementById('practiceCode').value,
                 measurementPhase: document.getElementById('measurementPhase').value,
-                testType: document.getElementById('testType').value,
-                notes: document.getElementById('notes').value,
-                results: {}
+                notes: document.getElementById('notes').value
             };
 
-            // Verzamel alle dynamische resultatenvelden
-            const config = testConfigs[formData.testType];
-            config.fields.forEach(field => {
-                const input = document.getElementById(field.name);
-                if (input) {
-                    formData.results[field.name] = {
-                        value: input.value,
-                        unit: field.unit
-                    };
-                }
-            });
-
             try {
-                const response = await fetch('/api/training-results', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
+                // Save each test separately
+                for (const [testType, results] of Object.entries(savedTests)) {
+                    const formData = {
+                        ...baseData,
+                        testType,
+                        results: {}
+                    };
+                    
+                    const config = testConfigs[testType];
+                    config.fields.forEach(field => {
+                        if (results[field.name]) {
+                            formData.results[field.name] = {
+                                value: results[field.name],
+                                unit: field.unit
+                            };
+                        }
+                    });
+                    
+                    const response = await fetch('/api/training-results', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
 
-                if (!response.ok) {
-                    throw new Error('Server error: ' + response.status);
+                    if (!response.ok) {
+                        throw new Error(`Test ${testType} failed: ` + response.status);
+                    }
                 }
 
-                const result = await response.json();
-                console.log('✅ Opgeslagen:', result);
+                console.log('✅ Alle tests opgeslagen');
                 
-                // Success message
                 successMsg.style.display = 'block';
                 errorMsg.style.display = 'none';
                 
-                // Reset form
+                // Reset everything
                 this.reset();
-                
-                // Clear test selection
-                testCards.forEach(c => c.classList.remove('selected'));
+                Object.keys(savedTests).forEach(key => delete savedTests[key]);
+                testCards.forEach(c => {
+                    c.classList.remove('active', 'completed');
+                    const checkmark = c.querySelector('.checkmark');
+                    if (checkmark) checkmark.remove();
+                });
                 resultSectionsContainer.innerHTML = '';
-                notesSection.style.display = 'none';
+                testSummary.style.display = 'none';
                 submitBtn.style.display = 'none';
+                addTestBtn.style.display = 'none';
                 
-                // Reset button
                 submitBtn.disabled = false;
-                submitBtn.textContent = '✓ Opslaan & Volgende';
+                submitBtn.textContent = '💾 Alle Tests Opslaan';
                 
-                // Focus terug naar naam
                 document.getElementById('patientName').focus();
                 
-                // Hide success message
                 setTimeout(() => {
                     successMsg.style.display = 'none';
-                }, 3000);
+                }, 5000);
 
             } catch (error) {
                 console.error('❌ Error:', error);
                 
-                // Error message
                 errorMsg.textContent = '❌ ' + error.message;
                 errorMsg.style.display = 'block';
                 successMsg.style.display = 'none';
                 
-                // Reset button
                 submitBtn.disabled = false;
-                submitBtn.textContent = '✓ Opslaan & Volgende';
+                submitBtn.textContent = '💾 Alle Tests Opslaan';
                 
-                // Hide error after 5 seconds
                 setTimeout(() => {
                     errorMsg.style.display = 'none';
                 }, 5000);

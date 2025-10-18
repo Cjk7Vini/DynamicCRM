@@ -121,6 +121,10 @@ app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
   res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
 });
+app.get(['/training-form.html/:code', '/training/:code'], (req, res) => {
+  const { code } = req.params;
+  res.redirect(302, `/training-form.html?p=${encodeURIComponent(code)}`);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -224,6 +228,26 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
         ORDER BY l.aangemaakt_op DESC
         LIMIT 500
+      `;
+      const r = await client.query(sql);
+      return r.rows;
+    });
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Database error', details: e.message });
+  }
+});
+
+// GET /api/practices - Haal alle actieve praktijken op (voor training form)
+app.get('/api/practices', async (_req, res) => {
+  try {
+    const rows = await withReadConnection(async (client) => {
+      const sql = `
+        SELECT code, naam
+        FROM public.praktijken
+        WHERE actief = TRUE
+        ORDER BY naam ASC
       `;
       const r = await client.query(sql);
       return r.rows;
