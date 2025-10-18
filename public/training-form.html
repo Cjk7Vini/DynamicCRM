@@ -729,17 +729,20 @@
                 card.classList.remove('active');
                 card.classList.add('completed');
                 if (!card.querySelector('.checkmark')) {
-                    card.innerHTML = '<span class="checkmark">✓</span>' + card.innerHTML;
+                    const checkmark = document.createElement('span');
+                    checkmark.className = 'checkmark';
+                    checkmark.textContent = '✓';
+                    card.insertBefore(checkmark, card.firstChild);
                 }
             }
             
             updateSummary();
             
-            // Auto-advance to NEXT test in order
+            // DIRECT naar volgende test ZONDER SCROLL NAAR BOVEN
             currentTestIndex++;
             
             if (currentTestIndex < allTests.length) {
-                // Load next test
+                // Load next test IMMEDIATELY
                 const nextTestType = allTests[currentTestIndex];
                 const nextCard = document.querySelector(`[data-test="${nextTestType}"]`);
                 
@@ -747,13 +750,18 @@
                 testCards.forEach(c => c.classList.remove('active'));
                 if (nextCard) nextCard.classList.add('active');
                 
-                // Generate next form
+                // METEEN form genereren - geen delay
                 generateResultFields(nextTestType);
                 
-                // Scroll to form (not to top)
+                // Focus direct op eerste input - GEEN SCROLL
                 setTimeout(() => {
-                    resultSectionsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 200);
+                    const firstInput = resultSectionsContainer.querySelector('input[type="number"]');
+                    if (firstInput) {
+                        firstInput.focus();
+                        // Scroll alleen het invoerveld in beeld, niet de hele pagina
+                        firstInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }, 100);
             } else {
                 // All tests done
                 showCompletionScreen();
