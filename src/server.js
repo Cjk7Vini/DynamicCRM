@@ -1,4 +1,4 @@
-// src/server.js — NL + Neon + SMTP + TESTMAIL + EVENTS + METRICS + safe rate-limit + SMTP retry
+// src/server.js — NL + Neon + SMTP + TESTMAIL + EVENTS + METRICS + safe rate-limit + SMTP retry + TRAINING RESULTS
 
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
@@ -108,7 +108,7 @@ const postLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use(['/leads', '/events'], postLimiter);
+app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
@@ -116,6 +116,7 @@ app.get('/', (req, res) => {
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
 app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html'));
+app.get('/training', (_req, res) => res.redirect(302, '/training-form.html'));
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
   res.redirect(302, `/form.html?s=${encodeURIComponent(code)}`);
@@ -790,6 +791,222 @@ app.get('/api/series', async (req, res) => {
   } catch (e) {
     console.error('GET /api/series error:', e);
     res.status(500).json({ error: 'Failed to compute series' });
+  }
+});
+
+// ==================== TRAINING RESULTS ENDPOINTS ====================
+
+// Schema voor training results validatie
+const trainingResultSchema = Joi.object({
+  date: Joi.string().required(),
+  time: Joi.string().required(),
+  patientName: Joi.string().min(2).max(200).required(),
+  birthDate: Joi.string().required(),
+  gender: Joi.string().valid('M', 'V', 'X').required(),
+  measurementPhase: Joi.string().valid('week0', 'week6', 'week12').required(),
+  testType: Joi.string().required(),
+  notes: Joi.string().allow('', null),
+  results: Joi.object().required()
+});
+
+// POST /api/training-results - Sla nieuwe testresultaten op
+app.post('/api/training-results', async (req, res) => {
+  try {
+    const { value, error } = trainingResultSchema.validate(req.body, { 
+      abortEarly: false, 
+      stripUnknown: true 
+    });
+    
+    if (error) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: error.details.map(d => d.message) 
+      });
+    }
+
+    const {
+      date,
+      time,
+      patientName,
+      birthDate,
+      gender,
+      measurementPhase,
+      testType,
+      notes,
+      results
+    } = value;
+
+    const inserted = await withWriteConnection(async (client) => {
+      // 1. Insert session
+      const sessionSql = `
+        INSERT INTO test_sessions 
+        (patient_name, birth_date, gender, measurement_phase, test_type, test_date, test_time, notes) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+        RETURNING id, created_at
+      `;
+      
+      const sessionResult = await client.query(sessionSql, [
+        patientName,
+        birthDate,
+        gender,
+        measurementPhase,
+        testType,
+        date,
+        time,
+        notes || null
+      ]);
+
+      const sessionId = sessionResult.rows[0].id;
+      const createdAt = sessionResult.rows[0].created_at;
+
+      // 2. Insert all results
+      const resultSql = `
+        INSERT INTO test_results (session_id, field_name, field_value, field_unit) 
+        VALUES ($1, $2, $3, $4)
+      `;
+
+      for (const [fieldName, fieldData] of Object.entries(results)) {
+        await client.query(resultSql, [
+          sessionId,
+          fieldName,
+          parseFloat(fieldData.value),
+          fieldData.unit
+        ]);
+      }
+
+      return { sessionId, createdAt };
+    });
+
+    console.log(`✅ Training result opgeslagen: Session ${inserted.sessionId} voor ${patientName}`);
+
+    res.status(201).json({ 
+      ok: true, 
+      sessionId: inserted.sessionId,
+      createdAt: inserted.createdAt
+    });
+
+  } catch (e) {
+    console.error('POST /api/training-results error:', e);
+    res.status(500).json({ 
+      error: 'Database insert error', 
+      details: e.message 
+    });
+  }
+});
+
+// GET /api/training-results - Haal alle testresultaten op (met admin key)
+app.get('/api/training-results', requireAdmin, async (req, res) => {
+  try {
+    const { patient_name, test_type, measurement_phase, limit = 100 } = req.query;
+
+    let sql = `
+      SELECT 
+        s.id,
+        s.patient_name,
+        s.birth_date,
+        s.gender,
+        s.measurement_phase,
+        s.test_type,
+        s.test_date,
+        s.test_time,
+        s.notes,
+        s.created_at,
+        json_agg(
+          json_build_object(
+            'field_name', r.field_name,
+            'field_value', r.field_value,
+            'field_unit', r.field_unit
+          )
+        ) AS results
+      FROM test_sessions s
+      LEFT JOIN test_results r ON r.session_id = s.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramCount = 1;
+
+    if (patient_name) {
+      sql += ` AND s.patient_name ILIKE ${paramCount}`;
+      params.push(`%${patient_name}%`);
+      paramCount++;
+    }
+
+    if (test_type) {
+      sql += ` AND s.test_type = ${paramCount}`;
+      params.push(test_type);
+      paramCount++;
+    }
+
+    if (measurement_phase) {
+      sql += ` AND s.measurement_phase = ${paramCount}`;
+      params.push(measurement_phase);
+      paramCount++;
+    }
+
+    sql += `
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+      LIMIT ${paramCount}
+    `;
+    params.push(parseInt(limit));
+
+    const rows = await withReadConnection(async (client) => {
+      const result = await client.query(sql, params);
+      return result.rows;
+    });
+
+    res.json({ ok: true, count: rows.length, data: rows });
+
+  } catch (e) {
+    console.error('GET /api/training-results error:', e);
+    res.status(500).json({ 
+      error: 'Database error', 
+      details: e.message 
+    });
+  }
+});
+
+// GET /api/training-results/:id - Haal specifieke testsessie op
+app.get('/api/training-results/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const session = await withReadConnection(async (client) => {
+      const sessionResult = await client.query(
+        `SELECT * FROM test_sessions WHERE id = $1`,
+        [id]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        return null;
+      }
+
+      const resultsQuery = await client.query(
+        `SELECT field_name, field_value, field_unit 
+         FROM test_results 
+         WHERE session_id = $1`,
+        [id]
+      );
+
+      return {
+        ...sessionResult.rows[0],
+        results: resultsQuery.rows
+      };
+    });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Testsessie niet gevonden' });
+    }
+
+    res.json({ ok: true, data: session });
+
+  } catch (e) {
+    console.error('GET /api/training-results/:id error:', e);
+    res.status(500).json({ 
+      error: 'Database error', 
+      details: e.message 
+    });
   }
 });
 
