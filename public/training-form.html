@@ -394,14 +394,36 @@
 
             <hr>
 
-            <button type="button" id="startTestsBtn" style="background: #10b981; margin-bottom: 30px; font-size: 18px;">
-                🚀 Start Alle Tests
-            </button>
+            <!-- Start Button - GROOT EN DUIDELIJK -->
+            <div style="text-align: center; margin: 30px 0;">
+                <button type="button" id="startTestsBtn" style="
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: white;
+                    font-size: 20px;
+                    padding: 20px 40px;
+                    border: none;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+                    font-weight: 700;
+                    display: block;
+                    width: 100%;
+                    max-width: 500px;
+                    margin: 0 auto;
+                ">
+                    🚀 Start Teststraat
+                </button>
+                <p style="color: #6b7280; margin-top: 12px; font-size: 14px;">
+                    Klik hier om alle tests in volgorde te doorlopen
+                </p>
+            </div>
 
-            <!-- Test Selection Cards - NU ALLEEN VOOR REFERENTIE -->
-            <div class="test-categories">
-                <p style="text-align: center; color: #6b7280; margin-bottom: 20px;">
-                    📋 Testoverzicht - Je doorloopt alle tests automatisch in volgorde
+            <hr style="margin: 30px 0;">
+
+            <!-- Test Selection Cards - ALLEEN VOOR OVERZICHT -->
+            <div class="test-categories" id="testOverview">
+                <p style="text-align: center; color: #6b7280; margin-bottom: 20px; font-weight: 600;">
+                    📋 Testoverzicht (9 tests totaal)
                 </p>
                 
                 <div class="category-title">1️⃣ Lichaamssamenstelling</div>
@@ -633,32 +655,42 @@
         const summaryContent = document.getElementById('summaryContent');
         const progressIndicator = document.getElementById('progressIndicator');
         const startTestsBtn = document.getElementById('startTestsBtn');
+        const testOverview = document.getElementById('testOverview');
 
-        // Disable manual test selection initially
-        testCards.forEach(card => {
-            card.style.pointerEvents = 'none';
-        });
+        console.log('Start button:', startTestsBtn); // Debug
 
-        // Start button
-        startTestsBtn.addEventListener('click', () => {
-            // Check if patient info is filled
-            const patientName = document.getElementById('patientName').value;
-            const birthDate = document.getElementById('birthDate').value;
-            const gender = document.getElementById('gender').value;
-            const measurementPhase = document.getElementById('measurementPhase').value;
-            
-            if (!patientName || !birthDate || !gender || !measurementPhase) {
-                alert('⚠️ Vul eerst alle patiëntgegevens en meetmoment in bovenaan het formulier');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                return;
-            }
-            
-            currentTestIndex = 0;
-            startTestsBtn.style.display = 'none';
-            loadNextTest();
-        });
+        // Start button click handler
+        if (startTestsBtn) {
+            startTestsBtn.addEventListener('click', function() {
+                console.log('Start button clicked!'); // Debug
+                
+                // Check if patient info is filled
+                const patientName = document.getElementById('patientName').value;
+                const birthDate = document.getElementById('birthDate').value;
+                const gender = document.getElementById('gender').value;
+                const measurementPhase = document.getElementById('measurementPhase').value;
+                
+                if (!patientName || !birthDate || !gender || !measurementPhase) {
+                    alert('⚠️ Vul eerst alle patiëntgegevens en meetmoment in bovenaan het formulier');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                }
+                
+                // Hide start button and overview
+                startTestsBtn.style.display = 'none';
+                testOverview.style.display = 'none';
+                
+                // Start first test
+                currentTestIndex = 0;
+                loadNextTest();
+            });
+        } else {
+            console.error('Start button not found!');
+        }
 
         function loadNextTest() {
+            console.log('Loading test index:', currentTestIndex); // Debug
+            
             if (currentTestIndex >= testOrder.length) {
                 // Alle tests gedaan
                 showFinalScreen();
@@ -666,22 +698,31 @@
             }
             
             const testType = testOrder[currentTestIndex];
+            console.log('Loading test type:', testType); // Debug
+            
             const card = document.querySelector(`[data-test="${testType}"]`);
             
             // Update progress
             progressIndicator.innerHTML = `📍 Test ${currentTestIndex + 1} van ${testOrder.length}: <strong>${getTestName(testType)}</strong>`;
+            progressIndicator.style.display = 'block';
             
             // Highlight current card
             testCards.forEach(c => c.classList.remove('active'));
-            if (card) card.classList.add('active');
+            if (card) {
+                card.classList.add('active');
+                card.style.opacity = '1';
+            }
             
             // Generate form
             generateResultFields(testType);
             
+            // Show submit button for later
+            submitBtn.style.display = 'none'; // Nog niet tonen
+            
             // Scroll to form
             setTimeout(() => {
                 resultSectionsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
+            }, 300);
         }
 
         function showFinalScreen() {
@@ -701,9 +742,16 @@
         }
 
         function generateResultFields(testType) {
+            console.log('Generating fields for:', testType); // Debug
+            
             const config = testConfigs[testType];
+            if (!config) {
+                console.error('No config found for test type:', testType);
+                return;
+            }
+            
             let html = `<div class="result-section active" data-test="${testType}">
-                <h3 style="color: #667eea; margin-bottom: 15px;">${getTestName(testType)}</h3>`;
+                <h3 style="color: #667eea; margin-bottom: 15px;">📝 ${getTestName(testType)}</h3>`;
             
             config.fields.forEach(field => {
                 const savedValue = savedTests[testType]?.[field.name] || '';
@@ -727,20 +775,23 @@
                 `;
             });
             
+            const isLastTest = currentTestIndex === testOrder.length - 1;
+            const buttonText = isLastTest ? 'Opslaan' : 'Opslaan & Volgende';
+            
             html += `
                 <button type="button" class="btn-secondary" onclick="saveCurrentTest('${testType}')">
-                    ✓ ${getTestName(testType)} Opslaan ${currentTestIndex < testOrder.length - 1 ? '& Volgende' : ''}
+                    ✓ ${getTestName(testType)} ${buttonText}
                 </button>
             </div>`;
             
             resultSectionsContainer.innerHTML = html;
+            console.log('Fields generated, HTML length:', html.length); // Debug
             
             // Focus op eerste veld
             const firstInput = resultSectionsContainer.querySelector('input');
-            if (firstInput) firstInput.focus();
-            
-            // Show submit button
-            submitBtn.style.display = 'block';
+            if (firstInput) {
+                setTimeout(() => firstInput.focus(), 400);
+            }
         }
 
         function getTestName(testType) {
