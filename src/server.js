@@ -259,6 +259,39 @@ app.get('/api/practices', async (_req, res) => {
   }
 });
 
+// ✅ FIX: GET /api/validate-practice - Valideer of practice code bestaat en actief is
+app.get('/api/validate-practice', async (req, res) => {
+  try {
+    const { code } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({ valid: false, error: 'Practice code is required' });
+    }
+
+    const rows = await withReadConnection(async (client) => {
+      const sql = `
+        SELECT code, naam, actief
+        FROM public.praktijken
+        WHERE code = $1 AND actief = TRUE
+      `;
+      const r = await client.query(sql, [code]);
+      return r.rows;
+    });
+
+    if (rows.length === 0) {
+      return res.json({ valid: false });
+    }
+
+    res.json({ 
+      valid: true, 
+      practice: rows[0] 
+    });
+  } catch (e) {
+    console.error('validate-practice error:', e);
+    res.status(500).json({ valid: false, error: e.message });
+  }
+});
+
 app.post('/leads', async (req, res) => {
   try {
     const { value, error } = leadSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
