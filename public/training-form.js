@@ -5,7 +5,8 @@
 
     function getPracticeCodeFromURL() {
         var urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('p') || urlParams.get('s') || null;
+        // ✅ FIX: Check voor 'practice', 'p', of 's'
+        return urlParams.get('practice') || urlParams.get('p') || urlParams.get('s') || null;
     }
 
     function loadPractices() {
@@ -22,21 +23,34 @@
             return;
         }
         
-        fetch('/api/practices')
+        // ✅ FIX: Gebruik /api/validate-practice in plaats van /api/practices
+        fetch('/api/validate-practice?code=' + encodeURIComponent(urlPracticeCode))
             .then(function(r) { return r.json(); })
-            .then(function(practices) {
-                var practice = practices.find(function(p) { return p.code === urlPracticeCode; });
-                if (practice) {
-                    document.getElementById('practiceDisplay').value = practice.naam + ' (' + practice.code + ')';
-                    document.getElementById('practiceCode').value = practice.code;
+            .then(function(response) {
+                if (response.valid && response.practice) {
+                    // Praktijk bestaat en is actief
+                    document.getElementById('practiceDisplay').value = response.practice.naam + ' (' + response.practice.code + ')';
+                    document.getElementById('practiceCode').value = response.practice.code;
                 } else {
-                    document.getElementById('practiceDisplay').value = 'Onbekend: ' + urlPracticeCode;
-                    document.getElementById('practiceCode').value = urlPracticeCode;
+                    // Praktijk bestaat niet of is niet actief
+                    var errorHtml = '<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:12px;padding:20px;text-align:center">' +
+                        '<div style="font-size:48px;margin-bottom:16px">🚫</div>' +
+                        '<h3 style="color:#991b1b;margin-bottom:12px">Geen toegang</h3>' +
+                        '<p style="color:#7f1d1d">Deze pagina is alleen toegankelijk via een unieke praktijklink.</p></div>';
+                    document.getElementById('practiceSection').innerHTML = errorHtml;
+                    document.getElementById('trainingForm').style.pointerEvents = 'none';
+                    document.getElementById('trainingForm').style.opacity = '0.5';
                 }
             })
-            .catch(function() {
-                document.getElementById('practiceDisplay').value = 'Praktijk ' + urlPracticeCode;
-                document.getElementById('practiceCode').value = urlPracticeCode;
+            .catch(function(error) {
+                console.error('Practice validation error:', error);
+                var errorHtml = '<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:12px;padding:20px;text-align:center">' +
+                    '<div style="font-size:48px;margin-bottom:16px">⚠️</div>' +
+                    '<h3 style="color:#991b1b;margin-bottom:12px">Fout bij laden</h3>' +
+                    '<p style="color:#7f1d1d">Kon praktijk niet valideren. Probeer het later opnieuw.</p></div>';
+                document.getElementById('practiceSection').innerHTML = errorHtml;
+                document.getElementById('trainingForm').style.pointerEvents = 'none';
+                document.getElementById('trainingForm').style.opacity = '0.5';
             });
     }
 

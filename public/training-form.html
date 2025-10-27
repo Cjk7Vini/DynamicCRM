@@ -293,35 +293,11 @@
                     <div class="test-card" data-test="step_2min">
                         <div class="test-name">2-Min Step-test</div>
                         <div class="test-duration">Alternatief 6MWT • 3 min</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="resultSections"></div>
-
-            <div class="test-summary" id="testSummary" style="display: none;">
-                <h3>✓ Ingevulde Tests</h3>
-                <div id="summaryContent"></div>
-            </div>
-
-            <div class="form-group">
-                <label for="notes">Algemene Opmerking (optioneel)</label>
-                <textarea id="notes" name="notes" rows="3" placeholder="Bijv. algemene conditie, bijzonderheden..."></textarea>
-            </div>
-
-            <button type="submit" id="submitBtn" style="display: none;">💾 Alle Tests Opslaan</button>
-        </form>
-    </div>
-
-    <script>
-(function() {
-    var pageLoadTime = new Date();
-    document.getElementById('testDate').value = pageLoadTime.toISOString().split('T')[0];
-    document.getElementById('testTime').value = pageLoadTime.toTimeString().slice(0,5);
 
     function getPracticeCodeFromURL() {
         var urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('p') || urlParams.get('s') || null;
+        // ✅ FIX: Check voor 'practice', 'p', of 's'
+        return urlParams.get('practice') || urlParams.get('p') || urlParams.get('s') || null;
     }
 
     function loadPractices() {
@@ -331,14 +307,45 @@
             var errorHtml = '<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:12px;padding:20px;text-align:center">' +
                 '<div style="font-size:48px;margin-bottom:16px">🚫</div>' +
                 '<h3 style="color:#991b1b;margin-bottom:12px">Geen toegang</h3>' +
-                '<p style="color:#7f1d1d;margin-bottom:16px">Deze pagina is alleen toegankelijk via een unieke praktijklink.</p>' +
-                '</div>';
+                '<p style="color:#7f1d1d">Deze pagina is alleen toegankelijk via een unieke praktijklink.</p></div>';
             document.getElementById('practiceSection').innerHTML = errorHtml;
             document.getElementById('trainingForm').style.pointerEvents = 'none';
             document.getElementById('trainingForm').style.opacity = '0.5';
             return;
         }
         
+        // ✅ FIX: Gebruik /api/validate-practice in plaats van /api/practices
+        fetch('/api/validate-practice?code=' + encodeURIComponent(urlPracticeCode))
+            .then(function(r) { return r.json(); })
+            .then(function(response) {
+                if (response.valid && response.practice) {
+                    // Praktijk bestaat en is actief
+                    document.getElementById('practiceDisplay').value = response.practice.naam + ' (' + response.practice.code + ')';
+                    document.getElementById('practiceCode').value = response.practice.code;
+                } else {
+                    // Praktijk bestaat niet of is niet actief
+                    var errorHtml = '<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:12px;padding:20px;text-align:center">' +
+                        '<div style="font-size:48px;margin-bottom:16px">🚫</div>' +
+                        '<h3 style="color:#991b1b;margin-bottom:12px">Geen toegang</h3>' +
+                        '<p style="color:#7f1d1d">Deze pagina is alleen toegankelijk via een unieke praktijklink.</p></div>';
+                    document.getElementById('practiceSection').innerHTML = errorHtml;
+                    document.getElementById('trainingForm').style.pointerEvents = 'none';
+                    document.getElementById('trainingForm').style.opacity = '0.5';
+                }
+            })
+            .catch(function(error) {
+                console.error('Practice validation error:', error);
+                var errorHtml = '<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:12px;padding:20px;text-align:center">' +
+                    '<div style="font-size:48px;margin-bottom:16px">⚠️</div>' +
+                    '<h3 style="color:#991b1b;margin-bottom:12px">Fout bij laden</h3>' +
+                    '<p style="color:#7f1d1d">Kon praktijk niet valideren. Probeer het later opnieuw.</p></div>';
+                document.getElementById('practiceSection').innerHTML = errorHtml;
+                document.getElementById('trainingForm').style.pointerEvents = 'none';
+                document.getElementById('trainingForm').style.opacity = '0.5';
+            });
+    }
+
+    loadPractices();
         fetch('/api/practices')
             .then(function(response) { return response.json(); })
             .then(function(practices) {
