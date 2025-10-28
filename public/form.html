@@ -89,6 +89,28 @@
     #msg{ margin-top:15px; padding:12px; border-radius:8px; font-size:14px; text-align:center; font-weight:500 }
     #msg.error{ background:#fee2e2; color:var(--err); border:1px solid #fecaca }
     #msg.success{ background:#dcfce7; color:var(--ok); border:1px solid #86efac }
+    .blocked-message {
+      background: #fee2e2;
+      border: 2px solid #ef4444;
+      border-radius: 16px;
+      padding: 30px 20px;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .blocked-message .icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .blocked-message h2 {
+      color: #991b1b;
+      margin-bottom: 12px;
+      font-size: 24px;
+    }
+    .blocked-message p {
+      color: #7f1d1d;
+      font-size: 15px;
+      line-height: 1.6;
+    }
     @media (max-width:480px){ body{padding:10px} .card{padding:15px} h1{font-size:22px} .bullets{flex-direction:column; align-items:center} .bullet{width:100%; max-width:250px; text-align:center} }
   </style>
 </head>
@@ -180,16 +202,66 @@
       if(ref.includes('google.com')) return 'Google';
       return 'Direct';
     }
+    
+    // Get practice code from URL
     praktijkInput.value = getParam('s') || getParam('praktijk') || getParam('p') || '';
     utmSource.value = getParam('utm_source') || detectSource();
     utmMedium.value = getParam('utm_medium') || 'organic';
     utmCampaign.value = getParam('utm_campaign') || '';
 
-    if (praktijkInput.value && navigator.sendBeacon) {
-      const payload = { practice_code: praktijkInput.value, event_type: 'clicked', metadata: { source: utmSource.value } };
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      navigator.sendBeacon('/events', blob);
+    // ✅ FIX: Validate practice before showing form
+    async function validatePractice() {
+      const practiceCode = praktijkInput.value;
+      
+      if (!practiceCode) {
+        showBlockedMessage('Deze pagina is alleen toegankelijk via een unieke praktijklink.');
+        return false;
+      }
+      
+      try {
+        const response = await fetch('/api/validate-practice?code=' + encodeURIComponent(practiceCode));
+        const data = await response.json();
+        
+        if (!data.valid) {
+          showBlockedMessage('Deze praktijk is momenteel niet actief. Neem contact op voor meer informatie.');
+          return false;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Practice validation error:', error);
+        showBlockedMessage('Kon praktijk niet valideren. Probeer het later opnieuw.');
+        return false;
+      }
     }
+
+    function showBlockedMessage(message) {
+      const container = document.querySelector('.container');
+      container.innerHTML = `
+        <div class="header">
+          <h1>Plan je eerste afspraak</h1>
+        </div>
+        <div class="card blocked-message">
+          <div class="icon">🚫</div>
+          <h2>Geen toegang</h2>
+          <p>${message}</p>
+        </div>
+      `;
+    }
+
+    // Validate practice on page load
+    validatePractice().then(isValid => {
+      if (!isValid) {
+        return; // Form is already blocked
+      }
+      
+      // Only track "clicked" event if practice is valid
+      if (praktijkInput.value && navigator.sendBeacon) {
+        const payload = { practice_code: praktijkInput.value, event_type: 'clicked', metadata: { source: utmSource.value } };
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        navigator.sendBeacon('/events', blob);
+      }
+    });
 
     toestemmingCheckbox.addEventListener('change', () => {
       if (toestemmingCheckbox.checked) {
