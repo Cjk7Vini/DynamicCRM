@@ -104,15 +104,14 @@
 <body>
   <div class="container">
     <h1>QR Code Generator</h1>
-    <p class="subtitle">Genereer een QR code voor je formulier link</p>
+    <p class="subtitle">Genereer een QR code voor je landing page of formulier link</p>
     
     <div class="input-group">
-      <label for="urlInput">Formulier URL</label>
+      <label for="urlInput">URL voor QR Code</label>
       <input 
         type="text" 
         id="urlInput" 
-        value=""
-        placeholder="https://dynamiccrm.onrender.com/form.html?s=..."
+        placeholder="Bijv: https://jouw-site.nl/landing.html?practice=S7F2MW"
       />
     </div>
     
@@ -125,7 +124,7 @@
     </button>
     
     <div class="info">
-      <strong>Tip:</strong> Gebruik deze QR code op flyers, posters, visitekaartjes of social media. Mensen kunnen scannen met hun telefoon om direct naar je aanmeldformulier te gaan.
+      <strong>Tip:</strong> Gebruik deze QR code op flyers, posters, visitekaartjes of social media. Mensen kunnen scannen met hun telefoon om direct naar je landing page of aanmeldformulier te gaan.
     </div>
   </div>
 
@@ -171,16 +170,13 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'qr-code-formulier.png';
+        a.download = 'qr-code.png';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       });
     }
-
-    // Don't generate QR code on page load - wait for user input
-    // window.addEventListener('load', generateQR);
   </script>
 </body>
 </html>

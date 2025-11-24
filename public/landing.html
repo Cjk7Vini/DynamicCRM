@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Uw Gezondere Toekomst - Dynamic Health Consultancy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+
+        /* Header with trust indicators */
+        .header {
+            background: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #254797;
+        }
+
+        .trust-badges {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .trust-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Warm welcoming hero */
+        .hero {
+            background: linear-gradient(135deg, rgba(37,71,151,0.95) 0%, rgba(41,163,185,0.95) 100%),
+                        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') bottom;
+            background-size: cover;
+            color: white;
+            padding: 80px 20px 100px;
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .practice-name {
+            background: rgba(153, 202, 51, 0.2);
+            border: 2px solid #99CA33;
+            border-radius: 30px;
+            padding: 8px 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: 42px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 22px;
+            margin-bottom: 40px;
+            opacity: 0.95;
+            line-height: 1.4;
+        }
+
+        /* Friendly benefits */
+        .benefits-row {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .benefit {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+        }
+
+        .check {
+            background: #99CA33;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        /* Warm CTA button */
+        .cta-button {
+            background: #99CA33;
+            color: white;
+            padding: 18px 45px;
+            border: none;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(153, 202, 51, 0.3);
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .cta-button:hover {
+            background: #8AB92D;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(153, 202, 51, 0.4);
+        }
+
+        /* Reassuring section */
+        .reassurance {
+            background: #f8f9fa;
+            padding: 80px 20px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 36px;
+            color: #254797;
+            margin-bottom: 20px;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 60px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 35px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
+            text-align: center;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 22px;
+            color: #254797;
+            margin-bottom: 15px;
+        }
+
+        .feature-desc {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Personal testimonial */
+        .testimonial {
+            background: linear-gradient(135deg, #254797 0%, #29A3B9 100%);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .testimonial-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .quote {
+            font-size: 24px;
+            font-style: italic;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .quote-author {
+            font-size: 18px;
+        }
+
+        .stars {
+            color: #FFD700;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        /* How it works */
+        .how-it-works {
+            padding: 80px 20px;
+            background: white;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .step {
+            text-align: center;
+        }
+
+        .step-number {
+            background: #99CA33;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0 auto 20px;
+        }
+
+        .step-title {
+            font-size: 20px;
+            color: #254797;
+            margin-bottom: 10px;
+        }
+
+        .step-desc {
+            color: #666;
+        }
+
+        /* Final CTA */
+        .final-cta {
+            background: #f8f9fa;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .urgency {
+            background: #FFE5B4;
+            color: #8B4513;
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* Footer */
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .footer-links {
+            margin-bottom: 20px;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            opacity: 0.8;
+        }
+
+        .footer-links a:hover {
+            opacity: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 32px;
+            }
+
+            .subtitle {
+                font-size: 18px;
+            }
+
+            .section-title {
+                font-size: 28px;
+            }
+
+            .benefits-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .trust-badges {
+                display: none;
+            }
+
+            .feature-card {
+                padding: 25px;
+            }
+
+            .quote {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                Dynamic Health Consultancy
+            </div>
+            <div class="trust-badges">
+                <div class="trust-badge">
+                    <span>✓</span>
+                    <span>100% Veilig</span>
+                </div>
+                <div class="trust-badge">
+                    <span>✓</span>
+                    <span>Privacy Gegarandeerd</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="practice-name" id="practiceName" style="display: none;">
+                Aanbevolen door uw fysiotherapeut
+            </div>
+            
+            <h1>Ontdek hoe u Fit en Vitaal blijft<br>op uw eigen tempo</h1>
+            
+            <p class="subtitle">
+                Speciaal ontwikkeld voor 40-plussers die comfortabel willen bewegen 
+                in een vertrouwde, kleinschalige omgeving
+            </p>
+
+            <div class="benefits-row">
+                <div class="benefit">
+                    <span class="check">✓</span>
+                    <span>Geen drukke sportschool</span>
+                </div>
+                <div class="benefit">
+                    <span class="check">✓</span>
+                    <span>Persoonlijke aandacht</span>
+                </div>
+                <div class="benefit">
+                    <span class="check">✓</span>
+                    <span>Op uw eigen gemak</span>
+                </div>
+            </div>
+
+            <a href="#" class="cta-button" id="mainCTA">
+                Ja, ik wil meer informatie →
+            </a>
+        </div>
+    </section>
+
+    <!-- Reassurance Section -->
+    <section class="reassurance">
+        <h2 class="section-title">Waarom voelt dit zo goed?</h2>
+        <p class="section-subtitle">
+            Wij begrijpen dat bewegen soms lastig kan zijn. Daarom maken we het u gemakkelijk én plezierig.
+        </p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">👥</div>
+                <h3 class="feature-title">Klein & Vertrouwd</h3>
+                <p class="feature-desc">
+                    In kleine groepen of individueel. U sport met gelijkgestemden in een rustige, vriendelijke sfeer.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🏥</div>
+                <h3 class="feature-title">Medisch Verantwoord</h3>
+                <p class="feature-desc">
+                    Onder begeleiding van professionals die rekening houden met uw gezondheid en eventuele klachten.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📍</div>
+                <h3 class="feature-title">Dichtbij Huis</h3>
+                <p class="feature-desc">
+                    Bij uw vertrouwde fysiotherapiepraktijk. Geen lange reistijden of zoeken naar parkeerplaatsen.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">☕</div>
+                <h3 class="feature-title">Gezellig & Ontspannen</h3>
+                <p class="feature-desc">
+                    Na het bewegen is er tijd voor koffie en een praatje. Het is meer dan alleen sporten.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonial -->
+    <section class="testimonial">
+        <div class="testimonial-content">
+            <div class="stars">★★★★★</div>
+            <p class="quote">
+                "Ik durfde niet naar de sportschool, te druk en te intimiderend. 
+                Hier voel ik me op mijn gemak. We lachen veel en ik merk echt dat ik sterker word. 
+                De koffie na afloop is minstens zo belangrijk als het sporten zelf!"
+            </p>
+            <p class="quote-author">
+                — Marijke, 62 jaar, beweegt al 8 maanden met plezier
+            </p>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how-it-works">
+        <h2 class="section-title">Zo simpel werkt het</h2>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3 class="step-title">Vrijblijvend Kennismaken</h3>
+                <p class="step-desc">
+                    We bespreken uw wensen en mogelijkheden bij een kopje koffie
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3 class="step-title">Persoonlijk Plan</h3>
+                <p class="step-desc">
+                    We maken samen een beweegplan dat bij u past
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3 class="step-title">Rustig Starten</h3>
+                <p class="step-desc">
+                    U begint op uw eigen niveau, zonder druk of haast
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">4</div>
+                <h3 class="step-title">Samen Groeien</h3>
+                <p class="step-desc">
+                    Stap voor stap werkt u aan uw gezondheid en vitaliteit
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        
+        <h2 class="section-title">Klaar om te beginnen?</h2>
+        <p class="section-subtitle">
+            Vul het formulier in en ontvang alle informatie. 
+            Geheel vrijblijvend en zonder verplichtingen.
+        </p>
+        
+        <a href="#" class="cta-button" id="finalCTA">
+            Ja, stuur mij de informatie →
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="#">Privacyverklaring</a>
+            <a href="#">Algemene Voorwaarden</a>
+            <a href="#">Contact</a>
+        </div>
+        <p>© 2025 Dynamic Health Consultancy - Alle rechten voorbehouden</p>
+    </footer>
+
+    <script>
+        // Get practice code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const practiceCode = urlParams.get('s');
+        
+        // Practice specific customizations
+        const practiceData = {
+            'S7F2MW': {
+                name: 'Fysiotherapie Soestdijk',
+                location: 'Soestdijk'
+            },
+            '5691C2': {
+                name: 'Fysiotherapie Joure', 
+                location: 'Joure'
+            },
+            'TEST123': {
+                name: 'Test Praktijk',
+                location: 'Test Locatie'
+            }
+        };
+
+        // Apply customizations if practice code exists
+        if (practiceCode && practiceData[practiceCode]) {
+            const practice = practiceData[practiceCode];
+            
+            // Show and update practice name badge
+            const practiceBadge = document.getElementById('practiceName');
+            practiceBadge.style.display = 'inline-block';
+            practiceBadge.textContent = `Aanbevolen door ${practice.name}`;
+            
+            // Update page title
+            document.title = `Start Uw Gezondere Toekomst - ${practice.name}`;
+            
+            // Log for debugging
+            console.log(`Practice loaded: ${practice.name} (${practiceCode})`);
+        } else if (practiceCode) {
+            // Unknown practice code - still pass it through
+            console.log(`Unknown practice code: ${practiceCode}`);
+        } else {
+            // No practice code - generic page
+            console.log('No practice code - showing generic page');
+        }
+
+        // Setup CTA buttons to pass practice code to form
+        function setupCTAButtons() {
+            const formUrl = practiceCode 
+                ? `form.html?s=${practiceCode}` 
+                : 'form.html';
+            
+            // Update all CTA buttons
+            document.getElementById('mainCTA').href = formUrl;
+            document.getElementById('finalCTA').href = formUrl;
+            
+            // Add click tracking
+            document.querySelectorAll('.cta-button').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    console.log(`CTA clicked - redirecting to: ${formUrl}`);
+                    
+                    // Optional: Add Google Analytics event here
+                    if (typeof gtag !== 'undefined') {
+                        gtag('event', 'click', {
+                            'event_category': 'CTA',
+                            'event_label': practiceCode || 'generic'
+                        });
+                    }
+                });
+            });
+        }
+
+        // Initialize
+        setupCTAButtons();
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add subtle animations on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe feature cards
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.6s ease';
+            observer.observe(card);
+        });
+
+        // Log page load
+        console.log('Landing page loaded successfully');
+        console.log('URL:', window.location.href);
+        console.log('Practice code:', practiceCode || 'none');
+    </script>
+</body>
+</html>
