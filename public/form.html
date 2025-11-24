@@ -263,7 +263,7 @@
             <div class="practice-badge" id="practiceBadge" style="display: none;">
                 Via uw fysiotherapeut
             </div>
-            <h1>Meld U Aan Voor Uw Gratis Informatie</h1>
+            <h1>Meld je aan voor gratis informatie</h1>
             <p class="form-subtitle">Vul het formulier in en ontvang direct alle informatie</p>
         </div>
 
@@ -324,55 +324,38 @@
                 <input type="tel" id="phone" name="phone" required placeholder="06-12345678">
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="age">
-                        Leeftijd
-                    </label>
-                    <select id="age" name="age">
-                        <option value="">Selecteer...</option>
-                        <option value="40-45">40-45 jaar</option>
-                        <option value="46-50">46-50 jaar</option>
-                        <option value="51-55">51-55 jaar</option>
-                        <option value="56-60">56-60 jaar</option>
-                        <option value="61-65">61-65 jaar</option>
-                        <option value="66-70">66-70 jaar</option>
-                        <option value="70+">70+ jaar</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="fitnessLevel">
-                        Huidig bewegingsniveau
-                    </label>
-                    <select id="fitnessLevel" name="fitness_level">
-                        <option value="">Selecteer...</option>
-                        <option value="geen">Ik beweeg momenteel niet</option>
-                        <option value="weinig">1-2x per week licht bewegen</option>
-                        <option value="regelmatig">2-3x per week actief</option>
-                        <option value="vaak">Meer dan 3x per week</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label for="bron">
+                    Hoe heb je ons gevonden? <span class="required">*</span>
+                </label>
+                <select id="bron" name="bron" required>
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
             </div>
 
             <div class="form-group">
-                <label for="goals">
-                    Wat wilt u bereiken? (optioneel)
+                <label for="doel">
+                    Wat is je doel? <span class="required">*</span>
                 </label>
-                <textarea id="goals" name="goals" placeholder="Bijvoorbeeld: fitter worden, afvallen, meer energie, minder pijn..."></textarea>
+                <select id="doel" name="doel" required>
+                    <option value="">Selecteer...</option>
+                    <option value="Afvallen">Afvallen</option>
+                    <option value="Fitter worden">Fitter worden</option>
+                    <option value="Spieren versterken">Spieren versterken</option>
+                    <option value="Gezonder leven">Gezonder leven</option>
+                    <option value="Gedrag veranderen">Gedrag veranderen</option>
+                </select>
             </div>
 
             <div class="checkbox-group">
                 <input type="checkbox" id="privacy" required>
                 <label for="privacy" class="checkbox-label">
                     Ik ga akkoord met de <a href="/privacy" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen over het beweegprogramma. <span class="required">*</span>
-                </label>
-            </div>
-
-            <div class="checkbox-group">
-                <input type="checkbox" id="newsletter">
-                <label for="newsletter" class="checkbox-label">
-                    Ja, ik ontvang graag tips en nieuws over gezond bewegen (u kunt zich altijd afmelden)
                 </label>
             </div>
 
@@ -383,8 +366,7 @@
             <div class="spinner" id="spinner"></div>
 
             <div class="security-note">
-                <span>🔒</span>
-                <span>Uw gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
+                <span>Je gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
             </div>
         </form>
     </div>
@@ -451,9 +433,6 @@
             // Get form data
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            
-            // Add newsletter preference
-            data.newsletter = document.getElementById('newsletter').checked;
             
             // Add timestamp
             data.submitted_at = new Date().toISOString();
