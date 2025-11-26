@@ -30,18 +30,6 @@
             max-width: 600px;
             width: 100%;
             padding: 50px;
-            animation: slideIn 0.5s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .form-header {
@@ -112,7 +100,7 @@
             color: #e74c3c;
         }
 
-        input, select, textarea {
+        input, select {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -122,15 +110,10 @@
             font-family: inherit;
         }
 
-        input:focus, select:focus, textarea:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: #29A3B9;
             box-shadow: 0 0 0 3px rgba(41, 163, 185, 0.1);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
         }
 
         .form-row {
@@ -186,13 +169,6 @@
             box-shadow: 0 6px 20px rgba(153, 202, 51, 0.4);
         }
 
-        .submit-button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
         .security-note {
             display: flex;
             align-items: center;
@@ -203,42 +179,24 @@
             font-size: 14px;
         }
 
-        .success-message {
+        #msg {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
             display: none;
+        }
+
+        #msg.success {
             background: #4CAF50;
             color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 600;
+            display: block;
         }
 
-        .error-message {
-            display: none;
+        #msg.error {
             background: #f44336;
             color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        /* Loading spinner */
-        .spinner {
-            display: none;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #99CA33;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            display: block;
         }
 
         /* Responsive */
@@ -261,7 +219,7 @@
     <div class="form-container">
         <div class="form-header">
             <div class="practice-badge" id="practiceBadge" style="display: none;">
-                Via uw fysiotherapeut
+                Via jouw fysiotherapeut
             </div>
             <h1>Meld je aan voor gratis informatie</h1>
             <p class="form-subtitle">Vul het formulier in en ontvang direct alle informatie</p>
@@ -282,53 +240,38 @@
             </div>
         </div>
 
-        <div class="success-message" id="successMessage">
-            ✓ Bedankt voor uw aanmelding! U ontvangt binnen enkele minuten een e-mail met alle informatie.
-        </div>
-
-        <div class="error-message" id="errorMessage">
-            Er ging iets mis. Probeer het opnieuw of neem contact op.
-        </div>
+        <div id="msg"></div>
 
         <form id="leadForm">
-            <!-- Hidden field for practice code -->
-            <input type="hidden" id="practiceCode" name="practice_code" value="">
+            <!-- Hidden field for practice code - BELANGRIJK: naam moet praktijk_code zijn -->
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="">
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="firstName">
-                        Voornaam <span class="required">*</span>
-                    </label>
-                    <input type="text" id="firstName" name="first_name" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="lastName">
-                        Achternaam <span class="required">*</span>
-                    </label>
-                    <input type="text" id="lastName" name="last_name" required>
-                </div>
+            <div class="form-group">
+                <label for="volledige_naam">
+                    Volledige naam <span class="required">*</span>
+                </label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required>
             </div>
 
             <div class="form-group">
-                <label for="email">
+                <label for="emailadres">
                     E-mailadres <span class="required">*</span>
                 </label>
-                <input type="email" id="email" name="email" required placeholder="uw.email@voorbeeld.nl">
+                <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
             </div>
 
             <div class="form-group">
-                <label for="phone">
-                    Telefoonnummer <span class="required">*</span>
+                <label for="telefoon">
+                    Telefoonnummer
                 </label>
-                <input type="tel" id="phone" name="phone" required placeholder="06-12345678">
+                <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678">
             </div>
 
             <div class="form-group">
                 <label for="bron">
-                    Hoe heb je ons gevonden? <span class="required">*</span>
+                    Hoe heb je ons gevonden?
                 </label>
-                <select id="bron" name="bron" required>
+                <select id="bron" name="bron">
                     <option value="">Selecteer...</option>
                     <option value="Facebook">Facebook</option>
                     <option value="Instagram">Instagram</option>
@@ -340,9 +283,9 @@
 
             <div class="form-group">
                 <label for="doel">
-                    Wat is je doel? <span class="required">*</span>
+                    Wat is je doel?
                 </label>
-                <select id="doel" name="doel" required>
+                <select id="doel" name="doel">
                     <option value="">Selecteer...</option>
                     <option value="Afvallen">Afvallen</option>
                     <option value="Fitter worden">Fitter worden</option>
@@ -353,8 +296,8 @@
             </div>
 
             <div class="checkbox-group">
-                <input type="checkbox" id="privacy" required>
-                <label for="privacy" class="checkbox-label">
+                <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                <label for="toestemming" class="checkbox-label">
                     Ik ga akkoord met de <a href="/privacy" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen over het beweegprogramma. <span class="required">*</span>
                 </label>
             </div>
@@ -363,41 +306,39 @@
                 Verstuur Mijn Aanmelding →
             </button>
 
-            <div class="spinner" id="spinner"></div>
-
             <div class="security-note">
                 <span>Je gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
             </div>
         </form>
     </div>
 
-    <script>
-        // Get practice code from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const practiceCode = urlParams.get('s');
-        
-        // Practice data (same as landing page)
-        const practiceData = {
-            'S7F2MW': {
-                name: 'Fysiotherapie Soestdijk',
-                location: 'Soestdijk'
-            },
-            '5691C2': {
-                name: 'Fysiotherapie Joure',
-                location: 'Joure'
-            },
-            'TEST123': {
-                name: 'Test Praktijk',
-                location: 'Test Locatie'
-            }
-        };
+    <!-- BELANGRIJK: Dit script wordt geladen vanuit je public folder -->
+    <script src="/form.js"></script>
 
-        // Set practice code in hidden field
-        if (practiceCode) {
-            document.getElementById('practiceCode').value = practiceCode;
+    <script>
+        // Extra script voor practice naam display
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
             
-            // Show practice badge if known practice
-            if (practiceData[practiceCode]) {
+            // Practice data voor display
+            const practiceData = {
+                'S7F2MW': {
+                    name: 'Fysiotherapie Soestdijk',
+                    location: 'Soestdijk'
+                },
+                '5691C2': {
+                    name: 'Fysiotherapie Joure',
+                    location: 'Joure'
+                },
+                'K9X3QY': {
+                    name: 'Fysiopraktijk De Jong',
+                    location: 'De Jong'
+                }
+            };
+
+            // Toon practice badge als bekend
+            if (practiceCode && practiceData[practiceCode]) {
                 const badge = document.getElementById('practiceBadge');
                 badge.style.display = 'inline-block';
                 badge.textContent = `Via ${practiceData[practiceCode].name}`;
@@ -406,96 +347,8 @@
                 document.title = `Aanmelden - ${practiceData[practiceCode].name}`;
             }
             
-            console.log(`Form loaded with practice code: ${practiceCode}`);
-        } else {
-            console.log('No practice code - generic form');
-        }
-
-        // Form submission handler
-        const form = document.getElementById('leadForm');
-        const submitButton = document.getElementById('submitButton');
-        const spinner = document.getElementById('spinner');
-        const successMessage = document.getElementById('successMessage');
-        const errorMessage = document.getElementById('errorMessage');
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Hide messages
-            successMessage.style.display = 'none';
-            errorMessage.style.display = 'none';
-            
-            // Show loading state
-            submitButton.disabled = true;
-            submitButton.textContent = 'Bezig met versturen...';
-            spinner.style.display = 'block';
-            
-            // Get form data
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            
-            // Add timestamp
-            data.submitted_at = new Date().toISOString();
-            
-            // Log for debugging
-            console.log('Submitting form data:', data);
-            
-            try {
-                // Simulate API call (replace with actual endpoint)
-                // In production, this would POST to your server.js endpoint
-                
-                // For demo purposes, simulate success after 2 seconds
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Mock success (in production, check actual response)
-                const success = true;
-                
-                if (success) {
-                    // Show success message
-                    successMessage.style.display = 'block';
-                    form.style.display = 'none';
-                    
-                    // Log success
-                    console.log('Lead submitted successfully');
-                    
-                    // Track conversion if Google Analytics is present
-                    if (typeof gtag !== 'undefined') {
-                        gtag('event', 'conversion', {
-                            'event_category': 'Lead',
-                            'event_label': practiceCode || 'generic'
-                        });
-                    }
-                    
-                    // Scroll to top
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                    throw new Error('Submission failed');
-                }
-                
-            } catch (error) {
-                console.error('Form submission error:', error);
-                errorMessage.style.display = 'block';
-                
-                // Reset button
-                submitButton.disabled = false;
-                submitButton.textContent = 'Verstuur Mijn Aanmelding →';
-            } finally {
-                spinner.style.display = 'none';
-            }
-        });
-
-        // Phone number formatting
-        document.getElementById('phone').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 0) {
-                if (value.length <= 2) {
-                    value = value;
-                } else if (value.length <= 10) {
-                    value = value.slice(0, 2) + '-' + value.slice(2);
-                }
-                e.target.value = value;
-            }
-        });
+            console.log('Form loaded with practice code:', practiceCode || 'none');
+        })();
     </script>
 </body>
 </html>
