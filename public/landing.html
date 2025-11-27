@@ -376,9 +376,6 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-content">
-            <div class="practice-name" id="practiceName" style="display: none;">
-                Aanbevolen door jouw fysiotherapeut
-            </div>
             
             <h1>Ontdek hoe je fit en vitaal blijft<br>op je eigen tempo</h1>
             
@@ -637,11 +634,6 @@
             if (logoElement) {
                 logoElement.textContent = practice.name;
             }
-            
-            // Show and update practice name badge
-            const practiceBadge = document.getElementById('practiceName');
-            practiceBadge.style.display = 'inline-block';
-            practiceBadge.textContent = `Aanbevolen door ${practice.name}`;
             
             // Update page title
             document.title = `Start je gezondere toekomst - ${practice.name}`;
