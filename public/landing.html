@@ -357,7 +357,7 @@
     <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <div class="logo">
+            <div class="logo" id="practiceLogo">
                 Dynamic Health Consultancy
             </div>
             <div class="trust-badges">
@@ -532,7 +532,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const practiceCode = urlParams.get('s');
         
-        // Practice specific customizations
+        // Practice specific customizations - UITGEBREIDE LIJST
         const practiceData = {
             'S7F2MW': {
                 name: 'Fysiotherapie Soestdijk',
@@ -541,6 +541,86 @@
             '5691C2': {
                 name: 'Fysiotherapie Joure', 
                 location: 'Joure'
+            },
+            'K9X3QY': {
+                name: 'Fysiopraktijk De Jong',
+                location: 'De Jong'
+            },
+            '77C34D': {
+                name: 'De Blaaij Actief & Vitaal - Burghaamstede',
+                location: 'Burghaamstede'
+            },
+            '952A92': {
+                name: 'Gezond & Vitaal Krommenie',
+                location: 'Krommenie'
+            },
+            '9F8009': {
+                name: 'Sportrevalidatie Centrum Hilversum',
+                location: 'Hilversum'
+            },
+            'C8UF5S': {
+                name: 'Fysio & Leefstijl Utrecht',
+                location: 'Utrecht'
+            },
+            'D32DAF': {
+                name: 'De Blaaij Actief & Vitaal - Goes',
+                location: 'Goes'
+            },
+            'DYN001': {
+                name: 'Dynamic Health',
+                location: 'Nederland'
+            },
+            'E8K2BM': {
+                name: 'FYSIK',
+                location: 'Nederland'
+            },
+            'FF42F5': {
+                name: 'Fysiotherapie Scholten Rosmalen',
+                location: 'Rosmalen'
+            },
+            'H5R9KM': {
+                name: 'Fysio Alphen',
+                location: 'Alphen'
+            },
+            'HILV01': {
+                name: 'FysioFit Hilvarenbeek',
+                location: 'Hilvarenbeek'
+            },
+            'L8D6QA': {
+                name: 'Fysiotherapie Bladel',
+                location: 'Bladel'
+            },
+            'M3Y7LE': {
+                name: 'Fit & Fitaal Zaanstreek',
+                location: 'Zaanstreek'
+            },
+            'N7Z8TW': {
+                name: 'Fysio Fitness Visser',
+                location: 'Visser'
+            },
+            'P4X7UE': {
+                name: 'VietAAL Sneek',
+                location: 'Sneek'
+            },
+            'Q9V3LC': {
+                name: 'Leefstijlcentrum Losser',
+                location: 'Losser'
+            },
+            'R8K5XN': {
+                name: 'Fit & Fysio Linne',
+                location: 'Linne'
+            },
+            'T6PV9A': {
+                name: 'VMvitaal',
+                location: 'Nederland'
+            },
+            'U6N5ZP': {
+                name: 'FitzMove Ulvenhout',
+                location: 'Ulvenhout'
+            },
+            'V6Q2BR': {
+                name: 'Leefstijl Zundert',
+                location: 'Zundert'
             },
             'TEST123': {
                 name: 'Test Praktijk',
@@ -552,13 +632,19 @@
         if (practiceCode && practiceData[practiceCode]) {
             const practice = practiceData[practiceCode];
             
+            // Update logo/header with practice name
+            const logoElement = document.getElementById('practiceLogo');
+            if (logoElement) {
+                logoElement.textContent = practice.name;
+            }
+            
             // Show and update practice name badge
             const practiceBadge = document.getElementById('practiceName');
             practiceBadge.style.display = 'inline-block';
             practiceBadge.textContent = `Aanbevolen door ${practice.name}`;
             
             // Update page title
-            document.title = `Start Uw Gezondere Toekomst - ${practice.name}`;
+            document.title = `Start je gezondere toekomst - ${practice.name}`;
             
             // Log for debugging
             console.log(`Practice loaded: ${practice.name} (${practiceCode})`);
