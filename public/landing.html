@@ -350,6 +350,97 @@
             .quote {
                 font-size: 20px;
             }
+            
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .faq-item summary {
+                font-size: 15px;
+                padding: 16px 20px;
+            }
+        }
+        
+        /* FAQ Styles */
+        .faq-section {
+            background: #f8f9fa;
+            padding: 80px 20px;
+        }
+        
+        .faq-section .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .faq-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            margin-bottom: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid #e5e5e7;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .faq-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .faq-item summary {
+            padding: 20px 24px;
+            font-size: 17px;
+            font-weight: 600;
+            color: #254797;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .faq-item summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        .faq-item summary::after {
+            content: '+';
+            font-size: 24px;
+            font-weight: 400;
+            color: #99CA33;
+            transition: transform 0.3s ease;
+        }
+        
+        .faq-item[open] summary::after {
+            transform: rotate(45deg);
+        }
+        
+        .faq-item summary:hover {
+            background: #f8f9fa;
+        }
+        
+        .faq-item p {
+            padding: 0 24px 24px 24px;
+            color: #666;
+            line-height: 1.7;
+            font-size: 16px;
+        }
+        
+        .faq-item[open] {
+            border-color: #99CA33;
+        }
+        
+        .faq-item[open] summary {
+            background: #f8f9fa;
+            border-bottom: 1px solid #e5e5e7;
         }
     </style>
 </head>
@@ -512,6 +603,118 @@
         <a href="#" class="cta-button" id="finalCTA">
             Ja, stuur mij de informatie →
         </a>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <h2 class="section-title">Veelgestelde vragen</h2>
+            <p class="section-subtitle">
+                Alles wat je wilt weten over ons beweegprogramma
+            </p>
+            
+            <div class="faq-grid">
+                <details class="faq-item">
+                    <summary>Moet ik eerst fysiotherapie hebben gehad voordat ik mag starten?</summary>
+                    <p>Nee, helemaal niet. Veel deelnemers beginnen juist bij ons omdat ze nog geen behandeling nodig hebben, maar wél veilig willen trainen.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Wat als ik pijn krijg tijdens het trainen?</summary>
+                    <p>Dan passen we meteen de oefening aan of stoppen we tijdelijk. Onze therapeuten zijn gespecialiseerd in pijnherkenning en alternatieve oefeningen, zodat je altijd verantwoord doorgaat.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Ik heb artrose. Kan ik dan meedoen?</summary>
+                    <p>Zeker. Artrose reageert vaak juist goed op gecontroleerde krachttraining en beweging. We letten nauw op belasting en mobiliteit.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Is dit hetzelfde als trainen bij een gewone sportschool?</summary>
+                    <p>Nee. Bij ons train je altijd onder toezicht van een fysiotherapeut, met een schema dat past bij jouw lichaam, niveau en klachten. Geen standaard machines of standaard schema's.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Krijg ik persoonlijke begeleiding, ook in een groep?</summary>
+                    <p>Ja. De groepen zijn klein zodat er genoeg tijd is om je techniek te controleren, oefeningen aan te passen en je progressie te volgen.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Hoe vaak per week kan of moet ik komen?</summary>
+                    <p>1–2 keer per week is voor de meeste mensen ideaal. Tijdens de intake kijken we wat het beste past bij jouw doelen en belastbaarheid.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Is het zwaar?</summary>
+                    <p>We bouwen rustig op. Je krijgt uitdagende, maar haalbare oefeningen. Het doel is sterker worden, niet overbelast raken.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Is dit ook geschikt als ik overgewicht heb?</summary>
+                    <p>Zeker. Veel van onze leden willen verantwoord afvallen of hun conditie verbeteren. Fysiofitness is veilig, laagdrempelig en past zich aan jouw tempo aan.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Ik heb soms last van mijn bloeddruk. Is dat een probleem?</summary>
+                    <p>Nee, vaak niet. We houden rekening met aandoeningen zoals hoge bloeddruk of diabetes en passen de intensiteit aan. Overleg bij twijfel altijd met je huisarts.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Hoe lang duurt een training?</summary>
+                    <p>Gemiddeld 45–60 minuten, afhankelijk van je programma.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Kan ik ook individueel trainen?</summary>
+                    <p>Ja, maar de meeste mensen kiezen voor kleine groepen omdat dat motiverender en betaalbaarder is.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Heb ik speciale kleding of schoenen nodig?</summary>
+                    <p>Gewoon comfortabele sportkleding en een paar goede, stevige sportschoenen. Meer is niet nodig.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Hoe snel merk ik resultaat?</summary>
+                    <p>Veel deelnemers voelen binnen 3–6 weken al verbetering in kracht, stabiliteit en klachten. Het exacte tempo verschilt per persoon.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Moet ik lid worden of werken jullie met strippenkaarten?</summary>
+                    <p>We bieden beide opties. Tijdens de intake bekijken we samen wat voor jou het voordeligst is.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Kan ik mijn abonnement pauzeren als ik op vakantie ga of ziek word?</summary>
+                    <p>Ja, dat kan. We zijn hier flexibel in omdat het leven nu eenmaal niet altijd te plannen is.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Mag ik tussendoor vragen stellen aan mijn fysiotherapeut?</summary>
+                    <p>Absoluut. Onze begeleiding stopt niet zodra de training voorbij is. We helpen je graag met tips, advies en uitleg.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Is dit geschikt voor mensen die al lang niet hebben gesport?</summary>
+                    <p>Juist! Een groot deel van onze leden begint na jaren stilstand — en dat gaat prima, omdat we alles rustig opbouwen.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Moet ik verplicht elke week komen?</summary>
+                    <p>Nee. Jij traint op jouw tempo. We motiveren je wel, maar niets is verplicht.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Worden er metingen gedaan?</summary>
+                    <p>Ja. We kijken regelmatig naar je voortgang en passen je programma aan zodat je blijft verbeteren.</p>
+                </details>
+
+                <details class="faq-item">
+                    <summary>Kan ik meteen starten?</summary>
+                    <p>Meestal wel! De intake kan vaak al binnen enkele dagen ingepland worden.</p>
+                </details>
+            </div>
+        </div>
     </section>
 
     <!-- Footer -->
