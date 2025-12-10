@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = C:\\Users\\CruzK\\OneDrive\\Desktop\\DB\\CRM\\mini-crm
+	tagOpt = --no-tags
+	fetch = +refs/*:refs/*
+	mirror = true
