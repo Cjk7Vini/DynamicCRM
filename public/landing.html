@@ -214,11 +214,97 @@
             color: white;
             padding: 80px 20px;
             text-align: center;
+            position: relative;
         }
 
         .testimonial-content {
             max-width: 900px;
             margin: 0 auto;
+        }
+        
+        /* Review Carousel Styles */
+        .review-carousel {
+            position: relative;
+            min-height: 300px;
+        }
+        
+        .review-item {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .review-item.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .carousel-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .indicator.active {
+            background: white;
+            transform: scale(1.2);
+        }
+        
+        .indicator:hover {
+            background: rgba(255,255,255,0.7);
+        }
+        
+        /* Image Styles */
+        .hero-image-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .hero-image {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .middle-image-container {
+            max-width: 900px;
+            margin: 40px auto 0;
+        }
+        
+        .middle-image {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .bottom-image-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .bottom-image {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         .quote {
@@ -534,21 +620,114 @@
                     Na het bewegen is er tijd voor koffie en een praatje. Het is meer dan alleen sporten.
                 </p>
             </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">💬</div>
+                <h3 class="feature-title">Persoonlijke Aandacht</h3>
+                <p class="feature-desc">
+                    We kennen je bij naam, weten wat je doelen zijn en houden je voortgang goed in de gaten. Geen nummer, maar echt iemand die gezien wordt.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🌿</div>
+                <h3 class="feature-title">Rustige Opbouw</h3>
+                <p class="feature-desc">
+                    We bouwen de intensiteit stap voor stap op, zodat je lichaam de tijd krijgt om sterker en stabieler te worden zonder overbelasting.
+                </p>
+            </div>
         </div>
     </section>
 
-    <!-- Testimonial -->
+    <!-- Hero Image Section -->
+    <div class="hero-image-container">
+        <img src="/images/hero.jpg" alt="Beweging op jouw tempo" class="hero-image">
+    </div>
+
+    <!-- Testimonial Carousel -->
     <section class="testimonial">
         <div class="testimonial-content">
-            <div class="stars">★★★★★</div>
-            <p class="quote">
-                "Ik durfde niet naar de sportschool, te druk en te intimiderend. 
-                Hier voel ik me op mijn gemak. We lachen veel en ik merk echt dat ik sterker word. 
-                De koffie na afloop is minstens zo belangrijk als het sporten zelf!"
-            </p>
-            <p class="quote-author">
-                — Marijke, 62 jaar, beweegt al 8 maanden met plezier
-            </p>
+            <div class="review-carousel" id="reviewCarousel">
+                <!-- Review 1 -->
+                <div class="review-item active">
+                    <div class="stars">★★★★★</div>
+                    <p class="quote">
+                        "Ik durfde niet naar de sportschool, te druk en te intimiderend. 
+                        Hier train ik in een kleine groep met mensen van mijn leeftijd. 
+                        De fysiotherapeut let op mijn knie en past oefeningen aan. 
+                        Nu voel ik me sterker dan in jaren!"
+                    </p>
+                    <p class="quote-author">
+                        — Marijke, 62 jaar, beweegt al 8 maanden met plezier
+                    </p>
+                </div>
+                
+                <!-- Review 2 -->
+                <div class="review-item">
+                    <div class="stars">★★★★★</div>
+                    <p class="quote">
+                        "Na mijn hartoperatie was ik bang om te bewegen. Hier kreeg ik 
+                        het vertrouwen terug. Ze houden rekening met mijn conditie en 
+                        bouwen rustig op. De koffie na afloop is net zo waardevol als de training!"
+                    </p>
+                    <p class="quote-author">
+                        — Jan, 68 jaar, voelt zich weer vitaal
+                    </p>
+                </div>
+                
+                <!-- Review 3 -->
+                <div class="review-item">
+                    <div class="stars">★★★★☆</div>
+                    <p class="quote">
+                        "Eindelijk een plek waar ik me niet opgejaagd voel. We gaan 
+                        op ons eigen tempo en er is altijd tijd voor uitleg. Mijn 
+                        rugklachten zijn verminderd en ik heb meer energie voor mijn kleinkinderen."
+                    </p>
+                    <p class="quote-author">
+                        — Truus, 71 jaar, oma van 5 kleinkinderen
+                    </p>
+                </div>
+                
+                <!-- Review 4 -->
+                <div class="review-item">
+                    <div class="stars">★★★★★</div>
+                    <p class="quote">
+                        "Als man tussen allemaal vrouwen voelde ik me eerst onwennig, 
+                        maar de groep is zo gezellig! We lachen veel en motiveren elkaar. 
+                        Mijn bloeddruk is gedaald en ik slaap beter."
+                    </p>
+                    <p class="quote-author">
+                        — Henk, 65 jaar, de enige man in de groep
+                    </p>
+                </div>
+                
+                <!-- Review 5 -->
+                <div class="review-item">
+                    <div class="stars">★★★★☆</div>
+                    <p class="quote">
+                        "Ik had nooit gedacht dat ik op mijn 73e nog zou gaan sporten! 
+                        Het is hier laagdrempelig en niet intimiderend. De begeleiding 
+                        is top en ik merk dat ik steviger sta en minder snel moe ben."
+                    </p>
+                    <p class="quote-author">
+                        — Annie, 73 jaar, begon zonder sportervaring
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Carousel indicators -->
+            <div class="carousel-indicators">
+                <span class="indicator active" onclick="goToReview(0)"></span>
+                <span class="indicator" onclick="goToReview(1)"></span>
+                <span class="indicator" onclick="goToReview(2)"></span>
+                <span class="indicator" onclick="goToReview(3)"></span>
+                <span class="indicator" onclick="goToReview(4)"></span>
+            </div>
+        </div>
+        
+        <!-- Middle Image Section -->
+        <div class="middle-image-container">
+            <img src="/images/midden.jpg" alt="Samen bewegen in kleine groep" class="middle-image">
         </div>
     </section>
 
@@ -588,6 +767,22 @@
                     Stap voor stap werk je aan je gezondheid en vitaliteit
                 </p>
             </div>
+            
+            <div class="step">
+                <div class="step-number">5</div>
+                <h3 class="step-title">Blijvend Begeleiden</h3>
+                <p class="step-desc">
+                    We blijven meekijken, motiveren en bijsturen zodat je veilig én met vertrouwen kunt blijven trainen
+                </p>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">6</div>
+                <h3 class="step-title">Voelbaar Resultaat</h3>
+                <p class="step-desc">
+                    Na een paar weken merk je het verschil: meer kracht, minder klachten en meer energie in het dagelijks leven
+                </p>
+            </div>
         </div>
     </section>
 
@@ -604,6 +799,11 @@
             Ja, stuur mij de informatie →
         </a>
     </section>
+    
+    <!-- Bottom Image Section -->
+    <div class="bottom-image-container">
+        <img src="/images/onderin.jpg" alt="Gezellige koffie na het sporten" class="bottom-image">
+    </div>
 
     <!-- FAQ Section -->
     <section class="faq-section">
@@ -920,6 +1120,43 @@
         console.log('Landing page loaded successfully');
         console.log('URL:', window.location.href);
         console.log('Practice code:', practiceCode || 'none');
+        
+        // Review Carousel Functionality
+        let currentReview = 0;
+        const reviews = document.querySelectorAll('.review-item');
+        const indicators = document.querySelectorAll('.indicator');
+        
+        function showReview(index) {
+            // Hide all reviews
+            reviews.forEach(review => review.classList.remove('active'));
+            indicators.forEach(indicator => indicator.classList.remove('active'));
+            
+            // Show selected review
+            if (reviews[index]) {
+                reviews[index].classList.add('active');
+                indicators[index].classList.add('active');
+            }
+            
+            currentReview = index;
+        }
+        
+        // Make goToReview global for onclick handlers
+        window.goToReview = function(index) {
+            showReview(index);
+        }
+        
+        function nextReview() {
+            let next = currentReview + 1;
+            if (next >= reviews.length) next = 0;
+            showReview(next);
+        }
+        
+        // Auto-rotate reviews every 5 seconds
+        if (reviews.length > 0) {
+            setInterval(nextReview, 5000);
+            // Initialize carousel
+            showReview(0);
+        }
     </script>
 </body>
 </html>
