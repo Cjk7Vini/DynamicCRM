@@ -110,9 +110,10 @@ const postLimiter = rateLimit({
 });
 app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 
+// ✅ FIX: Homepage redirect naar landing.html in plaats van form.html
 app.get('/', (req, res) => {
   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
-  res.redirect(302, q ? `/form.html?${q}` : '/form.html');
+  res.redirect(302, q ? `/landing.html?${q}` : '/landing.html');
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
 app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html'));
@@ -984,19 +985,19 @@ app.get('/api/training-results', requireAdmin, async (req, res) => {
     let paramCount = 1;
 
     if (patient_name) {
-      sql += ` AND s.patient_name ILIKE ${paramCount}`;
+      sql += ` AND s.patient_name ILIKE $${paramCount}`;
       params.push(`%${patient_name}%`);
       paramCount++;
     }
 
     if (test_type) {
-      sql += ` AND s.test_type = ${paramCount}`;
+      sql += ` AND s.test_type = $${paramCount}`;
       params.push(test_type);
       paramCount++;
     }
 
     if (measurement_phase) {
-      sql += ` AND s.measurement_phase = ${paramCount}`;
+      sql += ` AND s.measurement_phase = $${paramCount}`;
       params.push(measurement_phase);
       paramCount++;
     }
@@ -1004,7 +1005,7 @@ app.get('/api/training-results', requireAdmin, async (req, res) => {
     sql += `
       GROUP BY s.id
       ORDER BY s.created_at DESC
-      LIMIT ${paramCount}
+      LIMIT $${paramCount}
     `;
     params.push(parseInt(limit));
 
