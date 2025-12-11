@@ -57,23 +57,25 @@
             gap: 5px;
         }
 
-        /* Warm welcoming hero */
+        /* Hero with background image */
         .hero {
-            background: linear-gradient(135deg, rgba(37,71,151,0.95) 0%, rgba(41,163,185,0.95) 100%),
-                        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') bottom;
-            background-size: cover;
+            background: linear-gradient(135deg, rgba(37,71,151,0.85) 0%, rgba(41,163,185,0.85) 100%),
+                        url('/images/hero.jpg') center/cover no-repeat;
             color: white;
-            padding: 80px 20px 100px;
+            padding: 100px 20px 120px;
             text-align: center;
+            position: relative;
         }
 
         .hero-content {
             max-width: 900px;
             margin: 0 auto;
+            position: relative;
+            z-index: 2;
         }
 
         .practice-name {
-            background: rgba(153, 202, 51, 0.2);
+            background: rgba(153, 202, 51, 0.3);
             border: 2px solid #99CA33;
             border-radius: 30px;
             padding: 8px 20px;
@@ -88,6 +90,7 @@
             margin-bottom: 20px;
             font-weight: 700;
             line-height: 1.2;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
         .subtitle {
@@ -95,6 +98,7 @@
             margin-bottom: 40px;
             opacity: 0.95;
             line-height: 1.4;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
         }
 
         /* Friendly benefits */
@@ -111,6 +115,7 @@
             align-items: center;
             gap: 10px;
             font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .check {
@@ -128,7 +133,7 @@
 
         /* Warm CTA button */
         .cta-button {
-            background: #99CA33;
+            background: #FF8C00;
             color: white;
             padding: 18px 45px;
             border: none;
@@ -137,18 +142,18 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(153, 202, 51, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
             display: inline-block;
             text-decoration: none;
         }
 
         .cta-button:hover {
-            background: #8AB92D;
+            background: #FF7F00;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(153, 202, 51, 0.4);
+            box-shadow: 0 6px 20px rgba(255, 140, 0, 0.5);
         }
 
-        /* Reassuring section */
+        /* Reassurance Section */
         .reassurance {
             background: #f8f9fa;
             padding: 80px 20px;
@@ -192,11 +197,6 @@
             transform: translateY(-5px);
         }
 
-        .feature-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-
         .feature-title {
             font-size: 22px;
             color: #254797;
@@ -208,9 +208,10 @@
             line-height: 1.6;
         }
 
-        /* Personal testimonial */
+        /* Testimonial with background image */
         .testimonial {
-            background: linear-gradient(135deg, #254797 0%, #29A3B9 100%);
+            background: linear-gradient(135deg, rgba(37,71,151,0.85) 0%, rgba(41,163,185,0.85) 100%),
+                        url('/images/midden.jpg') center/cover no-repeat;
             color: white;
             padding: 80px 20px;
             text-align: center;
@@ -220,6 +221,8 @@
         .testimonial-content {
             max-width: 900px;
             margin: 0 auto;
+            position: relative;
+            z-index: 2;
         }
         
         /* Review Carousel Styles */
@@ -266,62 +269,25 @@
         .indicator:hover {
             background: rgba(255,255,255,0.7);
         }
-        
-        /* Image Styles */
-        .hero-image-container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        
-        .hero-image {
-            width: 100%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        
-        .middle-image-container {
-            max-width: 900px;
-            margin: 40px auto 0;
-        }
-        
-        .middle-image {
-            width: 100%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        
-        .bottom-image-container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        
-        .bottom-image {
-            width: 100%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
 
         .quote {
             font-size: 24px;
             font-style: italic;
             margin-bottom: 30px;
             line-height: 1.5;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
         .quote-author {
             font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .stars {
             color: #FFD700;
             font-size: 24px;
             margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
 
         /* How it works */
@@ -366,11 +332,24 @@
             color: #666;
         }
 
-        /* Final CTA */
+        /* Final CTA with background image */
         .final-cta {
-            background: #f8f9fa;
+            background: linear-gradient(135deg, rgba(37,71,151,0.85) 0%, rgba(41,163,185,0.85) 100%),
+                        url('/images/onderin.jpg') center/cover no-repeat;
             padding: 80px 20px;
             text-align: center;
+            color: white;
+            position: relative;
+        }
+
+        .final-cta .section-title {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .final-cta .section-subtitle {
+            color: rgba(255,255,255,0.95);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
         }
 
         .urgency {
@@ -550,10 +529,9 @@
         </div>
     </header>
 
-    <!-- Hero Section -->
+    <!-- Hero Section with Background Image -->
     <section class="hero">
         <div class="hero-content">
-            
             <h1>Ontdek hoe je fit en vitaal blijft<br>op je eigen tempo</h1>
             
             <p class="subtitle">
@@ -590,7 +568,6 @@
 
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">👥</div>
                 <h3 class="feature-title">Klein & Vertrouwd</h3>
                 <p class="feature-desc">
                     In kleine groepen of individueel. U sport met gelijkgestemden in een rustige, vriendelijke sfeer.
@@ -598,7 +575,6 @@
             </div>
 
             <div class="feature-card">
-                <div class="feature-icon">🏥</div>
                 <h3 class="feature-title">Professioneel Verantwoord</h3>
                 <p class="feature-desc">
                     Onder begeleiding van professionals die rekening houden met je gezondheid en eventuele klachten.
@@ -606,7 +582,6 @@
             </div>
 
             <div class="feature-card">
-                <div class="feature-icon">📍</div>
                 <h3 class="feature-title">Dichtbij Huis</h3>
                 <p class="feature-desc">
                     Bij je vertrouwde fysiotherapiepraktijk. Bij jou in de buurt.
@@ -614,7 +589,6 @@
             </div>
 
             <div class="feature-card">
-                <div class="feature-icon">☕</div>
                 <h3 class="feature-title">Gezellig & Ontspannen</h3>
                 <p class="feature-desc">
                     Na het bewegen is er tijd voor koffie en een praatje. Het is meer dan alleen sporten.
@@ -622,7 +596,6 @@
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon">💬</div>
                 <h3 class="feature-title">Persoonlijke Aandacht</h3>
                 <p class="feature-desc">
                     We kennen je bij naam, weten wat je doelen zijn en houden je voortgang goed in de gaten. Geen nummer, maar echt iemand die gezien wordt.
@@ -630,7 +603,6 @@
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon">🌿</div>
                 <h3 class="feature-title">Rustige Opbouw</h3>
                 <p class="feature-desc">
                     We bouwen de intensiteit stap voor stap op, zodat je lichaam de tijd krijgt om sterker en stabieler te worden zonder overbelasting.
@@ -639,12 +611,7 @@
         </div>
     </section>
 
-    <!-- Hero Image Section -->
-    <div class="hero-image-container">
-        <img src="/images/hero.jpg" alt="Beweging op jouw tempo" class="hero-image">
-    </div>
-
-    <!-- Testimonial Carousel -->
+    <!-- Testimonial Carousel with Background Image -->
     <section class="testimonial">
         <div class="testimonial-content">
             <div class="review-carousel" id="reviewCarousel">
@@ -658,7 +625,7 @@
                         Nu voel ik me sterker dan in jaren!"
                     </p>
                     <p class="quote-author">
-                        — Marijke, 62 jaar, beweegt al 8 maanden met plezier
+                        — Marijke van den Berg
                     </p>
                 </div>
                 
@@ -666,12 +633,12 @@
                 <div class="review-item">
                     <div class="stars">★★★★★</div>
                     <p class="quote">
-                        "Na mijn hartoperatie was ik bang om te bewegen. Hier kreeg ik 
+                        "Na mijn revalidatie was ik bang om te bewegen. Hier kreeg ik 
                         het vertrouwen terug. Ze houden rekening met mijn conditie en 
                         bouwen rustig op. De koffie na afloop is net zo waardevol als de training!"
                     </p>
                     <p class="quote-author">
-                        — Jan, 68 jaar, voelt zich weer vitaal
+                        — Jan de Vries
                     </p>
                 </div>
                 
@@ -684,20 +651,20 @@
                         rugklachten zijn verminderd en ik heb meer energie voor mijn kleinkinderen."
                     </p>
                     <p class="quote-author">
-                        — Truus, 71 jaar, oma van 5 kleinkinderen
+                        — Truus Jansen
                     </p>
                 </div>
                 
-                <!-- Review 4 -->
+                <!-- Review 4 - AANGEPAST -->
                 <div class="review-item">
                     <div class="stars">★★★★★</div>
                     <p class="quote">
-                        "Als man tussen allemaal vrouwen voelde ik me eerst onwennig, 
-                        maar de groep is zo gezellig! We lachen veel en motiveren elkaar. 
-                        Mijn bloeddruk is gedaald en ik slaap beter."
+                        "Het fijne van trainen bij een fysiotherapiepraktijk is dat er altijd 
+                        iemand is die echt verstand heeft van blessures en verantwoord bewegen. 
+                        Dat geeft me het vertrouwen om door te gaan, zelfs op mindere dagen."
                     </p>
                     <p class="quote-author">
-                        — Henk, 65 jaar, de enige man in de groep
+                        — Lars Bakker
                     </p>
                 </div>
                 
@@ -710,7 +677,7 @@
                         is top en ik merk dat ik steviger sta en minder snel moe ben."
                     </p>
                     <p class="quote-author">
-                        — Annie, 73 jaar, begon zonder sportervaring
+                        — Annie Visser
                     </p>
                 </div>
             </div>
@@ -723,11 +690,6 @@
                 <span class="indicator" onclick="goToReview(3)"></span>
                 <span class="indicator" onclick="goToReview(4)"></span>
             </div>
-        </div>
-        
-        <!-- Middle Image Section -->
-        <div class="middle-image-container">
-            <img src="/images/midden.jpg" alt="Samen bewegen in kleine groep" class="middle-image">
         </div>
     </section>
 
@@ -786,9 +748,8 @@
         </div>
     </section>
 
-    <!-- Final CTA -->
+    <!-- Final CTA with Background Image -->
     <section class="final-cta">
-        
         <h2 class="section-title">Klaar om te beginnen?</h2>
         <p class="section-subtitle">
             Vul het formulier in en ontvang alle informatie. 
@@ -799,13 +760,8 @@
             Ja, stuur mij de informatie →
         </a>
     </section>
-    
-    <!-- Bottom Image Section -->
-    <div class="bottom-image-container">
-        <img src="/images/onderin.jpg" alt="Gezellige koffie na het sporten" class="bottom-image">
-    </div>
 
-    <!-- FAQ Section -->
+    <!-- FAQ Section - VOLLEDIG VERVANGEN -->
     <section class="faq-section">
         <div class="container">
             <h2 class="section-title">Veelgestelde vragen</h2>
@@ -821,7 +777,7 @@
 
                 <details class="faq-item">
                     <summary>Wat als ik pijn krijg tijdens het trainen?</summary>
-                    <p>Dan passen we meteen de oefening aan of stoppen we tijdelijk. Onze therapeuten zijn gespecialiseerd in pijnherkenning en alternatieve oefeningen, zodat je altijd verantwoord doorgaat.</p>
+                    <p>Dan passen we meteen de oefening aan of stoppen we tijdelijk. Onze therapeuten en beweegcoaches zijn gespecialiseerd in pijnherkenning en alternatieve oefeningen, zodat je altijd verantwoord doorgaat.</p>
                 </details>
 
                 <details class="faq-item">
@@ -831,7 +787,7 @@
 
                 <details class="faq-item">
                     <summary>Is dit hetzelfde als trainen bij een gewone sportschool?</summary>
-                    <p>Nee. Bij ons train je altijd onder toezicht van een fysiotherapeut, met een schema dat past bij jouw lichaam, niveau en klachten. Geen standaard machines of standaard schema's.</p>
+                    <p>Nee. Bij ons train je altijd onder toezicht van een fysiotherapeut of beweegcoach, met een schema dat past bij jouw lichaam, niveau en klachten. Geen standaard machines of standaard schema's.</p>
                 </details>
 
                 <details class="faq-item">
@@ -866,7 +822,7 @@
 
                 <details class="faq-item">
                     <summary>Kan ik ook individueel trainen?</summary>
-                    <p>Ja, maar de meeste mensen kiezen voor kleine groepen omdat dat motiverender en betaalbaarder is.</p>
+                    <p>Ja. Je kunt kiezen uit kleine groepssessies of individuele training. Veel mensen vinden het prettig om in hun eigen tempo te trainen, zonder groepsdruk. U heeft uw eigen programma en werkt daaraan zelfstandig, terwijl onze begeleiders altijd rondlopen om te helpen wanneer nodig. Groepstraining is fijn als je de sfeer en motivatie van anderen prettig vindt.</p>
                 </details>
 
                 <details class="faq-item">
@@ -881,7 +837,7 @@
 
                 <details class="faq-item">
                     <summary>Moet ik lid worden of werken jullie met strippenkaarten?</summary>
-                    <p>We bieden beide opties. Tijdens de intake bekijken we samen wat voor jou het voordeligst is.</p>
+                    <p>We werken met verschillende lidmaatschappen, zodat je kunt kiezen wat het beste past bij jouw doelen en hoe vaak je wilt komen. Geen strippenkaarten en geen ingewikkelde constructies — gewoon overzichtelijke keuzes.</p>
                 </details>
 
                 <details class="faq-item">
