@@ -157,9 +157,23 @@
           console.error('Server detail:', json.details);
           return;
         }
-        msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
-        msg.className = 'success';
+        // Success! Show modal with practice name
         const leadId = json?.lead?.id ?? null;
+        
+        // Get practice name from validation result
+        let practiceName = validation?.practice?.naam || 'de praktijk';
+        
+        // Trigger success modal (defined in form.html)
+        if (typeof showSuccessModal === 'function') {
+          showSuccessModal(practiceName);
+        } else {
+          // Fallback to old method if modal not available
+          msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
+          msg.className = 'success';
+          form.reset();
+        }
+        
+        // Log event
         if (code) {
           postEvent({
             lead_id: leadId,
@@ -168,7 +182,8 @@
             metadata: { via: 'form.js', ts: Date.now() }
           });
         }
-        form.reset();
+        
+        // Reset hidden field
         hidden.value = code;
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
