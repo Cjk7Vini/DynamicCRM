@@ -437,7 +437,7 @@
         // Load practices for dropdown
         async function loadPractices() {
             try {
-                const res = await fetch('/api/practices');
+                const res = await fetch('/api/churn/practices');
                 const data = await res.json();
                 
                 if (data.success && data.practices) {
