@@ -170,7 +170,7 @@
           // Fallback to old method if modal not available
           msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
           msg.className = 'success';
-          form.reset();
+          // Note: form is NOT reset - data blijft staan
         }
         
         // Log event
@@ -183,7 +183,7 @@
           });
         }
         
-        // Reset hidden field
+        // Keep hidden field populated
         hidden.value = code;
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;

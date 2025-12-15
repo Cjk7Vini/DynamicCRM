@@ -436,7 +436,7 @@
             <p class="practice-name-highlight" id="modalPracticeName">de praktijk</p>
             <p style="margin-top: 20px;">We nemen binnen 1 werkdag contact met je op om een afspraak in te plannen.</p>
             <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
-            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">5</span> seconden</p>
+            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
         </div>
     </div>
 
@@ -457,8 +457,8 @@
             // Show modal
             modal.classList.add('active');
             
-            // Start countdown
-            let seconds = 5;
+            // Start countdown (10 seconds instead of 5)
+            let seconds = 10;
             const countdownEl = document.getElementById('countdown');
             
             countdownTimer = setInterval(() => {
@@ -480,7 +480,7 @@
                 clearInterval(countdownTimer);
             }
             
-            // Note: form.js handles form reset
+            // Note: form.js does NOT reset form anymore - data blijft staan
         }
 
         // Extra script voor practice naam display
