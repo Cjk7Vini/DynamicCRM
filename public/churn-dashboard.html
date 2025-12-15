@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Health Analytics - Churn & Conversie Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.5;
+        }
+        
+        .header {
+            background: white;
+            border-bottom: 1px solid #d2d2d7;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 20px; 
+        }
+        
+        .logo { 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px; 
+            font-weight: 700; 
+            color: #06c; 
+        }
+        
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .header-title { 
+            font-size: 16px; 
+            font-weight: 400;
+            color: #86868b;
+        }
+        
+        .header-right { 
+            display: flex; 
+            gap: 16px; 
+            align-items: center; 
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary { 
+            background: #06c; 
+            color: white; 
+        }
+        
+        .btn-primary:hover { 
+            background: #0077ed; 
+        }
+        
+        .btn-secondary { 
+            background: white; 
+            color: #1d1d1f; 
+            border: 1px solid #d2d2d7; 
+        }
+        
+        .btn-secondary:hover { 
+            background: #f5f5f7; 
+        }
+
+        /* Power BI Style Sidebar */
+        .dashboard-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 220px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 0 20px;
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #86868b;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        select, input[type="date"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+
+        select:focus, input[type="date"]:focus {
+            outline: none;
+            border-color: #06c;
+            box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            background: #f5f5f7;
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #86868b;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1d1d1f;
+            line-height: 1;
+        }
+
+        .kpi-subtitle {
+            font-size: 13px;
+            color: #86868b;
+            margin-top: 4px;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 16px;
+        }
+
+        .chart-subtitle {
+            font-size: 12px;
+            color: #86868b;
+            margin-bottom: 16px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Error & Loading States */
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            border-left: 4px solid #c62828;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #86868b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #86868b;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            
+            .dashboard-container {
+                flex-direction: column;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="6" fill="#06c"/>
+                    <path d="M16 8L24 16L16 24L8 16L16 8Z" fill="white"/>
+                </svg>
+                Dynamic Health
+            </div>
+            <div class="header-title">Churn & Conversie Analytics</div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-secondary" onclick="window.location.href='/'">← Terug naar CRM</button>
+            <button class="btn btn-primary" onclick="refreshData()">↻ Vernieuwen</button>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Sidebar Filters -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Filters</div>
+                
+                <div class="filter-group">
+                    <label class="filter-label" for="practiceFilter">Praktijk</label>
+                    <select id="practiceFilter" onchange="applyFilters()">
+                        <option value="">Alle praktijken</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="dateFrom">Van datum</label>
+                    <input type="date" id="dateFrom" onchange="applyFilters()">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="dateTo">Tot datum</label>
+                    <input type="date" id="dateTo" onchange="applyFilters()">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="sourceFilter">Bron</label>
+                    <select id="sourceFilter" onchange="applyFilters()">
+                        <option value="">Alle bronnen</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Google">Google</option>
+                        <option value="Vrienden/Familie">Vrienden/Familie</option>
+                        <option value="Voucher">Voucher</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="statusFilter">Status</label>
+                    <select id="statusFilter" onchange="applyFilters()">
+                        <option value="">Alle statussen</option>
+                        <option value="Nieuw">Nieuw</option>
+                        <option value="Gebeld">Gebeld</option>
+                        <option value="Afspraak Gepland">Afspraak Gepland</option>
+                        <option value="Geweest">Geweest</option>
+                        <option value="Lid Geworden">Lid Geworden</option>
+                        <option value="Niet Geïnteresseerd">Niet Geïnteresseerd</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Totaal Leads</div>
+                    <div class="kpi-value" id="totalLeads">-</div>
+                    <div class="kpi-subtitle">Alle leads in database</div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-label">Conversie Ratio</div>
+                    <div class="kpi-value" id="conversionRate">-</div>
+                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-label">Actieve Praktijken</div>
+                    <div class="kpi-value" id="activePractices">-</div>
+                    <div class="kpi-subtitle">Praktijken met leads</div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-label">Gemiddelde Tijd</div>
+                    <div class="kpi-value" id="avgTime">-</div>
+                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-label">Top Bron</div>
+                    <div class="kpi-value" id="topSource">-</div>
+                    <div class="kpi-subtitle">Meeste leads</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <!-- Churn Forecast -->
+                <div class="chart-container">
+                    <div class="chart-title">Churn Forecast</div>
+                    <div class="chart-subtitle">Voorspelling ledenaantal & uitval</div>
+                    <div class="chart-wrapper">
+                        <canvas id="churnForecastChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Conversion Funnel -->
+                <div class="chart-container">
+                    <div class="chart-title">Conversie Funnel</div>
+                    <div class="chart-subtitle">Lead journey van klik tot lid</div>
+                    <div class="chart-wrapper">
+                        <canvas id="conversionFunnelChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Practice Performance -->
+                <div class="chart-container">
+                    <div class="chart-title">Praktijk Performance</div>
+                    <div class="chart-subtitle">Top 10 praktijken naar totale leads</div>
+                    <div class="chart-wrapper">
+                        <canvas id="practiceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Source Distribution -->
+                <div class="chart-container">
+                    <div class="chart-title">Lead Bronnen</div>
+                    <div class="chart-subtitle">Distributie per marketing kanaal</div>
+                    <div class="chart-wrapper">
+                        <canvas id="sourceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Chart instances
+        let churnForecastChart, conversionFunnelChart, practiceChart, sourceChart;
+
+        // Initialize dashboard
+        async function init() {
+            await loadPractices();
+            await loadKPIs();
+            await loadChurnForecast();
+            await loadConversionFunnel();
+            await loadPracticePerformance();
+            await loadSourcePerformance();
+        }
+
+        // Load practices for dropdown
+        async function loadPractices() {
+            try {
+                const res = await fetch('/api/practices');
+                const data = await res.json();
+                
+                if (data.success && data.practices) {
+                    const select = document.getElementById('practiceFilter');
+                    select.innerHTML = '<option value="">Alle praktijken</option>';
+                    
+                    data.practices.forEach(practice => {
+                        const option = document.createElement('option');
+                        option.value = practice.code;
+                        option.textContent = practice.naam;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading practices:', error);
+            }
+        }
+
+        // Load KPIs
+        async function loadKPIs() {
+            try {
+                const res = await fetch('/api/practice-performance' + buildQueryString());
+                const data = await res.json();
+                
+                if (data.success && data.data) {
+                    // Calculate totals
+                    const totalLeads = data.data.reduce((sum, p) => sum + parseInt(p.total_leads || 0), 0);
+                    const totalConverted = data.data.reduce((sum, p) => sum + parseInt(p.lid_geworden || 0), 0);
+                    const conversionRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : 0;
+                    const activePractices = data.data.filter(p => p.total_leads > 0).length;
+                    
+                    // Update KPI cards
+                    document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
+                    document.getElementById('conversionRate').textContent = conversionRate + '%';
+                    document.getElementById('activePractices').textContent = activePractices;
+                    
+                    // Get top source
+                    const sourcesRes = await fetch('/api/sources' + buildQueryString());
+                    const sourcesData = await sourcesRes.json();
+                    if (sourcesData.success && sourcesData.sources.length > 0) {
+                        document.getElementById('topSource').textContent = sourcesData.sources[0].source || 'Onbekend';
+                    }
+                    
+                    // Calculate average time (mock for now)
+                    document.getElementById('avgTime').textContent = '12d';
+                }
+            } catch (error) {
+                console.error('Error loading KPIs:', error);
+            }
+        }
+
+        // Load Churn Forecast Chart
+        async function loadChurnForecast() {
+            try {
+                const res = await fetch('/api/churn-forecast');
+                const data = await res.json();
+                
+                if (data.success) {
+                    const allData = [...(data.historical || []), ...(data.forecast || [])];
+                    
+                    const ctx = document.getElementById('churnForecastChart');
+                    if (churnForecastChart) churnForecastChart.destroy();
+                    
+                    churnForecastChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: allData.map(d => d.month),
+                            datasets: [
+                                {
+                                    label: 'Total Members',
+                                    data: allData.map(d => d.total_members),
+                                    borderColor: '#06c',
+                                    backgroundColor: 'rgba(0,102,204,0.1)',
+                                    borderWidth: 2,
+                                    tension: 0.4,
+                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
+                                },
+                                {
+                                    label: 'Churned Members',
+                                    data: allData.map(d => d.churned_members),
+                                    borderColor: '#ff3b30',
+                                    backgroundColor: 'rgba(255,59,48,0.1)',
+                                    borderWidth: 2,
+                                    tension: 0.4,
+                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading churn forecast:', error);
+                showError('churnForecastChart', error.message);
+            }
+        }
+
+        // Load Conversion Funnel
+        async function loadConversionFunnel() {
+            try {
+                const res = await fetch('/api/funnel' + buildQueryString());
+                const data = await res.json();
+                
+                if (data.success && data.data) {
+                    const ctx = document.getElementById('conversionFunnelChart');
+                    if (conversionFunnelChart) conversionFunnelChart.destroy();
+                    
+                    conversionFunnelChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.data.map(d => d.stage),
+                            datasets: [{
+                                label: 'Count',
+                                data: data.data.map(d => d.count),
+                                backgroundColor: [
+                                    '#06c',
+                                    '#34c759',
+                                    '#ff9500',
+                                    '#ff3b30'
+                                ]
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading funnel:', error);
+                showError('conversionFunnelChart', error.message);
+            }
+        }
+
+        // Load Practice Performance
+        async function loadPracticePerformance() {
+            try {
+                const res = await fetch('/api/practice-performance');
+                const data = await res.json();
+                
+                if (data.success && data.data) {
+                    const topPractices = data.data.slice(0, 10);
+                    
+                    const ctx = document.getElementById('practiceChart');
+                    if (practiceChart) practiceChart.destroy();
+                    
+                    practiceChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: topPractices.map(d => d.praktijk_naam || d.praktijk_code),
+                            datasets: [{
+                                label: 'Total Leads',
+                                data: topPractices.map(d => d.total_leads),
+                                backgroundColor: '#06c'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading practice performance:', error);
+            }
+        }
+
+        // Load Source Performance
+        async function loadSourcePerformance() {
+            try {
+                const res = await fetch('/api/sources');
+                const data = await res.json();
+                
+                if (data.success && data.sources) {
+                    const ctx = document.getElementById('sourceChart');
+                    if (sourceChart) sourceChart.destroy();
+                    
+                    sourceChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.sources.map(d => d.source || 'Onbekend'),
+                            datasets: [{
+                                data: data.sources.map(d => d.count),
+                                backgroundColor: [
+                                    '#06c',
+                                    '#34c759',
+                                    '#ff9500',
+                                    '#af52de',
+                                    '#ff3b30'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sources:', error);
+            }
+        }
+
+        // Build query string from filters
+        function buildQueryString() {
+            const params = new URLSearchParams();
+            
+            const practice = document.getElementById('practiceFilter').value;
+            if (practice) params.append('practice', practice);
+            
+            const source = document.getElementById('sourceFilter').value;
+            if (source) params.append('source', source);
+            
+            const dateFrom = document.getElementById('dateFrom').value;
+            if (dateFrom) params.append('dateFrom', dateFrom);
+            
+            const dateTo = document.getElementById('dateTo').value;
+            if (dateTo) params.append('dateTo', dateTo);
+            
+            const status = document.getElementById('statusFilter').value;
+            if (status) params.append('status', status);
+            
+            const queryString = params.toString();
+            return queryString ? '?' + queryString : '';
+        }
+
+        // Apply filters
+        function applyFilters() {
+            loadKPIs();
+            loadConversionFunnel();
+        }
+
+        // Refresh all data
+        function refreshData() {
+            init();
+        }
+
+        // Show error message
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const parent = element.parentElement;
+                parent.innerHTML = `<div class="error-message">Error: ${message}</div>`;
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

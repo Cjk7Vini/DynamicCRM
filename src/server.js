@@ -1,4 +1,4 @@
-// src/server.js — NL + Neon + SMTP + TESTMAIL + EVENTS + METRICS + safe rate-limit + SMTP retry + TRAINING RESULTS
+// src/server.js — NL + Neon + SMTP + TESTMAIL + EVENTS + METRICS + safe rate-limit + SMTP retry + TRAINING RESULTS + CHURN ANALYTICS
 
 import dns from 'dns';
 dns.setDefaultResultOrder?.('ipv4first');
@@ -116,7 +116,7 @@ app.get('/', (req, res) => {
   res.redirect(302, q ? `/landing.html?${q}` : '/landing.html');
 });
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
-app.get('/dashboard', (_req, res) => res.redirect(302, '/dashboard.html'));
+app.get('/dashboard', (_req, res) => res.redirect(302, '/churn-dashboard.html'));
 app.get('/training', (_req, res) => res.redirect(302, '/training-form.html'));
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
@@ -229,26 +229,6 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
         ORDER BY l.aangemaakt_op DESC
         LIMIT 500
-      `;
-      const r = await client.query(sql);
-      return r.rows;
-    });
-    res.json(rows);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Database error', details: e.message });
-  }
-});
-
-// GET /api/practices - Haal alle actieve praktijken op (voor training form)
-app.get('/api/practices', async (_req, res) => {
-  try {
-    const rows = await withReadConnection(async (client) => {
-      const sql = `
-        SELECT code, naam
-        FROM public.praktijken
-        WHERE actief = TRUE
-        ORDER BY naam ASC
       `;
       const r = await client.query(sql);
       return r.rows;
@@ -1065,6 +1045,248 @@ app.get('/api/training-results/:id', requireAdmin, async (req, res) => {
       error: 'Database error', 
       details: e.message 
     });
+  }
+});
+
+// ==================== CHURN ANALYTICS ENDPOINTS ====================
+
+// GET /api/practices - Haal alle actieve praktijken op voor churn dashboard dropdown
+app.get('/api/churn/practices', async (_req, res) => {
+  try {
+    const rows = await withReadConnection(async (client) => {
+      const sql = `
+        SELECT code, naam, actief
+        FROM public.praktijken
+        WHERE actief = TRUE
+        ORDER BY naam ASC
+      `;
+      const r = await client.query(sql);
+      return r.rows;
+    });
+    res.json({ success: true, practices: rows });
+  } catch (e) {
+    console.error('GET /api/churn/practices error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/practice-performance - Performance metrics per praktijk
+app.get('/api/practice-performance', async (req, res) => {
+  try {
+    const { practice, dateFrom, dateTo, source, status } = req.query;
+    
+    let sql = `
+      SELECT 
+        l.praktijk_code,
+        p.naam AS praktijk_naam,
+        COUNT(l.id)::int AS total_leads,
+        COUNT(CASE WHEN l.status = 'Lid Geworden' THEN 1 END)::int AS lid_geworden,
+        COUNT(CASE WHEN l.status = 'Afspraak Gepland' THEN 1 END)::int AS afspraak_gepland,
+        COUNT(CASE WHEN l.status = 'Geweest' THEN 1 END)::int AS geweest,
+        COUNT(CASE WHEN l.status = 'Niet Geïnteresseerd' THEN 1 END)::int AS niet_geinteresseerd
+      FROM public.leads l
+      LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramCount = 1;
+
+    if (practice) {
+      sql += ` AND l.praktijk_code = $${paramCount}`;
+      params.push(practice);
+      paramCount++;
+    }
+
+    if (dateFrom) {
+      sql += ` AND l.aangemaakt_op >= $${paramCount}::date`;
+      params.push(dateFrom);
+      paramCount++;
+    }
+
+    if (dateTo) {
+      sql += ` AND l.aangemaakt_op <= $${paramCount}::date`;
+      params.push(dateTo);
+      paramCount++;
+    }
+
+    if (source) {
+      sql += ` AND l.bron = $${paramCount}`;
+      params.push(source);
+      paramCount++;
+    }
+
+    if (status) {
+      sql += ` AND l.status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    sql += `
+      GROUP BY l.praktijk_code, p.naam
+      ORDER BY total_leads DESC
+    `;
+
+    const rows = await withReadConnection(async (client) => {
+      const result = await client.query(sql, params);
+      return result.rows;
+    });
+
+    res.json({ success: true, data: rows });
+  } catch (e) {
+    console.error('GET /api/practice-performance error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/churn-forecast - Mock forecast data (replace with real ML model later)
+app.get('/api/churn-forecast', async (_req, res) => {
+  try {
+    // Mock historical data (last 6 months)
+    const historical = [
+      { month: 'Jul 2024', total_members: 450, churned_members: 15, is_forecast: false },
+      { month: 'Aug 2024', total_members: 468, churned_members: 12, is_forecast: false },
+      { month: 'Sep 2024', total_members: 485, churned_members: 18, is_forecast: false },
+      { month: 'Oct 2024', total_members: 502, churned_members: 14, is_forecast: false },
+      { month: 'Nov 2024', total_members: 520, churned_members: 16, is_forecast: false },
+      { month: 'Dec 2024', total_members: 538, churned_members: 13, is_forecast: false }
+    ];
+
+    // Mock forecast data (next 3 months)
+    const forecast = [
+      { month: 'Jan 2025', total_members: 555, churned_members: 17, is_forecast: true },
+      { month: 'Feb 2025', total_members: 568, churned_members: 15, is_forecast: true },
+      { month: 'Mar 2025', total_members: 582, churned_members: 14, is_forecast: true }
+    ];
+
+    res.json({ success: true, historical, forecast });
+  } catch (e) {
+    console.error('GET /api/churn-forecast error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/funnel - Conversie funnel data
+app.get('/api/funnel', async (req, res) => {
+  try {
+    const { practice, dateFrom, dateTo, source, status } = req.query;
+    
+    let sql = `
+      SELECT 
+        COUNT(CASE WHEN l.id IS NOT NULL THEN 1 END)::int AS total_leads,
+        COUNT(CASE WHEN l.status IN ('Gebeld', 'Afspraak Gepland', 'Geweest', 'Lid Geworden') THEN 1 END)::int AS contacted,
+        COUNT(CASE WHEN l.status IN ('Afspraak Gepland', 'Geweest', 'Lid Geworden') THEN 1 END)::int AS appointment_booked,
+        COUNT(CASE WHEN l.status = 'Lid Geworden' THEN 1 END)::int AS converted
+      FROM public.leads l
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramCount = 1;
+
+    if (practice) {
+      sql += ` AND l.praktijk_code = $${paramCount}`;
+      params.push(practice);
+      paramCount++;
+    }
+
+    if (dateFrom) {
+      sql += ` AND l.aangemaakt_op >= $${paramCount}::date`;
+      params.push(dateFrom);
+      paramCount++;
+    }
+
+    if (dateTo) {
+      sql += ` AND l.aangemaakt_op <= $${paramCount}::date`;
+      params.push(dateTo);
+      paramCount++;
+    }
+
+    if (source) {
+      sql += ` AND l.bron = $${paramCount}`;
+      params.push(source);
+      paramCount++;
+    }
+
+    if (status) {
+      sql += ` AND l.status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    const rows = await withReadConnection(async (client) => {
+      const result = await client.query(sql, params);
+      return result.rows[0];
+    });
+
+    const funnelData = [
+      { stage: 'Total Leads', count: rows.total_leads },
+      { stage: 'Contacted', count: rows.contacted },
+      { stage: 'Appointment', count: rows.appointment_booked },
+      { stage: 'Converted', count: rows.converted }
+    ];
+
+    res.json({ success: true, data: funnelData });
+  } catch (e) {
+    console.error('GET /api/funnel error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/sources - Lead bronnen distributie
+app.get('/api/sources', async (req, res) => {
+  try {
+    const { practice, dateFrom, dateTo, status } = req.query;
+    
+    let sql = `
+      SELECT 
+        l.bron AS source,
+        COUNT(l.id)::int AS count
+      FROM public.leads l
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramCount = 1;
+
+    if (practice) {
+      sql += ` AND l.praktijk_code = $${paramCount}`;
+      params.push(practice);
+      paramCount++;
+    }
+
+    if (dateFrom) {
+      sql += ` AND l.aangemaakt_op >= $${paramCount}::date`;
+      params.push(dateFrom);
+      paramCount++;
+    }
+
+    if (dateTo) {
+      sql += ` AND l.aangemaakt_op <= $${paramCount}::date`;
+      params.push(dateTo);
+      paramCount++;
+    }
+
+    if (status) {
+      sql += ` AND l.status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    sql += `
+      GROUP BY l.bron
+      ORDER BY count DESC
+    `;
+
+    const rows = await withReadConnection(async (client) => {
+      const result = await client.query(sql, params);
+      return result.rows;
+    });
+
+    res.json({ success: true, sources: rows });
+  } catch (e) {
+    console.error('GET /api/sources error:', e);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
