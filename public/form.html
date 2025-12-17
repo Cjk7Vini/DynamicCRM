@@ -434,7 +434,7 @@
             <h2>Gegevens succesvol verstuurd!</h2>
             <p>Je aanmelding is verstuurd naar</p>
             <p class="practice-name-highlight" id="modalPracticeName">de praktijk</p>
-            <p style="margin-top: 20px;">We nemen binnen 1 werkdag contact met je op om een afspraak in te plannen.</p>
+            <p style="margin-top: 20px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
             <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
             <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
         </div>
@@ -480,7 +480,19 @@
                 clearInterval(countdownTimer);
             }
             
-            // Note: form.js does NOT reset form anymore - data blijft staan
+            // Reset form when modal closes
+            const form = document.getElementById('leadForm');
+            if (form) {
+                form.reset();
+                
+                // Preserve practice code in hidden field
+                const urlParams = new URLSearchParams(window.location.search);
+                const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
+                const hiddenField = document.getElementById('praktijk_code');
+                if (hiddenField && practiceCode) {
+                    hiddenField.value = practiceCode;
+                }
+            }
         }
 
         // Extra script voor practice naam display
