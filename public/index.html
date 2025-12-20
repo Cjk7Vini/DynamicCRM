@@ -1,56 +1,559 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="nl">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mini CRM Lead Form (Test)</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Health Consultancy - Retentie voor Fysiotherapie Praktijken</title>
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
-      label { display:block; margin:.5rem 0 .25rem; }
-      input, textarea { width:100%; padding:.6rem; border:1px solid #ccc; border-radius: .5rem; }
-      button { padding:.7rem 1rem; border:0; border-radius:.7rem; background:#111; color:#fff; margin-top:1rem; }
-      .ok { color: green; }
-      .err { color: crimson; }
-      .small { color:#666; font-size:.9rem; }
-    </style>
-  </head>
-  <body>
-    <h1>Mini CRM (Test)</h1>
-    <p class="small">Vul het formulier in en klik op verzenden. Dit simuleert de klik vanuit een video reel.</p>
-    <form id="leadForm">
-      <label>Volledige naam</label>
-      <input name="fullName" required />
-      <label>E‑mail</label>
-      <input name="email" type="email" required />
-      <label>Telefoon</label>
-      <input name="phone" />
-      <label>Notities</label>
-      <textarea name="notes"></textarea>
-      <label><input type="checkbox" name="consent" checked/> Ik geef toestemming om gebeld te worden</label>
-      <button type="submit">Verzenden</button>
-    </form>
-    <pre id="out"></pre>
-    <script>
-      const form = document.getElementById('leadForm');
-      const out = document.getElementById('out');
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(form).entries());
-        if (data.consent === 'on') data.consent = true;
-        try {
-          const res = await fetch('/leads', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-          });
-          const json = await res.json();
-          out.textContent = JSON.stringify(json, null, 2);
-          out.className = json.ok ? 'ok' : 'err';
-        } catch (err) {
-          out.textContent = err.message;
-          out.className = 'err';
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      });
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(51, 51, 51, 0.95);
+            padding: 15px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo img {
+            height: 50px;
+            width: auto;
+        }
+
+        .logo-text {
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 30px;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            padding: 8px 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            border: 2px solid white;
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            height: 100vh;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('images/LCH_-68.jpg') center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            max-width: 900px;
+            margin-bottom: 40px;
+            line-height: 1.3;
+        }
+
+        .cta-button {
+            padding: 15px 40px;
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .cta-button:hover {
+            background: white;
+            color: #333;
+        }
+
+        /* Welcome Section */
+        .welcome {
+            padding: 100px 50px;
+            text-align: center;
+            background: white;
+        }
+
+        .welcome h2 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .welcome p {
+            font-size: 22px;
+            color: #666;
+            max-width: 900px;
+            margin: 0 auto 20px;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .welcome .subtitle {
+            font-size: 18px;
+            color: #666;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        /* Pillars Section */
+        .pillars {
+            padding: 80px 50px;
+            background: #f5f5f5;
+        }
+
+        .pillars h2 {
+            font-size: 42px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .pillars-subtitle {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 60px;
+        }
+
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto 60px;
+        }
+
+        .pillar-card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .pillar-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .pillar-number {
+            font-size: 48px;
+            font-weight: 700;
+            color: #3AACB8;
+            margin-bottom: 15px;
+        }
+
+        .pillar-card h3 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .pillar-card p {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #666;
+        }
+
+        .pillars-cta {
+            text-align: center;
+        }
+
+        .btn-large {
+            padding: 18px 50px;
+            background: #3AACB8;
+            color: white;
+            border: none;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+        }
+
+        .btn-large:hover {
+            background: #2E8A94;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(58, 172, 184, 0.4);
+        }
+
+        /* Why DHC Section */
+        .why-dhc {
+            padding: 100px 50px;
+            background: white;
+        }
+
+        .why-dhc-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .why-dhc h2 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #333;
+            text-align: center;
+        }
+
+        .why-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .why-list li {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 15px;
+            padding-left: 35px;
+            position: relative;
+        }
+
+        .why-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #3AACB8;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .why-dhc .closing {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        /* Contact Section */
+        .contact {
+            padding: 100px 50px;
+            background: #f5f5f5;
+        }
+
+        .contact h2 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .contact-intro {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 50px;
+            max-width: 600px;
+        }
+
+        .contact-form {
+            max-width: 600px;
+        }
+
+        .form-group {
+            margin-bottom: 30px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .submit-button {
+            padding: 15px 40px;
+            background: #3AACB8;
+            color: white;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-button:hover {
+            background: #2E8A94;
+        }
+
+        /* About Section */
+        .about {
+            padding: 100px 50px;
+            background: white;
+        }
+
+        .about-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .about h2 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .about p {
+            font-size: 18px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .header {
+                padding: 15px 20px;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .welcome h2,
+            .pillars h2,
+            .why-dhc h2,
+            .contact h2,
+            .about h2 {
+                font-size: 36px;
+            }
+
+            .pillars-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy Logo">
+            <span class="logo-text">DYNAMIC HEALTH CONSULTANCY</span>
+        </div>
+        <nav class="nav">
+            <a href="#home" class="active">HOME</a>
+            <a href="diensten.html">DIENSTEN</a>
+            <a href="#contact">CONTACT</a>
+        </nav>
+    </div>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <h1>Welkom bij Dynamic Health Consultancy</h1>
+        <a href="#contact" class="cta-button">Ontvang advies</a>
+    </section>
+
+    <!-- Welcome Section -->
+    <section class="welcome">
+        <h2>Dynamic Health Consultancy</h2>
+        <p><strong>Wij bouwen praktijken en leefstijlcentra die groeien, vitaliteit uitstralen en toekomstbestendig zijn.</strong></p>
+        <p class="subtitle">Bij DHC begeleiden we fysiotherapiepraktijken en leefstijlcentra bij het neerzetten van een Fit & Leefstijlconcept dat werkt. Van groei en positionering tot financiering, teamontwikkeling, sales en marketing: wij verbinden alle onderdelen die nodig zijn voor duurzame resultaten.</p>
+        <p class="subtitle">Onze aanpak is praktisch, onderbouwd en volledig afgestemd op jullie regio, doelgroep en ambities.</p>
+    </section>
+
+    <!-- 6 Pillars Section -->
+    <section class="pillars">
+        <h2>Onze 6 Pijlers</h2>
+        <p class="pillars-subtitle">De basis voor duurzame groei en succes</p>
+        
+        <div class="pillars-grid">
+            <div class="pillar-card">
+                <div class="pillar-number">1</div>
+                <h3>Groei & Positionering</h3>
+                <p>Een toekomstgerichte strategische basis, onderbouwd met regio- en concurrentieanalyse.</p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-number">2</div>
+                <h3>Hulp bij Financieringsaanvragen</h3>
+                <p>Sterke en onderbouwde financieringsaanvragen voor groei, verbouwingen en innovaties.</p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-number">3</div>
+                <h3>Teamontwikkeling</h3>
+                <p>Samenwerking versterken en teamdynamiek verbeteren met mentaliserend coachen.</p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-number">4</div>
+                <h3>Sales & Adviesvaardigheden</h3>
+                <p>Klantgericht adviseren, intakegesprekken verbeteren en hogere conversies realiseren.</p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-number">5</div>
+                <h3>Marketing, Rebranding & Inrichting</h3>
+                <p>Een merk dat vitaliteit uitstraalt, campagnes die leden opleveren en een moderne oefenzaal.</p>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-number">6</div>
+                <h3>Ledenbinding & Retentie</h3>
+                <p>Meer betrokkenheid, hogere tevredenheid en langdurige lidmaatschappen door slimme processen en persoonlijke aandacht.</p>
+            </div>
+        </div>
+
+        <div class="pillars-cta">
+            <a href="diensten.html" class="btn-large">Bekijk onze diensten →</a>
+        </div>
+    </section>
+
+    <!-- Why DHC Section -->
+    <section class="why-dhc">
+        <div class="why-dhc-content">
+            <h2>Waarom DHC?</h2>
+            <ul class="why-list">
+                <li>Meer dan 10 jaar ervaring in fysiotherapie, fitness & leefstijl</li>
+                <li>Gespecialiseerd in integratie van het Technogym-ecosysteem</li>
+                <li>Ervaring met praktijkgroei, ledengroei en commerciële structuren</li>
+                <li>Sterk in strategie én uitvoering</li>
+                <li>Veel projecten succesvol afgerond in heel Nederland</li>
+                <li>Altijd maatwerk en onderbouwd advies</li>
+            </ul>
+            <p class="closing">Samen bouwen we aan een praktijk die groeit — in leden, omzet én impact.</p>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <h2>Neem contact met ons op</h2>
+        <p class="contact-intro">Neem contact met ons op voor deskundig advies en op maat gemaakte retentie-oplossingen voor uw fysiotherapie praktijk. Vul het formulier in of bel ons direct.</p>
+        
+        <form class="contact-form">
+            <div class="form-group">
+                <label>Naam *</label>
+                <input type="text" required>
+            </div>
+            
+            <div class="form-group">
+                <label>E-mailadres *</label>
+                <input type="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Bericht *</label>
+                <textarea required></textarea>
+            </div>
+            
+            <button type="submit" class="submit-button">Verzenden</button>
+        </form>
+    </section>
+
+    <!-- Contact Info Section -->
+    <section class="about">
+        <div class="about-content">
+            <h2>Contact</h2>
+            <p>Dynamic Health Consultancy</p>
+            <p>Diamantlaan 1</p>
+            <p>2132 WV Hoofddorp</p>
+            <p>Nederland</p>
+            <p>info@dynamic-health-consultancy.nl</p>
+        </div>
+    </section>
+
+    <script>
+        // Smooth scrolling voor navigatie
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Active nav link on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const scrollY = window.pageYOffset;
+
+            sections.forEach(section => {
+                const sectionHeight = section.offsetHeight;
+                const sectionTop = section.offsetTop - 100;
+                const sectionId = section.getAttribute('id');
+                
+                if (scrollY > sectionTop && scrollY <= sectionTop + sectionHeight) {
+                    document.querySelectorAll('.nav a').forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === '#' + sectionId) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        });
     </script>
-  </body>
+</body>
 </html>

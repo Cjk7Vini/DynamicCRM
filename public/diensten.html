@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diensten - Dynamic Health Consultancy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(51, 51, 51, 0.95);
+            padding: 15px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo img {
+            height: 50px;
+            width: auto;
+        }
+
+        .logo-text {
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 30px;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            padding: 8px 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            border: 2px solid white;
+        }
+
+        /* Page Header */
+        .page-header {
+            padding: 150px 50px 80px;
+            background: linear-gradient(135deg, #3AACB8 0%, #2E8A94 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .page-header h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .page-header p {
+            font-size: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Services Section */
+        .services {
+            padding: 80px 50px;
+            background: #f5f5f5;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .service-card {
+            background: white;
+            overflow: hidden;
+        }
+
+        .service-image {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+        }
+
+        .service-content {
+            padding: 40px;
+        }
+
+        .service-content h3 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .service-content p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .service-button {
+            padding: 12px 30px;
+            background: #3AACB8;
+            color: white;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .service-button:hover {
+            background: #2E8A94;
+        }
+
+        /* Service Detail Pages */
+        .service-detail {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 80px 50px;
+            background: white;
+        }
+
+        .back-button {
+            padding: 12px 30px;
+            background: transparent;
+            color: #333;
+            border: 2px solid #333;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 40px;
+        }
+
+        .back-button:hover {
+            background: #333;
+            color: white;
+        }
+
+        .detail-content h2 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #333;
+        }
+
+        .detail-section {
+            margin-bottom: 50px;
+        }
+
+        .detail-section h3 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .detail-section h4 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            margin-top: 20px;
+            color: #333;
+        }
+
+        .detail-section p {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .usp-list {
+            background: #f9fafb;
+            padding: 25px;
+            border-left: 4px solid #3AACB8;
+            margin: 30px 0;
+        }
+
+        .usp-list li {
+            font-size: 17px;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 10px;
+            padding-left: 10px;
+        }
+
+        .deliverables-list,
+        .results-list {
+            margin: 20px 0;
+            padding-left: 25px;
+        }
+
+        .deliverables-list li,
+        .results-list li {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .detail-cta {
+            background: #f5f5f5;
+            padding: 50px;
+            text-align: center;
+            margin-top: 60px;
+        }
+
+        .detail-cta h3 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .detail-cta p {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            padding: 15px 40px;
+            background: #3AACB8;
+            color: white;
+            border: 2px solid #3AACB8;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            background: #2E8A94;
+            border-color: #2E8A94;
+        }
+
+        .btn-secondary {
+            padding: 15px 40px;
+            background: transparent;
+            color: #333;
+            border: 2px solid #333;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: #333;
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .header {
+                padding: 15px 20px;
+            }
+
+            .page-header h1 {
+                font-size: 36px;
+            }
+
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy Logo">
+            <span class="logo-text">DYNAMIC HEALTH CONSULTANCY</span>
+        </div>
+        <nav class="nav">
+            <a href="index.html">HOME</a>
+            <a href="diensten.html" class="active">DIENSTEN</a>
+            <a href="index.html#contact">CONTACT</a>
+        </nav>
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>Samen bouwen aan een toekomstbestendige fysiotherapiepraktijk en leefstijlcentrum</h1>
+        <p>Dynamic Health Consultancy (DHC) begeleidt praktijken en leefstijlcentra in de overgang van curatieve zorg naar preventieve leefstijlzorg. We combineren strategie, teamontwikkeling, marketing en implementatie in één traject, zodat jouw organisatie duurzaam kan groeien — in leden, omzet én maatschappelijke impact.</p>
+    </div>
+
+    <!-- USP Section -->
+    <section style="padding: 60px 50px; background: white;">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <ul class="usp-list">
+                <li>Van behandelkamer naar leefstijlconcept</li>
+                <li>Duurzame groei in leden, rendement en teamkracht</li>
+                <li>Eén partner voor strategie, team, marketing en implementatie</li>
+            </ul>
+            <div class="cta-buttons" style="margin-top: 40px;">
+                <a href="index.html#contact" class="btn-primary">Plan een vrijblijvend gesprek</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Overview -->
+    <section class="services" id="services-overview">
+        <div class="services-grid">
+            <div class="service-card">
+                <img src="images/LCH_-10.jpg" alt="Fit & leefstijl concept" class="service-image">
+                <div class="service-content">
+                    <h3>Fit & leefstijl concept</h3>
+                    <p>Professioneel advies en implementatie op maat. Optimalisatie van ledenretentie en patiënttevredenheid voor langdurige binding.</p>
+                    <button class="service-button" onclick="showServiceDetail('retentie')">Meer informatie</button>
+                </div>
+            </div>
+
+            <div class="service-card">
+                <img src="images/LCH_-43.jpg" alt="Inzichten & Rapportage" class="service-image">
+                <div class="service-content">
+                    <h3>Inzichten & Rapportage</h3>
+                    <p>Professionele data-analyse en overzichtelijke rapportages. Voorspellende inzichten helpen uitstroom te voorkomen en ondersteunen betere beslissingen voor duurzame praktijkresultaten.</p>
+                    <button class="service-button" onclick="showServiceDetail('analytics')">Meer informatie</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detail: Fit & Leefstijl -->
+    <div id="retentie-detail" class="service-detail" style="display: none;">
+        <button class="back-button" onclick="hideServiceDetail()">← Terug naar diensten</button>
+        
+        <div class="detail-content">
+            <h2>Fit & leefstijl concept</h2>
+            
+            <div class="detail-section">
+                <h3>Waarom Dynamic Health Consultancy</h3>
+                <h4>Van zorgverlener naar leefstijlbegeleider</h4>
+                <p>De rol van de fysiotherapeut en leefstijlcoach verandert. De nadruk verschuift van behandelen naar begeleiden, van klacht naar gedrag. Dynamic Health Consultancy helpt teams deze transitie succesvol te maken — met een heldere strategie, praktische begeleiding en een groeiplan dat écht werkt.</p>
+                <p><strong>De vier pijlers van onze aanpak:</strong></p>
+                <p><strong>1. Strategie & Propositie</strong> – positionering, prijsstrategie en businesscase afgestemd op jullie wijk en doelgroep.</p>
+                <p><strong>2. Team & Gedrag</strong> – sales- & adviesvaardigheden gecombineerd met teamcoaching (MBT) voor duurzame gedragsverandering.</p>
+                <p><strong>3. Marketing & Ledenwerving</strong> – reels, landingspagina's, flyers en leadopvolging voor een continue instroom van nieuwe leden.</p>
+                <p><strong>4. Implementatie & Data</strong> – visuele en automatische klantreis met dashboards voor instroom, conversie en retentie.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>Wat je krijgt</h3>
+                <h4>Van plan tot praktijk - zichtbare groei in leden, omzet en teamkracht</h4>
+                <p>DHC levert geen advies op papier, maar structurele resultaten in de praktijk. Samen bouwen we een groeimodel waarin strategie, gedrag, marketing en data elkaar versterken.</p>
+                <p><strong>Voorbeelden van deliverables:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Strategisch plan & businesscase (7-jaars prognose, break-even, routekaart)</li>
+                    <li>Visuele klantreis (1 groot bord + 4 kleinere borden)</li>
+                    <li>Automatische klantreis (onboarding, metingen, evaluaties, retentieflows)</li>
+                    <li>Marketingpakket: landingspagina, QR-flows, reels en flyers in huisstijl</li>
+                    <li>Sales- & adviestraining op basis van de klantreis</li>
+                    <li>Teamcoaching (gedragscomponent, draagvlak, consistentie)</li>
+                    <li>Administratie- & CRM-advies (ledenbeheer, prijsstructuur, AVG)</li>
+                    <li>Maandelijkse bestendiging: KPI-reviews, optimalisaties en contentkalender</li>
+                </ul>
+                <p><strong>Resultaten uit de praktijk:</strong></p>
+                <ul class="results-list">
+                    <li>+120 netto leden in 3 maanden</li>
+                    <li>38% minder no-shows bij intakes</li>
+                    <li>22% hogere retentie na 6 maanden</li>
+                </ul>
+            </div>
+
+            <div class="detail-section">
+                <h3>Onze werkwijze</h3>
+                <h4>Een traject van zes maanden: van strategie tot duurzame groei</h4>
+                <p>In zes maanden bouwen we samen aan een stevig fundament voor groei. Van de eerste analyse tot de volledige implementatie van jouw groeiplan — elke fase heeft duidelijke doelen en meetbare resultaten.</p>
+                <p><em>Toelichting: Elke fase wordt visueel weergegeven in een stappenplan (infographic of animatie). De inhoud van de fasen kan later worden ingevuld met beschrijvingen, deliverables en visuals.</em></p>
+            </div>
+
+            <div class="detail-cta">
+                <h3>Interesse?</h3>
+                <p>Neem contact met ons op voor een vrijblijvend gesprek.</p>
+                <div class="cta-buttons" style="justify-content: center;">
+                    <a href="index.html#contact" class="btn-primary" onclick="hideServiceDetail()">Plan een gesprek</a>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail: Inzichten & Rapportage -->
+    <div id="analytics-detail" class="service-detail" style="display: none;">
+        <button class="back-button" onclick="hideServiceDetail()">← Terug naar diensten</button>
+        
+        <div class="detail-content">
+            <h2>Inzichten & Rapportage</h2>
+            
+            <div class="detail-section">
+                <h3>1. Groei & Positionering</h3>
+                <h4>De strategische basis voor duurzame groei</h4>
+                <p>Wij ondersteunen praktijken en leefstijlcentra bij het bepalen van een duidelijke marktpositie en het opzetten van een schaalbaar groeimodel. Onze keuzes zijn altijd onderbouwd met data, regio-analyse en concurrentie-inzicht.</p>
+                <p><strong>Wij bieden:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Positionering & strategisch advies</li>
+                    <li>Omgevingsanalyse en concurrentieanalyse</li>
+                    <li>Ontwikkeling van schaalbare groeimodellen</li>
+                    <li>Integratie van het Technogym-ecosysteem</li>
+                    <li>Businesscoaching voor ondernemers</li>
+                </ul>
+                <p><strong>Resultaat:</strong> een heldere richting, een sterk onderscheidend vermogen en een model dat maandelijks groei oplevert.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>2. Hulp bij Financieringsaanvragen</h3>
+                <h4>Sterk onderbouwde aanvragen die vertrouwen geven</h4>
+                <p>Op basis van onderbouwde data ondersteunen wij praktijken en leefstijlcentra bij het aanvragen én onderbouwen van een financieringsaanvraag. Geschikt voor verbouwingen, inrichting, uitbreiding of innovatie.</p>
+                <p><strong>Wij bieden:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Financiële plannen & prognoses</li>
+                    <li>Exploitatiemodellen en rendementsberekeningen</li>
+                    <li>Begeleiding richting banken en financiers</li>
+                    <li>Ondersteuning bij subsidieaanvragen</li>
+                </ul>
+                <p><strong>Resultaat:</strong> een professionele, overtuigende aanvraag met maximale kans op goedkeuring.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>3. Teamontwikkeling</h3>
+                <h4>Sterker samenwerken, beter communiceren en groeien als team</h4>
+                <p>De kracht van een praktijk staat of valt met het team. Wij werken met mentaliserend coachen om samenwerking, onderling begrip en teamdynamiek te versterken.</p>
+                <p><strong>Wij bieden:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Mentaliserend coachen</li>
+                    <li>Verbetering van communicatie en samenwerking</li>
+                    <li>Ontwikkeling van een teamcultuur passend bij Fit & Leefstijl</li>
+                </ul>
+                <p><strong>Resultaat:</strong> een professioneel, hecht en toekomstgericht team.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>4. Sales & Adviesvaardigheden</h3>
+                <h4>Meer leden door helder, mensgericht en professioneel adviseren</h4>
+                <p>Wij trainen medewerkers, fysiotherapeuten en leefstijlcoaches in gespreksvaardigheden die passen bij de zorgsector: warm, duidelijk en overtuigend — niet commercieel.</p>
+                <p><strong>Wij bieden:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Training sales- en adviesvaardigheden</li>
+                    <li>Structuur voor intake- en adviesgesprekken</li>
+                    <li>Gesprekken op basis van gezondheidsdoelen</li>
+                    <li>Training in MyWellness, Bio-Strength & de 12-weeks klantreis</li>
+                </ul>
+                <p><strong>Resultaat:</strong> hogere conversies, betere begeleiding en meer tevreden leden.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>5. Marketing, Rebranding & Inrichting</h3>
+                <h4>Bouw aan een merk dat vitaliteit uitstraalt en nieuwe leden aantrekt</h4>
+                <p>Wij zorgen voor een merkidentiteit, zichtbaarheid en fysieke omgeving die direct aansluit op het Fit & Leefstijlconcept.</p>
+                <p><strong>Wij bieden:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Online marketing (Reels, Meta Ads, funnels)</li>
+                    <li>Offline marketing (flyers, vouchers, banners)</li>
+                    <li>Bouwen aan een merkidentiteit waarin vitaliteit centraal staat</li>
+                    <li>Advies over routing, aankleding en kleurstellingen van de oefenzaal</li>
+                    <li>Klantreisautomatisering binnen de praktijk</li>
+                </ul>
+                <p><strong>Resultaat:</strong> een sterke uitstraling, meer bereik en een oefenzaal die inspireert.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>6. Ledenbinding & Retentie</h3>
+                <p>Groei stopt niet bij inschrijving. Wij helpen je om leden langer betrokken, gemotiveerd en tevreden te houden. Met slimme onboarding, duidelijke klantreizen en persoonlijke contactmomenten zorgen we voor minder uitstroom en meer ambassadeurs van jouw praktijk of club.</p>
+                <p><strong>Wat dit oplevert:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Hogere tevredenheid en loyaliteit</li>
+                    <li>Minder opzeggingen</li>
+                    <li>Meer doorverwijzingen en stabiele omzet</li>
+                </ul>
+                <p><strong>Voorbeelden van ondersteuning:</strong></p>
+                <ul class="deliverables-list">
+                    <li>Optimaliseren van onboarding en evaluatiemomenten</li>
+                    <li>Verbeteren van communicatie en member experience</li>
+                    <li>Structuur aanbrengen in opvolging en voortgangsgesprekken</li>
+                </ul>
+            </div>
+
+            <div class="detail-section">
+                <h3>Over Ons</h3>
+                <h4>Wij geloven dat vitaliteit begint bij structuur, strategie en gedrag.</h4>
+                <p>Dynamic Health Consultancy (DHC) is opgericht om fysiotherapiepraktijken en leefstijlcentra te helpen groeien in een veranderende zorgmarkt.</p>
+                <p>Met jarenlange ervaring binnen fysiotherapie, fitness, leefstijlcoaching en implementatie van het Technogym-ecosysteem, begeleiden wij praktijken die klaar zijn voor de volgende stap.</p>
+                <p><strong>Onze visie:</strong> Een toekomstbestendige praktijk combineert zorg, leefstijl, vitaliteit en moderne begeleiding — ondersteund door slimme processen.</p>
+                <p><strong>Onze rol:</strong> Wij verbinden strategie, uitvoering en teamontwikkeling tot één sterk geheel.</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>Werkwijze</h3>
+                <p><strong>1. Analyse & Intake</strong><br>
+                We onderzoeken locatie, positie, doelgroep en huidige structuur.</p>
+                
+                <p><strong>2. Advies & Richting</strong><br>
+                We bepalen strategie, doelen en groeikansen.</p>
+                
+                <p><strong>3. Implementatie & Training</strong><br>
+                We helpen bij inrichting, financiering, marketing, sales en teamontwikkeling.</p>
+                
+                <p><strong>4. Optimalisatie & Coaching</strong><br>
+                We blijven ondersteunen tot alles volledig staat.</p>
+                
+                <p><strong>5. Continuïteit & Groei</strong><br>
+                Maandelijkse evaluaties en verdere optimalisatie.</p>
+            </div>
+
+            <div class="detail-cta">
+                <h3>Interesse?</h3>
+                <p>Neem contact met ons op voor een vrijblijvend gesprek.</p>
+                <div class="cta-buttons" style="justify-content: center;">
+                    <a href="index.html#contact" class="btn-primary" onclick="hideServiceDetail()">Plan een gesprek</a>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showServiceDetail(service) {
+            document.getElementById('services-overview').style.display = 'none';
+            if (service === 'retentie') {
+                document.getElementById('retentie-detail').style.display = 'block';
+            } else if (service === 'analytics') {
+                document.getElementById('analytics-detail').style.display = 'block';
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function hideServiceDetail() {
+            document.getElementById('retentie-detail').style.display = 'none';
+            document.getElementById('analytics-detail').style.display = 'none';
+            document.getElementById('services-overview').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
