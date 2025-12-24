@@ -39,6 +39,24 @@
     }
   }
   
+  // ✅ NEW: Load practice name dynamically from database
+  async function loadPracticeName(practiceCode) {
+    if (!practiceCode) return null;
+    
+    try {
+      const response = await fetch(`/api/practice/${practiceCode}`);
+      const data = await response.json();
+      
+      if (data.success && data.practice) {
+        return data.practice;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading practice name:', error);
+      return null;
+    }
+  }
+  
   function showBlockedMessage(message) {
     // Hide the form
     if (form) {
@@ -106,6 +124,20 @@
       // Block the form
       showBlockedMessage(validation.message);
       return;
+    }
+    
+    // ✅ NEW: Load and display practice name dynamically
+    if (code) {
+      const practice = await loadPracticeName(code);
+      if (practice) {
+        const badge = document.getElementById('practiceBadge');
+        if (badge) {
+          badge.style.display = 'inline-block';
+          badge.textContent = `Via ${practice.naam}`;
+        }
+        document.title = `Aanmelden - ${practice.naam}`;
+        console.log('Practice loaded from database:', practice.naam);
+      }
     }
     
     // Practice is valid - log 'clicked' event

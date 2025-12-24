@@ -273,6 +273,65 @@ app.get('/api/validate-practice', async (req, res) => {
   }
 });
 
+// ============================================================
+// GET /api/practice/:code - Dynamic practice info (path param)
+// Used by landing.html and form.html for dynamic name loading
+// ============================================================
+app.get('/api/practice/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    if (!code) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Practice code is required' 
+      });
+    }
+    
+    const practice = await withReadConnection(async (client) => {
+      const sql = `
+        SELECT code, naam, actief 
+        FROM public.praktijken 
+        WHERE code = $1 
+        LIMIT 1
+      `;
+      const result = await client.query(sql, [code]);
+      return result.rows[0] || null;
+    });
+    
+    if (!practice) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Practice not found' 
+      });
+    }
+    
+    if (!practice.actief) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Practice is not active' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      practice: {
+        code: practice.code,
+        naam: practice.naam,
+        actief: practice.actief
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching practice:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error' 
+    });
+  }
+});
+// ============================================================
+
 app.post('/leads', async (req, res) => {
   try {
     const { value, error } = leadSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
