@@ -56,6 +56,12 @@
             line-height: 1.2;
         }
 
+        .hero p.subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
         .hero-benefits {
             list-style: none;
             margin: 40px 0;
@@ -95,13 +101,6 @@
             transform: translateY(-3px);
             box-shadow: 0 15px 40px rgba(74, 222, 128, 0.4);
             background: #22c55e;
-        }
-
-        .notice {
-            margin-top: 20px;
-            font-size: 0.9rem;
-            font-style: italic;
-            opacity: 0.9;
         }
 
         /* Content Sections */
@@ -203,6 +202,12 @@
             margin-bottom: 20px;
         }
 
+        .quote-author {
+            font-size: 1.1rem;
+            margin-top: 20px;
+            opacity: 0.9;
+        }
+
         /* FAQ Section */
         .faq-section {
             background: #f9fafb;
@@ -218,7 +223,7 @@
 
         .faq-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 30px;
             max-width: 1200px;
             margin: 0 auto;
@@ -259,7 +264,7 @@
             font-size: 1.2rem;
             color: #6b7280;
             margin-bottom: 40px;
-            max-width: 600px;
+            max-width: 700px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -300,6 +305,10 @@
                 font-size: 2.5rem;
             }
 
+            .hero p.subtitle {
+                font-size: 1.1rem;
+            }
+
             .content-block {
                 grid-template-columns: 1fr;
                 gap: 40px;
@@ -329,7 +338,7 @@
         <div class="hero-content">
             <div class="hero-badge" id="practiceLogo">Jouw Fysiotherapeut</div>
             <h1>Start je gezondere toekomst</h1>
-            <p style="font-size: 1.2rem; margin-bottom: 30px;">
+            <p class="subtitle">
                 Fit & Leefstijl: het bewezen 12-weken programma dat je helpt om vitaler, fitter en energieker te worden.
             </p>
             <ul class="hero-benefits">
@@ -337,8 +346,7 @@
                 <li>Persoonlijke begeleiding van professionals</li>
                 <li>Groepstrainingen bij je vertrouwde praktijk</li>
             </ul>
-            <a href="#" id="mainCTA" class="cta-button">► Start jouw traject</a>
-            <p class="notice">Let op: Beperkt aantal plaatsen beschikbaar</p>
+            <a href="#" id="mainCTA" class="cta-button">Start jouw traject</a>
         </div>
     </section>
 
@@ -352,21 +360,34 @@
                 <div class="content-text">
                     <h2>Wat is Fit & Leefstijl?</h2>
                     <p>
-                        Fit & Leefstijl is een bewezen programma dat je helpt om gezonder te leven. 
-                        In 12 weken werk je aan je conditie, kracht en algehele vitaliteit.
-                    </p>
-                    <p>
-                        Het programma combineert groepstrainingen met persoonlijke begeleiding van 
-                        gekwalificeerde fysiotherapeuten en leefstijlcoaches.
+                        Fit & Leefstijl is een zorgvuldig opgebouwd programma waarin je in 12 weken werkt aan:
                     </p>
                     <ul class="benefits-list">
-                        <li>2x per week groepstraining</li>
-                        <li>Persoonlijk trainingsplan</li>
-                        <li>Begeleiding van professionals</li>
-                        <li>Veilige en vertrouwde omgeving</li>
+                        <li>Meer conditie</li>
+                        <li>Meer kracht</li>
+                        <li>Meer energie in het dagelijks leven</li>
                     </ul>
-                    <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href">Meld je aan</a>
+                    <p>
+                        Je traint voornamelijk individueel volgens jouw persoonlijke plan, met vaste begeleidingsmomenten 
+                        en gezamenlijke trainingsmomenten voor extra structuur en motivatie.
+                    </p>
+                    <p>
+                        De begeleiding wordt verzorgd door een team van fysiotherapeuten, beweegcoaches en leefstijlcoaches, 
+                        die oog hebben voor jouw gezondheid én jouw tempo.
+                    </p>
                 </div>
+            </div>
+
+            <div style="margin-top: 60px;">
+                <h2 style="font-size: 2.5rem; color: #1f2937; margin-bottom: 30px;">Wat kun je verwachten?</h2>
+                <ul class="benefits-list" style="max-width: 800px;">
+                    <li>Een persoonlijk trainingsplan, afgestemd op jouw lichaam</li>
+                    <li>Begeleiding door ervaren professionals</li>
+                    <li>Trainen in een veilige, overzichtelijke omgeving</li>
+                    <li>Vaste contactmomenten voor uitleg, motivatie en bijsturing</li>
+                    <li>Structuur en houvast gedurende 12 weken</li>
+                </ul>
+                <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href" style="margin-top: 30px;">Meld je aan voor meer informatie</a>
             </div>
         </div>
     </section>
@@ -379,21 +400,21 @@
                     <img src="images/LCH_-43.jpg" alt="Voor wie" class="content-image">
                 </div>
                 <div class="content-text">
-                    <h2>Voor wie is dit programma?</h2>
+                    <h2>Voor wie is Fit & Leefstijl bedoeld?</h2>
                     <p>
-                        Fit & Leefstijl is er voor iedereen die vitaler wil worden. 
-                        Je hoeft geen sportfanaat te zijn om mee te doen.
+                        Dit programma is geschikt voor iedereen die gezonder wil leven, zonder prestatiedruk of sportverleden.
                     </p>
                     <p>
-                        Het programma is speciaal ontworpen voor mensen die:
+                        Fit & Leefstijl past goed bij jou als je:
                     </p>
                     <ul class="benefits-list">
-                        <li>Meer willen bewegen, maar niet weten hoe te beginnen</li>
-                        <li>Liever in een vertrouwde omgeving trainen dan in een sportschool</li>
-                        <li>Begeleiding zoeken van ervaren professionals</li>
-                        <li>In groepsverband willen sporten voor extra motivatie</li>
+                        <li>Meer wilt bewegen, maar niet goed weet waar je moet beginnen</li>
+                        <li>Graag zelfstandig traint, met begeleiding in de buurt</li>
+                        <li>Zeker wilt weten dat je verantwoord en veilig beweegt</li>
+                        <li>Behoefte hebt aan structuur en motivatie</li>
+                        <li>Liever traint in een vertrouwde praktijk dan in een drukke sportsituatie</li>
                     </ul>
-                    <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href">Start vandaag</a>
+                    <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href">Start vandaag nog</a>
                 </div>
             </div>
         </div>
@@ -402,13 +423,14 @@
     <!-- Quote Section -->
     <section class="quote-section">
         <div class="quote-content">
-            <h3>Onze fysiotherapeuten staan voor je klaar</h3>
+            <h3>Begeleiding die verder kijkt dan alleen bewegen</h3>
             <p class="quote-text">
-                "Het motiveert om te zien dat iemand vooruitgang boekt en elke week een beetje beter wordt. 
-                Wat je doel ook is, samen gaan we de uitdaging aan. We zorgen voor een passend schema en 
-                de juiste begeleiding. Zien we je snel?"
+                "Het mooiste aan dit programma is dat we mensen echt zien groeien. Niet alleen fysiek, maar ook in 
+                vertrouwen en energie. We kijken samen wat bij je past, sturen bij waar nodig en bouwen rustig op. 
+                Zo ontstaat blijvend resultaat."
             </p>
-            <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href">Ja, ik wil meer informatie</a>
+            <p class="quote-author">— Team Fit & Leefstijl</p>
+            <a href="#" class="cta-button" onclick="window.location.href=document.getElementById('mainCTA').href" style="margin-top: 30px;">Ja, ik wil meer informatie</a>
         </div>
     </section>
 
@@ -418,45 +440,44 @@
             <h2>Veelgestelde vragen</h2>
             <div class="faq-grid">
                 <div class="faq-item">
-                    <h3>Wat zijn de voordelen?</h3>
+                    <h3>Wat levert Fit & Leefstijl jou op?</h3>
                     <p>
-                        Je wordt fitter, energieker en vitaler. Je leert gezonde gewoonten die je de rest 
-                        van je leven kunt gebruiken.
+                        Meer energie, een betere conditie en een fitter gevoel in het dagelijks leven. Daarnaast leer 
+                        je gezonde gewoontes die je ook na het programma kunt blijven toepassen.
                     </p>
                 </div>
                 <div class="faq-item">
-                    <h3>Hoe vaak train ik?</h3>
+                    <h3>Hoe vaak train je?</h3>
                     <p>
-                        Minimaal 2x per week in groepsverband. Daarnaast krijg je een persoonlijk trainingsplan 
-                        voor thuis.
+                        Je hebt vaste begeleide trainingsmomenten per week en traint daarnaast zelfstandig volgens jouw 
+                        persoonlijke plan — op momenten die voor jou prettig zijn.
                     </p>
                 </div>
                 <div class="faq-item">
-                    <h3>Wat als ik blessures heb?</h3>
+                    <h3>Wat als je klachten of blessures hebt?</h3>
                     <p>
-                        Geen probleem! Onze fysiotherapeuten passen de training aan op jouw situatie en zorgen 
-                        voor veilige begeleiding.
+                        Geen probleem. Onze fysiotherapeuten en beweegcoaches houden hier rekening mee en passen oefeningen 
+                        aan waar nodig.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Train je alleen in een groep?</h3>
+                    <p>
+                        Nee. De training is grotendeels individueel, met gezamenlijke momenten voor begeleiding, uitleg 
+                        en motivatie.
                     </p>
                 </div>
                 <div class="faq-item">
                     <h3>Wat kost het programma?</h3>
                     <p>
-                        De kosten verschillen per praktijk. Neem contact op voor de exacte prijzen en mogelijke 
-                        vergoedingen.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3>Hoe meld ik me aan?</h3>
-                    <p>
-                        Klik op de knop "Start jouw traject" en vul het formulier in. We nemen dan snel contact 
-                        met je op.
+                        Tijdens een persoonlijk gesprek vertellen we je precies wat het programma kost en welke opties er zijn. 
+                        Zo weet je vooraf waar je aan toe bent en kunnen we samen kijken wat het beste bij jou past.
                     </p>
                 </div>
                 <div class="faq-item">
                     <h3>Waar vinden de trainingen plaats?</h3>
                     <p>
-                        Bij jouw vertrouwde fysiotherapiepraktijk. Je traint in een bekende, veilige omgeving 
-                        met professionele begeleiding.
+                        Bij jouw vertrouwde fysiotherapiepraktijk, in een rustige en veilige omgeving.
                     </p>
                 </div>
             </div>
@@ -468,10 +489,9 @@
         <div class="container">
             <h2>Klaar voor de volgende stap?</h2>
             <p>
-                Meld je aan voor Fit & Leefstijl en start jouw reis naar een gezonder, fitter en energieker leven.
+                Gun jezelf 12 weken aandacht voor je gezondheid — op een manier die haalbaar en prettig voelt.
             </p>
-            <a href="#" id="finalCTA" class="cta-button">► Ja, ik wil starten</a>
-            <p class="notice" style="margin-top: 20px;">Beperkt aantal plaatsen beschikbaar</p>
+            <a href="#" id="finalCTA" class="cta-button">Ja, ik wil starten met Fit & Leefstijl</a>
         </div>
     </section>
 
