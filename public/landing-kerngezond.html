@@ -406,7 +406,7 @@
                 <li>Persoonlijke begeleiding van professionals</li>
                 <li>Groepstrainingen bij je vertrouwde praktijk</li>
             </ul>
-            <a href="form.html?s=458D05" id="mainCTA" class="cta-button">Start jouw traject</a>
+            <a href="form-kerngezond-lelystad.html?s=458D05" id="mainCTA" class="cta-button">Start jouw traject</a>
         </div>
     </section>
 
@@ -447,7 +447,7 @@
                     <li>Vaste contactmomenten voor uitleg, motivatie en bijsturing</li>
                     <li>Structuur en houvast gedurende 12 weken</li>
                 </ul>
-                <a href="form.html?s=458D05" class="cta-button" style="margin-top: 30px;">Meld je aan voor meer informatie</a>
+                <a href="form-kerngezond-lelystad.html?s=458D05" class="cta-button" style="margin-top: 30px;">Meld je aan voor meer informatie</a>
             </div>
         </div>
     </section>
@@ -474,7 +474,7 @@
                         <li>Behoefte hebt aan structuur en motivatie</li>
                         <li>Liever traint in een vertrouwde praktijk dan in een drukke sportsituatie</li>
                     </ul>
-                    <a href="form.html?s=458D05" class="cta-button">Start vandaag nog</a>
+                    <a href="form-kerngezond-lelystad.html?s=458D05" class="cta-button">Start vandaag nog</a>
                 </div>
             </div>
         </div>
@@ -490,7 +490,7 @@
                 Zo ontstaat blijvend resultaat."
             </p>
             <p class="quote-author">— Team Fit & Leefstijl</p>
-            <a href="form.html?s=458D05" class="cta-button" style="margin-top: 30px;">Ja, ik wil meer informatie</a>
+            <a href="form-kerngezond-lelystad.html?s=458D05" class="cta-button" style="margin-top: 30px;">Ja, ik wil meer informatie</a>
         </div>
     </section>
 
@@ -551,7 +551,7 @@
             <p>
                 Gun jezelf 12 weken aandacht voor je gezondheid — op een manier die haalbaar en prettig voelt.
             </p>
-            <a href="form.html?s=458D05" id="finalCTA" class="cta-button">Ja, ik wil starten met Fit & Leefstijl</a>
+            <a href="form-kerngezond-lelystad.html?s=458D05" id="finalCTA" class="cta-button">Ja, ik wil starten met Fit & Leefstijl</a>
         </div>
     </section>
 
@@ -564,18 +564,15 @@
         // Practice code is hardcoded for KernGezond Lelystad
         const practiceCode = '458D05';
         
-        // Setup CTA buttons with correct practice code
-        document.querySelectorAll('a[href*="form.html"]').forEach(link => {
-            if (!link.href.includes('?s=')) {
-                link.href = `form.html?s=${practiceCode}`;
-            }
-        });
+        // All CTA buttons already point to form-kerngezond-lelystad.html
+        // No dynamic setup needed
         
         // Update page title
         document.title = 'Start je gezondere toekomst - KernGezond Lelystad';
         
         console.log('KernGezond landing page loaded');
         console.log('Practice code:', practiceCode);
+        console.log('Form URL: form-kerngezond-lelystad.html?s=' + practiceCode);
     </script>
 </body>
 </html>
