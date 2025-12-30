@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aanmelden - KernGezond Lelystad</title>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Open Sans', sans-serif;
+            line-height: 1.8;
+            color: #393939;
+            background: linear-gradient(135deg, #174E8D 0%, #0d3a6b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            max-width: 600px;
+            width: 100%;
+            padding: 50px;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .practice-badge {
+            background: #F4EEE8;
+            color: #174E8D;
+            padding: 8px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        h1 {
+            font-family: 'Comfortaa', cursive;
+            color: #174E8D;
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .form-subtitle {
+            color: #666;
+            font-size: 18px;
+        }
+
+        .benefits-list {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .benefit-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .green-check {
+            color: #174E8D;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #174E8D;
+            box-shadow: 0 0 0 3px rgba(23, 78, 141, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 5px;
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .checkbox-label a {
+            color: #174E8D;
+            text-decoration: none;
+        }
+
+        .checkbox-label a:hover {
+            text-decoration: underline;
+        }
+
+        .submit-button {
+            background: #D2B599;
+            color: #174E8D;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(210, 181, 153, 0.3);
+            font-family: 'Comfortaa', cursive;
+        }
+
+        .submit-button:hover {
+            background: #e8c6ab;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(210, 181, 153, 0.4);
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        #msg {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        #msg.success {
+            background: #4CAF50;
+            color: white;
+            display: block;
+        }
+
+        #msg.error {
+            background: #f44336;
+            color: white;
+            display: block;
+        }
+
+        /* Success Modal Pop-up */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .success-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
+            position: relative;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #99CA33 0%, #8AB92D 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            box-shadow: 0 10px 30px rgba(153, 202, 51, 0.3);
+        }
+
+        .success-icon svg {
+            width: 50px;
+            height: 50px;
+            stroke: white;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        .success-modal h2 {
+            color: #254797;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+
+        .success-modal p {
+            color: #666;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .practice-name-highlight {
+            color: #99CA33;
+            font-weight: 700;
+        }
+
+        .success-modal .close-button {
+            background: #99CA33;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .success-modal .close-button:hover {
+            background: #8AB92D;
+            transform: translateY(-2px);
+        }
+
+        .auto-close-note {
+            color: #999;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-container {
+                padding: 30px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-header">
+            <div class="practice-badge" id="practiceBadge" style="display: none;">
+                Via jouw fysiotherapeut
+            </div>
+            <h1>Meld je aan voor gratis informatie</h1>
+            <p class="form-subtitle">Vul het formulier in en ontvang direct alle informatie</p>
+        </div>
+
+        <div class="benefits-list">
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Persoonlijk beweegplan op maat</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Gratis kennismakingsgesprek</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Informatie over tijden en tarieven</span>
+            </div>
+        </div>
+
+        <div id="msg"></div>
+
+        <form id="leadForm">
+            <!-- Hidden field for practice code - BELANGRIJK: naam moet praktijk_code zijn -->
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="">
+
+            <div class="form-group">
+                <label for="volledige_naam">
+                    Volledige naam <span class="required">*</span>
+                </label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required>
+            </div>
+
+            <div class="form-group">
+                <label for="emailadres">
+                    E-mailadres <span class="required">*</span>
+                </label>
+                <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">
+                    Telefoonnummer
+                </label>
+                <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678">
+            </div>
+
+            <div class="form-group">
+                <label for="bron">
+                    Hoe heb je ons gevonden?
+                </label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="doel">
+                    Wat is je doel?
+                </label>
+                <select id="doel" name="doel">
+                    <option value="">Selecteer...</option>
+                    <option value="Afvallen">Afvallen</option>
+                    <option value="Fitter worden">Fitter worden</option>
+                    <option value="Spieren versterken">Spieren vergroten</option>
+                    <option value="Gezonder leven">Klachten voorkomen</option>
+                    <option value="Gedrag veranderen">Sportprestaties verbeteren</option>
+                </select>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                <label for="toestemming" class="checkbox-label">
+                    Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen over het beweegprogramma. <span class="required">*</span>
+                </label>
+            </div>
+
+            <button type="submit" class="submit-button" id="submitButton">
+                Verstuur Mijn Aanmelding →
+            </button>
+
+            <div class="security-note">
+                <span>Je gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success Modal Pop-up -->
+    <div class="modal-overlay" id="successModal">
+        <div class="success-modal">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52">
+                    <polyline points="14 27 22 35 38 19"/>
+                </svg>
+            </div>
+            <h2>Gegevens succesvol verstuurd!</h2>
+            <p>Je aanmelding is verstuurd naar</p>
+            <p class="practice-name-highlight" id="modalPracticeName">de praktijk</p>
+            <p style="margin-top: 20px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
+            <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
+            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+        </div>
+    </div>
+
+    <!-- BELANGRIJK: Dit script wordt geladen vanuit je public folder -->
+    <script src="/form.js"></script>
+
+    <script>
+        // SUCCESS MODAL FUNCTIONS - GLOBAL SCOPE voor form.js
+        let countdownTimer;
+
+        function showSuccessModal(practiceName) {
+            const modal = document.getElementById('successModal');
+            const practiceNameEl = document.getElementById('modalPracticeName');
+            
+            // Set practice name
+            practiceNameEl.textContent = practiceName || 'de praktijk';
+            
+            // Show modal
+            modal.classList.add('active');
+            
+            // Start countdown (10 seconds instead of 5)
+            let seconds = 10;
+            const countdownEl = document.getElementById('countdown');
+            
+            countdownTimer = setInterval(() => {
+                seconds--;
+                countdownEl.textContent = seconds;
+                
+                if (seconds <= 0) {
+                    closeSuccessModal();
+                }
+            }, 1000);
+        }
+
+        function closeSuccessModal() {
+            const modal = document.getElementById('successModal');
+            modal.classList.remove('active');
+            
+            // Clear countdown
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            // Reset form when modal closes
+            const form = document.getElementById('leadForm');
+            if (form) {
+                form.reset();
+                
+                // Preserve practice code in hidden field
+                const urlParams = new URLSearchParams(window.location.search);
+                const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
+                const hiddenField = document.getElementById('praktijk_code');
+                if (hiddenField && practiceCode) {
+                    hiddenField.value = practiceCode;
+                }
+            }
+        }
+
+        // Extra script voor practice naam display
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
+            
+            // Practice data voor display
+            const practiceData = {
+                'S7F2MW': {
+                    name: 'Fysiotherapie Soestdijk',
+                    location: 'Soestdijk'
+                },
+                '5691C2': {
+                    name: 'Fysiotherapie Joure',
+                    location: 'Joure'
+                },
+                'K9X3QY': {
+                    name: 'Fysiopraktijk De Jong',
+                    location: 'De Jong'
+                }
+            };
+
+            // Toon practice badge als bekend
+            if (practiceCode && practiceData[practiceCode]) {
+                const badge = document.getElementById('practiceBadge');
+                badge.style.display = 'inline-block';
+                badge.textContent = `Via ${practiceData[practiceCode].name}`;
+                
+                // Update page title
+                document.title = `Aanmelden - ${practiceData[practiceCode].name}`;
+            }
+            
+            console.log('Form loaded with practice code:', practiceCode || 'none');
+        })();
+    </script>
+</body>
+</html>
