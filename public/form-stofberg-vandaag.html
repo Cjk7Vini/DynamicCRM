@@ -3,96 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aanmeldformulier - Stofberg Fysiotherapie</title>
+    <title>Aanmelden - Stofberg Vandaag</title>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            font-family: 'Open Sans', sans-serif;
+            line-height: 1.8;
+            color: #393939;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
             min-height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             padding: 20px;
         }
 
-        .container {
+        .form-container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(255, 107, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             max-width: 600px;
             width: 100%;
-            overflow: hidden;
+            padding: 50px;
         }
 
-        .header {
-            background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
-            color: white;
-            padding: 40px 30px;
+        .form-header {
             text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: repeating-linear-gradient(
-                45deg,
-                transparent,
-                transparent 10px,
-                rgba(0, 0, 0, 0.1) 10px,
-                rgba(0, 0, 0, 0.1) 20px
-            );
-            animation: slide 20s linear infinite;
-        }
-
-        @keyframes slide {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(50px, 50px); }
-        }
-
-        .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .header p {
-            font-size: 16px;
-            opacity: 0.95;
-            position: relative;
-            z-index: 1;
+            margin-bottom: 40px;
         }
 
         .practice-badge {
             background: #1a1a1a;
             color: #ff6b00;
-            padding: 12px 24px;
-            border-radius: 25px;
+            padding: 8px 20px;
+            border-radius: 20px;
             display: inline-block;
-            margin-top: 15px;
-            font-weight: bold;
+            margin-bottom: 20px;
+            font-weight: 600;
             font-size: 14px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            position: relative;
-            z-index: 1;
             border: 2px solid #ff6b00;
         }
 
-        .form-content {
-            padding: 40px 30px;
+        h1 {
+            font-family: 'Comfortaa', cursive;
+            color: #ff6b00;
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .form-subtitle {
+            color: #666;
+            font-size: 18px;
+        }
+
+        .benefits-list {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .benefit-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .green-check {
+            color: #ff6b00;
+            font-weight: bold;
+            font-size: 20px;
         }
 
         .form-group {
@@ -103,104 +96,210 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: #1a1a1a;
-            font-size: 14px;
+            color: #333;
+            font-size: 16px;
         }
 
-        label .required {
-            color: #ff6b00;
+        .required {
+            color: #e74c3c;
         }
 
-        input[type="text"],
-        input[type="email"],
-        input[type="tel"],
-        input[type="number"],
-        input[type="date"],
-        select {
+        input, select {
             width: 100%;
-            padding: 12px 15px;
+            padding: 12px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 16px;
             transition: all 0.3s ease;
-            background: white;
+            font-family: inherit;
         }
 
-        input:focus,
-        select:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: #ff6b00;
-            box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+            box-shadow: 0 0 0 3px rgba(23, 78, 141, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
         }
 
         .checkbox-group {
-            margin: 25px 0;
-            padding: 20px;
-            background: #f8f8f8;
-            border-radius: 10px;
-            border-left: 4px solid #ff6b00;
-        }
-
-        .checkbox-group label {
             display: flex;
             align-items: flex-start;
-            font-weight: normal;
-            cursor: pointer;
-            margin-bottom: 0;
+            gap: 10px;
+            margin-bottom: 25px;
         }
 
         .checkbox-group input[type="checkbox"] {
-            margin-right: 10px;
-            margin-top: 4px;
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: #ff6b00;
+            width: auto;
+            margin-top: 5px;
         }
 
-        .submit-btn {
-            width: 100%;
-            padding: 16px;
+        .checkbox-label {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .checkbox-label a {
+            color: #ff6b00;
+            text-decoration: none;
+        }
+
+        .checkbox-label a:hover {
+            text-decoration: underline;
+        }
+
+        .submit-button {
             background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
             color: white;
+            padding: 15px 40px;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
             cursor: pointer;
+            width: 100%;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(255, 107, 0, 0.3);
+            font-family: 'Comfortaa', cursive;
         }
 
-        .submit-btn:hover {
+        .submit-button:hover {
+            background: linear-gradient(135deg, #ff8c00 0%, #ffa500 100%);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(255, 107, 0, 0.4);
-            background: linear-gradient(135deg, #ff8c00 0%, #ffa500 100%);
         }
 
-        .submit-btn:active {
-            transform: translateY(0);
+        .security-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
         }
 
-        .submit-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
+        #msg {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
         }
 
-        /* Modal Styles */
-        .modal {
+        #msg.success {
+            background: #4CAF50;
+            color: white;
+            display: block;
+        }
+
+        #msg.error {
+            background: #f44336;
+            color: white;
+            display: block;
+        }
+
+        /* Success Modal Pop-up */
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
             justify-content: center;
             align-items: center;
             animation: fadeIn 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .success-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
+            position: relative;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            box-shadow: 0 10px 30px rgba(210, 181, 153, 0.3);
+        }
+
+        .success-icon svg {
+            width: 50px;
+            height: 50px;
+            stroke: white;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        .success-modal h2 {
+            font-family: 'Comfortaa', cursive;
+            color: #ff6b00;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .success-modal p {
+            color: #666;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .practice-name-highlight {
+            color: #ff6b00;
+            font-weight: 700;
+        }
+
+        .success-modal .close-button {
+            background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 25px;
+            transition: all 0.3s ease;
+            font-family: 'Comfortaa', cursive;
+        }
+
+        .success-modal .close-button:hover {
+            background: linear-gradient(135deg, #ff8c00 0%, #ffa500 100%);
+            transform: translateY(-2px);
+        }
+
+        .auto-close-note {
+            color: #999;
+            font-size: 14px;
+            margin-top: 15px;
         }
 
         @keyframes fadeIn {
@@ -208,256 +307,235 @@
             to { opacity: 1; }
         }
 
-        .modal-content {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            max-width: 500px;
-            margin: 20px;
-            animation: slideUp 0.3s ease;
-            box-shadow: 0 20px 60px rgba(255, 107, 0, 0.4);
-        }
-
         @keyframes slideUp {
             from {
-                transform: translateY(50px);
                 opacity: 0;
+                transform: translateY(50px);
             }
             to {
-                transform: translateY(0);
                 opacity: 1;
+                transform: translateY(0);
             }
         }
 
-        .modal-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 40px;
-            color: white;
-        }
-
-        .modal h2 {
-            color: #1a1a1a;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .modal p {
-            color: #333;
-            margin-bottom: 10px;
-            line-height: 1.6;
-        }
-
-        .modal-close {
-            margin-top: 25px;
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-
-        .modal-close:hover {
-            background: linear-gradient(135deg, #ff8c00 0%, #ffa500 100%);
-            transform: translateY(-2px);
-        }
-
-        .error-message {
-            background: #ffe0e0;
-            color: #c00;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #c00;
-            display: none;
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
-            .container {
-                margin: 10px;
+            .form-container {
+                padding: 30px;
             }
 
-            .header h1 {
-                font-size: 24px;
+            h1 {
+                font-size: 26px;
             }
 
-            .form-content {
-                padding: 30px 20px;
+            .form-row {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+    <div class="form-container">
+        <div class="form-header">
+            <div class="practice-badge" id="practiceBadge" style="display: none;">
+                Via jouw fysiotherapeut
+            </div>
             <h1>Word lid van onze fit & leefstijl groep</h1>
-            <p>Vul onderstaand formulier in om te starten</p>
-            <div class="practice-badge" id="practiceBadge">
-                <span id="practiceName">Stofberg Vandaag</span>
+            <p class="form-subtitle">Vul onderstaand formulier in om te starten</p>
+        </div>
+
+        <div class="benefits-list">
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Persoonlijk beweegplan op maat</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Gratis kennismakingsgesprek</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Informatie over tijden en tarieven</span>
             </div>
         </div>
 
-        <div class="form-content">
-            <div class="error-message" id="errorMessage"></div>
+        <div id="msg"></div>
 
-            <form id="leadForm">
-                <input type="hidden" id="practiceCode" name="practice_code" value="00E6AB">
+        <form id="leadForm">
+            <!-- Hidden field for practice code - BELANGRIJK: naam moet praktijk_code zijn -->
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="">
 
-                <div class="form-group">
-                    <label for="name">Volledige naam <span class="required">*</span></label>
-                    <input type="text" id="name" name="name" required placeholder="Voor- en achternaam">
-                </div>
+            <div class="form-group">
+                <label for="volledige_naam">
+                    Volledige naam <span class="required">*</span>
+                </label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required>
+            </div>
 
-                <div class="form-group">
-                    <label for="email">E-mailadres <span class="required">*</span></label>
-                    <input type="email" id="email" name="email" required placeholder="voorbeeld@email.nl">
-                </div>
+            <div class="form-group">
+                <label for="emailadres">
+                    E-mailadres <span class="required">*</span>
+                </label>
+                <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
+            </div>
 
-                <div class="form-group">
-                    <label for="phone">Telefoonnummer <span class="required">*</span></label>
-                    <input type="tel" id="phone" name="phone" required placeholder="06-12345678">
-                </div>
+            <div class="form-group">
+                <label for="telefoon">
+                    Telefoonnummer
+                </label>
+                <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678">
+            </div>
 
-                <div class="form-group">
-                    <label for="source">Hoe heb je ons gevonden?</label>
-                    <select id="source" name="source">
-                        <option value="">Selecteer...</option>
-                        <option value="google">Google</option>
-                        <option value="social_media">Social Media</option>
-                        <option value="friend">Via een vriend/kennis</option>
-                        <option value="flyer">Flyer/poster</option>
-                        <option value="website">Website</option>
-                        <option value="other">Anders</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label for="bron">
+                    Hoe heb je ons gevonden?
+                </label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
+            </div>
 
-                <div class="form-group">
-                    <label for="goal">Wat is je doel?</label>
-                    <select id="goal" name="goal">
-                        <option value="">Selecteer...</option>
-                        <option value="weight_loss">Afvallen</option>
-                        <option value="fitness">Fitter worden</option>
-                        <option value="strength">Sterker worden</option>
-                        <option value="health">Gezonder leven</option>
-                        <option value="pain_reduction">Pijnvermindering</option>
-                        <option value="mobility">Meer bewegen</option>
-                        <option value="other">Anders</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label for="doel">
+                    Wat is je doel?
+                </label>
+                <select id="doel" name="doel">
+                    <option value="">Selecteer...</option>
+                    <option value="Afvallen">Afvallen</option>
+                    <option value="Fitter worden">Fitter worden</option>
+                    <option value="Spieren versterken">Spieren vergroten</option>
+                    <option value="Gezonder leven">Klachten voorkomen</option>
+                    <option value="Gedrag veranderen">Sportprestaties verbeteren</option>
+                </select>
+            </div>
 
-                <div class="checkbox-group">
-                    <label>
-                        <input type="checkbox" id="consent" name="consent" required>
-                        <span>Ik ga akkoord met het privacy beleid en geef toestemming voor het verwerken van mijn gegevens. <span class="required">*</span></span>
-                    </label>
-                </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                <label for="toestemming" class="checkbox-label">
+                    Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen over het beweegprogramma. <span class="required">*</span>
+                </label>
+            </div>
 
-                <button type="submit" class="submit-btn" id="submitBtn">
-                    Aanmelden
-                </button>
-            </form>
+            <button type="submit" class="submit-button" id="submitButton">
+                Verstuur Mijn Aanmelding →
+            </button>
+
+            <div class="security-note">
+                <span>Je gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success Modal Pop-up -->
+    <div class="modal-overlay" id="successModal">
+        <div class="success-modal">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52">
+                    <polyline points="14 27 22 35 38 19"/>
+                </svg>
+            </div>
+            <h2>Gegevens succesvol verstuurd!</h2>
+            <p>Je aanmelding is verstuurd naar</p>
+            <p class="practice-name-highlight" id="modalPracticeName">de praktijk</p>
+            <p style="margin-top: 20px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
+            <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
+            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
         </div>
     </div>
 
-    <!-- Success Modal -->
-    <div class="modal" id="successModal">
-        <div class="modal-content">
-            <div class="modal-icon">✓</div>
-            <h2>Aanmelding Geslaagd!</h2>
-            <p>Bedankt voor je aanmelding bij <strong id="modalPracticeName">Stofberg Vandaag</strong>.</p>
-            <p>We nemen zo snel mogelijk contact met je op om je kennismakingsgesprek in te plannen.</p>
-            <button class="modal-close" onclick="closeModal()">Sluiten</button>
-        </div>
-    </div>
+    <!-- BELANGRIJK: Dit script wordt geladen vanuit je public folder -->
+    <script src="/form.js"></script>
 
     <script>
-        const PRACTICE_CODE = '00E6AB';
-        const API_URL = 'https://dynamiccrm.onrender.com';
+        // SUCCESS MODAL FUNCTIONS - GLOBAL SCOPE voor form.js
+        let countdownTimer;
 
-        // Load practice name dynamically
-        async function loadPracticeName() {
-            try {
-                const response = await fetch(`${API_URL}/api/practice/${PRACTICE_CODE}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.practice && data.practice.naam) {
-                        document.getElementById('practiceName').textContent = data.practice.naam;
-                        document.getElementById('modalPracticeName').textContent = data.practice.naam;
-                    }
+        function showSuccessModal(practiceName) {
+            const modal = document.getElementById('successModal');
+            const practiceNameEl = document.getElementById('modalPracticeName');
+            
+            // Set practice name
+            practiceNameEl.textContent = practiceName || 'de praktijk';
+            
+            // Show modal
+            modal.classList.add('active');
+            
+            // Start countdown (10 seconds instead of 5)
+            let seconds = 10;
+            const countdownEl = document.getElementById('countdown');
+            
+            countdownTimer = setInterval(() => {
+                seconds--;
+                countdownEl.textContent = seconds;
+                
+                if (seconds <= 0) {
+                    closeSuccessModal();
                 }
-            } catch (error) {
-                console.log('Using default practice name');
+            }, 1000);
+        }
+
+        function closeSuccessModal() {
+            const modal = document.getElementById('successModal');
+            modal.classList.remove('active');
+            
+            // Clear countdown
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            // Reset form when modal closes
+            const form = document.getElementById('leadForm');
+            if (form) {
+                form.reset();
+                
+                // Preserve practice code in hidden field
+                const urlParams = new URLSearchParams(window.location.search);
+                const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
+                const hiddenField = document.getElementById('praktijk_code');
+                if (hiddenField && practiceCode) {
+                    hiddenField.value = practiceCode;
+                }
             }
         }
 
-        // Form submission
-        document.getElementById('leadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('submitBtn');
-            const errorDiv = document.getElementById('errorMessage');
-
-            // Disable button
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Bezig met aanmelden...';
-            errorDiv.style.display = 'none';
-
-            // Get form data
-            const formData = {
-                praktijk_code: PRACTICE_CODE,
-                volledige_naam: document.getElementById('name').value,
-                emailadres: document.getElementById('email').value,
-                telefoon: document.getElementById('phone').value,
-                bron: document.getElementById('source').value || null,
-                doel: document.getElementById('goal').value || null,
-                toestemming: document.getElementById('consent').checked
+        // Extra script voor practice naam display
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
+            
+            // Practice data voor display
+            const practiceData = {
+                'S7F2MW': {
+                    name: 'Fysiotherapie Soestdijk',
+                    location: 'Soestdijk'
+                },
+                '5691C2': {
+                    name: 'Fysiotherapie Joure',
+                    location: 'Joure'
+                },
+                'K9X3QY': {
+                    name: 'Fysiopraktijk De Jong',
+                    location: 'De Jong'
+                }
             };
 
-            try {
-                const response = await fetch(`${API_URL}/api/leads`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
-                });
-
-                if (response.ok) {
-                    // Show success modal
-                    document.getElementById('successModal').style.display = 'flex';
-                    // Reset form
-                    document.getElementById('leadForm').reset();
-                } else {
-                    const error = await response.json();
-                    errorDiv.textContent = error.error || 'Er is een fout opgetreden. Probeer het opnieuw.';
-                    errorDiv.style.display = 'block';
-                }
-            } catch (error) {
-                errorDiv.textContent = 'Kan geen verbinding maken met de server. Controleer je internetverbinding.';
-                errorDiv.style.display = 'block';
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Aanmelden';
+            // Toon practice badge als bekend
+            if (practiceCode && practiceData[practiceCode]) {
+                const badge = document.getElementById('practiceBadge');
+                badge.style.display = 'inline-block';
+                badge.textContent = `Via ${practiceData[practiceCode].name}`;
+                
+                // Update page title
+                document.title = `Aanmelden - ${practiceData[practiceCode].name}`;
             }
-        });
-
-        function closeModal() {
-            document.getElementById('successModal').style.display = 'none';
-        }
-
-        // Load practice name on page load
-        loadPracticeName();
+            
+            console.log('Form loaded with practice code:', practiceCode || 'none');
+        })();
     </script>
 </body>
 </html>
