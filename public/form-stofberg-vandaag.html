@@ -391,9 +391,9 @@
                 const response = await fetch(`${API_URL}/api/practice/${PRACTICE_CODE}`);
                 if (response.ok) {
                     const data = await response.json();
-                    if (data.practice_name) {
-                        document.getElementById('practiceName').textContent = data.practice_name;
-                        document.getElementById('modalPracticeName').textContent = data.practice_name;
+                    if (data.success && data.practice && data.practice.naam) {
+                        document.getElementById('practiceName').textContent = data.practice.naam;
+                        document.getElementById('modalPracticeName').textContent = data.practice.naam;
                     }
                 }
             } catch (error) {
