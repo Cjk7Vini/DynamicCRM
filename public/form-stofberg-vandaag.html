@@ -448,11 +448,89 @@
         </div>
     </div>
 
-    <!-- BELANGRIJK: Dit script wordt geladen vanuit je public folder -->
-    <script src="/form.js"></script>
-
     <script>
-        // SUCCESS MODAL FUNCTIONS - GLOBAL SCOPE voor form.js
+        // FORM SUBMISSION LOGIC
+        const API_URL = 'https://dynamiccrm.onrender.com';
+        const PRACTICE_CODE = '00E6AB';
+
+        // FORM SUBMISSION LOGIC
+        const API_URL = 'https://dynamiccrm.onrender.com';
+        const PRACTICE_CODE = '00E6AB';
+
+        // Load practice name
+        async function loadPracticeName() {
+            try {
+                const response = await fetch(`${API_URL}/api/practice/${PRACTICE_CODE}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.practice && data.practice.naam) {
+                        // Update any practice name displays if needed
+                        console.log('Practice loaded:', data.practice.naam);
+                    }
+                }
+            } catch (error) {
+                console.log('Using default practice name');
+            }
+        }
+
+        // Form submission handler
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('leadForm');
+            const msg = document.getElementById('msg');
+
+            // Set practice code in hidden field
+            const hiddenField = document.getElementById('praktijk_code');
+            if (hiddenField) {
+                hiddenField.value = PRACTICE_CODE;
+            }
+
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Bezig met verzenden...';
+
+                const formData = {
+                    praktijk_code: PRACTICE_CODE,
+                    volledige_naam: document.getElementById('volledige_naam').value,
+                    emailadres: document.getElementById('emailadres').value,
+                    telefoon: document.getElementById('telefoon').value,
+                    bron: document.getElementById('bron')?.value || null,
+                    doel: document.getElementById('doel')?.value || null,
+                    toestemming: document.getElementById('toestemming').checked
+                };
+
+                try {
+                    const response = await fetch(`${API_URL}/api/leads`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (response.ok) {
+                        showSuccessModal('Stofberg Vandaag');
+                    } else {
+                        const error = await response.json();
+                        msg.textContent = error.error || 'Er ging iets mis. Probeer het opnieuw.';
+                        msg.className = 'error';
+                        msg.style.display = 'block';
+                    }
+                } catch (error) {
+                    msg.textContent = 'Kan geen verbinding maken. Controleer je internet.';
+                    msg.className = 'error';
+                    msg.style.display = 'block';
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            });
+
+            loadPracticeName();
+        });
+
+        // SUCCESS MODAL FUNCTIONS
         let countdownTimer;
 
         function showSuccessModal(practiceName) {
