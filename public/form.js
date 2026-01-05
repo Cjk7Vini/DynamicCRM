@@ -133,7 +133,7 @@
         const badge = document.getElementById('practiceBadge');
         if (badge) {
           badge.style.display = 'inline-block';
-          badge.textContent = `Via ${practice.naam}`;
+          badge.textContent = practice.naam;
         }
         document.title = `Aanmelden - ${practice.naam}`;
         console.log('Practice loaded from database:', practice.naam);
