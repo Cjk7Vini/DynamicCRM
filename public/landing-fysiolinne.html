@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start je gezondere toekomst - Fit & Fysio Linne</title>
+    <link href="https://fonts.googleapis.com/css2?family=Helvetica+Neue:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #CE2FB0;
+            --secondary: #0000AB;
+            --white: #ffffff;
+            --body-text: #333333;
+            --intro-text: #555555;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', sans-serif;
+            color: var(--body-text);
+            line-height: 1.6;
+            font-size: 10pt;
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            height: 100vh;
+            min-height: 600px;
+            background: linear-gradient(135deg, rgba(206, 47, 176, 0.85), rgba(0, 0, 171, 0.80)),
+                        url('images/FysioLinne1.jpg') center/cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero-logo {
+            max-width: 350px;
+            height: auto;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .hero-badge {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 18px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .hero h1 {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 52px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            line-height: 1.2;
+        }
+
+        .hero p.subtitle {
+            font-size: 11pt;
+            line-height: 1.7;
+            margin-bottom: 40px;
+            color: var(--white);
+        }
+
+        .hero-benefits {
+            list-style: none;
+            margin: 40px 0;
+            font-size: 16px;
+        }
+
+        .hero-benefits li {
+            margin: 15px 0;
+            padding-left: 35px;
+            position: relative;
+        }
+
+        .hero-benefits li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: var(--primary);
+            color: var(--white);
+            padding: 18px 50px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(206, 47, 176, 0.3);
+            margin-top: 20px;
+            font-family: 'Helvetica Neue', sans-serif;
+        }
+
+        .cta-button:hover {
+            background: var(--secondary);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 0, 171, 0.4);
+        }
+
+        /* Content Sections */
+        .section {
+            padding: 100px 20px;
+        }
+
+        .section-alternate {
+            background: var(--white);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .content-block {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            margin-bottom: 80px;
+        }
+
+        .content-block.reverse {
+            direction: rtl;
+        }
+
+        .content-block.reverse > * {
+            direction: ltr;
+        }
+
+        .content-image {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(23, 78, 141, 0.15);
+        }
+
+        .content-text h2 {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 36px;
+            color: var(--primary);
+            margin-bottom: 25px;
+            line-height: 1.3;
+            font-weight: 700;
+        }
+
+        .content-text p {
+            font-size: 10pt;
+            color: var(--body-text);
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        .content-text p.intro {
+            font-size: 11pt;
+            color: var(--intro-text);
+        }
+
+        .benefits-list {
+            list-style: none;
+            margin: 30px 0;
+        }
+
+        .benefits-list li {
+            padding: 15px 0;
+            padding-left: 40px;
+            position: relative;
+            font-size: 10pt;
+            color: var(--body-text);
+        }
+
+        .benefits-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        /* Quote Section */
+        .quote-section {
+            background: var(--primary);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .quote-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .quote-section h3 {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 32px;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .quote-text {
+            font-size: 16px;
+            font-style: italic;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+
+        .quote-author {
+            font-size: 14px;
+            margin-top: 20px;
+            opacity: 0.9;
+            font-family: 'Helvetica Neue', cursive;
+        }
+
+        /* FAQ Section */
+        .faq-section {
+            background: var(--white);
+            padding: 100px 20px;
+        }
+
+        .faq-section h2 {
+            font-family: 'Helvetica Neue', cursive;
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 60px;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .faq-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(23, 78, 141, 0.08);
+        }
+
+        .faq-item h3 {
+            font-family: 'Helvetica Neue', cursive;
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .faq-item p {
+            font-size: 10pt;
+            color: var(--body-text);
+            line-height: 1.7;
+        }
+
+        /* Final CTA Section */
+        .final-cta {
+            padding: 100px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(23, 78, 141, 0.05), rgba(210, 181, 153, 0.05));
+        }
+
+        .final-cta h2 {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 42px;
+            color: var(--primary);
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .final-cta p {
+            font-size: 11pt;
+            color: var(--intro-text);
+            margin-bottom: 40px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        footer p {
+            opacity: 0.8;
+            font-size: 9pt;
+        }
+
+        /* Practice Logo */
+        #practiceLogo {
+            max-width: 300px;
+            height: auto;
+        }
+
+        /* Section Headers */
+        .section-intro {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 60px;
+        }
+
+        .section-intro h2 {
+            font-family: 'Helvetica Neue', cursive;
+            font-size: 36px;
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .section-intro p {
+            font-size: 11pt;
+            color: var(--intro-text);
+            line-height: 1.7;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+
+            .hero p.subtitle {
+                font-size: 10pt;
+            }
+
+            .content-block {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .content-block.reverse {
+                direction: ltr;
+            }
+
+            .content-text h2 {
+                font-size: 28px;
+            }
+
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .final-cta h2 {
+                font-size: 32px;
+            }
+
+            .hero-logo {
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <img src="images/logolinne.jpg" alt="Fit & Fysio Linne" class="hero-logo" id="practiceLogo">
+            <div class="hero-badge">fit & gezond bewegen</div>
+            <h1>Start je gezondere toekomst</h1>
+            <p class="subtitle">
+                Fit & Leefstijl: het 12-weken programma dat je helpt om vitaler, fitter en energieker te worden.
+            </p>
+            <ul class="hero-benefits">
+                <li>Kom in beweging op je eigen tempo</li>
+                <li>Persoonlijke begeleiding van professionals</li>
+                <li>Groepstrainingen bij je vertrouwde praktijk</li>
+            </ul>
+            <a href="form-fysiolinne.html" id="mainCTA" class="cta-button">Start jouw traject</a>
+        </div>
+    </section>
+
+    <!-- Section 1: Wat is Fit & Leefstijl -->
+    <section class="section">
+        <div class="container">
+            <div class="content-block">
+                <div class="content-image-wrapper">
+                    <img src="images/FysioLinne2.jpg?w=600&h=400&fit=crop" alt="Samen in beweging" class="content-image">
+                </div>
+                <div class="content-text">
+                    <h2>Wat is Fit & Leefstijl?</h2>
+                    <p class="intro">
+                        Fit & Leefstijl is een zorgvuldig opgebouwd programma waarin je in 12 weken werkt aan:
+                    </p>
+                    <ul class="benefits-list">
+                        <li>Meer conditie</li>
+                        <li>Meer kracht</li>
+                        <li>Meer energie in het dagelijks leven</li>
+                    </ul>
+                    <p>
+                        Je traint voornamelijk individueel volgens jouw persoonlijke plan, met vaste begeleidingsmomenten 
+                        en gezamenlijke trainingsmomenten voor extra structuur en motivatie.
+                    </p>
+                    <p>
+                        De begeleiding wordt verzorgd door een team van fysiotherapeuten, beweegcoaches en leefstijlcoaches, 
+                        die oog hebben voor jouw gezondheid én jouw tempo.
+                    </p>
+                </div>
+            </div>
+
+            <div class="section-intro" style="margin-top: 60px;">
+                <h2>Wat kun je verwachten?</h2>
+                <ul class="benefits-list" style="max-width: 800px; margin: 30px auto;">
+                    <li>Een persoonlijk trainingsplan, afgestemd op jouw lichaam</li>
+                    <li>Begeleiding door ervaren professionals</li>
+                    <li>Trainen in een veilige, overzichtelijke omgeving</li>
+                    <li>Vaste contactmomenten voor uitleg, motivatie en bijsturing</li>
+                    <li>Structuur en houvast gedurende 12 weken</li>
+                </ul>
+                <a href="form-fysiolinne.html" class="cta-button" style="margin-top: 30px;">Meld je aan voor meer informatie</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Voor wie -->
+    <section class="section section-alternate">
+        <div class="container">
+            <div class="content-block reverse">
+                <div class="content-image-wrapper">
+                    <img src="images/FysioLinne3.jpg?w=600&h=400&fit=crop" alt="Voor wie" class="content-image">
+                </div>
+                <div class="content-text">
+                    <h2>Voor wie is Fit & Leefstijl bedoeld?</h2>
+                    <p class="intro">
+                        Dit programma is geschikt voor iedereen die gezonder wil leven, zonder prestatiedruk of sportverleden.
+                    </p>
+                    <p>
+                        Fit & Leefstijl past goed bij jou als je:
+                    </p>
+                    <ul class="benefits-list">
+                        <li>Meer wilt bewegen, maar niet goed weet waar je moet beginnen</li>
+                        <li>Graag zelfstandig traint, met begeleiding in de buurt</li>
+                        <li>Zeker wilt weten dat je verantwoord en veilig beweegt</li>
+                        <li>Behoefte hebt aan structuur en motivatie</li>
+                        <li>Liever traint in een vertrouwde praktijk dan in een drukke sportsituatie</li>
+                    </ul>
+                    <a href="form-fysiolinne.html" class="cta-button">Start vandaag nog</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quote Section -->
+    <section class="quote-section">
+        <div class="quote-content">
+            <h3>Begeleiding die verder kijkt dan alleen bewegen</h3>
+            <p class="quote-text">
+                "Het mooiste aan dit programma is dat we mensen echt zien groeien. Niet alleen fysiek, maar ook in 
+                vertrouwen en energie. We kijken samen wat bij je past, sturen bij waar nodig en bouwen rustig op. 
+                Zo ontstaat blijvend resultaat."
+            </p>
+            <p class="quote-author">— Team Fit & Leefstijl</p>
+            <a href="form-fysiolinne.html" class="cta-button" style="margin-top: 30px;">Ja, ik wil meer informatie</a>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <h2>Veelgestelde vragen</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3>Wat levert Fit & Leefstijl jou op?</h3>
+                    <p>
+                        Meer energie, een betere conditie en een fitter gevoel in het dagelijks leven. Daarnaast leer 
+                        je gezonde gewoontes die je ook na het programma kunt blijven toepassen.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Hoe vaak train je?</h3>
+                    <p>
+                        Je hebt vaste begeleide trainingsmomenten per week en traint daarnaast zelfstandig volgens jouw 
+                        persoonlijke plan — op momenten die voor jou prettig zijn.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Wat als je klachten of blessures hebt?</h3>
+                    <p>
+                        Geen probleem. Onze fysiotherapeuten en beweegcoaches houden hier rekening mee en passen oefeningen 
+                        aan waar nodig.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Train je alleen in een groep?</h3>
+                    <p>
+                        Nee. De training is grotendeels individueel, met gezamenlijke momenten voor begeleiding, uitleg 
+                        en motivatie.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Wat kost het programma?</h3>
+                    <p>
+                        Tijdens een persoonlijk gesprek vertellen we je precies wat het programma kost en welke opties er zijn. 
+                        Zo weet je vooraf waar je aan toe bent en kunnen we samen kijken wat het beste bij jou past.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3>Waar vinden de trainingen plaats?</h3>
+                    <p>
+                        Bij jouw vertrouwde fysiotherapiepraktijk, in een rustige en veilige omgeving.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>Klaar voor de volgende stap?</h2>
+            <p>
+                Gun jezelf 12 weken aandacht voor je gezondheid — op een manier die haalbaar en prettig voelt.
+            </p>
+            <a href="form-fysiolinne.html" id="finalCTA" class="cta-button">Ja, ik wil starten met Fit & Leefstijl</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>© 2025 KernGezond Lelystad - Alle rechten voorbehouden</p>
+    </footer>
+
+    <script>
+        // Practice code is hardcoded for KernGezond Lelystad
+        const practiceCode = '458D05';
+        
+        // All CTA buttons already point to form-kerngezond-lelystad.html
+        // No dynamic setup needed
+        
+        // Update page title
+        document.title = 'Start je gezondere toekomst - KernGezond Lelystad';
+        
+        console.log('KernGezond landing page loaded');
+        console.log('Practice code:', practiceCode);
+        console.log('Form URL: form-kerngezond-lelystad.html?s=' + practiceCode);
+    </script>
+</body>
+</html>
