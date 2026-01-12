@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic Health Analytics - Churn & Conversie Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -289,6 +290,7 @@
             <div class="header-title">Churn & Conversie Analytics</div>
         </div>
         <div class="header-right">
+            <button class="btn btn-secondary" onclick="exportToExcel()" style="margin-right: 12px;">📊 Export Rapportage</button>
             <button class="btn btn-primary" onclick="refreshData()">↻ Vernieuwen</button>
         </div>
     </div>
@@ -720,6 +722,95 @@
             if (element) {
                 const parent = element.parentElement;
                 parent.innerHTML = `<div class="error-message">Error: ${message}</div>`;
+            }
+        }
+
+        // Excel Export Function
+        async function exportToExcel() {
+            try {
+                const filters = getCurrentFilters();
+                const practice = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
+                const dateRange = filters.dateFrom && filters.dateTo 
+                    ? `${filters.dateFrom} tot ${filters.dateTo}` 
+                    : 'Alle data';
+
+                // Fetch all data with current filters
+                const [funnelRes, performanceRes, sourcesRes, forecastRes] = await Promise.all([
+                    fetch('/api/funnel' + buildQueryString()),
+                    fetch('/api/practice-performance' + buildQueryString()),
+                    fetch('/api/sources' + buildQueryString()),
+                    fetch('/api/churn-forecast')
+                ]);
+
+                const funnelData = await funnelRes.json();
+                const performanceData = await performanceRes.json();
+                const sourcesData = await sourcesRes.json();
+                const forecastData = await forecastRes.json();
+
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+
+                // Sheet 1: Funnel Data
+                if (funnelData.success && funnelData.data) {
+                    const funnelSheet = XLSX.utils.json_to_sheet(funnelData.data.map(d => ({
+                        'Stage': d.stage,
+                        'Aantal': d.count
+                    })));
+                    XLSX.utils.book_append_sheet(wb, funnelSheet, 'Conversie Funnel');
+                }
+
+                // Sheet 2: Practice Performance
+                if (performanceData.success && performanceData.data) {
+                    const perfSheet = XLSX.utils.json_to_sheet(performanceData.data.map(d => ({
+                        'Praktijk': d.practice_name,
+                        'Totaal Leads': d.total_leads,
+                        'Afspraken': d.appointments,
+                        'Conversies': d.conversions,
+                        'Conversie %': d.conversion_rate ? `${d.conversion_rate}%` : '0%'
+                    })));
+                    XLSX.utils.book_append_sheet(wb, perfSheet, 'Praktijk Performance');
+                }
+
+                // Sheet 3: Source Analysis
+                if (sourcesData.success && sourcesData.data) {
+                    const sourcesSheet = XLSX.utils.json_to_sheet(sourcesData.data.map(d => ({
+                        'Bron': d.source || 'Onbekend',
+                        'Aantal Leads': d.count
+                    })));
+                    XLSX.utils.book_append_sheet(wb, sourcesSheet, 'Lead Bronnen');
+                }
+
+                // Sheet 4: Forecast Data
+                if (forecastData.success && forecastData.forecast) {
+                    const forecastSheet = XLSX.utils.json_to_sheet(forecastData.forecast.map(d => ({
+                        'Maand': d.month,
+                        'Voorspelde Churn': d.predicted_churn,
+                        'Risico Niveau': d.risk_level
+                    })));
+                    XLSX.utils.book_append_sheet(wb, forecastSheet, 'Churn Forecast');
+                }
+
+                // Add metadata sheet
+                const metadata = [
+                    { 'Parameter': 'Export Datum', 'Waarde': new Date().toLocaleString('nl-NL') },
+                    { 'Parameter': 'Praktijk Filter', 'Waarde': practice },
+                    { 'Parameter': 'Datum Bereik', 'Waarde': dateRange },
+                    { 'Parameter': 'Gegenereerd door', 'Waarde': 'Dynamic Health Analytics' }
+                ];
+                const metaSheet = XLSX.utils.json_to_sheet(metadata);
+                XLSX.utils.book_append_sheet(wb, metaSheet, 'Export Info');
+
+                // Generate filename
+                const timestamp = new Date().toISOString().split('T')[0];
+                const filename = `DHC_Analytics_${timestamp}.xlsx`;
+
+                // Download
+                XLSX.writeFile(wb, filename);
+
+                alert('✅ Rapportage succesvol geëxporteerd!');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('❌ Fout bij exporteren: ' + error.message);
             }
         }
 
