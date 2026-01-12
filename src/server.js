@@ -675,7 +675,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
 
       await client.query(
         `UPDATE public.leads 
-         SET appointment_date = $1, appointment_time = $2 
+         SET appointment_date = $1, appointment_time = $2, status = 'Afspraak Gepland'
          WHERE id = $3`,
         [date, time, lead_id]
       );
