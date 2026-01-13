@@ -148,8 +148,16 @@ app.get('/health', (_req, res) =>
 
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
-  emailadres: Joi.string().email().allow('', null),
-  telefoon: Joi.string().max(50).allow('', null),
+  emailadres: Joi.string().email().required().messages({
+    'string.empty': 'Email adres is verplicht',
+    'string.email': 'Voer een geldig email adres in',
+    'any.required': 'Email adres is verplicht'
+  }),
+  telefoon: Joi.string().pattern(/^[0-9]{10,}$/).required().messages({
+    'string.empty': 'Telefoonnummer is verplicht',
+    'string.pattern.base': 'Voer een geldig telefoonnummer in (minimaal 10 cijfers)',
+    'any.required': 'Telefoonnummer is verplicht'
+  }),
   bron: Joi.string().max(100).allow('', null),
   doel: Joi.string().max(200).allow('', null),
   toestemming: Joi.boolean().truthy('on').falsy('off').default(false),

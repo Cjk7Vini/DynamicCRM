@@ -166,10 +166,29 @@
         return;
       }
       
+      // ✅ NEW: Validate email and phone
+      const email = form.emailadres.value.trim();
+      const phone = form.telefoon.value.trim();
+      
+      if (!email || !email.includes('@') || !email.includes('.')) {
+        msg.textContent = 'Voer een geldig email adres in';
+        msg.className = 'error';
+        form.emailadres.focus();
+        return;
+      }
+      
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (!phone || phoneDigits.length < 10) {
+        msg.textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers)';
+        msg.className = 'error';
+        form.telefoon.focus();
+        return;
+      }
+      
       const data = {
         volledige_naam: form.volledige_naam.value.trim(),
-        emailadres:     form.emailadres.value.trim() || null,
-        telefoon:       form.telefoon.value.trim() || null,
+        emailadres:     email,
+        telefoon:       phoneDigits,
         bron:           form.bron.value || null,
         doel:           form.doel.value.trim() || null,
         toestemming:    form.toestemming.checked,

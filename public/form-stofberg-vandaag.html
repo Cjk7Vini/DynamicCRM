@@ -340,7 +340,7 @@
             <div class="practice-badge" id="practiceBadge" style="display: none;">
                 Via jouw fysiotherapeut
             </div>
-            <h1>Word lid van Stofberg Vandaag</h1>
+            <h1>Word lid van onze fit & leefstijl groep</h1>
             <p class="form-subtitle">Vul onderstaand formulier in om te starten</p>
         </div>
 
@@ -408,7 +408,7 @@
                     <option value="">Selecteer...</option>
                     <option value="Afvallen">Afvallen</option>
                     <option value="Fitter worden">Fitter worden</option>
-                    <option value="Spieren versterken">Spieren verbeteren</option>
+                    <option value="Spieren versterken">Spieren vergroten</option>
                     <option value="Gezonder leven">Klachten voorkomen</option>
                     <option value="Gedrag veranderen">Sportprestaties verbeteren</option>
                 </select>
@@ -488,11 +488,36 @@
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Bezig met verzenden...';
 
+                // ✅ Validate email and phone
+                const email = document.getElementById('emailadres').value.trim();
+                const phone = document.getElementById('telefoon').value.trim();
+                
+                if (!email || !email.includes('@') || !email.includes('.')) {
+                    msg.textContent = 'Voer een geldig email adres in';
+                    msg.className = 'error';
+                    msg.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                    document.getElementById('emailadres').focus();
+                    return;
+                }
+                
+                const phoneDigits = phone.replace(/\D/g, '');
+                if (!phone || phoneDigits.length < 10) {
+                    msg.textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers)';
+                    msg.className = 'error';
+                    msg.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                    document.getElementById('telefoon').focus();
+                    return;
+                }
+
                 const formData = {
                     praktijk_code: PRACTICE_CODE,
                     volledige_naam: document.getElementById('volledige_naam').value,
-                    emailadres: document.getElementById('emailadres').value,
-                    telefoon: document.getElementById('telefoon').value,
+                    emailadres: email,
+                    telefoon: phoneDigits,
                     bron: document.getElementById('bron')?.value || null,
                     doel: document.getElementById('doel')?.value || null,
                     toestemming: document.getElementById('toestemming').checked
