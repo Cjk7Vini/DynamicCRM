@@ -1418,10 +1418,6 @@ app.get('/api/check-reminders', async (req, res) => {
   try {
     console.log('🔔 Checking for appointment reminders...');
     
-    // Find appointments in next 1 hour where reminder not sent
-    const now = new Date();
-    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-    
     const appointments = await withReadConnection(async (client) => {
       const result = await client.query(`
         SELECT 
@@ -1441,9 +1437,13 @@ app.get('/api/check-reminders', async (req, res) => {
           AND l.appointment_time IS NOT NULL
           AND (l.reminder_sent IS NULL OR l.reminder_sent = FALSE)
           AND l.status = 'Afspraak Gepland'
-          AND CONCAT(l.appointment_date, ' ', l.appointment_time)::timestamp <= $1
-          AND CONCAT(l.appointment_date, ' ', l.appointment_time)::timestamp > NOW()
-      `, [oneHourFromNow.toISOString()]);
+          AND (l.appointment_date::text || ' ' || l.appointment_time::text)::timestamp 
+              AT TIME ZONE 'Europe/Amsterdam' 
+              <= (NOW() AT TIME ZONE 'Europe/Amsterdam') + interval '1 hour'
+          AND (l.appointment_date::text || ' ' || l.appointment_time::text)::timestamp 
+              AT TIME ZONE 'Europe/Amsterdam' 
+              > (NOW() AT TIME ZONE 'Europe/Amsterdam')
+      `);
       return result.rows;
     });
 
