@@ -833,6 +833,60 @@ app.post('/api/confirm-appointment', async (req, res) => {
       })();
     }
 
+    // 🆕 SEND CONFIRMATION EMAIL TO PRACTICE
+    if (updated.lead.praktijk_email && SMTP.host && SMTP.user && SMTP.pass) {
+      (async () => {
+        try {
+          const practiceHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                <tr>
+                  <td>
+                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak Bevestiging</h1>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
+                      Beste,
+                    </p>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
+                      Uw afspraak met <strong>${updated.lead.volledige_naam}</strong> is nu bevestigd op de volgende datum:
+                    </p>
+                    
+                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${updated.lead.volledige_naam}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${updated.lead.telefoon || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${updated.lead.emailadres || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Datum:</strong> ${formattedDate}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Type:</strong> ${appointmentTypeDisplay}</p>
+                      ${updated.notes ? `<p style="color:#374151;font-size:14px;margin:8px 0"><strong>Opmerkingen:</strong> ${updated.notes}</p>` : ''}
+                    </div>
+
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
+                      Met vriendelijke groet,<br/>
+                      <strong>Marketingteam Dynamic Health Consultancy</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>`;
+
+          await sendMailResilient({
+            from: SMTP.from,
+            to: updated.lead.praktijk_email,
+            subject: `Nieuwe afspraak bevestigd - ${updated.lead.volledige_naam} op ${formattedDate}`,
+            html: practiceHtml,
+            text: `Beste,\n\nUw afspraak met ${updated.lead.volledige_naam} is nu bevestigd.\n\nNaam: ${updated.lead.volledige_naam}\nTelefoonnummer: ${updated.lead.telefoon || 'Niet opgegeven'}\nEmail: ${updated.lead.emailadres || 'Niet opgegeven'}\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nType: ${appointmentTypeDisplay}\n${updated.notes ? 'Opmerkingen: ' + updated.notes : ''}\n\nMet vriendelijke groet,\nMarketingteam Dynamic Health Consultancy`
+          });
+          console.log('PRAKTIJK BEVESTIGING verstuurd naar:', updated.lead.praktijk_email);
+        } catch (mailErr) {
+          console.error('PRAKTIJK BEVESTIGING ERROR:', mailErr);
+        }
+      })();
+    }
+
     res.json({ 
       ok: true, 
       lead_name: updated.lead.volledige_naam,
@@ -1354,6 +1408,464 @@ app.get('/api/sources', async (req, res) => {
   } catch (e) {
     console.error('GET /api/sources error:', e);
     res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 🆕 APPOINTMENT REMINDER SYSTEM
+
+// Helper: Generate secure action token
+function generateActionToken(appointmentId) {
+  const crypto = require('crypto');
+  const secret = process.env.ACTION_TOKEN_SECRET || 'default-secret-change-in-production';
+  return crypto.createHmac('sha256', secret).update(String(appointmentId)).digest('hex').substring(0, 16);
+}
+
+// Cron endpoint - called by EasyCron every 15 minutes
+app.get('/api/check-reminders', async (req, res) => {
+  try {
+    console.log('🔔 Checking for appointment reminders...');
+    
+    // Find appointments in next 1 hour where reminder not sent
+    const now = new Date();
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+    
+    const appointments = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT 
+          l.id, 
+          l.volledige_naam, 
+          l.emailadres, 
+          l.telefoon,
+          l.appointment_date,
+          l.appointment_time,
+          l.reminder_sent,
+          p.naam as praktijk_naam,
+          p.email_to as praktijk_email,
+          p.code as praktijk_code
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.appointment_date IS NOT NULL
+          AND l.appointment_time IS NOT NULL
+          AND (l.reminder_sent IS NULL OR l.reminder_sent = FALSE)
+          AND l.status = 'Afspraak Gepland'
+          AND CONCAT(l.appointment_date, ' ', l.appointment_time)::timestamp <= $1
+          AND CONCAT(l.appointment_date, ' ', l.appointment_time)::timestamp > NOW()
+      `, [oneHourFromNow.toISOString()]);
+      return result.rows;
+    });
+
+    console.log(`Found ${appointments.length} appointments needing reminders`);
+
+    for (const appt of appointments) {
+      try {
+        const appointmentDateTime = `${appt.appointment_date}T${appt.appointment_time}`;
+        const dateObj = new Date(appointmentDateTime);
+        const formattedDate = new Intl.DateTimeFormat('nl-NL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }).format(dateObj);
+        const formattedTime = appt.appointment_time.substring(0, 5);
+        
+        const actionToken = generateActionToken(appt.id);
+        const attendedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=attended&token=${actionToken}`;
+        const missedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=missed&token=${actionToken}`;
+
+        // Send reminder email to practice
+        if (appt.praktijk_email && SMTP.host) {
+          const reminderHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+                <tr>
+                  <td>
+                    <div style="background:#fef3c7;border-radius:12px;padding:16px;margin-bottom:20px;border-left:4px solid #f59e0b">
+                      <p style="color:#92400e;font-size:16px;margin:0;font-weight:600">⏰ Afspraak over 1 uur!</p>
+                    </div>
+                    
+                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak Herinnering</h1>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
+                      Beste,
+                    </p>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
+                      Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
+                      U kunt nu uw afspraak voorbereiden voor de lead.
+                    </p>
+                    
+                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${appt.volledige_naam}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${appt.telefoon || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${appt.emailadres || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
+                    </div>
+
+                    <div style="margin:30px 0">
+                      <p style="color:#111827;font-size:15px;font-weight:600;margin-bottom:16px">Na de afspraak:</p>
+                      
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding:0 10px 10px 0" width="50%">
+                            <a href="${attendedUrl}" style="display:block;background:#10b981;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                              ✓ Lead is langsgeweest
+                            </a>
+                          </td>
+                          <td style="padding:0 0 10px 10px" width="50%">
+                            <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                              ✗ Afspraak gemist
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:16px">
+                        Als de lead is langsgeweest, kunt u dat bevestigen door de button in te klikken.<br/>
+                        Indien de lead niet is komen opdagen, klik dan op de button "Afspraak gemist".<br/>
+                        Wij zullen namens Dynamic Health Consultancy een email naar de lead sturen dat zij de afspraak hebben gemist.
+                      </p>
+                    </div>
+
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
+                      Met vriendelijke groet,<br/>
+                      <strong>Dynamic Health Consultancy</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>`;
+
+          await sendMailResilient({
+            from: SMTP.from,
+            to: appt.praktijk_email,
+            subject: `⏰ Afspraak over 1 uur - ${appt.volledige_naam} om ${formattedTime}`,
+            html: reminderHtml
+          });
+          
+          console.log(`Reminder sent for appointment ${appt.id} to ${appt.praktijk_email}`);
+        }
+
+        // Mark reminder as sent
+        await withWriteConnection(async (client) => {
+          await client.query('UPDATE public.leads SET reminder_sent = TRUE WHERE id = $1', [appt.id]);
+        });
+
+      } catch (err) {
+        console.error(`Error sending reminder for appointment ${appt.id}:`, err);
+      }
+    }
+
+    res.json({ success: true, reminders_sent: appointments.length });
+  } catch (error) {
+    console.error('Check reminders error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Action endpoint - handles attended/missed buttons
+app.get('/api/appointment-action', async (req, res) => {
+  try {
+    const { id, action, token } = req.query;
+    
+    if (!id || !action || !token) {
+      return res.status(400).send('Ongeldige parameters');
+    }
+
+    // Validate token
+    const expectedToken = generateActionToken(id);
+    if (token !== expectedToken) {
+      return res.status(401).send('Ongeldige token');
+    }
+
+    const appointment = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT l.*, p.naam as praktijk_naam, p.email_to as praktijk_email
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.id = $1
+      `, [id]);
+      return result.rows[0];
+    });
+
+    if (!appointment) {
+      return res.status(404).send('Afspraak niet gevonden');
+    }
+
+    if (action === 'attended') {
+      // Update status to "Geweest"
+      await withWriteConnection(async (client) => {
+        await client.query('UPDATE public.leads SET status = $1 WHERE id = $2', ['Geweest', id]);
+        await client.query(
+          `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+           VALUES ($1, $2, 'attended', 'practice_action', $3::jsonb)`,
+          [id, appointment.praktijk_code, JSON.stringify({ via: 'email_button' })]
+        );
+      });
+
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Bevestigd</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+            .card { background: white; border-radius: 16px; padding: 40px; max-width: 400px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .icon { width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 40px; color: white; }
+            h1 { color: #111827; font-size: 24px; margin: 0 0 12px 0; }
+            p { color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">✓</div>
+            <h1>Lead Bevestigd</h1>
+            <p>De lead <strong>${appointment.volledige_naam}</strong> is gemarkeerd als langsgeweest.</p>
+          </div>
+        </body>
+        </html>
+      `);
+
+    } else if (action === 'missed') {
+      // Update status to "Afspraak Gemist"
+      await withWriteConnection(async (client) => {
+        await client.query('UPDATE public.leads SET status = $1 WHERE id = $2', ['Afspraak Gemist', id]);
+        await client.query(
+          `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+           VALUES ($1, $2, 'no_show', 'practice_action', $3::jsonb)`,
+          [id, appointment.praktijk_code, JSON.stringify({ via: 'email_button' })]
+        );
+      });
+
+      // Send no-show email to lead
+      if (appointment.emailadres && SMTP.host) {
+        const rebookToken = generateActionToken(id + '-rebook');
+        const rebookUrl = `https://dynamic-health-consultancy.nl/api/rebook?id=${id}&practice=${appointment.praktijk_code}&token=${rebookToken}`;
+
+        const noShowHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head><meta charset="utf-8"></head>
+          <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+            <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+              <tr>
+                <td>
+                  <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Gemiste Afspraak</h1>
+                  <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
+                    Beste ${appointment.volledige_naam},
+                  </p>
+                  <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
+                    Wij hadden jou verwacht op <strong>${appointment.appointment_date} om ${appointment.appointment_time}</strong> bij <strong>${appointment.praktijk_naam}</strong> voor een intake.
+                  </p>
+                  <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
+                    Indien u nog interesse heeft, kunt u een nieuwe afspraak maken voor een intake.
+                  </p>
+                  
+                  <div style="text-align:center;margin:30px 0">
+                    <a href="${rebookUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px">
+                      Ik heb interesse
+                    </a>
+                  </div>
+
+                  <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
+                    Met vriendelijke groet,<br/>
+                    <strong>${appointment.praktijk_naam}</strong>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>`;
+
+        await sendMailResilient({
+          from: SMTP.from,
+          to: appointment.emailadres,
+          subject: `Gemiste afspraak bij ${appointment.praktijk_naam}`,
+          html: noShowHtml
+        });
+      }
+
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Gemist</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+            .card { background: white; border-radius: 16px; padding: 40px; max-width: 400px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .icon { width: 80px; height: 80px; background: #ef4444; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 40px; color: white; }
+            h1 { color: #111827; font-size: 24px; margin: 0 0 12px 0; }
+            p { color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">✗</div>
+            <h1>Afspraak Gemist</h1>
+            <p>De lead <strong>${appointment.volledige_naam}</strong> is gemarkeerd als niet verschenen.<br/><br/>Een follow-up email is verstuurd naar de lead.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      res.status(400).send('Ongeldige actie');
+    }
+
+  } catch (error) {
+    console.error('Appointment action error:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+// Rebook endpoint - when lead clicks "I have interest" in no-show email
+app.get('/api/rebook', async (req, res) => {
+  try {
+    const { id, practice, token } = req.query;
+    
+    if (!id || !practice || !token) {
+      return res.status(400).send('Ongeldige parameters');
+    }
+
+    // Validate token
+    const expectedToken = generateActionToken(id + '-rebook');
+    if (token !== expectedToken) {
+      return res.status(401).send('Ongeldige token');
+    }
+
+    const originalLead = await withReadConnection(async (client) => {
+      const result = await client.query('SELECT * FROM public.leads WHERE id = $1', [id]);
+      return result.rows[0];
+    });
+
+    if (!originalLead) {
+      return res.status(404).send('Lead niet gevonden');
+    }
+
+    // Create new lead with source "Herhaal afspraak"
+    const newLead = await withWriteConnection(async (client) => {
+      const result = await client.query(`
+        INSERT INTO public.leads 
+          (volledige_naam, emailadres, telefoon, bron, praktijk_code, status, toestemming)
+        VALUES ($1, $2, $3, 'Herhaal afspraak', $4, 'nieuw', true)
+        RETURNING id
+      `, [originalLead.volledige_naam, originalLead.emailadres, originalLead.telefoon, practice]);
+      
+      await client.query(
+        `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+         VALUES ($1, $2, 'lead_submitted', 'rebook_action', $3::jsonb)`,
+        [result.rows[0].id, practice, JSON.stringify({ original_lead_id: id, via: 'no_show_email' })]
+      );
+      
+      return result.rows[0];
+    });
+
+    // Send new lead notification to practice (same as original lead notification)
+    const practiceInfo = await withReadConnection(async (client) => {
+      const result = await client.query('SELECT * FROM public.praktijken WHERE code = $1', [practice]);
+      return result.rows[0];
+    });
+
+    if (practiceInfo && practiceInfo.email_to && SMTP.host) {
+      // Use existing lead notification email template
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family:system-ui;background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);padding:20px">
+          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:30px;box-shadow:0 10px 40px rgba(0,0,0,0.15)">
+            <div style="text-align:center;padding:20px 0">
+              <div style="background:linear-gradient(135deg, #2563eb, #10b981);width:80px;height:80px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px">
+                <span style="color:white;font-size:40px;font-weight:bold">!</span>
+              </div>
+              <h1 style="color:#111827;font-size:28px;margin:0 0 8px 0">Er is een nieuwe lead binnengekomen!</h1>
+            </div>
+            
+            <div style="background:#f9fafb;border-radius:12px;padding:24px;margin:24px 0">
+              <div style="margin-bottom:16px">
+                <span style="font-size:32px;margin-right:8px">👤</span>
+                <div style="display:inline-block;vertical-align:middle">
+                  <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Naam:</div>
+                  <div style="font-size:18px;color:#111827;font-weight:600">${originalLead.volledige_naam}</div>
+                </div>
+              </div>
+              <div style="margin-bottom:16px">
+                <span style="font-size:32px;margin-right:8px">📧</span>
+                <div style="display:inline-block;vertical-align:middle">
+                  <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Email:</div>
+                  <div style="font-size:16px;color:#2563eb;font-weight:500">${originalLead.emailadres || 'Niet opgegeven'}</div>
+                </div>
+              </div>
+              <div style="margin-bottom:16px">
+                <span style="font-size:32px;margin-right:8px">📱</span>
+                <div style="display:inline-block;vertical-align:middle">
+                  <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Telefoon:</div>
+                  <div style="font-size:16px;color:#111827;font-weight:500">${originalLead.telefoon || 'Niet opgegeven'}</div>
+                </div>
+              </div>
+              <div style="margin-bottom:16px">
+                <span style="font-size:32px;margin-right:8px">💡</span>
+                <div style="display:inline-block;vertical-align:middle">
+                  <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Bron:</div>
+                  <div style="font-size:16px;color:#111827;font-weight:500">Herhaal afspraak</div>
+                </div>
+              </div>
+              <div>
+                <span style="font-size:32px;margin-right:8px">🏢</span>
+                <div style="display:inline-block;vertical-align:middle">
+                  <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Praktijk:</div>
+                  <div style="font-size:16px;color:#111827;font-weight:500">${practiceInfo.naam}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px;border-radius:8px;margin:20px 0">
+              <p style="color:#92400e;font-size:14px;margin:0"><strong>ℹ️ Let op:</strong> Dit is een herhaal-afspraak van een eerdere no-show.</p>
+            </div>
+          </div>
+        </body>
+        </html>`;
+
+      await sendMailResilient({
+        from: SMTP.from,
+        to: practiceInfo.email_to,
+        subject: `🔄 Herhaal Afspraak - ${originalLead.volledige_naam} wil opnieuw langskomen`,
+        html: emailHtml
+      });
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Interesse Bevestigd</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+          .card { background: white; border-radius: 16px; padding: 40px; max-width: 400px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .icon { width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 40px; color: white; }
+          h1 { color: #111827; font-size: 24px; margin: 0 0 12px 0; }
+          p { color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">✓</div>
+          <h1>Bedankt voor je interesse!</h1>
+          <p>Wij hebben je verzoek ontvangen. <strong>${practiceInfo.naam}</strong> neemt zo spoedig mogelijk contact met je op om een nieuwe afspraak te plannen.</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+  } catch (error) {
+    console.error('Rebook error:', error);
+    res.status(500).send('Server error');
   }
 });
 
