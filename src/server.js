@@ -1437,12 +1437,8 @@ app.get('/api/check-reminders', async (req, res) => {
           AND l.appointment_time IS NOT NULL
           AND (l.reminder_sent IS NULL OR l.reminder_sent = FALSE)
           AND l.status = 'Afspraak Gepland'
-          AND (l.appointment_date::text || ' ' || l.appointment_time::text)::timestamp 
-              AT TIME ZONE 'Europe/Amsterdam' 
-              <= (NOW() AT TIME ZONE 'Europe/Amsterdam') + interval '1 hour'
-          AND (l.appointment_date::text || ' ' || l.appointment_time::text)::timestamp 
-              AT TIME ZONE 'Europe/Amsterdam' 
-              > (NOW() AT TIME ZONE 'Europe/Amsterdam')
+          AND (l.appointment_date + l.appointment_time) <= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::timestamp + interval '1 hour'
+          AND (l.appointment_date + l.appointment_time) > (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::timestamp
       `);
       return result.rows;
     });
