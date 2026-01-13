@@ -1413,13 +1413,6 @@ app.get('/api/sources', async (req, res) => {
 
 // 🆕 APPOINTMENT REMINDER SYSTEM
 
-// Helper: Generate secure action token
-function generateActionToken(appointmentId) {
-  const crypto = require('crypto');
-  const secret = process.env.ACTION_TOKEN_SECRET || 'default-secret-change-in-production';
-  return crypto.createHmac('sha256', secret).update(String(appointmentId)).digest('hex').substring(0, 16);
-}
-
 // Cron endpoint - called by EasyCron every 15 minutes
 app.get('/api/check-reminders', async (req, res) => {
   try {
@@ -1468,7 +1461,7 @@ app.get('/api/check-reminders', async (req, res) => {
         }).format(dateObj);
         const formattedTime = appt.appointment_time.substring(0, 5);
         
-        const actionToken = generateActionToken(appt.id);
+        const actionToken = generateActionToken(appt.id, appt.praktijk_code);
         const attendedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=attended&token=${actionToken}`;
         const missedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=missed&token=${actionToken}`;
 
@@ -1573,12 +1566,6 @@ app.get('/api/appointment-action', async (req, res) => {
       return res.status(400).send('Ongeldige parameters');
     }
 
-    // Validate token
-    const expectedToken = generateActionToken(id);
-    if (token !== expectedToken) {
-      return res.status(401).send('Ongeldige token');
-    }
-
     const appointment = await withReadConnection(async (client) => {
       const result = await client.query(`
         SELECT l.*, p.naam as praktijk_naam, p.email_to as praktijk_email
@@ -1588,6 +1575,16 @@ app.get('/api/appointment-action', async (req, res) => {
       `, [id]);
       return result.rows[0];
     });
+
+    if (!appointment) {
+      return res.status(404).send('Afspraak niet gevonden');
+    }
+
+    // Validate token with practice_code
+    const expectedToken = generateActionToken(id, appointment.praktijk_code);
+    if (token !== expectedToken) {
+      return res.status(401).send('Ongeldige token');
+    }
 
     if (!appointment) {
       return res.status(404).send('Afspraak niet gevonden');
@@ -1642,7 +1639,7 @@ app.get('/api/appointment-action', async (req, res) => {
 
       // Send no-show email to lead
       if (appointment.emailadres && SMTP.host) {
-        const rebookToken = generateActionToken(id + '-rebook');
+        const rebookToken = generateActionToken(id + '-rebook', appointment.praktijk_code);
         const rebookUrl = `https://dynamic-health-consultancy.nl/api/rebook?id=${id}&practice=${appointment.praktijk_code}&token=${rebookToken}`;
 
         const noShowHtml = `
@@ -1732,7 +1729,7 @@ app.get('/api/rebook', async (req, res) => {
     }
 
     // Validate token
-    const expectedToken = generateActionToken(id + '-rebook');
+    const expectedToken = generateActionToken(id + '-rebook', practice);
     if (token !== expectedToken) {
       return res.status(401).send('Ongeldige token');
     }
