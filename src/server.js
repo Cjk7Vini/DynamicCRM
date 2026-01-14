@@ -683,7 +683,10 @@ app.post('/api/confirm-appointment', async (req, res) => {
 
       await client.query(
         `UPDATE public.leads 
-         SET appointment_date = $1, appointment_time = $2, status = 'Afspraak Gepland'
+         SET appointment_date = $1, 
+             appointment_time = $2, 
+             appointment_datetime = timezone('Europe/Amsterdam', ($1::date + $2::time)::timestamp),
+             status = 'Afspraak Gepland'
          WHERE id = $3`,
         [date, time, lead_id]
       );
@@ -1425,20 +1428,18 @@ app.get('/api/check-reminders', async (req, res) => {
           l.volledige_naam, 
           l.emailadres, 
           l.telefoon,
-          l.appointment_date,
-          l.appointment_time,
+          l.appointment_datetime,
           l.reminder_sent,
           p.naam as praktijk_naam,
           p.email_to as praktijk_email,
           p.code as praktijk_code
         FROM public.leads l
         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
-        WHERE l.appointment_date IS NOT NULL
-          AND l.appointment_time IS NOT NULL
+        WHERE l.appointment_datetime IS NOT NULL
           AND (l.reminder_sent IS NULL OR l.reminder_sent = FALSE)
           AND l.status = 'Afspraak Gepland'
-          AND (l.appointment_date + l.appointment_time) <= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::timestamp + interval '1 hour'
-          AND (l.appointment_date + l.appointment_time) > (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::timestamp
+          AND l.appointment_datetime <= NOW() + interval '1 hour'
+          AND l.appointment_datetime > NOW()
       `);
       return result.rows;
     });
@@ -1447,23 +1448,23 @@ app.get('/api/check-reminders', async (req, res) => {
 
     for (const appt of appointments) {
       try {
-        // Parse appointment date/time safely
-        // Convert to string in case DB returns Date objects
-        const dateStr = String(appt.appointment_date).split('T')[0]; // YYYY-MM-DD
-        const timeStr = String(appt.appointment_time); // HH:MM:SS or HH:MM:SS+TZ
-        
-        // Create date object in local timezone
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const [hour, minute] = timeStr.split(':').map(Number);
-        const dateObj = new Date(year, month - 1, day, hour, minute);
+        // Use appointment_datetime directly (already a proper timestamp)
+        const dateObj = new Date(appt.appointment_datetime);
         
         const formattedDate = new Intl.DateTimeFormat('nl-NL', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
-          day: 'numeric'
+          day: 'numeric',
+          timeZone: 'Europe/Amsterdam'
         }).format(dateObj);
-        const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        
+        const formattedTime = new Intl.DateTimeFormat('nl-NL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Amsterdam'
+        }).format(dateObj);
+        
         
         const actionToken = generateActionToken(appt.id, appt.praktijk_code);
         const attendedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=attended&token=${actionToken}`;
