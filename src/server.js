@@ -1447,15 +1447,22 @@ app.get('/api/check-reminders', async (req, res) => {
 
     for (const appt of appointments) {
       try {
-        const appointmentDateTime = `${appt.appointment_date}T${appt.appointment_time}`;
-        const dateObj = new Date(appointmentDateTime);
+        // Parse appointment date/time safely
+        const dateStr = appt.appointment_date; // YYYY-MM-DD
+        const timeStr = appt.appointment_time; // HH:MM:SS
+        
+        // Create date object in local timezone
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const [hour, minute] = timeStr.split(':').map(Number);
+        const dateObj = new Date(year, month - 1, day, hour, minute);
+        
         const formattedDate = new Intl.DateTimeFormat('nl-NL', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric'
         }).format(dateObj);
-        const formattedTime = appt.appointment_time.substring(0, 5);
+        const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
         
         const actionToken = generateActionToken(appt.id, appt.praktijk_code);
         const attendedUrl = `https://dynamic-health-consultancy.nl/api/appointment-action?id=${appt.id}&action=attended&token=${actionToken}`;
