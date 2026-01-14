@@ -1788,9 +1788,9 @@ app.get('/api/rebook', async (req, res) => {
     });
 
     if (practiceInfo && practiceInfo.email_to && SMTP.host) {
-      // Generate appointment link for practice
+      // Generate appointment link for practice (same as normal lead notifications)
       const appointmentToken = generateActionToken(newLead.id, practice);
-      const appointmentUrl = `https://dynamic-health-consultancy.nl/appointment-form?lead_id=${newLead.id}&practice_code=${practice}&token=${appointmentToken}`;
+      const appointmentUrl = `https://dynamic-health-consultancy.nl/appointment-form.html?lead_id=${newLead.id}&practice_code=${practice}&token=${appointmentToken}`;
       
       // Use existing lead notification email template
       const emailHtml = `
