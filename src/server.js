@@ -38,7 +38,7 @@ function formatAms(ts) {
 /** Action-token helpers (basic) */
 function generateActionToken(leadId, practiceCode) {
   const secret = process.env.ACTION_TOKEN_SECRET || 'your-secret-key-change-this';
-  const data = `${leadId}-${practiceCode}-${Date.now()}`;
+  const data = `${leadId}-${practiceCode}`;
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
 function validateActionToken(token) {
@@ -848,7 +848,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
               <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
                 <tr>
                   <td>
-                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak Bevestiging</h1>
+                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak bevestiging</h1>
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
                       Beste,
                     </p>
@@ -1484,7 +1484,7 @@ app.get('/api/check-reminders', async (req, res) => {
                       <p style="color:#92400e;font-size:16px;margin:0;font-weight:600">⏰ Afspraak over 1 uur!</p>
                     </div>
                     
-                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak Herinnering</h1>
+                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak herinnering</h1>
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
                       Beste,
                     </p>
