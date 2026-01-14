@@ -1448,8 +1448,9 @@ app.get('/api/check-reminders', async (req, res) => {
     for (const appt of appointments) {
       try {
         // Parse appointment date/time safely
-        const dateStr = appt.appointment_date; // YYYY-MM-DD
-        const timeStr = appt.appointment_time; // HH:MM:SS
+        // Convert to string in case DB returns Date objects
+        const dateStr = String(appt.appointment_date).split('T')[0]; // YYYY-MM-DD
+        const timeStr = String(appt.appointment_time); // HH:MM:SS or HH:MM:SS+TZ
         
         // Create date object in local timezone
         const [year, month, day] = dateStr.split('-').map(Number);
