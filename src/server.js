@@ -1647,6 +1647,21 @@ app.get('/api/appointment-action', async (req, res) => {
         const rebookToken = generateActionToken(id + '-rebook', appointment.praktijk_code);
         const rebookUrl = `https://dynamic-health-consultancy.nl/api/rebook?id=${id}&practice=${appointment.praktijk_code}&token=${rebookToken}`;
 
+        // Format appointment datetime properly
+        const apptDate = new Date(appointment.appointment_datetime);
+        const formattedApptDate = new Intl.DateTimeFormat('nl-NL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timeZone: 'Europe/Amsterdam'
+        }).format(apptDate);
+        const formattedApptTime = new Intl.DateTimeFormat('nl-NL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Amsterdam'
+        }).format(apptDate);
+
         const noShowHtml = `
           <!DOCTYPE html>
           <html>
@@ -1655,12 +1670,12 @@ app.get('/api/appointment-action', async (req, res) => {
             <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
               <tr>
                 <td>
-                  <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Gemiste Afspraak</h1>
+                  <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Gemiste afspraak</h1>
                   <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
                     Beste ${appointment.volledige_naam},
                   </p>
                   <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
-                    Wij hadden jou verwacht op <strong>${appointment.appointment_date} om ${appointment.appointment_time}</strong> bij <strong>${appointment.praktijk_naam}</strong> voor een intake.
+                    Wij hadden jou verwacht op <strong>${formattedApptDate} om ${formattedApptTime}</strong> bij <strong>${appointment.praktijk_naam}</strong> voor een intake.
                   </p>
                   <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
                     Indien u nog interesse heeft, kunt u een nieuwe afspraak maken voor een intake.
@@ -1773,6 +1788,10 @@ app.get('/api/rebook', async (req, res) => {
     });
 
     if (practiceInfo && practiceInfo.email_to && SMTP.host) {
+      // Generate appointment link for practice
+      const appointmentToken = generateActionToken(newLead.id, practice);
+      const appointmentUrl = `https://dynamic-health-consultancy.nl/appointment-form?lead_id=${newLead.id}&practice_code=${practice}&token=${appointmentToken}`;
+      
       // Use existing lead notification email template
       const emailHtml = `
         <!DOCTYPE html>
@@ -1827,6 +1846,12 @@ app.get('/api/rebook', async (req, res) => {
 
             <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px;border-radius:8px;margin:20px 0">
               <p style="color:#92400e;font-size:14px;margin:0"><strong>ℹ️ Let op:</strong> Dit is een herhaal-afspraak van een eerdere no-show.</p>
+            </div>
+
+            <div style="text-align:center;margin:30px 0">
+              <a href="${appointmentUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px">
+                📅 Afspraak Inplannen
+              </a>
             </div>
           </div>
         </body>
