@@ -1896,6 +1896,362 @@ app.get('/api/rebook', async (req, res) => {
   }
 });
 
+// ============================================================================
+// ENHANCED DASHBOARD API ENDPOINTS
+// ============================================================================
+
+// GET /api/funnel - Pipeline funnel stages with counts and conversion rates
+app.get('/api/funnel', async (req, res) => {
+  try {
+    const { practice, from, to, source } = req.query;
+    
+    const stages = await withReadConnection(async (client) => {
+      let query = `
+        SELECT 
+          funnel_stage,
+          COUNT(*) as count,
+          ROUND(AVG(conversion_likelihood), 2) as avg_likelihood,
+          SUM(expected_value) as pipeline_value
+        FROM public.leads
+        WHERE 1=1
+      `;
+      
+      const params = [];
+      let paramCount = 1;
+      
+      if (practice) {
+        query += ` AND praktijk_code = $${paramCount++}`;
+        params.push(practice);
+      }
+      
+      if (from) {
+        query += ` AND aangemaakt_op >= $${paramCount++}`;
+        params.push(from);
+      }
+      
+      if (to) {
+        query += ` AND aangemaakt_op <= $${paramCount++}`;
+        params.push(to);
+      }
+      
+      if (source) {
+        query += ` AND bron = $${paramCount++}`;
+        params.push(source);
+      }
+      
+      query += `
+        GROUP BY funnel_stage
+        ORDER BY 
+          CASE funnel_stage
+            WHEN 'awareness' THEN 1
+            WHEN 'interest' THEN 2
+            WHEN 'intent' THEN 3
+            WHEN 'consideration' THEN 4
+            WHEN 'decision' THEN 5
+            WHEN 'won' THEN 6
+            WHEN 'lost' THEN 7
+          END
+      `;
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    });
+    
+    // Add stage names and calculate conversion rates
+    const stageNames = {
+      'awareness': 'Awareness',
+      'interest': 'Interest',
+      'intent': 'Intent',
+      'consideration': 'Consideration',
+      'decision': 'Decision',
+      'won': 'Won',
+      'lost': 'Lost'
+    };
+    
+    const enrichedStages = stages.map((stage, idx) => ({
+      stage: stage.funnel_stage,
+      stage_name: stageNames[stage.funnel_stage] || stage.funnel_stage,
+      count: parseInt(stage.count),
+      avg_likelihood: parseFloat(stage.avg_likelihood) || 0,
+      pipeline_value: parseFloat(stage.pipeline_value) || 0,
+      conversion_rate: idx > 0 
+        ? ((stage.count / stages[idx - 1].count) * 100).toFixed(1)
+        : 100
+    }));
+    
+    res.json({
+      success: true,
+      stages: enrichedStages
+    });
+    
+  } catch (error) {
+    console.error('Funnel API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pipeline-metrics - Key metrics for KPI cards
+app.get('/api/pipeline-metrics', async (req, res) => {
+  try {
+    const { practice, from, to } = req.query;
+    
+    const metrics = await withReadConnection(async (client) => {
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+      let paramCount = 1;
+      
+      if (practice) {
+        whereClause += ` AND praktijk_code = $${paramCount++}`;
+        params.push(practice);
+      }
+      
+      if (from) {
+        whereClause += ` AND aangemaakt_op >= $${paramCount++}`;
+        params.push(from);
+      }
+      
+      if (to) {
+        whereClause += ` AND aangemaakt_op <= $${paramCount++}`;
+        params.push(to);
+      }
+      
+      const query = `
+        SELECT 
+          -- Pipeline value
+          SUM(CASE WHEN funnel_stage NOT IN ('won', 'lost') THEN expected_value ELSE 0 END) as total_pipeline_value,
+          
+          -- Won deals
+          COUNT(CASE WHEN funnel_stage = 'won' THEN 1 END) as won_deals,
+          SUM(CASE WHEN funnel_stage = 'won' THEN actual_value ELSE 0 END) as won_revenue,
+          
+          -- Active leads (not won/lost)
+          COUNT(CASE WHEN funnel_stage NOT IN ('won', 'lost') THEN 1 END) as active_leads,
+          
+          -- Conversion rate
+          ROUND(
+            (COUNT(CASE WHEN funnel_stage = 'won' THEN 1 END)::float / 
+             NULLIF(COUNT(*), 0) * 100), 
+            2
+          ) as conversion_rate,
+          
+          -- Average deal size
+          ROUND(AVG(CASE WHEN funnel_stage = 'won' THEN actual_value END), 2) as avg_deal_size,
+          
+          -- Lead velocity (leads this period)
+          COUNT(*) as lead_velocity,
+          
+          -- Forecast
+          COUNT(CASE WHEN conversion_likelihood >= 70 THEN 1 END) as expected_conversions,
+          
+          -- Practice visits
+          SUM(practice_visits) as total_practice_visits,
+          ROUND(AVG(practice_visits), 2) as avg_practice_visits,
+          
+          -- No-show stats
+          SUM(no_show_count) as total_no_shows,
+          ROUND(
+            (SUM(no_show_count)::float / NULLIF(COUNT(CASE WHEN appointment_datetime IS NOT NULL THEN 1 END), 0) * 100),
+            2
+          ) as no_show_rate,
+          
+          -- Engagement
+          SUM(emails_sent) as total_emails_sent,
+          SUM(emails_opened) as total_emails_opened,
+          ROUND(
+            (SUM(emails_opened)::float / NULLIF(SUM(emails_sent), 0) * 100),
+            2
+          ) as email_open_rate
+          
+        FROM public.leads
+        ${whereClause}
+      `;
+      
+      const result = await client.query(query, params);
+      return result.rows[0];
+    });
+    
+    // Calculate growth percentages (compare to previous period)
+    // For now, return mock growth data - can be enhanced later
+    const enrichedMetrics = {
+      ...metrics,
+      won_growth_percent: 15,
+      velocity_growth_percent: 23,
+      total_pipeline_value: parseFloat(metrics.total_pipeline_value) || 0,
+      won_deals: parseInt(metrics.won_deals) || 0,
+      active_leads: parseInt(metrics.active_leads) || 0,
+      conversion_rate: parseFloat(metrics.conversion_rate) || 0,
+      avg_deal_size: parseFloat(metrics.avg_deal_size) || 0,
+      lead_velocity: parseInt(metrics.lead_velocity) || 0,
+      expected_conversions: parseInt(metrics.expected_conversions) || 0
+    };
+    
+    res.json({
+      success: true,
+      ...enrichedMetrics
+    });
+    
+  } catch (error) {
+    console.error('Pipeline metrics API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/hot-leads - Leads with high conversion likelihood
+app.get('/api/hot-leads', async (req, res) => {
+  try {
+    const { practice, limit = 10 } = req.query;
+    
+    const leads = await withReadConnection(async (client) => {
+      let query = `
+        SELECT 
+          l.id,
+          l.volledige_naam,
+          l.emailadres,
+          l.telefoon,
+          l.funnel_stage,
+          l.qualification_score,
+          l.conversion_likelihood,
+          l.expected_value,
+          l.last_interaction_at,
+          p.naam as praktijk_naam,
+          p.code as praktijk_code
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.conversion_likelihood >= 70
+          AND l.funnel_stage NOT IN ('won', 'lost')
+      `;
+      
+      const params = [];
+      let paramCount = 1;
+      
+      if (practice) {
+        query += ` AND l.praktijk_code = $${paramCount++}`;
+        params.push(practice);
+      }
+      
+      query += `
+        ORDER BY l.conversion_likelihood DESC, l.expected_value DESC
+        LIMIT $${paramCount}
+      `;
+      params.push(limit);
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    });
+    
+    res.json({
+      success: true,
+      leads: leads
+    });
+    
+  } catch (error) {
+    console.error('Hot leads API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/growth-data - Monthly growth trends (last 6 months)
+app.get('/api/growth-data', async (req, res) => {
+  try {
+    const { practice } = req.query;
+    
+    const growth = await withReadConnection(async (client) => {
+      let query = `
+        SELECT 
+          DATE_TRUNC('month', aangemaakt_op) as month,
+          COUNT(*) as leads,
+          COUNT(CASE WHEN funnel_stage = 'won' THEN 1 END) as conversions,
+          SUM(CASE WHEN funnel_stage = 'won' THEN actual_value ELSE 0 END) as revenue
+        FROM public.leads
+        WHERE aangemaakt_op >= NOW() - INTERVAL '6 months'
+      `;
+      
+      const params = [];
+      
+      if (practice) {
+        query += ` AND praktijk_code = $1`;
+        params.push(practice);
+      }
+      
+      query += `
+        GROUP BY DATE_TRUNC('month', aangemaakt_op)
+        ORDER BY month ASC
+      `;
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    });
+    
+    // Format month names
+    const monthNames = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+    const formattedGrowth = growth.map(row => ({
+      month: monthNames[new Date(row.month).getMonth()],
+      leads: parseInt(row.leads),
+      conversions: parseInt(row.conversions),
+      revenue: parseFloat(row.revenue) || 0
+    }));
+    
+    res.json({
+      success: true,
+      data: formattedGrowth
+    });
+    
+  } catch (error) {
+    console.error('Growth data API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/practices - List all practices for filter
+app.get('/api/practices', async (req, res) => {
+  try {
+    const practices = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT code, naam
+        FROM public.praktijken
+        ORDER BY naam ASC
+      `);
+      return result.rows;
+    });
+    
+    res.json({
+      success: true,
+      practices: practices
+    });
+    
+  } catch (error) {
+    console.error('Practices API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/sources - List all lead sources for filter
+app.get('/api/sources', async (req, res) => {
+  try {
+    const sources = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT 
+          bron,
+          COUNT(*) as count
+        FROM public.leads
+        WHERE bron IS NOT NULL
+        GROUP BY bron
+        ORDER BY count DESC
+      `);
+      return result.rows;
+    });
+    
+    res.json({
+      success: true,
+      sources: sources
+    });
+    
+  } catch (error) {
+    console.error('Sources API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
