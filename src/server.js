@@ -2030,7 +2030,7 @@ app.get('/api/pipeline-metrics', async (req, res) => {
           -- Conversion rate
           ROUND(
             (COUNT(CASE WHEN funnel_stage = 'won' THEN 1 END)::float / 
-             NULLIF(COUNT(*), 0) * 100), 
+             NULLIF(COUNT(*), 0) * 100)::numeric, 
             2
           ) as conversion_rate,
           
@@ -2050,7 +2050,7 @@ app.get('/api/pipeline-metrics', async (req, res) => {
           -- No-show stats
           SUM(no_show_count) as total_no_shows,
           ROUND(
-            (SUM(no_show_count)::float / NULLIF(COUNT(CASE WHEN appointment_datetime IS NOT NULL THEN 1 END), 0) * 100),
+            (SUM(no_show_count)::float / NULLIF(COUNT(CASE WHEN appointment_datetime IS NOT NULL THEN 1 END), 0) * 100)::numeric,
             2
           ) as no_show_rate,
           
@@ -2058,7 +2058,7 @@ app.get('/api/pipeline-metrics', async (req, res) => {
           SUM(emails_sent) as total_emails_sent,
           SUM(emails_opened) as total_emails_opened,
           ROUND(
-            (SUM(emails_opened)::float / NULLIF(SUM(emails_sent), 0) * 100),
+            (SUM(emails_opened)::float / NULLIF(SUM(emails_sent), 0) * 100)::numeric,
             2
           ) as email_open_rate
           
