@@ -275,6 +275,89 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Pipeline Funnel Styles */
+        .funnel-stage {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+
+        .funnel-bar {
+            flex: 1;
+            height: 50px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .funnel-bar:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .funnel-bar.awareness { background: #3b82f6; }
+        .funnel-bar.interest { background: #06b6d4; }
+        .funnel-bar.intent { background: #10b981; }
+        .funnel-bar.consideration { background: #f59e0b; }
+        .funnel-bar.decision { background: #ef4444; }
+        .funnel-bar.won { background: #22c55e; }
+
+        .funnel-count {
+            margin-left: auto;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .funnel-stats {
+            min-width: 120px;
+            text-align: right;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .conversion-rate {
+            display: block;
+            font-weight: 600;
+            color: #10b981;
+            margin-top: 4px;
+        }
+
+        /* Hot Leads List */
+        .hot-lead-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 3px solid #ef4444;
+        }
+
+        .hot-lead-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .hot-lead-meta {
+            font-size: 12px;
+            color: #64748b;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .hot-lead-likelihood {
+            color: #ef4444;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -418,6 +501,54 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ENHANCED: Pipeline Funnel Section -->
+            <div class="chart-container" style="grid-column: 1 / -1; margin-top: 20px;">
+                <div class="chart-title">Sales Pipeline - Lead Lifecycle</div>
+                <div class="chart-subtitle">Van awareness tot conversie - zie waar leads uitvallen</div>
+                
+                <div id="pipelineFunnelContainer" style="padding: 20px 0;">
+                    <div class="loading">Data laden...</div>
+                </div>
+            </div>
+
+            <!-- ENHANCED: Forecast vs Actual -->
+            <div class="charts-grid" style="margin-top: 20px;">
+                <div class="chart-container">
+                    <div class="chart-title">Forecast vs Actueel</div>
+                    <div class="chart-subtitle">Verwachte vs werkelijke conversies</div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                        <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border: 2px solid #93c5fd;">
+                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">VERWACHT</div>
+                            <div id="forecastExpected" style="font-size: 32px; font-weight: 700; color: #2563eb;">-</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Op basis van likelihood</div>
+                        </div>
+                        
+                        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border: 2px solid #86efac;">
+                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">ACTUEEL</div>
+                            <div id="forecastActual" style="font-size: 32px; font-weight: 700; color: #10b981;">-</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Daadwerkelijk gewonnen</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; text-align: center; margin-top: 16px;">
+                        <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 4px;">GAP ANALYSE</div>
+                        <div id="gapValue" style="font-size: 24px; font-weight: 700; color: #92400e;">-</div>
+                        <div id="gapDescription" style="font-size: 12px; color: #78350f; margin-top: 4px;">-</div>
+                    </div>
+                </div>
+
+                <!-- Hot Leads -->
+                <div class="chart-container">
+                    <div class="chart-title">Hot Leads</div>
+                    <div class="chart-subtitle">Hoge conversiekans (70%+)</div>
+                    
+                    <div id="hotLeadsList" style="margin-top: 16px;">
+                        <div class="loading">Data laden...</div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -433,6 +564,11 @@
             await loadConversionFunnel();
             await loadPracticePerformance();
             await loadSourcePerformance();
+            
+            // NEW: Enhanced dashboard features
+            await loadPipelineFunnel();
+            await loadForecastComparison();
+            await loadHotLeads();
         }
 
         // Load practices for dropdown
@@ -811,6 +947,120 @@
             } catch (error) {
                 console.error('Export error:', error);
                 alert('❌ Fout bij exporteren: ' + error.message);
+            }
+        }
+
+        // NEW: Load Pipeline Funnel
+        async function loadPipelineFunnel() {
+            try {
+                const res = await fetch('/api/funnel' + buildQueryString());
+                const data = await res.json();
+                
+                if (!data.success || !data.stages) {
+                    document.getElementById('pipelineFunnelContainer').innerHTML = 
+                        '<div style="text-align:center;color:#86868b;padding:20px;">Geen data beschikbaar</div>';
+                    return;
+                }
+                
+                const stages = data.stages;
+                const total = stages[0]?.count || 1;
+                
+                let html = '';
+                stages.forEach((stage, idx) => {
+                    const percentage = (stage.count / total * 100).toFixed(1);
+                    const convRate = idx > 0 ? stage.conversion_rate : '100.0';
+                    
+                    html += `
+                        <div class="funnel-stage">
+                            <div class="funnel-bar ${stage.stage}" style="width: ${percentage}%">
+                                <span>${stage.stage_name}</span>
+                                <span class="funnel-count">${stage.count}</span>
+                            </div>
+                            <div class="funnel-stats">
+                                <div>${percentage}% of total</div>
+                                ${idx > 0 ? `<span class="conversion-rate">${convRate}% conversion</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('pipelineFunnelContainer').innerHTML = html;
+            } catch (error) {
+                console.error('Pipeline funnel error:', error);
+                document.getElementById('pipelineFunnelContainer').innerHTML = 
+                    '<div style="text-align:center;color:#c62828;padding:20px;">Error loading funnel</div>';
+            }
+        }
+
+        // NEW: Load Forecast Comparison
+        async function loadForecastComparison() {
+            try {
+                const res = await fetch('/api/pipeline-metrics' + buildQueryString());
+                const data = await res.json();
+                
+                if (!data.success) return;
+                
+                const expected = data.expected_conversions || 0;
+                const actual = data.won_deals || 0;
+                const gap = actual - expected;
+                const gapPercent = expected > 0 ? ((gap / expected) * 100).toFixed(1) : 0;
+                
+                document.getElementById('forecastExpected').textContent = expected;
+                document.getElementById('forecastActual').textContent = actual;
+                document.getElementById('gapValue').textContent = 
+                    `${gap >= 0 ? '+' : ''}${gap} (${gapPercent}%)`;
+                
+                const gapDesc = document.getElementById('gapDescription');
+                if (gap >= 0) {
+                    gapDesc.textContent = 'Boven forecast - excellent performance';
+                    gapDesc.style.color = '#10b981';
+                } else if (gap > -3) {
+                    gapDesc.textContent = 'Licht onder forecast - nog bij te halen';
+                    gapDesc.style.color = '#f59e0b';
+                } else {
+                    gapDesc.textContent = 'Onder forecast - actie vereist';
+                    gapDesc.style.color = '#ef4444';
+                }
+            } catch (error) {
+                console.error('Forecast comparison error:', error);
+            }
+        }
+
+        // NEW: Load Hot Leads
+        async function loadHotLeads() {
+            try {
+                const practice = document.getElementById('practiceFilter').value;
+                const url = `/api/hot-leads?limit=5${practice ? '&practice=' + practice : ''}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                const container = document.getElementById('hotLeadsList');
+                
+                if (!data.success || !data.leads || data.leads.length === 0) {
+                    container.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:12px;">Geen hot leads</div>';
+                    return;
+                }
+                
+                let html = '';
+                data.leads.forEach(lead => {
+                    html += `
+                        <div class="hot-lead-item">
+                            <div class="hot-lead-name">${lead.volledige_naam}</div>
+                            <div class="hot-lead-meta">
+                                <span>${lead.praktijk_naam || 'Geen praktijk'}</span>
+                                <span>${lead.funnel_stage}</span>
+                                <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
+                                <span>€${(lead.expected_value || 0).toFixed(0)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Hot leads error:', error);
+                document.getElementById('hotLeadsList').innerHTML = 
+                    '<div style="text-align:center;color:#c62828;padding:20px;font-size:12px;">Error loading hot leads</div>';
             }
         }
 
