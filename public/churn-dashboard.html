@@ -689,7 +689,7 @@
         // Load Conversion Funnel
         async function loadConversionFunnel() {
             try {
-                const res = await fetch('/api/funnel' + buildQueryString());
+                const res = await fetch('/api/conversion-funnel' + buildQueryString());
                 const data = await res.json();
                 
                 if (data.success && data.data) {

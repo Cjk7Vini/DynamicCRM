@@ -1290,8 +1290,8 @@ app.get('/api/churn-forecast', async (_req, res) => {
   }
 });
 
-// GET /api/funnel - Conversie funnel data
-app.get('/api/funnel', async (req, res) => {
+// GET /api/conversion-funnel - Conversie funnel data (OLD)
+app.get('/api/conversion-funnel', async (req, res) => {
   try {
     const { practice, dateFrom, dateTo, source, status } = req.query;
     
@@ -2035,7 +2035,7 @@ app.get('/api/pipeline-metrics', async (req, res) => {
           ) as conversion_rate,
           
           -- Average deal size
-          ROUND(AVG(CASE WHEN funnel_stage = 'won' THEN actual_value END), 2) as avg_deal_size,
+          ROUND(AVG(CASE WHEN funnel_stage = 'won' THEN actual_value END)::numeric, 2) as avg_deal_size,
           
           -- Lead velocity (leads this period)
           COUNT(*) as lead_velocity,
@@ -2045,7 +2045,7 @@ app.get('/api/pipeline-metrics', async (req, res) => {
           
           -- Practice visits
           SUM(practice_visits) as total_practice_visits,
-          ROUND(AVG(practice_visits), 2) as avg_practice_visits,
+          ROUND(AVG(practice_visits)::numeric, 2) as avg_practice_visits,
           
           -- No-show stats
           SUM(no_show_count) as total_no_shows,
