@@ -1050,7 +1050,7 @@
                                 <span>${lead.praktijk_naam || 'Geen praktijk'}</span>
                                 <span>${lead.funnel_stage}</span>
                                 <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
-                                <span>€${(lead.expected_value || 0).toFixed(0)}</span>
+                                <span>€${parseFloat(lead.expected_value || 0).toFixed(0)}</span>
                             </div>
                         </div>
                     `;
