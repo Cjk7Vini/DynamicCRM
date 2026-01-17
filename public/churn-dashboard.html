@@ -845,6 +845,13 @@
         function applyFilters() {
             loadKPIs();
             loadConversionFunnel();
+            loadPracticePerformance();
+            loadSourcePerformance();
+            
+            // NEW: Also reload enhanced sections
+            loadPipelineFunnel();
+            loadForecastComparison();
+            loadHotLeads();
         }
 
         // Refresh all data
