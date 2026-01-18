@@ -16,6 +16,7 @@ import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
+import pgSession from 'connect-pg-simple';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
@@ -104,8 +105,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Session middleware for authentication
+// Session middleware for authentication with PostgreSQL store
+const PgStore = pgSession(session);
+
 app.use(session({
+  store: new PgStore({
+    conString: process.env.PG_WRITE_URL,
+    tableName: 'sessions', // Will use existing sessions table
+    createTableIfMissing: false // We already created the table
+  }),
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-ASAP',
   resave: false,
   saveUninitialized: false,
@@ -114,7 +122,6 @@ app.use(session({
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax', // Allow cookies on same-site navigation
-    domain: '.dynamic-health-consultancy.nl' // Share across subdomains
   },
   proxy: true // Trust Render proxy
 }));
