@@ -60,6 +60,55 @@
             align-items: center; 
         }
         
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: #f5f5f7;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .user-icon {
+            width: 32px;
+            height: 32px;
+            background: #06c;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .user-email {
+            color: #1d1d1f;
+            font-weight: 500;
+        }
+        
+        .user-role {
+            color: #86868b;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .btn-logout {
+            padding: 8px 16px;
+            background: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-logout:hover {
+            background: #ff453a;
+        }
+        
         .btn {
             padding: 8px 16px;
             border-radius: 8px;
@@ -373,8 +422,16 @@
             <div class="header-title">Churn & Conversie Analytics</div>
         </div>
         <div class="header-right">
+            <div class="user-info" id="userInfo" style="display: none;">
+                <div class="user-icon" id="userIcon">A</div>
+                <div>
+                    <div class="user-email" id="userEmail">Loading...</div>
+                    <div class="user-role" id="userRole">...</div>
+                </div>
+            </div>
             <button class="btn btn-secondary" onclick="exportToExcel()" style="margin-right: 12px;">📊 Export Rapportage</button>
             <button class="btn btn-primary" onclick="refreshData()">↻ Vernieuwen</button>
+            <button class="btn-logout" onclick="logout()">Uitloggen</button>
         </div>
     </div>
 
@@ -553,11 +610,86 @@
     </div>
 
     <script>
+        // User session state
+        let currentUser = null;
+        
         // Chart instances
         let churnForecastChart, conversionFunnelChart, practiceChart, sourceChart;
 
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'include' });
+                if (!res.ok) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                currentUser = await res.json();
+                updateUserUI();
+                return true;
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Update user info in header
+        function updateUserUI() {
+            if (!currentUser) return;
+            
+            const userInfo = document.getElementById('userInfo');
+            const userIcon = document.getElementById('userIcon');
+            const userEmail = document.getElementById('userEmail');
+            const userRole = document.getElementById('userRole');
+            
+            // Show user info
+            userInfo.style.display = 'flex';
+            
+            // Set user icon (first letter of email)
+            userIcon.textContent = currentUser.email.charAt(0).toUpperCase();
+            
+            // Set email and role
+            userEmail.textContent = currentUser.email;
+            userRole.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Praktijk';
+            
+            // If practice user, hide admin-only features
+            if (currentUser.role === 'practice') {
+                hideAdminFeatures();
+            }
+        }
+
+        // Hide admin-only features for practice users
+        function hideAdminFeatures() {
+            // Hide practice filter (can only see own data)
+            const practiceFilter = document.getElementById('practiceFilter');
+            if (practiceFilter && practiceFilter.parentElement) {
+                practiceFilter.parentElement.parentElement.style.display = 'none';
+            }
+            
+            // Hide export button (optional - remove if practices should export too)
+            // document.querySelector('[onclick="exportToExcel()"]').style.display = 'none';
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { 
+                    method: 'POST',
+                    credentials: 'include' 
+                });
+            } catch (err) {
+                console.error('Logout failed:', err);
+            }
+            window.location.href = '/login.html';
+        }
+
         // Initialize dashboard
         async function init() {
+            // Check auth first
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+            
             await loadPractices();
             await loadKPIs();
             await loadChurnForecast();
@@ -829,8 +961,14 @@
         function buildQueryString() {
             const params = new URLSearchParams();
             
-            const practice = document.getElementById('practiceFilter').value;
-            if (practice) params.append('practice', practice);
+            // If practice user, force their practice code
+            if (currentUser && currentUser.role === 'practice' && currentUser.practice_code) {
+                params.append('practice', currentUser.practice_code);
+            } else {
+                // Admin can filter by practice
+                const practice = document.getElementById('practiceFilter').value;
+                if (practice) params.append('practice', practice);
+            }
             
             const source = document.getElementById('sourceFilter').value;
             if (source) params.append('source', source);
