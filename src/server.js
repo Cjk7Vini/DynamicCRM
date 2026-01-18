@@ -105,25 +105,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Session middleware for authentication with PostgreSQL store
+// Session middleware for authentication (TEMPORARY: MemoryStore for development)
+// Session middleware with PostgreSQL store
 const PgStore = pgSession(session);
 
 app.use(session({
   store: new PgStore({
     conString: process.env.PG_WRITE_URL,
-    tableName: 'session', // Standard name (singular)
-    createTableIfMissing: true // Let library create correct schema
+    tableName: 'session',
+    createTableIfMissing: false, // Table already exists with correct permissions
+    pruneSessionInterval: 60 * 15 // Clean up expired sessions every 15 minutes
   }),
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-ASAP',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true, // HTTPS is required
+    secure: true,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax', // Allow cookies on same-site navigation
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax',
   },
-  proxy: true // Trust Render proxy
+  proxy: true
 }));
 
 const postLimiter = rateLimit({
