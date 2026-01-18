@@ -14,6 +14,8 @@ import Joi from 'joi';
 import nodemailer from 'nodemailer';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
+import session from 'express-session';
 import { withReadConnection, withWriteConnection } from './db.js';
 
 const app = express();
@@ -101,6 +103,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+
+// Session middleware for authentication
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-ASAP',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 const postLimiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000),
@@ -2249,6 +2263,140 @@ app.get('/api/sources', async (req, res) => {
   } catch (error) {
     console.error('Sources API error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// AUTHENTICATION MIDDLEWARE
+// ============================================================================
+
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: 'Niet ingelogd' });
+  }
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.session || req.session.role !== 'admin') {
+    return res.status(403).json({ error: 'Alleen voor admins' });
+  }
+  next();
+}
+
+function checkPracticeAccess(req, res, next) {
+  const requestedPractice = req.query.practice || req.body.practice;
+  
+  if (req.session.role === 'admin') {
+    return next();
+  }
+  
+  if (req.session.role === 'practice') {
+    if (requestedPractice && requestedPractice !== req.session.practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+    req.query.practice = req.session.practiceCode;
+    req.body.practice = req.session.practiceCode;
+  }
+  
+  next();
+}
+
+// ============================================================================
+// AUTH ENDPOINTS
+// ============================================================================
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email en wachtwoord verplicht' });
+    }
+    
+    const user = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT * FROM public.users WHERE email = $1 AND active = TRUE',
+        [email.toLowerCase()]
+      );
+      return result.rows[0];
+    });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Onjuiste inloggegevens' });
+    }
+    
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Onjuiste inloggegevens' });
+    }
+    
+    req.session.userId = user.id;
+    req.session.email = user.email;
+    req.session.role = user.role;
+    req.session.practiceCode = user.practice_code;
+    
+    await withWriteConnection(async (client) => {
+      await client.query(
+        'UPDATE public.users SET last_login_at = NOW() WHERE id = $1',
+        [user.id]
+      );
+    });
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        practiceCode: user.practice_code
+      }
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login mislukt' });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) console.error('Logout error:', err);
+    res.clearCookie('connect.sid');
+    res.json({ success: true });
+  });
+});
+
+// Get current user
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const user = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT id, email, role, practice_code FROM public.users WHERE id = $1',
+        [req.session.userId]
+      );
+      return result.rows[0];
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        practiceCode: user.practice_code
+      }
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Fout bij ophalen gebruiker' });
   }
 });
 
