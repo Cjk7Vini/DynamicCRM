@@ -110,10 +110,13 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: true, // HTTPS is required
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax', // Allow cookies on same-site navigation
+    domain: '.dynamic-health-consultancy.nl' // Share across subdomains
+  },
+  proxy: true // Trust Render proxy
 }));
 
 const postLimiter = rateLimit({
@@ -2263,6 +2266,12 @@ app.get('/api/sources', async (req, res) => {
 // ============================================================================
 
 function requireAuth(req, res, next) {
+  console.log('🔐 Auth check:', {
+    hasSession: !!req.session,
+    userId: req.session?.userId,
+    sessionID: req.sessionID
+  });
+  
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ error: 'Niet ingelogd' });
   }
@@ -2330,21 +2339,30 @@ app.post('/api/auth/login', async (req, res) => {
     req.session.role = user.role;
     req.session.practiceCode = user.practice_code;
     
-    await withWriteConnection(async (client) => {
-      await client.query(
-        'UPDATE public.users SET last_login_at = NOW() WHERE id = $1',
-        [user.id]
-      );
-    });
-    
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        practiceCode: user.practice_code
+    // Force session save before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Session opslaan mislukt' });
       }
+      
+      // Update last login
+      withWriteConnection(async (client) => {
+        await client.query(
+          'UPDATE public.users SET last_login_at = NOW() WHERE id = $1',
+          [user.id]
+        );
+      }).catch(console.error);
+      
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          practiceCode: user.practice_code
+        }
+      });
     });
     
   } catch (error) {
