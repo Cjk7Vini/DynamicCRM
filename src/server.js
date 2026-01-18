@@ -2410,7 +2410,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
-        practiceCode: user.practice_code
+        practice_code: user.practice_code
       }
     });
   } catch (error) {
