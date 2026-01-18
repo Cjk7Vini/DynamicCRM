@@ -111,8 +111,8 @@ const PgStore = pgSession(session);
 app.use(session({
   store: new PgStore({
     conString: process.env.PG_WRITE_URL,
-    tableName: 'sessions', // Will use existing sessions table
-    createTableIfMissing: false // We already created the table
+    tableName: 'session', // Standard name (singular)
+    createTableIfMissing: true // Let library create correct schema
   }),
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-ASAP',
   resave: false,
