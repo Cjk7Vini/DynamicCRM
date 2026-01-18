@@ -625,7 +625,8 @@
                     // TEMPORARILY DISABLED: window.location.href = '/login.html';
                     return true; // Allow access anyway
                 }
-                currentUser = await res.json();
+                const data = await res.json();
+                currentUser = data.user; // Extract user object from {success: true, user: {...}}
                 updateUserUI();
                 return true;
             } catch (err) {
