@@ -966,10 +966,13 @@
             // If practice user, force their practice code
             if (currentUser && currentUser.role === 'practice' && currentUser.practice_code) {
                 params.append('practice', currentUser.practice_code);
-            } else {
-                // Admin can filter by practice
-                const practice = document.getElementById('practiceFilter').value;
-                if (practice) params.append('practice', practice);
+            } else if (currentUser && currentUser.role === 'admin') {
+                // Admin can filter by practice - only if explicitly selected
+                const practiceFilter = document.getElementById('practiceFilter');
+                if (practiceFilter && practiceFilter.value) {
+                    params.append('practice', practiceFilter.value);
+                }
+                // If no filter selected, show ALL (don't add practice param)
             }
             
             const source = document.getElementById('sourceFilter').value;
