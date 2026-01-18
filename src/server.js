@@ -182,14 +182,6 @@ const leadSchema = Joi.object({
   utm_campaign: Joi.string().allow('', null),
 });
 
-function requireAdmin(req, res, next) {
-  const key = req.headers['x-admin-key'];
-  if (!ADMIN_KEY || key !== ADMIN_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-}
-
 async function recordEvent({ lead_id = null, practice_code, event_type, actor = 'system', metadata = {} }) {
   if (!practice_code || !event_type) {
     throw new Error('Missing fields for event (practice_code, event_type)');
