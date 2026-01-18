@@ -621,19 +621,19 @@
             try {
                 const res = await fetch('/api/auth/me', { credentials: 'include' });
                 if (!res.ok) {
-                    console.log('Not logged in - continuing without auth');
-                    // TEMPORARILY DISABLED: window.location.href = '/login.html';
-                    return true; // Allow access anyway
+                    window.location.href = '/login.html';
+                    return false;
                 }
                 const data = await res.json();
-                currentUser = data.user; // Extract user object from {success: true, user: {...}}
+                currentUser = data.user;
                 updateUserUI();
                 return true;
             } catch (err) {
                 console.error('Auth check failed:', err);
-                // TEMPORARILY DISABLED: window.location.href = '/login.html';
-                return true; // Allow access anyway
+                window.location.href = '/login.html';
+                return false;
             }
+        }
         }
 
         // Update user info in header
@@ -1019,7 +1019,21 @@
         async function exportToExcel() {
             try {
                 const filters = getCurrentFilters();
-                const practice = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
+                
+                // Get practice name - for practice users, use their practice name
+                let practiceName = 'Alle praktijken';
+                if (currentUser && currentUser.role === 'practice') {
+                    // For practice users, get their practice name from the dropdown or API
+                    const practiceFilter = document.getElementById('practiceFilter');
+                    const selectedOption = Array.from(practiceFilter.options).find(
+                        opt => opt.value === currentUser.practice_code
+                    );
+                    practiceName = selectedOption ? selectedOption.text : currentUser.practice_code;
+                } else {
+                    // For admin, use selected filter
+                    practiceName = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
+                }
+                
                 const dateRange = filters.dateFrom && filters.dateTo 
                     ? `${filters.dateFrom} tot ${filters.dateTo}` 
                     : 'Alle data';
@@ -1029,7 +1043,7 @@
                     fetch('/api/funnel' + buildQueryString()),
                     fetch('/api/practice-performance' + buildQueryString()),
                     fetch('/api/sources' + buildQueryString()),
-                    fetch('/api/churn-forecast')
+                    fetch('/api/churn-forecast' + buildQueryString())
                 ]);
 
                 const funnelData = await funnelRes.json();
@@ -1078,6 +1092,31 @@
                         'Risico Niveau': d.risk_level
                     })));
                     XLSX.utils.book_append_sheet(wb, forecastSheet, 'Churn Forecast');
+                }
+
+                // Add metadata sheet
+                const metadata = [
+                    { 'Parameter': 'Export Datum', 'Waarde': new Date().toLocaleString('nl-NL') },
+                    { 'Parameter': 'Praktijk Filter', 'Waarde': practiceName },
+                    { 'Parameter': 'Datum Bereik', 'Waarde': dateRange },
+                    { 'Parameter': 'Gegenereerd door', 'Waarde': 'Dynamic Health Analytics' }
+                ];
+                const metaSheet = XLSX.utils.json_to_sheet(metadata);
+                XLSX.utils.book_append_sheet(wb, metaSheet, 'Export Info');
+
+                // Generate filename
+                const timestamp = new Date().toISOString().split('T')[0];
+                const filename = `DHC_Analytics_${timestamp}.xlsx`;
+
+                // Download
+                XLSX.writeFile(wb, filename);
+
+                alert('✅ Rapportage succesvol geëxporteerd!');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('❌ Fout bij exporteren: ' + error.message);
+            }
+        }
                 }
 
                 // Add metadata sheet
@@ -1183,8 +1222,9 @@
         // NEW: Load Hot Leads
         async function loadHotLeads() {
             try {
-                const practice = document.getElementById('practiceFilter').value;
-                const url = `/api/hot-leads?limit=5${practice ? '&practice=' + practice : ''}`;
+                // Use buildQueryString to apply practice isolation
+                const queryString = buildQueryString();
+                const url = `/api/hot-leads?limit=5${queryString ? '&' + queryString.substring(1) : ''}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
