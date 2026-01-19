@@ -541,7 +541,7 @@
                 </div>
 
                 <!-- Practice Performance -->
-                <div class="chart-container">
+                <div class="chart-container" id="practicePerformanceContainer">
                     <div class="chart-title">Praktijk Performance</div>
                     <div class="chart-subtitle">Top 10 praktijken naar totale leads</div>
                     <div class="chart-wrapper">
@@ -662,14 +662,19 @@
 
         // Hide admin-only features for practice users
         function hideAdminFeatures() {
-            // Hide practice filter (can only see own data)
-            const practiceFilter = document.getElementById('practiceFilter');
-            if (practiceFilter && practiceFilter.parentElement) {
-                practiceFilter.parentElement.parentElement.style.display = 'none';
+            // Hide ONLY the practice filter dropdown (not the whole sidebar!)
+            const practiceFilterGroup = document.getElementById('practiceFilter')?.closest('.filter-group');
+            if (practiceFilterGroup) {
+                practiceFilterGroup.style.display = 'none';
             }
             
-            // Hide export button (optional - remove if practices should export too)
-            // document.querySelector('[onclick="exportToExcel()"]').style.display = 'none';
+            // Hide practice performance chart (admin only)
+            const practicePerformanceContainer = document.getElementById('practicePerformanceContainer');
+            if (practicePerformanceContainer) {
+                practicePerformanceContainer.style.display = 'none';
+            }
+            
+            // Date/source/status filters remain visible for practice users
         }
 
         // Logout function
@@ -1015,6 +1020,17 @@
                 const parent = element.parentElement;
                 parent.innerHTML = `<div class="error-message">Error: ${message}</div>`;
             }
+        }
+
+        // Get current filter values
+        function getCurrentFilters() {
+            return {
+                practice: document.getElementById('practiceFilter')?.value || '',
+                source: document.getElementById('sourceFilter')?.value || '',
+                status: document.getElementById('statusFilter')?.value || '',
+                dateFrom: document.getElementById('dateFrom')?.value || '',
+                dateTo: document.getElementById('dateTo')?.value || ''
+            };
         }
 
         // Excel Export Function
