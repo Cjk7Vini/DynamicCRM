@@ -1119,31 +1119,6 @@
                 alert('❌ Fout bij exporteren: ' + error.message);
             }
         }
-                }
-
-                // Add metadata sheet
-                const metadata = [
-                    { 'Parameter': 'Export Datum', 'Waarde': new Date().toLocaleString('nl-NL') },
-                    { 'Parameter': 'Praktijk Filter', 'Waarde': practice },
-                    { 'Parameter': 'Datum Bereik', 'Waarde': dateRange },
-                    { 'Parameter': 'Gegenereerd door', 'Waarde': 'Dynamic Health Analytics' }
-                ];
-                const metaSheet = XLSX.utils.json_to_sheet(metadata);
-                XLSX.utils.book_append_sheet(wb, metaSheet, 'Export Info');
-
-                // Generate filename
-                const timestamp = new Date().toISOString().split('T')[0];
-                const filename = `DHC_Analytics_${timestamp}.xlsx`;
-
-                // Download
-                XLSX.writeFile(wb, filename);
-
-                alert('✅ Rapportage succesvol geëxporteerd!');
-            } catch (error) {
-                console.error('Export error:', error);
-                alert('❌ Fout bij exporteren: ' + error.message);
-            }
-        }
 
         // NEW: Load Pipeline Funnel
         async function loadPipelineFunnel() {
