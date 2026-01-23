@@ -411,10 +411,7 @@
         /* Meta Marketing Section */
         .meta-marketing-section {
             margin-top: 32px;
-            padding: 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
-            color: white;
+            padding: 0;
         }
 
         .meta-section-header {
@@ -422,19 +419,21 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #d2d2d7;
         }
 
         .meta-section-title {
-            font-size: 24px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d1d1f;
         }
 
         .meta-sync-info {
             font-size: 12px;
-            color: rgba(255,255,255,0.8);
+            color: #86868b;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -442,17 +441,20 @@
 
         .btn-sync {
             padding: 8px 16px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
+            background: white;
+            border: 1px solid #d2d2d7;
             border-radius: 8px;
-            color: white;
+            color: #1d1d1f;
             font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
+            font-weight: 500;
         }
 
         .btn-sync:hover {
-            background: rgba(255,255,255,0.3);
+            background: #f5f5f7;
+            border-color: #06c;
+            color: #06c;
         }
 
         .meta-metrics-grid {
@@ -463,41 +465,35 @@
         }
 
         .meta-metric-card {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: white;
+            border: 1px solid #d2d2d7;
             border-radius: 12px;
             padding: 20px;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .meta-metric-card:hover {
-            background: rgba(255,255,255,0.25);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            border-color: #06c;
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
         }
 
         .meta-metric-card.highlight {
-            background: rgba(153, 204, 51, 0.2);
-            border: 2px solid #99CC33;
-        }
-
-        .meta-metric-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-
-        .meta-metric-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: white;
-            margin: 8px 0;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-color: #06c;
         }
 
         .meta-metric-label {
             font-size: 13px;
-            color: rgba(255,255,255,0.8);
-            margin-top: 4px;
+            color: #86868b;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .meta-metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin: 4px 0;
         }
 
         .meta-metric-change {
@@ -505,16 +501,18 @@
             margin-top: 8px;
             padding: 4px 8px;
             border-radius: 4px;
-            background: rgba(0,0,0,0.2);
             display: inline-block;
+            font-weight: 500;
         }
 
         .meta-metric-change.positive {
-            color: #99CC33;
+            background: #d1fae5;
+            color: #065f46;
         }
 
         .meta-metric-change.negative {
-            color: #ff6b6b;
+            background: #fee2e2;
+            color: #991b1b;
         }
 
         .meta-charts-grid {
@@ -524,58 +522,47 @@
         }
 
         .meta-chart-container {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: white;
+            border: 1px solid #d2d2d7;
             border-radius: 12px;
-            padding: 20px;
+            padding: 24px;
         }
 
         .meta-chart-title {
             font-size: 16px;
             font-weight: 600;
-            color: rgba(255,255,255,0.9);
+            color: #1d1d1f;
             margin-bottom: 16px;
         }
 
         .meta-table {
             width: 100%;
             border-collapse: collapse;
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            overflow: hidden;
         }
 
         .meta-table th {
-            background: rgba(0,0,0,0.2);
-            color: white;
+            background: #f5f5f7;
+            color: #1d1d1f;
             padding: 12px;
             text-align: left;
             font-size: 13px;
             font-weight: 600;
-            border-bottom: 2px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid #d2d2d7;
         }
 
         .meta-table td {
-            color: rgba(255,255,255,0.9);
+            color: #1d1d1f;
             padding: 12px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid #f5f5f7;
             font-size: 14px;
         }
 
         .meta-table tbody tr:hover {
-            background: rgba(255,255,255,0.15);
+            background: #f5f5f7;
         }
 
         .meta-table tbody tr:last-child td {
             border-bottom: none;
-        }
-
-        .meta-disabled-message {
-            text-align: center;
-            padding: 40px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
-            color: rgba(255,255,255,0.8);
         }
 
         @media (max-width: 768px) {
@@ -791,13 +778,12 @@
             <div class="meta-marketing-section" id="metaMarketingSection" style="display: none;">
                 <div class="meta-section-header">
                     <div class="meta-section-title">
-                        <span>📱</span>
-                        <span>Meta Marketing Performance</span>
+                        Meta Marketing Performance
                     </div>
                     <div class="meta-sync-info">
                         <span id="metaLastSync">Laatste sync: --</span>
                         <button class="btn-sync" onclick="syncMetaData()">
-                            🔄 Sync Nu
+                            Sync Nu
                         </button>
                     </div>
                 </div>
@@ -805,56 +791,48 @@
                 <!-- Metrics Grid -->
                 <div class="meta-metrics-grid">
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">💰</div>
                         <div class="meta-metric-label">Total Ad Spend</div>
                         <div class="meta-metric-value" id="metaTotalSpend">€0.00</div>
                         <div class="meta-metric-change" id="metaSpendChange"></div>
                     </div>
 
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">👁️</div>
                         <div class="meta-metric-label">Impressions</div>
                         <div class="meta-metric-value" id="metaImpressions">0</div>
                         <div class="meta-metric-change" id="metaImpressionsChange"></div>
                     </div>
 
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">🖱️</div>
                         <div class="meta-metric-label">Clicks</div>
                         <div class="meta-metric-value" id="metaClicks">0</div>
                         <div class="meta-metric-change" id="metaClicksChange"></div>
                     </div>
 
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">📊</div>
                         <div class="meta-metric-label">CTR</div>
                         <div class="meta-metric-value" id="metaCTR">0.00%</div>
                         <div class="meta-metric-change" id="metaCTRChange"></div>
                     </div>
 
                     <div class="meta-metric-card highlight">
-                        <div class="meta-metric-icon">🎯</div>
                         <div class="meta-metric-label">Conversions (Leads)</div>
                         <div class="meta-metric-value" id="metaConversions">0</div>
                         <div class="meta-metric-change" id="metaConversionsChange"></div>
                     </div>
 
                     <div class="meta-metric-card highlight">
-                        <div class="meta-metric-icon">💸</div>
                         <div class="meta-metric-label">Cost Per Lead</div>
                         <div class="meta-metric-value" id="metaCostPerLead">€0.00</div>
                         <div class="meta-metric-change" id="metaCostChange"></div>
                     </div>
 
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">📈</div>
                         <div class="meta-metric-label">ROAS</div>
                         <div class="meta-metric-value" id="metaROAS">0.0x</div>
                         <div class="meta-metric-change" id="metaROASChange"></div>
                     </div>
 
                     <div class="meta-metric-card">
-                        <div class="meta-metric-icon">💶</div>
                         <div class="meta-metric-label">CPC</div>
                         <div class="meta-metric-value" id="metaCPC">€0.00</div>
                         <div class="meta-metric-change" id="metaCPCChange"></div>
@@ -1598,7 +1576,7 @@
                 document.getElementById('metaCampaignsBody').innerHTML = `
                     <tr>
                         <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.8); padding: 24px;">
-                            <div style="font-size: 16px; margin-bottom: 8px;">⚠️ Meta data niet beschikbaar</div>
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 600; color: #1d1d1f;">Meta data niet beschikbaar</div>
                             <div style="font-size: 12px;">Configureer eerst Meta credentials voor deze praktijk</div>
                         </td>
                     </tr>
@@ -1701,16 +1679,16 @@
                         {
                             label: 'Ad Spend (€)',
                             data: topCampaigns.map(c => parseFloat(c.spend || 0)),
-                            backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                            borderColor: '#06c',
                             borderWidth: 2,
                             yAxisID: 'y'
                         },
                         {
                             label: 'Conversions',
                             data: topCampaigns.map(c => c.conversions || 0),
-                            backgroundColor: 'rgba(153, 204, 51, 0.5)',
-                            borderColor: '#99CC33',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderColor: '#10b981',
                             borderWidth: 2,
                             yAxisID: 'y1'
                         }
@@ -1721,17 +1699,28 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            labels: { color: 'white' }
+                            labels: { 
+                                color: '#1d1d1f',
+                                font: {
+                                    size: 13
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             ticks: { 
-                                color: 'rgba(255,255,255,0.8)',
+                                color: '#86868b',
                                 maxRotation: 45,
-                                minRotation: 45
+                                minRotation: 45,
+                                font: {
+                                    size: 11
+                                }
                             },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
+                            grid: { 
+                                color: '#f5f5f7',
+                                drawBorder: false
+                            }
                         },
                         y: {
                             type: 'linear',
@@ -1739,10 +1728,22 @@
                             title: { 
                                 display: true, 
                                 text: 'Spend (€)', 
-                                color: 'white' 
+                                color: '#86868b',
+                                font: {
+                                    size: 12,
+                                    weight: 500
+                                }
                             },
-                            ticks: { color: 'rgba(255,255,255,0.8)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
+                            ticks: { 
+                                color: '#86868b',
+                                font: {
+                                    size: 11
+                                }
+                            },
+                            grid: { 
+                                color: '#f5f5f7',
+                                drawBorder: false
+                            }
                         },
                         y1: {
                             type: 'linear',
@@ -1750,9 +1751,18 @@
                             title: { 
                                 display: true, 
                                 text: 'Conversions', 
-                                color: 'white' 
+                                color: '#86868b',
+                                font: {
+                                    size: 12,
+                                    weight: 500
+                                }
                             },
-                            ticks: { color: 'rgba(255,255,255,0.8)' },
+                            ticks: { 
+                                color: '#86868b',
+                                font: {
+                                    size: 11
+                                }
+                            },
                             grid: { drawOnChartArea: false }
                         }
                     }
@@ -1787,10 +1797,10 @@
                 }
                 
                 await loadMetaMarketing();
-                alert('✅ Meta data gesynchroniseerd!');
+                alert('Meta data gesynchroniseerd!');
             } catch (error) {
                 console.error('Sync error:', error);
-                alert('❌ Sync mislukt: ' + error.message);
+                alert('Sync mislukt: ' + error.message);
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
