@@ -19,7 +19,7 @@ import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
-import MetaService from './services/MetaService.js';
+import MetaService from './service/MetaService.js';
 
 const app = express();
 
