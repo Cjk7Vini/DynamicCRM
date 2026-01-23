@@ -1,11 +1,11 @@
-// services/MetaService.js
+// service/MetaService.js
 import axios from 'axios';
 
 class MetaService {
   constructor(readConn, writeConn) {
     this.readConn = readConn;
     this.writeConn = writeConn;
-    this.baseUrl = 'https://graph.facebook.com/v18.0';
+    this.baseUrl = 'https://graph.facebook.com/v22.0';
   }
 
   // Get credentials for practice from environment variables
