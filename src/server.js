@@ -18,6 +18,8 @@ import bcrypt from 'bcrypt';
 import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { withReadConnection, withWriteConnection } from './db.js';
+import axios from 'axios';
+import MetaService from './services/MetaService.js';
 
 const app = express();
 
@@ -135,6 +137,9 @@ const postLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use(['/leads', '/events', '/api/training-results'], postLimiter);
+
+// Initialize MetaService with connection wrappers
+const metaService = new MetaService(withReadConnection, withWriteConnection);
 
 // ✅ FIX: Homepage redirect naar landing.html in plaats van form.html
 app.get('/', (req, res) => {
@@ -2416,6 +2421,118 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Fout bij ophalen gebruiker' });
+  }
+});
+
+// ============================================
+// META MARKETING API ENDPOINTS
+// ============================================
+
+// Get Meta summary for practice
+app.get('/api/meta/summary/:practiceCode', async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const { dateFrom, dateTo } = req.query;
+
+    // Auth check
+    if (req.session.role === 'practice' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Check if Meta enabled for this practice
+    const isEnabled = await metaService.isMetaEnabled(practiceCode);
+    
+    if (!isEnabled) {
+      return res.json({
+        total_campaigns: 0,
+        total_impressions: 0,
+        total_clicks: 0,
+        total_spend: 0,
+        total_conversions: 0,
+        avg_cost_per_lead: 0,
+        avg_ctr: 0,
+        avg_cpc: 0,
+        meta_enabled: false
+      });
+    }
+
+    const summary = await metaService.getSummary(practiceCode, dateFrom, dateTo);
+    res.json({ ...summary, meta_enabled: true });
+
+  } catch (error) {
+    console.error('Meta summary error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      meta_enabled: false
+    });
+  }
+});
+
+// Get campaign performance for practice
+app.get('/api/meta/campaigns/:practiceCode', async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const { dateFrom, dateTo } = req.query;
+
+    // Auth check
+    if (req.session.role === 'practice' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const campaigns = await metaService.getCampaignPerformance(practiceCode, dateFrom, dateTo);
+    res.json(campaigns);
+
+  } catch (error) {
+    console.error('Meta campaigns error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manual sync for specific practice (admin only)
+app.post('/api/meta/sync/:practiceCode', async (req, res) => {
+  try {
+    // Check admin auth
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { practiceCode } = req.params;
+    
+    // Default to last 30 days
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - 30);
+    
+    const result = await metaService.syncPractice(
+      practiceCode,
+      dateFrom.toISOString().split('T')[0],
+      new Date().toISOString().split('T')[0]
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Meta sync error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+// Sync all Meta-enabled practices (admin only)
+app.post('/api/meta/sync-all', async (req, res) => {
+  try {
+    // Check admin auth
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const results = await metaService.syncAllPractices();
+    res.json(results);
+    
+  } catch (error) {
+    console.error('Meta sync all error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
