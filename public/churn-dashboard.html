@@ -407,6 +407,186 @@
             color: #ef4444;
             font-weight: 600;
         }
+
+        /* Meta Marketing Section */
+        .meta-marketing-section {
+            margin-top: 32px;
+            padding: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            color: white;
+        }
+
+        .meta-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .meta-section-title {
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .meta-sync-info {
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-sync {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-sync:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .meta-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .meta-metric-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .meta-metric-card:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .meta-metric-card.highlight {
+            background: rgba(153, 204, 51, 0.2);
+            border: 2px solid #99CC33;
+        }
+
+        .meta-metric-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .meta-metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin: 8px 0;
+        }
+
+        .meta-metric-label {
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+            margin-top: 4px;
+        }
+
+        .meta-metric-change {
+            font-size: 12px;
+            margin-top: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            display: inline-block;
+        }
+
+        .meta-metric-change.positive {
+            color: #99CC33;
+        }
+
+        .meta-metric-change.negative {
+            color: #ff6b6b;
+        }
+
+        .meta-charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .meta-chart-container {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .meta-chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 16px;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .meta-table th {
+            background: rgba(0,0,0,0.2);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .meta-table td {
+            color: rgba(255,255,255,0.9);
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+        }
+
+        .meta-table tbody tr:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .meta-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .meta-disabled-message {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        @media (max-width: 768px) {
+            .meta-charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .meta-metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
@@ -606,6 +786,111 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Meta Marketing Section -->
+            <div class="meta-marketing-section" id="metaMarketingSection" style="display: none;">
+                <div class="meta-section-header">
+                    <div class="meta-section-title">
+                        <span>📱</span>
+                        <span>Meta Marketing Performance</span>
+                    </div>
+                    <div class="meta-sync-info">
+                        <span id="metaLastSync">Laatste sync: --</span>
+                        <button class="btn-sync" onclick="syncMetaData()">
+                            🔄 Sync Nu
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="meta-metrics-grid">
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">💰</div>
+                        <div class="meta-metric-label">Total Ad Spend</div>
+                        <div class="meta-metric-value" id="metaTotalSpend">€0.00</div>
+                        <div class="meta-metric-change" id="metaSpendChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">👁️</div>
+                        <div class="meta-metric-label">Impressions</div>
+                        <div class="meta-metric-value" id="metaImpressions">0</div>
+                        <div class="meta-metric-change" id="metaImpressionsChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">🖱️</div>
+                        <div class="meta-metric-label">Clicks</div>
+                        <div class="meta-metric-value" id="metaClicks">0</div>
+                        <div class="meta-metric-change" id="metaClicksChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">📊</div>
+                        <div class="meta-metric-label">CTR</div>
+                        <div class="meta-metric-value" id="metaCTR">0.00%</div>
+                        <div class="meta-metric-change" id="metaCTRChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card highlight">
+                        <div class="meta-metric-icon">🎯</div>
+                        <div class="meta-metric-label">Conversions (Leads)</div>
+                        <div class="meta-metric-value" id="metaConversions">0</div>
+                        <div class="meta-metric-change" id="metaConversionsChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card highlight">
+                        <div class="meta-metric-icon">💸</div>
+                        <div class="meta-metric-label">Cost Per Lead</div>
+                        <div class="meta-metric-value" id="metaCostPerLead">€0.00</div>
+                        <div class="meta-metric-change" id="metaCostChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">📈</div>
+                        <div class="meta-metric-label">ROAS</div>
+                        <div class="meta-metric-value" id="metaROAS">0.0x</div>
+                        <div class="meta-metric-change" id="metaROASChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card">
+                        <div class="meta-metric-icon">💶</div>
+                        <div class="meta-metric-label">CPC</div>
+                        <div class="meta-metric-value" id="metaCPC">€0.00</div>
+                        <div class="meta-metric-change" id="metaCPCChange"></div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="meta-charts-grid">
+                    <div class="meta-chart-container">
+                        <div class="meta-chart-title">Campaign Performance</div>
+                        <canvas id="metaCampaignChart" height="250"></canvas>
+                    </div>
+
+                    <div class="meta-chart-container">
+                        <div class="meta-chart-title">Active Campaigns</div>
+                        <table class="meta-table">
+                            <thead>
+                                <tr>
+                                    <th>Campaign</th>
+                                    <th>Spend</th>
+                                    <th>Leads</th>
+                                    <th>CPL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metaCampaignsBody">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6);">
+                                        Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -707,6 +992,7 @@
             await loadPipelineFunnel();
             await loadForecastComparison();
             await loadHotLeads();
+            await loadMetaMarketing(); // Load Meta data on init
         }
 
         // Load practices for dropdown
@@ -1006,6 +1292,7 @@
             loadPipelineFunnel();
             loadForecastComparison();
             loadHotLeads();
+            loadMetaMarketing(); // Load Meta data
         }
 
         // Refresh all data
@@ -1253,6 +1540,269 @@
 
         // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
+
+        // ============================================
+        // META MARKETING FUNCTIONS
+        // ============================================
+
+        let metaChart = null;
+
+        // Load Meta Marketing data
+        async function loadMetaMarketing() {
+            const practiceCode = currentUser.role === 'admin' 
+                ? document.getElementById('practiceFilter').value 
+                : currentUser.practiceCode;
+                
+            if (!practiceCode) {
+                document.getElementById('metaMarketingSection').style.display = 'none';
+                return;
+            }
+            
+            const dateFrom = document.getElementById('dateFrom').value || '2025-01-01';
+            const dateTo = document.getElementById('dateTo').value || new Date().toISOString().split('T')[0];
+            
+            try {
+                // Get summary
+                const summaryRes = await fetch(
+                    `/api/meta/summary/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
+                );
+                const summary = await summaryRes.json();
+                
+                // Check if Meta enabled
+                if (!summary.meta_enabled) {
+                    document.getElementById('metaMarketingSection').style.display = 'none';
+                    return;
+                }
+                
+                // Show section
+                document.getElementById('metaMarketingSection').style.display = 'block';
+                displayMetaSummary(summary);
+                
+                // Get campaigns
+                const campaignsRes = await fetch(
+                    `/api/meta/campaigns/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
+                );
+                const campaigns = await campaignsRes.json();
+                
+                displayMetaCampaigns(campaigns);
+                displayMetaChart(campaigns);
+                
+                // Update sync time
+                document.getElementById('metaLastSync').textContent = 
+                    `Laatste sync: ${new Date().toLocaleString('nl-NL')}`;
+                    
+            } catch (error) {
+                console.error('Meta marketing error:', error);
+                // Show section but with error message
+                document.getElementById('metaMarketingSection').style.display = 'block';
+                document.getElementById('metaCampaignsBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.8); padding: 24px;">
+                            <div style="font-size: 16px; margin-bottom: 8px;">⚠️ Meta data niet beschikbaar</div>
+                            <div style="font-size: 12px;">Configureer eerst Meta credentials voor deze praktijk</div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Display Meta summary metrics
+        function displayMetaSummary(data) {
+            // Ad Spend
+            document.getElementById('metaTotalSpend').textContent = 
+                `€${(data.total_spend || 0).toFixed(2)}`;
+            
+            // Impressions
+            document.getElementById('metaImpressions').textContent = 
+                formatNumber(data.total_impressions || 0);
+            
+            // Clicks
+            document.getElementById('metaClicks').textContent = 
+                formatNumber(data.total_clicks || 0);
+            
+            // CTR
+            document.getElementById('metaCTR').textContent = 
+                `${(data.avg_ctr || 0).toFixed(2)}%`;
+            
+            // Conversions
+            document.getElementById('metaConversions').textContent = 
+                data.total_conversions || 0;
+            
+            // Cost Per Lead
+            document.getElementById('metaCostPerLead').textContent = 
+                `€${(data.avg_cost_per_lead || 0).toFixed(2)}`;
+            
+            // CPC
+            document.getElementById('metaCPC').textContent = 
+                `€${(data.avg_cpc || 0).toFixed(2)}`;
+            
+            // ROAS (estimated)
+            const estimatedLeadValue = 150; // Average patient lifetime value
+            const roas = data.total_spend > 0 
+                ? ((data.total_conversions * estimatedLeadValue) / data.total_spend).toFixed(1)
+                : '0.0';
+            document.getElementById('metaROAS').textContent = `${roas}x`;
+        }
+
+        // Display Meta campaigns table
+        function displayMetaCampaigns(campaigns) {
+            const tbody = document.getElementById('metaCampaignsBody');
+            
+            if (!campaigns || campaigns.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6); padding: 24px;">
+                            Geen actieve campagnes in geselecteerde periode
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = campaigns.slice(0, 10).map(campaign => `
+                <tr>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${campaign.campaign_name}">
+                        ${campaign.campaign_name}
+                    </td>
+                    <td>€${parseFloat(campaign.spend || 0).toFixed(2)}</td>
+                    <td>${campaign.conversions || 0}</td>
+                    <td>€${parseFloat(campaign.cost_per_conversion || 0).toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Display Meta chart
+        function displayMetaChart(campaigns) {
+            const ctx = document.getElementById('metaCampaignChart');
+            if (!ctx) return;
+            
+            // Destroy existing chart
+            if (metaChart) {
+                metaChart.destroy();
+            }
+            
+            if (!campaigns || campaigns.length === 0) {
+                ctx.parentElement.innerHTML = `
+                    <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 40px;">
+                        Geen campagne data beschikbaar
+                    </div>
+                `;
+                return;
+            }
+            
+            // Limit to top 10 campaigns by spend
+            const topCampaigns = campaigns.slice(0, 10);
+            
+            metaChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topCampaigns.map(c => c.campaign_name.substring(0, 25)),
+                    datasets: [
+                        {
+                            label: 'Ad Spend (€)',
+                            data: topCampaigns.map(c => parseFloat(c.spend || 0)),
+                            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            borderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Conversions',
+                            data: topCampaigns.map(c => c.conversions || 0),
+                            backgroundColor: 'rgba(153, 204, 51, 0.5)',
+                            borderColor: '#99CC33',
+                            borderWidth: 2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.8)',
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { 
+                                display: true, 
+                                text: 'Spend (€)', 
+                                color: 'white' 
+                            },
+                            ticks: { color: 'rgba(255,255,255,0.8)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { 
+                                display: true, 
+                                text: 'Conversions', 
+                                color: 'white' 
+                            },
+                            ticks: { color: 'rgba(255,255,255,0.8)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Manual sync Meta data
+        async function syncMetaData() {
+            const practiceCode = currentUser.role === 'admin' 
+                ? document.getElementById('practiceFilter').value 
+                : currentUser.practiceCode;
+                
+            if (!practiceCode) {
+                alert('Selecteer eerst een praktijk');
+                return;
+            }
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Syncing...';
+            
+            try {
+                const res = await fetch(`/api/meta/sync/${practiceCode}`, { 
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Sync failed');
+                }
+                
+                await loadMetaMarketing();
+                alert('✅ Meta data gesynchroniseerd!');
+            } catch (error) {
+                console.error('Sync error:', error);
+                alert('❌ Sync mislukt: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // Helper: Format large numbers
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
     </script>
 </body>
 </html>
