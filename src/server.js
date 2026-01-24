@@ -2452,7 +2452,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     // Update password
     await withWriteConnection(async (client) => {
       await client.query(
-        'UPDATE public.users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        'UPDATE public.users SET password_hash = $1 WHERE id = $2',
         [newPasswordHash, req.session.userId]
       );
     });
@@ -2611,7 +2611,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     // Update password and clear reset token
     await withWriteConnection(async (client) => {
       await client.query(
-        'UPDATE public.users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL, updated_at = NOW() WHERE id = $2',
+        'UPDATE public.users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2',
         [newPasswordHash, user.id]
       );
     });
