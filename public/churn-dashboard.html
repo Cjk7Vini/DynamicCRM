@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic Health Analytics - Churn & Conversie Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1940,7 +1940,7 @@
         function displayMetaSummary(data) {
             // Ad Spend
             document.getElementById('metaTotalSpend').textContent = 
-                `€${(data.total_spend || 0).toFixed(2)}`;
+                `€${parseFloat(data.total_spend || 0).toFixed(2)}`;
             
             // Impressions
             document.getElementById('metaImpressions').textContent = 
@@ -1952,7 +1952,7 @@
             
             // CTR
             document.getElementById('metaCTR').textContent = 
-                `${(data.avg_ctr || 0).toFixed(2)}%`;
+                `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
             
             // Conversions
             document.getElementById('metaConversions').textContent = 
@@ -1960,16 +1960,18 @@
             
             // Cost Per Lead
             document.getElementById('metaCostPerLead').textContent = 
-                `€${(data.avg_cost_per_lead || 0).toFixed(2)}`;
+                `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
             
             // CPC
             document.getElementById('metaCPC').textContent = 
-                `€${(data.avg_cpc || 0).toFixed(2)}`;
+                `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
             
             // ROAS (estimated)
             const estimatedLeadValue = 150; // Average patient lifetime value
-            const roas = data.total_spend > 0 
-                ? ((data.total_conversions * estimatedLeadValue) / data.total_spend).toFixed(1)
+            const totalSpend = parseFloat(data.total_spend || 0);
+            const totalConversions = parseInt(data.total_conversions || 0);
+            const roas = totalSpend > 0 
+                ? ((totalConversions * estimatedLeadValue) / totalSpend).toFixed(1)
                 : '0.0';
             document.getElementById('metaROAS').textContent = `${roas}x`;
         }
