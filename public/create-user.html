@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nieuwe Gebruiker - Dynamic Health Consultancy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #333399 0%, #3399CC 50%, #99CC33 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header img {
+            height: 50px;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #86868b;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #06c;
+            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #86868b;
+            margin-top: 4px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #333399 0%, #3399CC 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(51, 153, 204, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f5f5f7;
+            color: #1d1d1f;
+            margin-top: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8ed;
+            box-shadow: none;
+        }
+
+        .message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            display: block;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            display: block;
+        }
+
+        .credentials-box {
+            background: #f5f5f7;
+            border: 2px dashed #d2d2d7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .credentials-box h3 {
+            font-size: 16px;
+            color: #1d1d1f;
+            margin-bottom: 12px;
+        }
+
+        .credential-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e8e8ed;
+        }
+
+        .credential-item:last-child {
+            border-bottom: none;
+        }
+
+        .credential-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #86868b;
+        }
+
+        .credential-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+            font-family: 'Courier New', monospace;
+        }
+
+        .copy-btn {
+            padding: 6px 12px;
+            background: #06c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .copy-btn:hover {
+            background: #0051a3;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="/images/dynamic-logo-2.png" alt="Dynamic Health">
+            <h1>Nieuwe Gebruiker Aanmaken</h1>
+            <p>Admin Tool</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <form id="createUserForm" onsubmit="createUser(event)">
+            <div class="form-group">
+                <label for="email">Email Adres *</label>
+                <input type="email" id="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Rol *</label>
+                <select id="role" required onchange="togglePracticeField()">
+                    <option value="">Selecteer rol...</option>
+                    <option value="admin">Admin</option>
+                    <option value="practice">Practice (Fysio)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="practiceGroup" style="display: none;">
+                <label for="practiceCode">Practice Code</label>
+                <input type="text" id="practiceCode" maxlength="10" style="text-transform: uppercase;">
+                <div class="help-text">Alleen voor practice users (bijv. S7F2MW)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="generatedPassword">Gegenereerd Wachtwoord</label>
+                <input type="text" id="generatedPassword" readonly style="background: #f5f5f7;">
+                <div class="help-text">Automatisch gegenereerd veilig wachtwoord</div>
+            </div>
+
+            <button type="button" class="btn-secondary" onclick="generatePassword()">
+                🔄 Nieuw Wachtwoord Genereren
+            </button>
+
+            <button type="submit" class="btn" id="submitBtn" style="margin-top: 24px;">
+                Gebruiker Aanmaken
+            </button>
+        </form>
+
+        <div id="credentialsBox" style="display: none;">
+            <div class="credentials-box">
+                <h3>✅ Gebruiker Aangemaakt!</h3>
+                
+                <div class="credential-item">
+                    <span class="credential-label">Email:</span>
+                    <div>
+                        <span class="credential-value" id="createdEmail"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('createdEmail')">Kopieer</button>
+                    </div>
+                </div>
+                
+                <div class="credential-item">
+                    <span class="credential-label">Wachtwoord:</span>
+                    <div>
+                        <span class="credential-value" id="createdPassword"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('createdPassword')">Kopieer</button>
+                    </div>
+                </div>
+                
+                <div class="credential-item">
+                    <span class="credential-label">Rol:</span>
+                    <span class="credential-value" id="createdRole"></span>
+                </div>
+
+                <div class="warning">
+                    ⚠️ Sla deze gegevens op! Het wachtwoord wordt niet opnieuw getoond.
+                </div>
+            </div>
+
+            <button class="btn" onclick="location.reload()" style="margin-top: 16px;">
+                Nieuwe Gebruiker Aanmaken
+            </button>
+        </div>
+
+        <button class="btn-secondary" onclick="window.location.href='/churn-dashboard.html'">
+            ← Terug naar Dashboard
+        </button>
+    </div>
+
+    <script>
+        // Check if admin
+        async function checkAdmin() {
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'include' });
+                if (!res.ok) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await res.json();
+                if (data.user.role !== 'admin') {
+                    alert('Alleen admins hebben toegang tot deze pagina');
+                    window.location.href = '/churn-dashboard.html';
+                }
+            } catch (error) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        checkAdmin();
+
+        function togglePracticeField() {
+            const role = document.getElementById('role').value;
+            const practiceGroup = document.getElementById('practiceGroup');
+            practiceGroup.style.display = role === 'practice' ? 'block' : 'none';
+            
+            if (role === 'practice') {
+                document.getElementById('practiceCode').required = true;
+            } else {
+                document.getElementById('practiceCode').required = false;
+                document.getElementById('practiceCode').value = '';
+            }
+        }
+
+        function generatePassword() {
+            const length = 16;
+            const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+            let password = '';
+            
+            // Ensure at least one of each required character type
+            password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
+            password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
+            password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
+            password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special
+            
+            // Fill the rest
+            for (let i = password.length; i < length; i++) {
+                password += charset[Math.floor(Math.random() * charset.length)];
+            }
+            
+            // Shuffle
+            password = password.split('').sort(() => Math.random() - 0.5).join('');
+            
+            document.getElementById('generatedPassword').value = password;
+        }
+
+        // Generate password on load
+        generatePassword();
+
+        async function createUser(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value.trim().toLowerCase();
+            const role = document.getElementById('role').value;
+            const practiceCode = document.getElementById('practiceCode').value.trim().toUpperCase() || null;
+            const password = document.getElementById('generatedPassword').value;
+            
+            const messageDiv = document.getElementById('message');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            messageDiv.className = 'message';
+            messageDiv.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Bezig met aanmaken...';
+            
+            try {
+                const res = await fetch('/api/admin/create-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        role,
+                        practiceCode
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    // Show credentials
+                    document.getElementById('createdEmail').textContent = email;
+                    document.getElementById('createdPassword').textContent = password;
+                    document.getElementById('createdRole').textContent = role;
+                    
+                    document.getElementById('createUserForm').style.display = 'none';
+                    document.getElementById('credentialsBox').style.display = 'block';
+                    
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = '✅ Gebruiker succesvol aangemaakt!';
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = data.error || 'Fout bij aanmaken gebruiker';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Gebruiker Aanmaken';
+                }
+                
+            } catch (error) {
+                console.error('Create user error:', error);
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'Netwerkfout. Probeer opnieuw.';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Gebruiker Aanmaken';
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Gekopieerd!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

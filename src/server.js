@@ -2629,6 +2629,95 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+// Admin: Create new user
+app.post('/api/admin/create-user', requireAuth, async (req, res) => {
+  try {
+    // Check admin access
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin toegang vereist' });
+    }
+
+    const { email, password, role, practiceCode } = req.body;
+
+    // Validate input
+    if (!email || !password || !role) {
+      return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
+    }
+
+    if (!['admin', 'practice'].includes(role)) {
+      return res.status(400).json({ error: 'Ongeldige rol' });
+    }
+
+    if (role === 'practice' && !practiceCode) {
+      return res.status(400).json({ error: 'Practice code is verplicht voor practice users' });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Wachtwoord moet minimaal 8 tekens zijn' });
+    }
+
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (!hasUpper || !hasLower || !hasNumber) {
+      return res.status(400).json({
+        error: 'Wachtwoord moet hoofdletter, kleine letter en cijfer bevatten'
+      });
+    }
+
+    // Check if email already exists
+    const existingUser = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT id FROM public.users WHERE email = $1',
+        [email.toLowerCase().trim()]
+      );
+      return result.rows[0];
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email adres bestaat al' });
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const newUser = await withWriteConnection(async (client) => {
+      const result = await client.query(
+        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         RETURNING id, email, role, practice_code`,
+        [
+          email.toLowerCase().trim(),
+          passwordHash,
+          role,
+          role === 'practice' ? practiceCode.toUpperCase().trim() : null
+        ]
+      );
+      return result.rows[0];
+    });
+
+    console.log(`✅ Admin ${req.session.userEmail} created new user: ${newUser.email} (${newUser.role})`);
+
+    res.json({
+      success: true,
+      message: 'Gebruiker succesvol aangemaakt',
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        practice_code: newUser.practice_code
+      }
+    });
+
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Fout bij aanmaken gebruiker' });
+  }
+});
+
 // Get current user
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
