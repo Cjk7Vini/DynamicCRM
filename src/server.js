@@ -2402,6 +2402,233 @@ app.post('/api/auth/heartbeat', requireAuth, (req, res) => {
   res.json({ success: true, expiresIn: req.session.cookie.maxAge });
 });
 
+// Change password (requires current password)
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Huidige en nieuwe wachtwoord zijn verplicht' });
+    }
+    
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Wachtwoord moet minimaal 8 tekens zijn' });
+    }
+    
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    
+    if (!hasUpper || !hasLower || !hasNumber) {
+      return res.status(400).json({ 
+        error: 'Wachtwoord moet een hoofdletter, kleine letter en cijfer bevatten' 
+      });
+    }
+    
+    // Get user with current password hash
+    const user = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT id, email, password_hash FROM public.users WHERE id = $1',
+        [req.session.userId]
+      );
+      return result.rows[0];
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Huidig wachtwoord is onjuist' });
+    }
+    
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    await withWriteConnection(async (client) => {
+      await client.query(
+        'UPDATE public.users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [newPasswordHash, req.session.userId]
+      );
+    });
+    
+    console.log(`✅ Password changed for user: ${user.email}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Wachtwoord succesvol gewijzigd' 
+    });
+    
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Fout bij wijzigen wachtwoord' });
+  }
+});
+
+// Request password reset (send email with token)
+app.post('/api/auth/request-password-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is verplicht' });
+    }
+    
+    // Check if user exists
+    const user = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT id, email FROM public.users WHERE email = $1',
+        [email.toLowerCase().trim()]
+      );
+      return result.rows[0];
+    });
+    
+    // Always return success to prevent email enumeration
+    if (!user) {
+      console.log(`⚠️ Password reset requested for non-existent email: ${email}`);
+      return res.json({ 
+        success: true, 
+        message: 'Als dit email adres bestaat, hebben we een reset link verstuurd' 
+      });
+    }
+    
+    // Generate reset token (valid for 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    
+    // Save token to database
+    await withWriteConnection(async (client) => {
+      await client.query(
+        'UPDATE public.users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3',
+        [resetToken, resetTokenExpiry, user.id]
+      );
+    });
+    
+    // Send reset email
+    const resetUrl = `https://dynamic-health-consultancy.nl/reset-password.html?token=${resetToken}`;
+    
+    try {
+      await sendEmail({
+        from: process.env.SMTP_FROM || 'noreply@dynamic-health-consultancy.nl',
+        to: user.email,
+        subject: 'Wachtwoord Reset - Dynamic Health Consultancy',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333399;">Wachtwoord Reset</h2>
+            <p>Je hebt een wachtwoord reset aangevraagd voor je Dynamic Health Consultancy account.</p>
+            <p>Click op de knop hieronder om een nieuw wachtwoord in te stellen:</p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetUrl}" 
+                 style="background: linear-gradient(135deg, #333399 0%, #3399CC 100%); 
+                        color: white; 
+                        padding: 14px 32px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: 600;
+                        display: inline-block;">
+                Reset Wachtwoord
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">Of kopieer deze link naar je browser:</p>
+            <p style="color: #06c; font-size: 12px; word-break: break-all;">${resetUrl}</p>
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 24px 0;">
+            <p style="color: #999; font-size: 12px;">
+              Deze link is 1 uur geldig.<br>
+              Als je geen wachtwoord reset hebt aangevraagd, kun je deze email negeren.
+            </p>
+          </div>
+        `
+      });
+      
+      console.log(`✅ Password reset email sent to: ${user.email}`);
+      
+    } catch (emailError) {
+      console.error('Failed to send reset email:', emailError);
+      return res.status(500).json({ error: 'Fout bij versturen reset email' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Reset link verstuurd naar je email' 
+    });
+    
+  } catch (error) {
+    console.error('Request password reset error:', error);
+    res.status(500).json({ error: 'Fout bij aanvragen reset' });
+  }
+});
+
+// Reset password with token
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token en nieuw wachtwoord zijn verplicht' });
+    }
+    
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Wachtwoord moet minimaal 8 tekens zijn' });
+    }
+    
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    
+    if (!hasUpper || !hasLower || !hasNumber) {
+      return res.status(400).json({ 
+        error: 'Wachtwoord moet een hoofdletter, kleine letter en cijfer bevatten' 
+      });
+    }
+    
+    // Find user by token
+    const user = await withReadConnection(async (client) => {
+      const result = await client.query(
+        'SELECT id, email, reset_token_expiry FROM public.users WHERE reset_token = $1',
+        [token]
+      );
+      return result.rows[0];
+    });
+    
+    if (!user) {
+      return res.status(400).json({ error: 'Ongeldige of verlopen reset link' });
+    }
+    
+    // Check if token expired
+    if (new Date() > new Date(user.reset_token_expiry)) {
+      return res.status(400).json({ error: 'Reset link is verlopen. Vraag een nieuwe aan.' });
+    }
+    
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password and clear reset token
+    await withWriteConnection(async (client) => {
+      await client.query(
+        'UPDATE public.users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL, updated_at = NOW() WHERE id = $2',
+        [newPasswordHash, user.id]
+      );
+    });
+    
+    console.log(`✅ Password reset successful for user: ${user.email}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Wachtwoord succesvol ingesteld' 
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Fout bij instellen wachtwoord' });
+  }
+});
+
 // Get current user
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
