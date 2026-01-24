@@ -115,16 +115,17 @@ app.use(session({
   store: new PgStore({
     conString: process.env.PG_WRITE_URL,
     tableName: 'session',
-    createTableIfMissing: false, // Table already exists with correct permissions
+    createTableIfMissing: false,
     pruneSessionInterval: 60 * 15 // Clean up expired sessions every 15 minutes
   }),
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-ASAP',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Reset expiry on activity
   cookie: {
     secure: true,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 60 * 60 * 1000, // 1 hour idle timeout
     sameSite: 'lax',
   },
   proxy: true
@@ -2392,6 +2393,13 @@ app.post('/api/auth/logout', (req, res) => {
     res.clearCookie('connect.sid');
     res.json({ success: true });
   });
+});
+
+// Heartbeat to keep session alive on activity
+app.post('/api/auth/heartbeat', requireAuth, (req, res) => {
+  // Session middleware with rolling:true will automatically refresh
+  req.session.touch(); // Explicitly update lastModified
+  res.json({ success: true, expiresIn: req.session.cookie.maxAge });
 });
 
 // Get current user

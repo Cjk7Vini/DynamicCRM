@@ -959,6 +959,9 @@
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) return;
             
+            // Start idle detection
+            startIdleDetection();
+            
             await loadPractices();
             await loadKPIs();
             await loadChurnForecast();
@@ -1518,6 +1521,127 @@
 
         // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
+
+        // ============================================
+        // IDLE DETECTION & AUTO-LOGOUT
+        // ============================================
+
+        let idleTimer = null;
+        let heartbeatInterval = null;
+        let lastActivity = Date.now();
+        const IDLE_TIMEOUT = 60 * 60 * 1000; // 1 hour
+        const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 minutes
+        const WARNING_TIME = 5 * 60 * 1000; // Warn 5 min before logout
+
+        function startIdleDetection() {
+            // Track user activity
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, onActivity, true);
+            });
+
+            // Start heartbeat to keep session alive
+            heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
+
+            // Start idle checker
+            checkIdle();
+        }
+
+        function onActivity() {
+            lastActivity = Date.now();
+        }
+
+        async function sendHeartbeat() {
+            try {
+                // Only send heartbeat if there was recent activity
+                const idleTime = Date.now() - lastActivity;
+                if (idleTime < HEARTBEAT_INTERVAL) {
+                    await fetch('/api/auth/heartbeat', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                }
+            } catch (error) {
+                console.error('Heartbeat failed:', error);
+            }
+        }
+
+        function checkIdle() {
+            const idleTime = Date.now() - lastActivity;
+            
+            if (idleTime >= IDLE_TIMEOUT) {
+                // Auto logout
+                handleIdleLogout();
+            } else if (idleTime >= IDLE_TIMEOUT - WARNING_TIME) {
+                // Show warning
+                showIdleWarning(Math.floor((IDLE_TIMEOUT - idleTime) / 1000));
+            }
+
+            // Check again in 10 seconds
+            idleTimer = setTimeout(checkIdle, 10000);
+        }
+
+        function showIdleWarning(secondsLeft) {
+            const minutes = Math.ceil(secondsLeft / 60);
+            
+            // Only show once
+            if (document.getElementById('idleWarning')) return;
+
+            const warning = document.createElement('div');
+            warning.id = 'idleWarning';
+            warning.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: #ff9800;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-size: 14px;
+                max-width: 300px;
+            `;
+            warning.innerHTML = `
+                <strong>⚠️ Sessie verloopt binnenkort</strong><br>
+                Je wordt over ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} uitgelogd wegens inactiviteit.
+            `;
+            document.body.appendChild(warning);
+
+            // Remove warning on activity
+            const removeWarning = () => {
+                warning?.remove();
+                activityEvents.forEach(event => {
+                    document.removeEventListener(event, removeWarning, true);
+                });
+            };
+
+            const activityEvents = ['mousedown', 'keypress', 'click'];
+            activityEvents.forEach(event => {
+                document.addEventListener(event, removeWarning, true);
+            });
+        }
+
+        async function handleIdleLogout() {
+            // Clear intervals
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (idleTimer) clearTimeout(idleTimer);
+
+            // Logout
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+
+            // Redirect with message
+            alert('Je bent uitgelogd wegens inactiviteit.');
+            window.location.href = '/login.html';
+        }
 
         // ============================================
         // META MARKETING FUNCTIONS
