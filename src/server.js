@@ -2513,7 +2513,7 @@ app.post('/api/auth/request-password-reset', async (req, res) => {
     const resetUrl = `https://dynamic-health-consultancy.nl/reset-password.html?token=${resetToken}`;
     
     try {
-      await sendEmail({
+      await sendMailResilient({
         from: process.env.SMTP_FROM || 'noreply@dynamic-health-consultancy.nl',
         to: user.email,
         subject: 'Wachtwoord Reset - Dynamic Health Consultancy',
