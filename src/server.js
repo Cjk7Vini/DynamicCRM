@@ -2249,33 +2249,6 @@ app.get('/api/practices', async (req, res) => {
   }
 });
 
-// GET /api/sources - List all lead sources for filter
-app.get('/api/sources', async (req, res) => {
-  try {
-    const sources = await withReadConnection(async (client) => {
-      const result = await client.query(`
-        SELECT 
-          bron,
-          COUNT(*) as count
-        FROM public.leads
-        WHERE bron IS NOT NULL
-        GROUP BY bron
-        ORDER BY count DESC
-      `);
-      return result.rows;
-    });
-    
-    res.json({
-      success: true,
-      sources: sources
-    });
-    
-  } catch (error) {
-    console.error('Sources API error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ============================================================================
 // AUTHENTICATION MIDDLEWARE
 // ============================================================================
