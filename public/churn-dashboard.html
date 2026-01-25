@@ -1300,15 +1300,6 @@
                 let html = '<table style="width: 100%; border-collapse: collapse;">';
                 html += '<thead><tr style="background: #f5f5f7; text-align: left;">';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Naam</th>';
-                
-                if (stage === 'awareness') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Datum Formulier</th>';
-                } else if (stage === 'intent') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
-                } else if (stage === 'won') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Lid Sinds</th>';
-                }
-                
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Email</th>';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Telefoon</th>';
                 html += '</tr></thead><tbody>';
@@ -1316,18 +1307,6 @@
                 data.leads.forEach(lead => {
                     html += '<tr style="border-bottom: 1px solid #e5e5e5;">';
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
-                    
-                    if (stage === 'awareness') {
-                        const date = lead.aangemaakt_op ? new Date(lead.aangemaakt_op).toLocaleDateString('nl-NL') : '-';
-                        html += `<td style="padding: 12px; font-size: 14px;">${date}</td>`;
-                    } else if (stage === 'intent') {
-                        const date = lead.afspraak_datum ? new Date(lead.afspraak_datum).toLocaleDateString('nl-NL') : '-';
-                        html += `<td style="padding: 12px; font-size: 14px;">${date}</td>`;
-                    } else if (stage === 'won') {
-                        const date = lead.lid_geworden_op ? new Date(lead.lid_geworden_op).toLocaleDateString('nl-NL') : '-';
-                        html += `<td style="padding: 12px; font-size: 14px;">${date}</td>`;
-                    }
-                    
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
                     html += '</tr>';
@@ -1814,7 +1793,7 @@
                 stages.forEach((stage, idx) => {
                     const percentage = (stage.count / total * 100).toFixed(1);
                     const convRate = idx > 0 ? stage.conversion_rate : '100.0';
-                    const isClickable = ['awareness', 'intent', 'won'].includes(stage.stage);
+                    const isClickable = ['awareness', 'intent'].includes(stage.stage);
                     const cursor = isClickable ? 'cursor: pointer;' : '';
                     const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
                     

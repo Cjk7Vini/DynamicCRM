@@ -2025,6 +2025,15 @@ app.get('/api/leads-by-stage', async (req, res) => {
       return res.status(400).json({ error: 'Stage parameter required' });
     }
     
+    // Block 'won' stage - no data available yet
+    if (stage === 'won') {
+      return res.json({
+        success: true,
+        stage: stage,
+        leads: []
+      });
+    }
+    
     const leads = await withReadConnection(async (client) => {
       let query = `
         SELECT 
@@ -2044,6 +2053,11 @@ app.get('/api/leads-by-stage', async (req, res) => {
       
       const params = [stage];
       let paramCount = 2;
+      
+      // For 'intent' (Benaderd), only show leads with actual appointment
+      if (stage === 'intent') {
+        query += ` AND afspraak_datum IS NOT NULL`;
+      }
       
       if (practice) {
         query += ` AND praktijk_code = $${paramCount++}`;
