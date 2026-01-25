@@ -2064,9 +2064,9 @@ app.get('/api/leads-by-stage', async (req, res) => {
       const params = [stage];
       let paramCount = 2;
       
-      // For 'intent' (Benaderd), only show leads with actual appointment
+      // Strict: Intent (Benaderd) requires appointment_date
       if (stage === 'intent') {
-        query += ` AND afspraak_datum IS NOT NULL`;
+        query += ` AND appointment_date IS NOT NULL`;
       }
       
       if (practice) {

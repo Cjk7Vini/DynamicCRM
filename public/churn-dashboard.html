@@ -1277,7 +1277,12 @@
             document.getElementById('leadsModal').classList.remove('active');
         }
 
+        let isLoadingLeads = false;
+        
         async function showLeadsForStage(stage, stageName) {
+            if (isLoadingLeads) return;
+            isLoadingLeads = true;
+            
             const modal = document.getElementById('leadsModal');
             const title = document.getElementById('leadsModalTitle');
             const content = document.getElementById('leadsModalContent');
@@ -1318,6 +1323,8 @@
             } catch (error) {
                 console.error('Load leads error:', error);
                 content.innerHTML = '<div style="text-align: center; padding: 40px; color: #c62828;">Fout bij laden leads</div>';
+            } finally {
+                isLoadingLeads = false;
             }
         }
 
