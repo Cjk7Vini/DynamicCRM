@@ -1413,7 +1413,7 @@
         // Load Source Performance
         async function loadSourcePerformance() {
             try {
-                const res = await fetch('/api/sources');
+                const res = await fetch('/api/sources' + buildQueryString());
                 const data = await res.json();
                 
                 if (data.success && data.sources) {
