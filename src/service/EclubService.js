@@ -181,7 +181,7 @@ export default class EclubService {
                            AND membership_start_date <= COALESCE($3::date, '2100-12-31')) as new_members,
           COUNT(*) FILTER (WHERE cancelled_date >= COALESCE($2::date, '1900-01-01')
                            AND cancelled_date <= COALESCE($3::date, '2100-12-31')) as churned_members,
-          ROUND(AVG(EXTRACT(DAY FROM (COALESCE(membership_end_date, CURRENT_DATE) - membership_start_date)))::numeric, 0) as avg_membership_days,
+          ROUND(AVG(EXTRACT(DAY FROM (COALESCE(membership_end_date, CURRENT_DATE) - membership_start_date)::interval))::numeric, 0) as avg_membership_days,
           SUM(visit_count) as total_visits,
           SUM(monthly_revenue) as total_monthly_revenue,
           SUM(total_revenue) as total_lifetime_revenue
