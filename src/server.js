@@ -1985,12 +1985,12 @@ app.get('/api/funnel', async (req, res) => {
     
     // Add stage names and calculate conversion rates
     const stageNames = {
-      'awareness': 'Awareness',
+      'awareness': 'Leads',
       'interest': 'Interest',
-      'intent': 'Intent',
+      'intent': 'Benaderd',
       'consideration': 'Consideration',
       'decision': 'Decision',
-      'won': 'Won',
+      'won': 'Lid',
       'lost': 'Lost'
     };
     
@@ -2012,6 +2012,58 @@ app.get('/api/funnel', async (req, res) => {
     
   } catch (error) {
     console.error('Funnel API error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/leads-by-stage - Get leads for a specific funnel stage
+app.get('/api/leads-by-stage', async (req, res) => {
+  try {
+    const { practice, stage } = req.query;
+    
+    if (!stage) {
+      return res.status(400).json({ error: 'Stage parameter required' });
+    }
+    
+    const leads = await withReadConnection(async (client) => {
+      let query = `
+        SELECT 
+          id,
+          volledige_naam,
+          emailadres,
+          telefoon,
+          bron,
+          aangemaakt_op,
+          afspraak_datum,
+          is_lid,
+          lid_geworden_op,
+          funnel_stage
+        FROM public.leads
+        WHERE funnel_stage = $1
+      `;
+      
+      const params = [stage];
+      let paramCount = 2;
+      
+      if (practice) {
+        query += ` AND praktijk_code = $${paramCount++}`;
+        params.push(practice);
+      }
+      
+      query += ` ORDER BY aangemaakt_op DESC LIMIT 100`;
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    });
+    
+    res.json({
+      success: true,
+      stage: stage,
+      leads: leads
+    });
+    
+  } catch (error) {
+    console.error('Leads by stage error:', error);
     res.status(500).json({ error: error.message });
   }
 });
