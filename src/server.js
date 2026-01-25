@@ -20,6 +20,7 @@ import pgSession from 'connect-pg-simple';
 import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
 import MetaService from './service/MetaService.js';
+import EclubService from './service/EclubService.js';
 
 const app = express();
 
@@ -141,6 +142,7 @@ app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 
 // Initialize MetaService with connection wrappers
 const metaService = new MetaService(withReadConnection, withWriteConnection);
+const eclubService = new EclubService(withReadConnection, withWriteConnection);
 
 // ✅ FIX: Homepage redirect naar landing.html in plaats van form.html
 app.get('/', (req, res) => {
@@ -2829,6 +2831,98 @@ app.post('/api/meta/sync-all', async (req, res) => {
     
   } catch (error) {
     console.error('Meta sync all error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// ECLUB API ENDPOINTS
+// Member data from Eclub integration
+// ============================================
+
+// GET /api/eclub/summary/:practiceCode - Member summary stats
+app.get('/api/eclub/summary/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const { dateFrom, dateTo } = req.query;
+
+    // Check access
+    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+
+    const summary = await eclubService.getMemberSummary(practiceCode, dateFrom, dateTo);
+
+    res.json({
+      success: true,
+      data: summary,
+      eclub_enabled: eclubService.isEclubEnabled(practiceCode)
+    });
+
+  } catch (error) {
+    console.error('Eclub summary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/eclub/members/:practiceCode - Member list
+app.get('/api/eclub/members/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const { status } = req.query;
+
+    // Check access
+    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+
+    const members = await eclubService.getMemberList(practiceCode, status);
+
+    res.json({
+      success: true,
+      members: members
+    });
+
+  } catch (error) {
+    console.error('Eclub members error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/eclub/sync/:practiceCode - Manual sync (admin only)
+app.post('/api/eclub/sync/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin toegang vereist' });
+    }
+
+    const { practiceCode } = req.params;
+    const result = await eclubService.syncPractice(practiceCode);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Eclub sync error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/eclub/sync-all - Sync all practices (admin only)
+app.post('/api/eclub/sync-all', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin toegang vereist' });
+    }
+
+    const results = await eclubService.syncAllPractices();
+
+    res.json({
+      success: true,
+      results: results
+    });
+
+  } catch (error) {
+    console.error('Eclub sync all error:', error);
     res.status(500).json({ error: error.message });
   }
 });
