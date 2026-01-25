@@ -1288,7 +1288,7 @@
             
             try {
                 const queryString = buildQueryString();
-                const url = `/api/leads-by-stage?stage=${stage}${queryString}`;
+                const url = `/api/leads-by-stage?stage=${stage}${queryString.replace('?', '&')}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
