@@ -1230,6 +1230,12 @@ app.get('/api/practice-performance', async (req, res) => {
         l.praktijk_code,
         p.naam AS praktijk_naam,
         COUNT(l.id)::int AS total_leads,
+        COUNT(DISTINCT DATE_TRUNC('month', l.aangemaakt_op))::int AS months_active,
+        CASE 
+          WHEN COUNT(DISTINCT DATE_TRUNC('month', l.aangemaakt_op)) > 0 
+          THEN ROUND(COUNT(l.id)::numeric / COUNT(DISTINCT DATE_TRUNC('month', l.aangemaakt_op))::numeric, 1)
+          ELSE 0
+        END AS avg_leads_per_month,
         COUNT(CASE WHEN l.status = 'Lid Geworden' THEN 1 END)::int AS lid_geworden,
         COUNT(CASE WHEN l.status = 'Afspraak Gepland' THEN 1 END)::int AS afspraak_gepland,
         COUNT(CASE WHEN l.status = 'Geweest' THEN 1 END)::int AS geweest,
@@ -2054,6 +2060,8 @@ app.get('/api/leads-by-stage', async (req, res) => {
           bron,
           aangemaakt_op,
           afspraak_datum,
+          appointment_date,
+          appointment_time,
           is_lid,
           lid_geworden_op,
           funnel_stage

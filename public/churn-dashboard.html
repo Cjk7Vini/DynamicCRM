@@ -1307,6 +1307,11 @@
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Naam</th>';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Email</th>';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Telefoon</th>';
+                
+                if (stage === 'intent') {
+                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
+                }
+                
                 html += '</tr></thead><tbody>';
                 
                 data.leads.forEach(lead => {
@@ -1314,6 +1319,23 @@
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
+                    
+                    if (stage === 'intent') {
+                        const appointmentDate = lead.appointment_date || lead.afspraak_datum;
+                        const appointmentTime = lead.appointment_time || '';
+                        let displayDate = '-';
+                        
+                        if (appointmentDate) {
+                            const date = new Date(appointmentDate);
+                            displayDate = date.toLocaleDateString('nl-NL');
+                            if (appointmentTime) {
+                                displayDate += ' ' + appointmentTime.substring(0, 5);
+                            }
+                        }
+                        
+                        html += `<td style="padding: 12px; font-size: 14px;">${displayDate}</td>`;
+                    }
+                    
                     html += '</tr>';
                 });
                 
@@ -1532,8 +1554,8 @@
                         data: {
                             labels: topPractices.map(d => d.praktijk_naam || d.praktijk_code),
                             datasets: [{
-                                label: 'Total Leads',
-                                data: topPractices.map(d => d.total_leads),
+                                label: 'Gemiddelde Leads per Maand',
+                                data: topPractices.map(d => parseFloat(d.avg_leads_per_month) || 0),
                                 backgroundColor: '#06c'
                             }]
                         },
