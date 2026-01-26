@@ -223,6 +223,81 @@ async function recordEvent({ lead_id = null, practice_code, event_type, actor = 
   });
 }
 
+/** 
+ * Send conversion event to Meta Conversions API
+ * @param {Object} leadData - Lead information
+ * @param {string} practiceCode - Practice code
+ * @param {Object} requestInfo - Request metadata (IP, user agent, etc.)
+ */
+async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
+  const pixelId = process.env.META_PIXEL_ID;
+  const accessToken = process.env[`META_ACCESS_TOKEN_${practiceCode}`];
+
+  // Skip if no pixel ID or access token configured
+  if (!pixelId || !accessToken) {
+    console.log(`⚠️ Meta Conversions API not configured for ${practiceCode}`);
+    return { success: false, reason: 'not_configured' };
+  }
+
+  try {
+    // Hash user data for privacy (GDPR compliant)
+    const hashSHA256 = (text) => {
+      if (!text) return null;
+      return crypto.createHash('sha256')
+        .update(text.toLowerCase().trim())
+        .digest('hex');
+    };
+
+    // Build event data
+    const eventData = {
+      data: [{
+        event_name: 'Lead',
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: 'website',
+        event_source_url: `https://dynamic-health-consultancy.nl/form.html?s=${practiceCode}`,
+        user_data: {
+          em: hashSHA256(leadData.emailadres),
+          ph: hashSHA256(leadData.telefoon),
+          client_ip_address: requestInfo.ip,
+          client_user_agent: requestInfo.userAgent,
+          fbc: requestInfo.fbc || null, // Facebook click ID from cookie
+          fbp: requestInfo.fbp || null  // Facebook browser ID from cookie
+        },
+        custom_data: {
+          practice_code: practiceCode,
+          lead_source: leadData.bron || 'website',
+          value: 1.00,
+          currency: 'EUR',
+          content_name: 'Fysio Lead Form'
+        }
+      }]
+    };
+
+    // Add test event code if in development
+    if (process.env.META_TEST_EVENT_CODE) {
+      eventData.test_event_code = process.env.META_TEST_EVENT_CODE;
+    }
+
+    // Send to Meta Conversions API
+    const response = await axios.post(
+      `https://graph.facebook.com/v18.0/${pixelId}/events`,
+      eventData,
+      {
+        params: { access_token: accessToken },
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 5000
+      }
+    );
+
+    console.log(`✅ Meta conversion event sent for ${practiceCode}:`, response.data);
+    return { success: true, data: response.data };
+
+  } catch (error) {
+    console.error(`❌ Meta conversion event failed for ${practiceCode}:`, error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 app.post('/events', async (req, res) => {
   try {
     const { lead_id = null, practice_code, event_type, metadata } = req.body || {};
@@ -602,6 +677,22 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
           }
         })();
       }
+    }
+
+    // Send Meta Conversion Event (non-blocking)
+    if (praktijk_code) {
+      sendMetaConversionEvent(
+        { emailadres, telefoon, volledige_naam, bron },
+        praktijk_code,
+        {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+          fbc: req.cookies?._fbc || null,
+          fbp: req.cookies?._fbp || null
+        }
+      ).catch(err => {
+        console.warn('Meta Conversion API failed (non-critical):', err.message);
+      });
     }
 
     if (req.is('application/x-www-form-urlencoded')) {
