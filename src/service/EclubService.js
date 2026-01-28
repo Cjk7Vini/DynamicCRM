@@ -335,11 +335,15 @@ export default class EclubService {
     console.log(`🔄 [ECLUB] Fetching members from branch ${branchId}...`);
 
     try {
-      // Fetch all members with pagination (max 50 per request)
+      // Fetch all active members with pagination
+      // Eclub API: GET /api/members/active?branchid={id}&take={count}&skip={offset}
       const members = await this.apiClient.getPaginated({
-        url: `/api/members/${branchId}`,
+        url: `/api/members/active`,
+        params: {
+          branchid: branchId  // Note: lowercase 'branchid' as per Eclub docs
+        },
         businessId: this.businessId,
-        pageSize: 50
+        pageSize: 25  // Max 25 per request as per Eclub docs
       });
 
       console.log(`📊 [ECLUB] Fetched ${members.length} members from branch ${branchId}`);

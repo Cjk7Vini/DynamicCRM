@@ -214,16 +214,17 @@ class EclubApiClient {
    * @param {number} options.pageSize - Items per page (default 50)
    * @returns {Promise<Array>} All items from all pages
    */
-  async getPaginated({ url, params = {}, businessId, pageSize = 50 }) {
+  async getPaginated({ url, params = {}, businessId, pageSize = 25 }) {
     let allItems = [];
-    let page = 1;
+    let skip = 0;
     let hasMore = true;
 
     while (hasMore) {
+      // Eclub uses 'skip' and 'take' parameters
       const pageParams = {
         ...params,
-        page,
-        pageSize
+        skip: skip,
+        take: pageSize
       };
 
       const response = await this.get({
@@ -239,16 +240,16 @@ class EclubApiClient {
 
       // Check if there are more pages
       hasMore = items.length === pageSize;
-      page++;
+      skip += pageSize;
 
       // Safety check to prevent infinite loops
-      if (page > 1000) {
-        console.warn(`⚠️ [ECLUB-API] Stopped pagination at page ${page} for safety`);
+      if (skip > 25000) {
+        console.warn(`⚠️ [ECLUB-API] Stopped pagination at skip ${skip} for safety`);
         break;
       }
     }
 
-    console.log(`📊 [ECLUB-API] Fetched ${allItems.length} items across ${page - 1} pages from ${url}`);
+    console.log(`📊 [ECLUB-API] Fetched ${allItems.length} items (skip/take pagination) from ${url}`);
     return allItems;
   }
 
