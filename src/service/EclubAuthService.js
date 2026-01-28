@@ -258,12 +258,32 @@ class EclubAuthService {
   }
 
   /**
-   * Clear cached token for a business (force re-auth)
-   * @param {string} businessId 
+   * Check if we have valid credentials configured
    */
-  clearCache(businessId) {
-    this.tokenCache.delete(businessId);
-    console.log(`🗑️ [ECLUB-AUTH] Cleared cache for businessId ${businessId}`);
+  hasCredentials() {
+    return !!(this.clientId && this.username && this.password);
+  }
+
+  /**
+   * Get token info for debugging
+   * @param {string} businessId 
+   * @returns {Object}
+   */
+  getTokenInfo(businessId) {
+    const cached = this.tokenCache.get(businessId);
+    if (!cached) {
+      return { cached: false, valid: false };
+    }
+
+    const expiresIn = Math.round((cached.expiresAt - Date.now()) / 1000 / 60);
+    
+    return {
+      cached: true,
+      valid: Date.now() < cached.expiresAt,
+      expiresAt: new Date(cached.expiresAt).toISOString(),
+      expiresIn: `${expiresIn} minutes`,
+      businessId: businessId
+    };
   }
 
   /**

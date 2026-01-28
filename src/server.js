@@ -3102,6 +3102,69 @@ app.post('/api/eclub/sync-all', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================
+// ECLUB TEST ENDPOINTS (for demo/debugging)
+// ============================================
+
+// Test Eclub authentication
+app.get('/api/eclub/test-auth', async (req, res) => {
+  try {
+    const result = await eclubService.testAuthentication();
+    res.json(result);
+  } catch (error) {
+    console.error('Eclub auth test error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+// Get available branches
+app.get('/api/eclub/branches', requireAuth, async (req, res) => {
+  try {
+    // Check admin auth
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const branches = await eclubService.getBranches();
+    
+    res.json({
+      success: true,
+      branches: branches,
+      count: branches.length
+    });
+
+  } catch (error) {
+    console.error('Get branches error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+// Clear Eclub caches
+app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    eclubService.clearCaches();
+    
+    res.json({
+      success: true,
+      message: 'All Eclub caches cleared'
+    });
+
+  } catch (error) {
+    console.error('Clear cache error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
