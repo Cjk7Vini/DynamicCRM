@@ -701,6 +701,69 @@
             font-size: 14px;
             margin-bottom: 16px;
         }
+
+        /* Eclub Sync Button */
+        .btn-sync {
+            width: 100%;
+            padding: 12px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-sync:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-sync:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sync-info {
+            padding: 12px;
+            background: #f5f5f7;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        /* Status Badge Fix - Ensure proper contrast */
+        .status-badge,
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            color: white !important;
+        }
+
+        .badge-active,
+        .status-active {
+            background: #10b981 !important;
+        }
+
+        .badge-frozen,
+        .status-frozen {
+            background: #f59e0b !important;
+        }
+
+        .badge-cancelled,
+        .status-cancelled,
+        .badge-lost {
+            background: #ef4444 !important;
+        }
+
+        .badge-default {
+            background: #6b7280 !important;
+        }
     </style>
 </head>
 <body>
@@ -825,6 +888,26 @@
                         <option value="Niet Geïnteresseerd">Niet Geïnteresseerd</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- Eclub Sync Section -->
+            <div class="sidebar-section" id="eclubSyncSection" style="display: none;">
+                <div class="sidebar-title">Eclub Sync</div>
+                
+                <div class="sync-info" id="eclubSyncInfo">
+                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
+                        Laatste sync: <span id="lastSyncTime">-</span>
+                    </div>
+                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
+                        Leden: <span id="eclubMemberCount">-</span>
+                    </div>
+                </div>
+
+                <button id="btnEclubSync" class="btn-sync" onclick="syncEclubData()">
+                    <span id="syncButtonText">🔄 Sync Leden</span>
+                </button>
+
+                <div id="syncStatus" style="margin-top: 12px; font-size: 13px; display: none;"></div>
             </div>
         </aside>
 
@@ -2442,6 +2525,111 @@
             if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
             return num.toString();
         }
+
+        // ============================================
+        // ECLUB SYNC FUNCTIONS
+        // ============================================
+
+        // Load Eclub data for selected practice
+        async function loadEclubData() {
+            const practiceCode = document.getElementById('practiceFilter').value;
+            
+            if (!practiceCode) {
+                document.getElementById('eclubSyncSection').style.display = 'none';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/eclub/summary/${practiceCode}`);
+                const data = await res.json();
+
+                if (data.success && data.eclub_enabled) {
+                    document.getElementById('eclubSyncSection').style.display = 'block';
+                    document.getElementById('eclubMemberCount').textContent = 
+                        `${data.data.active_members} actief, ${data.data.frozen_members} bevroren`;
+                    
+                    if (data.data.last_sync) {
+                        const lastSync = new Date(data.data.last_sync);
+                        document.getElementById('lastSyncTime').textContent = 
+                            lastSync.toLocaleString('nl-NL');
+                    } else {
+                        document.getElementById('lastSyncTime').textContent = 'Nog niet gesynchroniseerd';
+                    }
+                } else {
+                    document.getElementById('eclubSyncSection').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading Eclub data:', error);
+                document.getElementById('eclubSyncSection').style.display = 'none';
+            }
+        }
+
+        // Sync Eclub data
+        async function syncEclubData() {
+            const practiceCode = document.getElementById('practiceFilter').value;
+            
+            if (!practiceCode) {
+                alert('Selecteer eerst een praktijk');
+                return;
+            }
+
+            const btn = document.getElementById('btnEclubSync');
+            const statusDiv = document.getElementById('syncStatus');
+            const btnText = document.getElementById('syncButtonText');
+            
+            // Disable button
+            btn.disabled = true;
+            btnText.textContent = '⏳ Synchroniseren...';
+            statusDiv.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/eclub/sync/${practiceCode}`, {
+                    method: 'POST'
+                });
+                
+                const data = await res.json();
+
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div style="color: #10b981; font-weight: 600;">
+                            ✅ ${data.recordsSynced} leden gesynchroniseerd
+                        </div>
+                    `;
+                    statusDiv.style.display = 'block';
+
+                    // Reload Eclub data
+                    setTimeout(() => {
+                        loadEclubData();
+                        statusDiv.style.display = 'none';
+                    }, 3000);
+                } else {
+                    statusDiv.innerHTML = `
+                        <div style="color: #ef4444; font-weight: 600;">
+                            ❌ Sync mislukt: ${data.error}
+                        </div>
+                    `;
+                    statusDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                statusDiv.innerHTML = `
+                    <div style="color: #ef4444; font-weight: 600;">
+                        ❌ Fout: ${error.message}
+                    </div>
+                `;
+                statusDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = '🔄 Sync Leden';
+            }
+        }
+
+        // Update applyFilters to also load Eclub data
+        const originalApplyFilters = applyFilters;
+        applyFilters = function() {
+            originalApplyFilters();
+            loadEclubData();
+        };
     </script>
 </body>
 </html>
