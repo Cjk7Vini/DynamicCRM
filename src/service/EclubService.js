@@ -397,7 +397,7 @@ export default class EclubService {
       status: this.mapMemberStatus(member.status || member.membershipStatus),
       membership_type: member.membershipType || member.subscriptionType || member.type || null,
       membership_start_date: member.membershipStartDate || member.startDate || member.joinDate || null,
-      monthly_revenue: parseFloat(member.monthlyRevenue || member.monthlyFee || member.subscription Fee || 0),
+      monthly_revenue: parseFloat(member.monthlyRevenue || member.monthlyFee || member.subscriptionFee || 0),
       visit_count: parseInt(member.visitCount || member.visits || member.checkIns || 0),
       last_visit_date: member.lastVisitDate || member.lastVisit || member.lastCheckIn || null
     };
