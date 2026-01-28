@@ -1404,6 +1404,10 @@
                     html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
                 }
                 
+                if (stage === 'lost') {
+                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Status</th>';
+                }
+                
                 html += '</tr></thead><tbody>';
                 
                 data.leads.forEach(lead => {
@@ -1426,6 +1430,10 @@
                         }
                         
                         html += `<td style="padding: 12px; font-size: 14px;">${displayDate}</td>`;
+                    }
+                    
+                    if (stage === 'lost') {
+                        html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${lead.status || 'Niet Geïnteresseerd'}</span></td>`;
                     }
                     
                     html += '</tr>';
@@ -1914,7 +1922,8 @@
                 stages.forEach((stage, idx) => {
                     const percentage = (stage.count / total * 100).toFixed(1);
                     const convRate = idx > 0 ? stage.conversion_rate : '100.0';
-                    const isClickable = ['awareness', 'intent'].includes(stage.stage);
+                    // Make awareness, intent, and lost clickable
+                    const isClickable = ['awareness', 'intent', 'lost'].includes(stage.stage);
                     const cursor = isClickable ? 'cursor: pointer;' : '';
                     const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
                     
