@@ -2009,8 +2009,8 @@
                 stages.forEach((stage, idx) => {
                     const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
                     const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
-                    // Make awareness and lost clickable
-                    const isClickable = ['awareness', 'lost'].includes(stage.stage);
+                    // Make awareness, intent, and lost clickable
+                    const isClickable = ['awareness', 'intent', 'lost'].includes(stage.stage);
                     const cursor = isClickable ? 'cursor: pointer;' : '';
                     const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
                     
