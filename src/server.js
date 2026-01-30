@@ -2091,16 +2091,21 @@ app.get('/api/funnel', async (req, res) => {
       'lost': 'Lost'
     };
     
-    const enrichedStages = stages.map((stage, idx) => ({
-      stage: stage.funnel_stage,
-      stage_name: stageNames[stage.funnel_stage] || stage.funnel_stage,
-      count: parseInt(stage.count),
-      avg_likelihood: parseFloat(stage.avg_likelihood) || 0,
-      pipeline_value: parseFloat(stage.pipeline_value) || 0,
-      conversion_rate: idx > 0 
-        ? ((stage.count / stages[idx - 1].count) * 100).toFixed(1)
-        : 100
-    }));
+    const enrichedStages = stages.map((stage, idx) => {
+      const currentCount = parseInt(stage.count) || 0;
+      const prevCount = idx > 0 ? (parseInt(stages[idx - 1].count) || 0) : 0;
+      
+      return {
+        stage: stage.funnel_stage,
+        stage_name: stageNames[stage.funnel_stage] || stage.funnel_stage,
+        count: currentCount,
+        avg_likelihood: parseFloat(stage.avg_likelihood) || 0,
+        pipeline_value: parseFloat(stage.pipeline_value) || 0,
+        conversion_rate: idx > 0 && prevCount > 0
+          ? ((currentCount / prevCount) * 100).toFixed(1)
+          : '100.0'
+      };
+    });
     
     // Add Won (Lid) stage with 0 count
     enrichedStages.push({
