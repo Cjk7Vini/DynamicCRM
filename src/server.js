@@ -2031,13 +2031,19 @@ app.get('/api/funnel', async (req, res) => {
     const stages = await withReadConnection(async (client) => {
       let query = `
         SELECT 
-          funnel_stage,
+          CASE
+            WHEN status = 'Nieuw' OR status IS NULL THEN 'awareness'
+            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 'contacted'
+            WHEN status = 'Geweest' THEN 'consideration'
+            WHEN status = 'Lid Geworden' THEN 'won'
+            WHEN status = 'Niet Geïnteresseerd' THEN 'lost'
+            ELSE 'awareness'
+          END as funnel_stage,
           COUNT(*) as count,
-          ROUND(AVG(conversion_likelihood), 2) as avg_likelihood,
-          SUM(expected_value) as pipeline_value
+          ROUND(AVG(COALESCE(conversion_likelihood, 0)), 2) as avg_likelihood,
+          SUM(COALESCE(expected_value, 0)) as pipeline_value
         FROM public.leads
         WHERE 1=1
-        AND funnel_stage != 'won'
       `;
       
       const params = [];
@@ -2065,15 +2071,13 @@ app.get('/api/funnel', async (req, res) => {
       
       query += `
         GROUP BY funnel_stage
+        HAVING funnel_stage != 'won'
         ORDER BY 
           CASE funnel_stage
             WHEN 'awareness' THEN 1
             WHEN 'contacted' THEN 2
-            WHEN 'interest' THEN 3
-            WHEN 'intent' THEN 4
-            WHEN 'consideration' THEN 5
-            WHEN 'decision' THEN 6
-            WHEN 'lost' THEN 7
+            WHEN 'consideration' THEN 3
+            WHEN 'lost' THEN 4
           END
       `;
       
@@ -2085,10 +2089,7 @@ app.get('/api/funnel', async (req, res) => {
     const stageNames = {
       'awareness': 'Leads',
       'contacted': 'Benaderd',
-      'interest': 'Interest',
-      'intent': 'Intent',
-      'consideration': 'Consideration',
-      'decision': 'Decision',
+      'consideration': 'Geweest',
       'won': 'Lid',
       'lost': 'Lost'
     };
