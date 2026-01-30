@@ -2071,18 +2071,40 @@ app.get('/api/funnel', async (req, res) => {
       
       query += `
         GROUP BY funnel_stage
-        HAVING funnel_stage != 'won'
         ORDER BY 
           CASE funnel_stage
             WHEN 'awareness' THEN 1
             WHEN 'contacted' THEN 2
             WHEN 'consideration' THEN 3
-            WHEN 'lost' THEN 4
+            WHEN 'won' THEN 4
+            WHEN 'lost' THEN 5
           END
       `;
       
       const result = await client.query(query, params);
-      return result.rows;
+      
+      // Ensure all stages are present, even with 0 count
+      const allStages = ['awareness', 'contacted', 'consideration', 'lost'];
+      const stageMap = {};
+      result.rows.forEach(row => {
+        if (row.funnel_stage !== 'won') {
+          stageMap[row.funnel_stage] = row;
+        }
+      });
+      
+      const completeStages = allStages.map(stage => {
+        if (stageMap[stage]) {
+          return stageMap[stage];
+        }
+        return {
+          funnel_stage: stage,
+          count: '0',
+          avg_likelihood: '0',
+          pipeline_value: '0'
+        };
+      });
+      
+      return completeStages;
     });
     
     // Add stage names and calculate conversion rates
@@ -2122,7 +2144,10 @@ app.get('/api/funnel', async (req, res) => {
     
   } catch (error) {
     console.error('Funnel API error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
   }
 });
 
