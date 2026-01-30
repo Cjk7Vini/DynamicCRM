@@ -2031,19 +2031,13 @@ app.get('/api/funnel', async (req, res) => {
     const stages = await withReadConnection(async (client) => {
       let query = `
         SELECT 
-          CASE
-            WHEN status = 'Nieuw' OR status IS NULL THEN 'awareness'
-            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 'contacted'
-            WHEN status = 'Geweest' THEN 'consideration'
-            WHEN status = 'Lid Geworden' THEN 'won'
-            WHEN status = 'Niet Geïnteresseerd' THEN 'lost'
-            ELSE 'awareness'
-          END as funnel_stage,
+          funnel_stage,
           COUNT(*) as count,
-          ROUND(AVG(COALESCE(conversion_likelihood, 0)), 2) as avg_likelihood,
-          SUM(COALESCE(expected_value, 0)) as pipeline_value
+          ROUND(AVG(conversion_likelihood), 2) as avg_likelihood,
+          SUM(expected_value) as pipeline_value
         FROM public.leads
         WHERE 1=1
+        AND funnel_stage != 'won'
       `;
       
       const params = [];
@@ -2070,57 +2064,29 @@ app.get('/api/funnel', async (req, res) => {
       }
       
       query += `
-        GROUP BY 
-          CASE
-            WHEN status = 'Nieuw' OR status IS NULL THEN 'awareness'
-            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 'contacted'
-            WHEN status = 'Geweest' THEN 'consideration'
-            WHEN status = 'Lid Geworden' THEN 'won'
-            WHEN status = 'Niet Geïnteresseerd' THEN 'lost'
-            ELSE 'awareness'
-          END
+        GROUP BY funnel_stage
         ORDER BY 
-          CASE
-            WHEN status = 'Nieuw' OR status IS NULL THEN 1
-            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 2
-            WHEN status = 'Geweest' THEN 3
-            WHEN status = 'Lid Geworden' THEN 4
-            WHEN status = 'Niet Geïnteresseerd' THEN 5
-            ELSE 1
+          CASE funnel_stage
+            WHEN 'awareness' THEN 1
+            WHEN 'interest' THEN 2
+            WHEN 'intent' THEN 3
+            WHEN 'consideration' THEN 4
+            WHEN 'decision' THEN 5
+            WHEN 'lost' THEN 6
           END
       `;
       
       const result = await client.query(query, params);
-      
-      // Ensure all stages are present, even with 0 count
-      const allStages = ['awareness', 'contacted', 'consideration', 'lost'];
-      const stageMap = {};
-      result.rows.forEach(row => {
-        if (row.funnel_stage !== 'won') {
-          stageMap[row.funnel_stage] = row;
-        }
-      });
-      
-      const completeStages = allStages.map(stage => {
-        if (stageMap[stage]) {
-          return stageMap[stage];
-        }
-        return {
-          funnel_stage: stage,
-          count: '0',
-          avg_likelihood: '0',
-          pipeline_value: '0'
-        };
-      });
-      
-      return completeStages;
+      return result.rows;
     });
     
     // Add stage names and calculate conversion rates
     const stageNames = {
       'awareness': 'Leads',
-      'contacted': 'Benaderd',
-      'consideration': 'Geweest',
+      'interest': 'Interest',
+      'intent': 'Benaderd',
+      'consideration': 'Consideration',
+      'decision': 'Decision',
       'won': 'Lid',
       'lost': 'Lost'
     };
@@ -2153,10 +2119,7 @@ app.get('/api/funnel', async (req, res) => {
     
   } catch (error) {
     console.error('Funnel API error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
