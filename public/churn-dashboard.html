@@ -362,6 +362,7 @@
         }
 
         .funnel-bar.awareness { background: #3b82f6; }
+        .funnel-bar.contacted { background: #10b981; }
         .funnel-bar.interest { background: #06b6d4; }
         .funnel-bar.intent { background: #10b981; }
         .funnel-bar.consideration { background: #f59e0b; }
@@ -856,6 +857,18 @@
                     <select id="practiceFilter" onchange="applyFilters()">
                         <option value="">Alle praktijken</option>
                     </select>
+                </div>
+
+                <!-- Practice Search (Admin Only) -->
+                <div class="filter-group" id="practiceSearchGroup" style="display: none;">
+                    <label class="filter-label" for="practiceSearch">Zoek praktijk</label>
+                    <input 
+                        type="text" 
+                        id="practiceSearch" 
+                        placeholder="Type om te zoeken..."
+                        oninput="filterPractices()"
+                        style="width: 100%; padding: 8px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 14px;"
+                    >
                 </div>
 
                 <div class="filter-group">
@@ -1479,12 +1492,17 @@
         }
 
         // Load practices for dropdown
+        // Store all practices globally for search
+        let allPractices = [];
+
         async function loadPractices() {
             try {
                 const res = await fetch('/api/churn/practices');
                 const data = await res.json();
                 
                 if (data.success && data.practices) {
+                    allPractices = data.practices; // Store globally
+                    
                     const select = document.getElementById('practiceFilter');
                     select.innerHTML = '<option value="">Alle praktijken</option>';
                     
@@ -1492,11 +1510,35 @@
                         const option = document.createElement('option');
                         option.value = practice.code;
                         option.textContent = practice.naam;
+                        option.dataset.naam = practice.naam.toLowerCase();
                         select.appendChild(option);
                     });
+
+                    // Show search box for admin only
+                    if (currentUser && currentUser.role === 'admin') {
+                        document.getElementById('practiceSearchGroup').style.display = 'block';
+                    }
                 }
             } catch (error) {
                 console.error('Error loading practices:', error);
+            }
+        }
+
+        // Filter practices based on search input (admin only)
+        function filterPractices() {
+            const searchInput = document.getElementById('practiceSearch').value.toLowerCase();
+            const select = document.getElementById('practiceFilter');
+            const options = select.getElementsByTagName('option');
+
+            for (let i = 1; i < options.length; i++) { // Skip first "Alle praktijken"
+                const option = options[i];
+                const naam = option.dataset.naam || option.textContent.toLowerCase();
+                
+                if (naam.includes(searchInput)) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
             }
         }
 
@@ -1919,15 +1961,34 @@
                     return;
                 }
                 
-                const stages = data.stages;
-                const total = stages[0]?.count || 1;
+                // Define expected stages with defaults
+                const expectedStages = [
+                    { stage: 'awareness', stage_name: 'Leads', count: 0 },
+                    { stage: 'contacted', stage_name: 'Benaderd', count: 0 },
+                    { stage: 'won', stage_name: 'Lid', count: 0 }
+                ];
+
+                // Merge with actual data
+                const stagesMap = {};
+                data.stages.forEach(stage => {
+                    stagesMap[stage.stage] = stage;
+                });
+
+                const stages = expectedStages.map(expected => {
+                    if (stagesMap[expected.stage]) {
+                        return stagesMap[expected.stage];
+                    }
+                    return expected;
+                });
+
+                const total = Math.max(stages[0]?.count || 1, 1);
                 
                 let html = '';
                 stages.forEach((stage, idx) => {
-                    const percentage = (stage.count / total * 100).toFixed(1);
-                    const convRate = idx > 0 ? stage.conversion_rate : '100.0';
-                    // Make awareness, intent, and lost clickable
-                    const isClickable = ['awareness', 'intent', 'lost'].includes(stage.stage);
+                    const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
+                    const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
+                    // Make awareness and lost clickable
+                    const isClickable = ['awareness', 'lost'].includes(stage.stage);
                     const cursor = isClickable ? 'cursor: pointer;' : '';
                     const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
                     
@@ -1938,7 +1999,7 @@
                                 <span class="funnel-count">${stage.count}</span>
                             </div>
                             <div class="funnel-stats">
-                                <div>${percentage}% of total</div>
+                                <div>${(stage.count / total * 100).toFixed(1)}% of total</div>
                                 ${idx > 0 ? `<span class="conversion-rate">${convRate}% conversion</span>` : ''}
                             </div>
                         </div>
