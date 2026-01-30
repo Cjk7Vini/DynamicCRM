@@ -2070,14 +2070,23 @@ app.get('/api/funnel', async (req, res) => {
       }
       
       query += `
-        GROUP BY funnel_stage
+        GROUP BY 
+          CASE
+            WHEN status = 'Nieuw' OR status IS NULL THEN 'awareness'
+            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 'contacted'
+            WHEN status = 'Geweest' THEN 'consideration'
+            WHEN status = 'Lid Geworden' THEN 'won'
+            WHEN status = 'Niet Geïnteresseerd' THEN 'lost'
+            ELSE 'awareness'
+          END
         ORDER BY 
-          CASE funnel_stage
-            WHEN 'awareness' THEN 1
-            WHEN 'contacted' THEN 2
-            WHEN 'consideration' THEN 3
-            WHEN 'won' THEN 4
-            WHEN 'lost' THEN 5
+          CASE
+            WHEN status = 'Nieuw' OR status IS NULL THEN 1
+            WHEN status IN ('Gebeld', 'Afspraak Gepland') THEN 2
+            WHEN status = 'Geweest' THEN 3
+            WHEN status = 'Lid Geworden' THEN 4
+            WHEN status = 'Niet Geïnteresseerd' THEN 5
+            ELSE 1
           END
       `;
       
