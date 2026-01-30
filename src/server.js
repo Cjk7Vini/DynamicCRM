@@ -2031,13 +2031,19 @@ app.get('/api/funnel', async (req, res) => {
     const stages = await withReadConnection(async (client) => {
       let query = `
         SELECT 
-          funnel_stage,
+          CASE
+            WHEN status IN ('Nieuw', 'Niet Benaderd') OR status IS NULL THEN 'awareness'
+            WHEN status IN ('Gebeld', 'Benaderd', 'Afspraak Gepland') THEN 'contacted'
+            WHEN status IN ('Geweest') THEN 'consideration'
+            WHEN status = 'Lid Geworden' THEN 'won'
+            WHEN status = 'Niet Geïnteresseerd' THEN 'lost'
+            ELSE 'awareness'
+          END as funnel_stage,
           COUNT(*) as count,
-          ROUND(AVG(conversion_likelihood), 2) as avg_likelihood,
-          SUM(expected_value) as pipeline_value
+          ROUND(AVG(COALESCE(conversion_likelihood, 0)), 2) as avg_likelihood,
+          SUM(COALESCE(expected_value, 0)) as pipeline_value
         FROM public.leads
         WHERE 1=1
-        AND funnel_stage != 'won'
       `;
       
       const params = [];
@@ -2065,14 +2071,13 @@ app.get('/api/funnel', async (req, res) => {
       
       query += `
         GROUP BY funnel_stage
+        HAVING funnel_stage != 'won'
         ORDER BY 
           CASE funnel_stage
             WHEN 'awareness' THEN 1
-            WHEN 'interest' THEN 2
-            WHEN 'intent' THEN 3
-            WHEN 'consideration' THEN 4
-            WHEN 'decision' THEN 5
-            WHEN 'lost' THEN 6
+            WHEN 'contacted' THEN 2
+            WHEN 'consideration' THEN 3
+            WHEN 'lost' THEN 4
           END
       `;
       
@@ -2083,10 +2088,8 @@ app.get('/api/funnel', async (req, res) => {
     // Add stage names and calculate conversion rates
     const stageNames = {
       'awareness': 'Leads',
-      'interest': 'Interest',
-      'intent': 'Benaderd',
-      'consideration': 'Consideration',
-      'decision': 'Decision',
+      'contacted': 'Benaderd',
+      'consideration': 'Geweest',
       'won': 'Lid',
       'lost': 'Lost'
     };
@@ -2101,16 +2104,6 @@ app.get('/api/funnel', async (req, res) => {
         ? ((stage.count / stages[idx - 1].count) * 100).toFixed(1)
         : 100
     }));
-    
-    // Add Won (Lid) stage with 0 count
-    enrichedStages.push({
-      stage: 'won',
-      stage_name: 'Lid',
-      count: 0,
-      avg_likelihood: 0,
-      pipeline_value: 0,
-      conversion_rate: '0.0'
-    });
     
     res.json({
       success: true,

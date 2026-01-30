@@ -1526,19 +1526,41 @@
 
         // Filter practices based on search input (admin only)
         function filterPractices() {
-            const searchInput = document.getElementById('practiceSearch').value.toLowerCase();
+            const searchInput = document.getElementById('practiceSearch').value.toLowerCase().trim();
             const select = document.getElementById('practiceFilter');
+            
+            if (!searchInput) {
+                // Reset - show all options
+                const options = select.getElementsByTagName('option');
+                for (let i = 0; i < options.length; i++) {
+                    options[i].style.display = '';
+                }
+                return;
+            }
+
+            // Filter and focus dropdown
             const options = select.getElementsByTagName('option');
+            let firstMatch = null;
 
             for (let i = 1; i < options.length; i++) { // Skip first "Alle praktijken"
                 const option = options[i];
-                const naam = option.dataset.naam || option.textContent.toLowerCase();
+                const naam = option.textContent.toLowerCase();
                 
                 if (naam.includes(searchInput)) {
                     option.style.display = '';
+                    if (!firstMatch) {
+                        firstMatch = option;
+                    }
                 } else {
                     option.style.display = 'none';
                 }
+            }
+
+            // Auto-select first match if exists
+            if (firstMatch && allPractices.length > 0) {
+                select.value = firstMatch.value;
+                // Trigger change to update dashboard
+                select.dispatchEvent(new Event('change'));
             }
         }
 
