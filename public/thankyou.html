@@ -243,7 +243,7 @@
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
-          <span class="info-text">We bellen binnen 1 werkdag</span>
+          <span class="info-text">We nemen telefonisch contact met je op</span>
         </div>
         
         <div class="info-item">
@@ -251,13 +251,6 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
           <span class="info-text">Check je email voor bevestiging</span>
-        </div>
-        
-        <div class="info-item">
-          <svg viewBox="0 0 24 24">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-          </svg>
-          <span class="info-text">Houd je telefoon bij de hand</span>
         </div>
       </div>
       
@@ -267,7 +260,7 @@
         <div class="step">
           <div class="step-number">1</div>
           <div class="step-text">
-            We ontvangen je aanmelding en beoordelen je wensen
+            We ontvangen je aanmelding en bekijken je gegevens
           </div>
         </div>
         
@@ -330,11 +323,8 @@
       
       if (seconds <= 0) {
         clearInterval(interval);
-        window.close();
-        // If window.close() doesn't work (popup blocker), redirect to homepage
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 500);
+        // Redirect to Dynamic Health homepage
+        window.location.href = 'https://dynamic-health-consultancy.nl/index.html';
       }
     }, 1000);
     
