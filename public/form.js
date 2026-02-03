@@ -208,23 +208,10 @@
           console.error('Server detail:', json.details);
           return;
         }
-        // Success! Show modal with practice name
+        // Success! Redirect to thank you page for Meta conversion tracking
         const leadId = json?.lead?.id ?? null;
         
-        // Get practice name from validation result
-        let practiceName = validation?.practice?.naam || 'de praktijk';
-        
-        // Trigger success modal (defined in form.html)
-        if (typeof showSuccessModal === 'function') {
-          showSuccessModal(practiceName);
-        } else {
-          // Fallback to old method if modal not available
-          msg.textContent = 'Bedankt! Je aanmelding is verstuurd. We nemen snel contact op.';
-          msg.className = 'success';
-          // Note: form is NOT reset - data blijft staan
-        }
-        
-        // Log event
+        // Log event before redirect
         if (code) {
           postEvent({
             lead_id: leadId,
@@ -234,8 +221,9 @@
           });
         }
         
-        // Keep hidden field populated
-        hidden.value = code;
+        // Redirect to thank you page
+        // Meta will track this as a conversion (pageview on /thankyou.html)
+        window.location.href = `/thankyou.html?s=${code}`;
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';
