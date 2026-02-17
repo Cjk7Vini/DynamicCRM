@@ -8,14 +8,14 @@ class MetaService {
     this.baseUrl = 'https://graph.facebook.com/v22.0';
   }
 
-  // Get credentials for practice from environment variables
+  // Get credentials - centralized for all practices (1 account, 1 pixel)
   getCredentials(practiceCode) {
-    const accessToken = process.env[`META_ACCESS_TOKEN_${practiceCode}`];
-    const adAccountId = process.env[`META_AD_ACCOUNT_${practiceCode}`];
-    const pixelId = process.env[`META_PIXEL_${practiceCode}`];
+    const accessToken = process.env.META_ACCESS_TOKEN;
+    const adAccountId = process.env.META_AD_ACCOUNT;
+    const pixelId = process.env.META_PIXEL_ID;
 
     if (!accessToken || !adAccountId) {
-      throw new Error(`Meta credentials not configured for ${practiceCode}`);
+      throw new Error(`Meta credentials not configured (META_ACCESS_TOKEN / META_AD_ACCOUNT missing)`);
     }
 
     return { accessToken, adAccountId, pixelId };

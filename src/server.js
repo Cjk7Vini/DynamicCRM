@@ -231,7 +231,7 @@ async function recordEvent({ lead_id = null, practice_code, event_type, actor = 
  */
 async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
   const pixelId = process.env.META_PIXEL_ID;
-  const accessToken = process.env[`META_ACCESS_TOKEN_${practiceCode}`];
+  const accessToken = process.env.META_ACCESS_TOKEN;
 
   // Skip if no pixel ID or access token configured
   if (!pixelId || !accessToken) {
