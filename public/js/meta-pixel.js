@@ -8,7 +8,7 @@
   'use strict';
 
   // Meta Pixel ID
-  const PIXEL_ID = '1177365577340703';
+  const PIXEL_ID = '662300986944267';
 
   // Initialize Meta Pixel
   !function(f,b,e,v,n,t,s) {
