@@ -71,31 +71,71 @@ class MetaService {
     }
   }
 
+  // Fetch custom conversion data from Meta Pixel API
+  async fetchCustomConversions(pixelId, accessToken, dateFrom, dateTo) {
+    try {
+      console.log(`📊 Fetching custom conversions for pixel ${pixelId}...`);
+      
+      const response = await axios.get(
+        `${this.baseUrl}/${pixelId}`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'name,id',
+          },
+          timeout: 30000
+        }
+      );
+
+      console.log(`✅ Pixel data retrieved`);
+      
+      // Note: Custom conversion data is aggregated at campaign level
+      // We'll rely on the actions data from campaign insights
+      return response.data || {};
+      
+    } catch (error) {
+      console.warn('⚠️ Could not fetch custom conversions:', error.message);
+      return {};
+    }
+  }
+
   // Parse conversions from Meta's actions array
   parseConversions(actions) {
     if (!actions || !Array.isArray(actions)) return 0;
     
-    // Look for lead conversion actions
-    const leadAction = actions.find(a => 
+    // Look for ANY conversion actions (including custom conversions)
+    // Custom conversions appear as: offsite_conversion.custom.{conversion_id}
+    const conversionActions = actions.filter(a => 
       a.action_type === 'lead' || 
       a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      a.action_type === 'onsite_conversion.lead_grouped'
+      a.action_type === 'onsite_conversion.lead_grouped' ||
+      a.action_type.includes('offsite_conversion.custom') || // Custom conversions!
+      a.action_type.includes('offsite_conversion.fb_pixel_custom')
     );
     
-    return leadAction ? parseInt(leadAction.value) || 0 : 0;
+    // Sum all conversion values
+    const totalConversions = conversionActions.reduce((sum, action) => {
+      return sum + (parseInt(action.value) || 0);
+    }, 0);
+    
+    return totalConversions;
   }
 
-  // Parse cost per conversion
+  // Parse cost per conversion (including custom conversions)
   parseCostPerConversion(costPerActionType) {
     if (!costPerActionType || !Array.isArray(costPerActionType)) return 0;
     
-    const leadCost = costPerActionType.find(c => 
+    // Look for ANY conversion cost (including custom conversions)
+    const conversionCosts = costPerActionType.filter(c => 
       c.action_type === 'lead' ||
       c.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      c.action_type === 'onsite_conversion.lead_grouped'
+      c.action_type === 'onsite_conversion.lead_grouped' ||
+      c.action_type.includes('offsite_conversion.custom') ||
+      c.action_type.includes('offsite_conversion.fb_pixel_custom')
     );
     
-    return leadCost ? parseFloat(leadCost.value) || 0 : 0;
+    // Return first found cost, or 0
+    return conversionCosts.length > 0 ? parseFloat(conversionCosts[0].value) || 0 : 0;
   }
 
   // Sync data for a specific practice

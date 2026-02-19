@@ -1119,7 +1119,9 @@
                 <div class="meta-charts-grid">
                     <div class="meta-chart-container">
                         <div class="meta-chart-title">Campaign Performance</div>
-                        <canvas id="metaCampaignChart" height="250"></canvas>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <canvas id="metaCampaignChart"></canvas>
+                        </div>
                     </div>
 
                     <div class="meta-chart-container">
@@ -2346,7 +2348,7 @@
             const dateTo = document.getElementById('dateTo').value || new Date().toISOString().split('T')[0];
             
             try {
-                // Get summary
+                // Get summary (conversies komen uit Meta API via sync)
                 const summaryRes = await fetch(
                     `/api/meta/summary/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
                 );
