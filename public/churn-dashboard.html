@@ -2368,18 +2368,29 @@
                 
                 // Get verified leads from database (bron = Facebook or Instagram)
                 try {
-                    const leadsRes = await fetch(`/api/leads?practice=${practiceCode}&dateFrom=${dateFrom}&dateTo=${dateTo}`);
+                    const leadsRes = await fetch(`/api/leads`);
                     const leadsData = await leadsRes.json();
                     
-                    if (leadsData.success && leadsData.leads) {
-                        // Filter leads with bron = 'Facebook' or 'Instagram'
-                        const metaLeads = leadsData.leads.filter(lead => {
+                    // API returns array directly, not { success: true, leads: [...] }
+                    if (Array.isArray(leadsData)) {
+                        // Filter by practice code and date range
+                        const practiceLeads = leadsData.filter(lead => {
+                            // Match practice
+                            if (lead.praktijk_code !== practiceCode) return false;
+                            
+                            // Match date range
+                            const leadDate = new Date(lead.aangemaakt_op);
+                            const from = new Date(dateFrom);
+                            const to = new Date(dateTo);
+                            if (leadDate < from || leadDate > to) return false;
+                            
+                            // Match bron (Facebook or Instagram)
                             const bron = (lead.bron || '').toLowerCase();
                             return bron === 'facebook' || bron === 'instagram';
                         });
                         
                         // Add verified leads count to summary
-                        summary.verified_leads = metaLeads.length;
+                        summary.verified_leads = practiceLeads.length;
                     } else {
                         summary.verified_leads = 0;
                     }
