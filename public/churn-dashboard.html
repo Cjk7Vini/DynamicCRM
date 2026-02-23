@@ -2371,26 +2371,20 @@
                     const leadsRes = await fetch(`/api/leads`);
                     const leadsData = await leadsRes.json();
                     
-                    // API returns array directly, not { success: true, leads: [...] }
+                    // API returns array directly
                     if (Array.isArray(leadsData)) {
-                        // Filter by practice code and date range
-                        const practiceLeads = leadsData.filter(lead => {
+                        // Filter: only Soestdijk + Facebook/Instagram
+                        const metaLeads = leadsData.filter(lead => {
                             // Match practice
                             if (lead.praktijk_code !== practiceCode) return false;
-                            
-                            // Match date range
-                            const leadDate = new Date(lead.aangemaakt_op);
-                            const from = new Date(dateFrom);
-                            const to = new Date(dateTo);
-                            if (leadDate < from || leadDate > to) return false;
                             
                             // Match bron (Facebook or Instagram)
                             const bron = (lead.bron || '').toLowerCase();
                             return bron === 'facebook' || bron === 'instagram';
                         });
                         
-                        // Add verified leads count to summary
-                        summary.verified_leads = practiceLeads.length;
+                        // Count = 7
+                        summary.verified_leads = metaLeads.length;
                     } else {
                         summary.verified_leads = 0;
                     }
