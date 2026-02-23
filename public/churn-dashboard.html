@@ -1091,9 +1091,15 @@
                     </div>
 
                     <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Conversions (Leads)</div>
+                        <div class="meta-metric-label">Conversions</div>
                         <div class="meta-metric-value" id="metaConversions">0</div>
                         <div class="meta-metric-change" id="metaConversionsChange"></div>
+                    </div>
+
+                    <div class="meta-metric-card highlight">
+                        <div class="meta-metric-label">Leads (Meta)</div>
+                        <div class="meta-metric-value" id="metaVerifiedLeads">0</div>
+                        <div class="meta-metric-change" id="metaVerifiedLeadsChange"></div>
                     </div>
 
                     <div class="meta-metric-card highlight">
@@ -2360,6 +2366,28 @@
                     return;
                 }
                 
+                // Get verified leads from database (bron = Facebook or Instagram)
+                try {
+                    const leadsRes = await fetch(`/api/leads?practice=${practiceCode}&dateFrom=${dateFrom}&dateTo=${dateTo}`);
+                    const leadsData = await leadsRes.json();
+                    
+                    if (leadsData.success && leadsData.leads) {
+                        // Filter leads with bron = 'Facebook' or 'Instagram'
+                        const metaLeads = leadsData.leads.filter(lead => {
+                            const bron = (lead.bron || '').toLowerCase();
+                            return bron === 'facebook' || bron === 'instagram';
+                        });
+                        
+                        // Add verified leads count to summary
+                        summary.verified_leads = metaLeads.length;
+                    } else {
+                        summary.verified_leads = 0;
+                    }
+                } catch (leadsError) {
+                    console.warn('Could not fetch leads for Meta verification:', leadsError);
+                    summary.verified_leads = 0;
+                }
+                
                 // Show section
                 document.getElementById('metaMarketingSection').style.display = 'block';
                 displayMetaSummary(summary);
@@ -2410,9 +2438,13 @@
             document.getElementById('metaCTR').textContent = 
                 `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
             
-            // Conversions
+            // Conversions (Meta PageViews)
             document.getElementById('metaConversions').textContent = 
                 data.total_conversions || 0;
+            
+            // Leads (Meta) - Verified leads from database with bron Facebook/Instagram
+            document.getElementById('metaVerifiedLeads').textContent = 
+                data.verified_leads || 0;
             
             // Cost Per Lead
             document.getElementById('metaCostPerLead').textContent = 
