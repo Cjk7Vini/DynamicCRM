@@ -839,7 +839,8 @@
                     window.location.href = '/login.html';
                     return;
                 }
-                currentUser = await res.json();
+                const data = await res.json();
+                currentUser = data.user;
                 
                 // Update UI
                 document.getElementById('userEmail').textContent = currentUser.email;
@@ -891,7 +892,7 @@
             try {
                 const practiceCode = currentUser.role === 'admin' 
                     ? document.getElementById('practiceFilter').value 
-                    : currentUser.practiceCode;
+                    : currentUser.practice_code;
                 
                 const dateFrom = document.getElementById('dateFrom')?.value || '2025-01-01';
                 const dateTo = document.getElementById('dateTo')?.value || new Date().toISOString().split('T')[0];
@@ -921,7 +922,7 @@
         async function loadMetaMarketing() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
-                : currentUser.practiceCode;
+                : currentUser.practice_code;
             
             if (!practiceCode) {
                 document.getElementById('metaMarketingSection').style.display = 'none';
@@ -1003,7 +1004,7 @@
             try {
                 const practiceCode = currentUser.role === 'admin' 
                     ? document.getElementById('practiceFilter').value 
-                    : currentUser.practiceCode;
+                    : currentUser.practice_code;
                 
                 let url = '/api/leads-by-stage?stage=awareness';
                 if (practiceCode) url += `&practice=${practiceCode}`;
@@ -1032,7 +1033,7 @@
             try {
                 const practiceCode = currentUser.role === 'admin' 
                     ? document.getElementById('practiceFilter').value 
-                    : currentUser.practiceCode;
+                    : currentUser.practice_code;
                 
                 let url = '/api/leads-by-stage?stage=intent';
                 if (practiceCode) url += `&practice=${practiceCode}`;
@@ -1068,7 +1069,7 @@
         async function syncMetaData() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
-                : currentUser.practiceCode;
+                : currentUser.practice_code;
             
             if (!practiceCode) {
                 alert('Selecteer eerst een praktijk');
