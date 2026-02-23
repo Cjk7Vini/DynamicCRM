@@ -3,23 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Health Analytics - Churn & Conversie Dashboard</title>
+    <title>Dynamic Health - Churn & Conversie Analytics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
-            line-height: 1.5;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        .header {
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f8f9fa;
+            color: #212529;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: #2c3e50;
+            padding: 20px 0;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .logo {
+            padding: 0 20px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .logo h2 {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .logo p {
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .nav-item {
+            padding: 12px 20px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .nav-item.active {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-left: 3px solid #3498db;
+        }
+        
+        .nav-icon {
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+        }
+        
+        /* Dropdown in sidebar */
+        .nav-dropdown {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .nav-dropdown.open {
+            max-height: 200px;
+        }
+        
+        .nav-dropdown-item {
+            padding: 10px 20px 10px 40px;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .nav-dropdown-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.9);
+        }
+        
+        /* Main content */
+        .main-content {
+            margin-left: 240px;
+            min-height: 100vh;
+        }
+        
+        /* Top bar */
+        .top-bar {
             background: white;
-            border-bottom: 1px solid #d2d2d7;
-            padding: 16px 32px;
+            border-bottom: 1px solid #dee2e6;
+            padding: 16px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -28,568 +121,279 @@
             z-index: 100;
         }
         
-        .header-left { 
-            display: flex; 
-            align-items: center; 
-            gap: 20px; 
+        .page-title h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
         }
         
-        .logo { 
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 20px; 
-            font-weight: 700; 
-            color: #06c; 
-        }
-        
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-        }
-        
-        .header-title { 
-            font-size: 16px; 
-            font-weight: 400;
-            color: #86868b;
-        }
-        
-        .header-right { 
-            display: flex; 
-            gap: 16px; 
-            align-items: center; 
+        .user-menu {
+            position: relative;
         }
         
         .user-info {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 8px 12px;
-            background: #f5f5f7;
+            padding: 8px 16px;
+            background: #f8f9fa;
             border-radius: 8px;
-            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
         
-        .user-icon {
+        .user-info:hover {
+            background: #e9ecef;
+        }
+        
+        .user-avatar {
             width: 32px;
             height: 32px;
-            background: #06c;
-            color: white;
             border-radius: 50%;
+            background: #3498db;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
             font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .user-details {
+            display: flex;
+            flex-direction: column;
         }
         
         .user-email {
-            color: #1d1d1f;
+            font-size: 14px;
+            color: #2c3e50;
             font-weight: 500;
         }
         
         .user-role {
-            color: #86868b;
-            font-size: 12px;
+            font-size: 11px;
+            color: #6c757d;
             text-transform: uppercase;
         }
         
-        .btn-logout {
-            padding: 8px 16px;
-            background: #ff3b30;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
+        .dropdown-arrow {
+            margin-left: 8px;
+            font-size: 10px;
+            color: #6c757d;
         }
         
-        .btn-logout:hover {
-            background: #ff453a;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary { 
-            background: #06c; 
-            color: white; 
-        }
-        
-        .btn-primary:hover { 
-            background: #0077ed; 
-        }
-        
-        .btn-secondary { 
-            background: white; 
-            color: #1d1d1f; 
-            border: 1px solid #d2d2d7; 
-        }
-        
-        .btn-secondary:hover { 
-            background: #f5f5f7; 
-        }
-
-        /* Power BI Style Sidebar */
-        .dashboard-container {
-            display: flex;
-            height: calc(100vh - 60px);
-        }
-
-        .sidebar {
-            width: 220px;
+        /* User dropdown menu */
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
             background: white;
-            border-right: 1px solid #e0e0e0;
-            padding: 20px 0;
-            overflow-y: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 220px;
+            display: none;
+            z-index: 1000;
         }
-
-        .sidebar-section {
-            padding: 0 20px;
+        
+        .user-dropdown.show {
+            display: block;
+        }
+        
+        .dropdown-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #2c3e50;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        
+        .dropdown-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .dropdown-item.danger {
+            color: #dc3545;
+        }
+        
+        .dropdown-item.danger:hover {
+            background: #fff5f5;
+        }
+        
+        /* Content area */
+        .content-area {
+            padding: 30px;
+        }
+        
+        /* Filters */
+        .filters-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 24px;
         }
-
-        .sidebar-title {
-            font-size: 11px;
+        
+        .filters-title {
+            font-size: 14px;
             font-weight: 600;
+            color: #6c757d;
+            margin-bottom: 16px;
             text-transform: uppercase;
-            color: #86868b;
-            margin-bottom: 12px;
             letter-spacing: 0.5px;
         }
-
-        .filter-group {
-            margin-bottom: 20px;
+        
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 12px;
         }
-
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
         .filter-label {
             font-size: 13px;
             font-weight: 500;
-            color: #1d1d1f;
-            margin-bottom: 8px;
-            display: block;
+            color: #495057;
+            margin-bottom: 6px;
         }
-
-        select, input[type="date"] {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d2d2d7;
+        
+        .filter-input {
+            padding: 10px 14px;
+            border: 1px solid #dee2e6;
             border-radius: 6px;
-            font-size: 13px;
-            background: white;
+            font-size: 14px;
+            transition: all 0.2s;
         }
-
-        select:focus, input[type="date"]:focus {
+        
+        .filter-input:focus {
             outline: none;
-            border-color: #06c;
-            box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
-
-        /* Main Content Area */
-        .main-content {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
-            background: #f5f5f7;
-        }
-
-        /* KPI Cards */
-        .kpi-grid {
+        
+        /* Stats grid */
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .kpi-card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            border: 1px solid #e0e0e0;
-        }
-
-        .kpi-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: #86868b;
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
-        }
-
-        .kpi-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #1d1d1f;
-            line-height: 1;
-        }
-
-        /* Smaller font for TOP BRON to handle long source names */
-        #topSource {
-            font-size: 20px !important;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 100%;
-        }
-
-        .kpi-subtitle {
-            font-size: 13px;
-            color: #86868b;
-            margin-top: 4px;
-        }
-
-        /* Charts Grid */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 20px;
             margin-bottom: 24px;
         }
-
-        .chart-container {
+        
+        .stat-card {
             background: white;
-            border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            border: 1px solid #e0e0e0;
-        }
-
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
-
-        .chart-subtitle {
-            font-size: 12px;
-            color: #86868b;
-            margin-bottom: 16px;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 300px;
-        }
-
-        /* Error & Loading States */
-        .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            border-left: 4px solid #c62828;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #86868b;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #86868b;
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.3;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                border-right: none;
-                border-bottom: 1px solid #e0e0e0;
-            }
-            
-            .dashboard-container {
-                flex-direction: column;
-            }
-            
-            .kpi-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Pipeline Funnel Styles */
-        .funnel-stage {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            gap: 12px;
-        }
-
-        .funnel-bar {
-            flex: 1;
-            height: 50px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            color: white;
-            font-weight: 600;
-            transition: all 0.2s;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .funnel-bar:hover {
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        .funnel-bar.awareness { background: #3b82f6; }
-        .funnel-bar.contacted { background: #10b981; }
-        .funnel-bar.interest { background: #06b6d4; }
-        .funnel-bar.intent { background: #10b981; }
-        .funnel-bar.consideration { background: #f59e0b; }
-        .funnel-bar.decision { background: #ef4444; }
-        .funnel-bar.won { background: #22c55e; }
-        .funnel-bar.lost { 
-            background: #dc2626 !important; 
-            color: white !important;
-        }
-
-        .funnel-count {
-            margin-left: auto;
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        .funnel-stats {
-            min-width: 120px;
-            text-align: right;
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        .conversion-rate {
-            display: block;
-            font-weight: 600;
-            color: #10b981;
-            margin-top: 4px;
-        }
-
-        /* Hot Leads List */
-        .hot-lead-item {
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            border-left: 3px solid #ef4444;
-        }
-
-        .hot-lead-name {
-            font-weight: 600;
-            font-size: 14px;
-            color: #1e293b;
-            margin-bottom: 4px;
-        }
-
-        .hot-lead-meta {
-            font-size: 12px;
-            color: #64748b;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .hot-lead-likelihood {
-            color: #ef4444;
-            font-weight: 600;
-        }
-
-        /* Meta Marketing Section */
-        .meta-marketing-section {
-            margin-top: 32px;
-            padding: 0;
-        }
-
-        .meta-section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding: 24px;
-            background: white;
             border-radius: 12px;
-            border: 1px solid #d2d2d7;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 4px solid #3498db;
         }
-
-        .meta-section-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1d1d1f;
+        
+        .stat-card.green {
+            border-left-color: #2ecc71;
         }
-
-        .meta-sync-info {
+        
+        .stat-card.orange {
+            border-left-color: #f39c12;
+        }
+        
+        .stat-card.red {
+            border-left-color: #e74c3c;
+        }
+        
+        .stat-label {
             font-size: 12px;
-            color: #86868b;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .btn-sync {
-            padding: 8px 16px;
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            color: #1d1d1f;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .btn-sync:hover {
-            background: #f5f5f7;
-            border-color: #06c;
-            color: #06c;
-        }
-
-        .meta-metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .meta-metric-card {
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s ease;
-        }
-
-        .meta-metric-card:hover {
-            border-color: #06c;
-            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
-        }
-
-        .meta-metric-card.highlight {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-color: #06c;
-        }
-
-        .meta-metric-label {
-            font-size: 13px;
-            color: #86868b;
-            font-weight: 500;
+            color: #6c757d;
             margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-
-        .meta-metric-value {
+        
+        .stat-value {
             font-size: 32px;
             font-weight: 700;
-            color: #1d1d1f;
-            margin: 4px 0;
+            color: #2c3e50;
         }
-
-        .meta-metric-change {
-            font-size: 12px;
-            margin-top: 8px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            font-weight: 500;
-        }
-
-        .meta-metric-change.positive {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .meta-metric-change.negative {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .meta-charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        .meta-chart-container {
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 12px;
-            padding: 24px;
-        }
-
-        .meta-chart-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
-
-        .meta-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .meta-table th {
-            background: #f5f5f7;
-            color: #1d1d1f;
-            padding: 12px;
-            text-align: left;
+        
+        .stat-subtitle {
             font-size: 13px;
+            color: #95a5a6;
+            margin-top: 4px;
+        }
+        
+        /* Section headers */
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .section-title {
+            font-size: 18px;
             font-weight: 600;
-            border-bottom: 1px solid #d2d2d7;
+            color: #2c3e50;
         }
-
-        .meta-table td {
-            color: #1d1d1f;
-            padding: 12px;
-            border-bottom: 1px solid #f5f5f7;
+        
+        .section-subtitle {
+            font-size: 13px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        
+        .section-content {
+            padding: 20px;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
             font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-
-        .meta-table tbody tr:hover {
-            background: #f5f5f7;
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
         }
-
-        .meta-table tbody tr:last-child td {
-            border-bottom: none;
+        
+        .btn-primary:hover {
+            background: #2980b9;
         }
-
-        @media (max-width: 768px) {
-            .meta-charts-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .meta-metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        
+        .btn-success {
+            background: #2ecc71;
+            color: white;
         }
-
-        /* Password Change Modal */
+        
+        .btn-success:hover {
+            background: #27ae60;
+        }
+        
+        
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -597,1793 +401,556 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 10000;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
             align-items: center;
             justify-content: center;
         }
-
-        .modal.active {
+        
+        .modal.show {
             display: flex;
         }
-
+        
         .modal-content {
             background: white;
             border-radius: 12px;
-            padding: 32px;
-            max-width: 450px;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
             width: 90%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
-
+        
         .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
             font-size: 20px;
             font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 24px;
+            color: #2c3e50;
         }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #1d1d1f;
-            margin-bottom: 8px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #06c;
-            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
-        }
-
-        .password-requirements {
-            font-size: 12px;
-            color: #86868b;
-            margin-top: 4px;
-        }
-
-        .modal-buttons {
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
             display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .btn-change {
-            background: #06c;
-            color: white;
-        }
-
-        .btn-change:hover {
-            background: #0051a3;
-        }
-
-        .btn-cancel {
-            background: #f5f5f7;
-            color: #1d1d1f;
-        }
-
-        .btn-cancel:hover {
-            background: #e8e8ed;
-        }
-
-        .error-message {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .success-message {
-            background: #d1fae5;
-            color: #065f46;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        /* Eclub Sync Button */
-        .btn-sync {
-            width: 100%;
-            padding: 12px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
             transition: all 0.2s;
         }
-
-        .btn-sync:hover {
-            background: #059669;
-            transform: translateY(-1px);
+        
+        .modal-close:hover {
+            background: #f8f9fa;
         }
-
-        .btn-sync:disabled {
-            background: #d1d5db;
-            cursor: not-allowed;
-            transform: none;
+        
+        .modal-body {
+            padding: 20px;
         }
-
-        .sync-info {
+        
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #f8f9fa;
+        }
+        
+        th {
             padding: 12px;
-            background: #f5f5f7;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-
-        /* Status Badge Fix - Ensure proper contrast */
-        .status-badge,
-        .badge {
-            padding: 4px 12px;
-            border-radius: 12px;
+            text-align: left;
             font-size: 12px;
             font-weight: 600;
-            display: inline-block;
-            color: white !important;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-
-        .badge-active,
-        .status-active {
-            background: #10b981 !important;
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 14px;
         }
-
-        .badge-frozen,
-        .status-frozen {
-            background: #f59e0b !important;
+        
+        tr:last-child td {
+            border-bottom: none;
         }
-
-        .badge-cancelled,
-        .status-cancelled,
-        .badge-lost {
-            background: #ef4444 !important;
+        
+        /* Chart container */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
         }
-
-        .badge-default {
-            background: #6b7280 !important;
+        
+        /* Meta Marketing specific */
+        .meta-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .meta-metric-card {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .meta-metric-card.highlight {
+            border-color: #3498db;
+            background: #f0f8ff;
+        }
+        
+        .meta-metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .meta-metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">
-            <div class="logo">
-                <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="6" fill="#06c"/>
-                    <path d="M16 8L24 16L16 24L8 16L16 8Z" fill="white"/>
-                </svg>
-                Dynamic Health
-            </div>
-            <div class="header-title">Churn & Conversie Analytics</div>
-        </div>
-        <div class="header-right">
-            <div class="user-info" id="userInfo" style="display: none;">
-                <div class="user-icon" id="userIcon">A</div>
-                <div>
-                    <div class="user-email" id="userEmail">Loading...</div>
-                    <div class="user-role" id="userRole">...</div>
-                </div>
-            </div>
-            <button class="btn btn-secondary" onclick="exportToExcel()" style="margin-right: 12px;">📊 Export Rapportage</button>
-            <button class="btn btn-primary" onclick="refreshData()">↻ Vernieuwen</button>
-            <button class="btn btn-secondary" onclick="openPasswordModal()" style="margin-right: 12px;">🔒 Wachtwoord</button>
-            <button class="btn-logout" onclick="logout()">Uitloggen</button>
-        </div>
-    </div>
 
-    <!-- Password Change Modal -->
-    <div class="modal" id="passwordModal">
-        <div class="modal-content">
-            <div class="modal-header">Wachtwoord Wijzigen</div>
-            
-            <div id="passwordMessage"></div>
-            
-            <form id="passwordForm" onsubmit="changePassword(event)">
-                <div class="form-group">
-                    <label for="currentPassword">Huidig Wachtwoord</label>
-                    <input type="password" id="currentPassword" required autocomplete="current-password">
-                </div>
-                
-                <div class="form-group">
-                    <label for="newPassword">Nieuw Wachtwoord</label>
-                    <input type="password" id="newPassword" required minlength="8" autocomplete="new-password">
-                    <div class="password-requirements">
-                        Minimaal 8 tekens, inclusief hoofdletter, kleine letter en cijfer
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirmPassword">Bevestig Nieuw Wachtwoord</label>
-                    <input type="password" id="confirmPassword" required autocomplete="new-password">
-                </div>
-                
-                <div class="modal-buttons">
-                    <button type="button" class="btn-cancel" onclick="closePasswordModal()">Annuleren</button>
-                    <button type="submit" class="btn-change">Wijzigen</button>
-                </div>
-            </form>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <h2>Dynamic Health</h2>
+            <p>Churn & Conversie Analytics</p>
+        </div>
+        
+        <div class="nav-item active">
+            <span><span class="nav-icon">📊</span> Dashboard</span>
+        </div>
+        
+        <div class="nav-item" id="marketingDropdownToggle">
+            <span><span class="nav-icon">📈</span> Marketing</span>
+            <span>▼</span>
+        </div>
+        <div class="nav-dropdown" id="marketingDropdown">
+            <div class="nav-dropdown-item" onclick="openLeadsModal()">Leads</div>
+            <div class="nav-dropdown-item" onclick="openBenaderdModal()">Benaderd</div>
+        </div>
+        
+        <div class="nav-item">
+            <span><span class="nav-icon">🔥</span> Hot Leads</span>
+        </div>
+        
+        <div class="nav-item">
+            <span><span class="nav-icon">📧</span> Eclub Data</span>
+        </div>
+        
+        <div class="nav-item" id="metaMarketingNav" style="display: none;">
+            <span><span class="nav-icon">💰</span> Meta Marketing</span>
         </div>
     </div>
 
-    <!-- Leads List Modal -->
-    <div class="modal" id="leadsModal">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <span id="leadsModalTitle">Leads</span>
-                <button onclick="closeLeadsModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; float: right; margin-top: -8px;">&times;</button>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="page-title">
+                <h1>Dashboard Overzicht</h1>
             </div>
             
-            <div id="leadsModalContent" style="max-height: 500px; overflow-y: auto;">
-                <div style="text-align: center; padding: 40px; color: #86868b;">Laden...</div>
+            <div class="user-menu">
+                <div class="user-info" id="userInfoToggle">
+                    <div class="user-avatar" id="userAvatar">A</div>
+                    <div class="user-details">
+                        <div class="user-email" id="userEmail">Loading...</div>
+                        <div class="user-role" id="userRole">...</div>
+                    </div>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                
+                <div class="user-dropdown" id="userDropdown">
+                    <div class="dropdown-item" onclick="window.location.href='/profile.html'">
+                        <span>👤</span> Profiel
+                    </div>
+                    <div class="dropdown-item" id="praktijkenMenuItem" style="display: none;" onclick="window.location.href='/praktijken.html'">
+                        <span>👥</span> Praktijken
+                    </div>
+                    <div class="dropdown-item" onclick="exportReport()">
+                        <span>📊</span> Rapportage
+                    </div>
+                    <div class="dropdown-item" onclick="syncMetaData()">
+                        <span>🔄</span> Sync Meta
+                    </div>
+                    <div class="dropdown-item" onclick="syncEclubData()">
+                        <span>🔄</span> Sync Eclub
+                    </div>
+                    <div class="dropdown-item danger" onclick="logout()">
+                        <span>🚪</span> Uitloggen
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="dashboard-container">
-        <!-- Sidebar Filters -->
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-title">Filters</div>
-                
-                <div class="filter-group">
-                    <label class="filter-label" for="practiceFilter">Praktijk</label>
-                    <select id="practiceFilter" onchange="applyFilters()">
-                        <option value="">Alle praktijken</option>
-                    </select>
-                </div>
-
-                <!-- Practice Search (Admin Only) -->
-                <div class="filter-group" id="practiceSearchGroup" style="display: none;">
-                    <label class="filter-label" for="practiceSearch">Zoek praktijk</label>
-                    <input 
-                        type="text" 
-                        id="practiceSearch" 
-                        placeholder="Type om te zoeken..."
-                        oninput="filterPractices()"
-                        style="width: 100%; padding: 8px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 14px;"
-                    >
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="dateFrom">Van datum</label>
-                    <input type="date" id="dateFrom" onchange="applyFilters()">
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="dateTo">Tot datum</label>
-                    <input type="date" id="dateTo" onchange="applyFilters()">
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="sourceFilter">Bron</label>
-                    <select id="sourceFilter" onchange="applyFilters()">
-                        <option value="">Alle bronnen</option>
-                        <option value="Facebook">Facebook</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="Google">Google</option>
-                        <option value="Vrienden/Familie">Vrienden/Familie</option>
-                        <option value="Voucher">Voucher</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="statusFilter">Status</label>
-                    <select id="statusFilter" onchange="applyFilters()">
-                        <option value="">Alle statussen</option>
-                        <option value="Nieuw">Nieuw</option>
-                        <option value="Gebeld">Gebeld</option>
-                        <option value="Afspraak Gepland">Afspraak Gepland</option>
-                        <option value="Geweest">Geweest</option>
-                        <option value="Lid Geworden">Lid Geworden</option>
-                        <option value="Niet Geïnteresseerd">Niet Geïnteresseerd</option>
-                    </select>
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Filters -->
+            <div class="filters-section" id="adminFilters" style="display: none;">
+                <div class="filters-title">Filters</div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="filter-label">Praktijk</label>
+                        <select class="filter-input" id="practiceFilter" onchange="loadAllData()">
+                            <option value="">Alle praktijken</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Van datum</label>
+                        <input type="date" class="filter-input" id="dateFrom" onchange="loadAllData()">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Tot datum</label>
+                        <input type="date" class="filter-input" id="dateTo" onchange="loadAllData()">
+                    </div>
                 </div>
             </div>
 
-            <!-- Eclub Sync Section -->
-            <div class="sidebar-section" id="eclubSyncSection" style="display: none;">
-                <div class="sidebar-title">Eclub Sync</div>
-                
-                <div class="sync-info" id="eclubSyncInfo">
-                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
-                        Laatste sync: <span id="lastSyncTime">-</span>
-                    </div>
-                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
-                        Leden: <span id="eclubMemberCount">-</span>
-                    </div>
+            <!-- KPI Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Totaal Leads</div>
+                    <div class="stat-value" id="totalLeads">0</div>
+                    <div class="stat-subtitle">Alle leads in database</div>
                 </div>
-
-                <button id="btnEclubSync" class="btn-sync" onclick="syncEclubData()">
-                    <span id="syncButtonText">🔄 Sync Leden</span>
-                </button>
-
-                <div id="syncStatus" style="margin-top: 12px; font-size: 13px; display: none;"></div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- KPI Cards -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Totaal Leads</div>
-                    <div class="kpi-value" id="totalLeads">-</div>
-                    <div class="kpi-subtitle">Alle leads in database</div>
+                <div class="stat-card green">
+                    <div class="stat-label">Conversie Ratio</div>
+                    <div class="stat-value" id="conversionRatio">0.0%</div>
+                    <div class="stat-subtitle">Lead → Lid Geworden</div>
                 </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Conversie Ratio</div>
-                    <div class="kpi-value" id="conversionRate">-</div>
-                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
+                <div class="stat-card orange">
+                    <div class="stat-label">Actieve Praktijken</div>
+                    <div class="stat-value" id="activePractices">0</div>
+                    <div class="stat-subtitle">Praktijken met leads</div>
                 </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Actieve Praktijken</div>
-                    <div class="kpi-value" id="activePractices">-</div>
-                    <div class="kpi-subtitle">Praktijken met leads</div>
+                <div class="stat-card red">
+                    <div class="stat-label">Gemiddelde Tijd</div>
+                    <div class="stat-value" id="avgTime">0d</div>
+                    <div class="stat-subtitle">Lead → Lid Geworden</div>
                 </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Gemiddelde Tijd</div>
-                    <div class="kpi-value" id="avgTime">-</div>
-                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Top Bron</div>
-                    <div class="kpi-value" id="topSource">-</div>
-                    <div class="kpi-subtitle">Meeste leads</div>
+                <div class="stat-card">
+                    <div class="stat-label">Top Bron</div>
+                    <div class="stat-value" id="topSource" style="font-size: 18px;">-</div>
+                    <div class="stat-subtitle">Meeste leads</div>
                 </div>
             </div>
 
-            <!-- Charts Grid -->
-            <div class="charts-grid">
-                <!-- Churn Forecast -->
-                <div class="chart-container">
-                    <div class="chart-title">Churn Forecast</div>
-                    <div class="chart-subtitle">Voorspelling ledenaantal & uitval</div>
-                    <div class="chart-wrapper">
-                        <canvas id="churnForecastChart"></canvas>
+            <!-- Charts Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">Churn Forecast</div>
+                    <div class="section-subtitle">Voorspelling ledenaantal & uitval</div>
+                </div>
+                <div class="section-content">
+                    <div class="chart-container">
+                        <canvas id="churnChart"></canvas>
                     </div>
                 </div>
+            </div>
 
-                <!-- Conversion Funnel -->
-                <div class="chart-container">
-                    <div class="chart-title">Conversie Funnel</div>
-                    <div class="chart-subtitle">Lead journey van klik tot lid</div>
-                    <div class="chart-wrapper">
-                        <canvas id="conversionFunnelChart"></canvas>
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">Conversie Funnel</div>
+                    <div class="section-subtitle">Lead journey van klik tot lid</div>
+                </div>
+                <div class="section-content">
+                    <div class="chart-container">
+                        <canvas id="funnelChart"></canvas>
                     </div>
                 </div>
+            </div>
 
-                <!-- Practice Performance -->
-                <div class="chart-container" id="practicePerformanceContainer">
-                    <div class="chart-title">Praktijk Performance</div>
-                    <div class="chart-subtitle">Top 10 praktijken naar totale leads</div>
-                    <div class="chart-wrapper">
-                        <canvas id="practiceChart"></canvas>
-                    </div>
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">Lead Bronnen</div>
+                    <div class="section-subtitle">Distributie per marketing kanaal</div>
                 </div>
-
-                <!-- Source Distribution -->
-                <div class="chart-container">
-                    <div class="chart-title">Lead Bronnen</div>
-                    <div class="chart-subtitle">Distributie per marketing kanaal</div>
-                    <div class="chart-wrapper">
+                <div class="section-content">
+                    <div class="chart-container">
                         <canvas id="sourceChart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- ENHANCED: Pipeline Funnel Section -->
-            <div class="chart-container" style="grid-column: 1 / -1; margin-top: 20px;">
-                <div class="chart-title">Sales Pipeline - Lead Lifecycle</div>
-                <div class="chart-subtitle">Van awareness tot conversie - zie waar leads uitvallen</div>
-                
-                <div id="pipelineFunnelContainer" style="padding: 20px 0;">
-                    <div class="loading">Data laden...</div>
-                </div>
-            </div>
-
-            <!-- ENHANCED: Forecast vs Actual -->
-            <div class="charts-grid" style="margin-top: 20px;">
-                <div class="chart-container">
-                    <div class="chart-title">Forecast vs Actueel</div>
-                    <div class="chart-subtitle">Verwachte vs werkelijke conversies</div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-                        <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border: 2px solid #93c5fd;">
-                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">VERWACHT</div>
-                            <div id="forecastExpected" style="font-size: 32px; font-weight: 700; color: #2563eb;">-</div>
-                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Op basis van likelihood</div>
-                        </div>
-                        
-                        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border: 2px solid #86efac;">
-                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">ACTUEEL</div>
-                            <div id="forecastActual" style="font-size: 32px; font-weight: 700; color: #10b981;">-</div>
-                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Daadwerkelijk gewonnen</div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; text-align: center; margin-top: 16px;">
-                        <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 4px;">GAP ANALYSE</div>
-                        <div id="gapValue" style="font-size: 24px; font-weight: 700; color: #92400e;">-</div>
-                        <div id="gapDescription" style="font-size: 12px; color: #78350f; margin-top: 4px;">-</div>
-                    </div>
-                </div>
-
-                <!-- Hot Leads -->
-                <div class="chart-container">
-                    <div class="chart-title">Hot Leads</div>
-                    <div class="chart-subtitle">Hoge conversiekans (70%+)</div>
-                    
-                    <div id="hotLeadsList" style="margin-top: 16px;">
-                        <div class="loading">Data laden...</div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Meta Marketing Section -->
-            <div class="meta-marketing-section" id="metaMarketingSection" style="display: none;">
-                <div class="meta-section-header">
-                    <div class="meta-section-title">
-                        Meta Marketing Performance
-                    </div>
-                    <div class="meta-sync-info">
+            <div class="section" id="metaMarketingSection" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">Meta Marketing Performance</div>
+                    <div class="section-subtitle">
                         <span id="metaLastSync">Laatste sync: --</span>
-                        <button class="btn-sync" onclick="syncMetaData()">
-                            Sync Nu
-                        </button>
+                        <button class="btn btn-success" onclick="syncMetaData()" style="margin-left: 16px;">Sync Nu</button>
                     </div>
                 </div>
-
-                <!-- Metrics Grid -->
-                <div class="meta-metrics-grid">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Total Ad Spend</div>
-                        <div class="meta-metric-value" id="metaTotalSpend">€0.00</div>
-                        <div class="meta-metric-change" id="metaSpendChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Impressions</div>
-                        <div class="meta-metric-value" id="metaImpressions">0</div>
-                        <div class="meta-metric-change" id="metaImpressionsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Clicks</div>
-                        <div class="meta-metric-value" id="metaClicks">0</div>
-                        <div class="meta-metric-change" id="metaClicksChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">CTR</div>
-                        <div class="meta-metric-value" id="metaCTR">0.00%</div>
-                        <div class="meta-metric-change" id="metaCTRChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Conversions</div>
-                        <div class="meta-metric-value" id="metaConversions">0</div>
-                        <div class="meta-metric-change" id="metaConversionsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Leads (Meta)</div>
-                        <div class="meta-metric-value" id="metaVerifiedLeads">0</div>
-                        <div class="meta-metric-change" id="metaVerifiedLeadsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Cost Per Lead</div>
-                        <div class="meta-metric-value" id="metaCostPerLead">€0.00</div>
-                        <div class="meta-metric-change" id="metaCostChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">ROAS</div>
-                        <div class="meta-metric-value" id="metaROAS">0.0x</div>
-                        <div class="meta-metric-change" id="metaROASChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">CPC</div>
-                        <div class="meta-metric-value" id="metaCPC">€0.00</div>
-                        <div class="meta-metric-change" id="metaCPCChange"></div>
-                    </div>
-                </div>
-
-                <!-- Charts -->
-                <div class="meta-charts-grid">
-                    <div class="meta-chart-container">
-                        <div class="meta-chart-title">Campaign Performance</div>
-                        <div style="max-height: 400px; overflow-y: auto;">
-                            <canvas id="metaCampaignChart"></canvas>
+                <div class="section-content">
+                    <div class="meta-metrics-grid">
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">Total Ad Spend</div>
+                            <div class="meta-metric-value" id="metaTotalSpend">€0.00</div>
                         </div>
-                    </div>
-
-                    <div class="meta-chart-container">
-                        <div class="meta-chart-title">Active Campaigns</div>
-                        <table class="meta-table">
-                            <thead>
-                                <tr>
-                                    <th>Campaign</th>
-                                    <th>Spend</th>
-                                    <th>Leads</th>
-                                    <th>CPL</th>
-                                </tr>
-                            </thead>
-                            <tbody id="metaCampaignsBody">
-                                <tr>
-                                    <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6);">
-                                        Loading...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">Impressions</div>
+                            <div class="meta-metric-value" id="metaImpressions">0</div>
+                        </div>
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">Clicks</div>
+                            <div class="meta-metric-value" id="metaClicks">0</div>
+                        </div>
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">CTR</div>
+                            <div class="meta-metric-value" id="metaCTR">0.00%</div>
+                        </div>
+                        <div class="meta-metric-card highlight">
+                            <div class="meta-metric-label">Conversions</div>
+                            <div class="meta-metric-value" id="metaConversions">0</div>
+                        </div>
+                        <div class="meta-metric-card highlight">
+                            <div class="meta-metric-label">Leads (Meta)</div>
+                            <div class="meta-metric-value" id="metaVerifiedLeads">0</div>
+                        </div>
+                        <div class="meta-metric-card highlight">
+                            <div class="meta-metric-label">Cost Per Lead</div>
+                            <div class="meta-metric-value" id="metaCostPerLead">€0.00</div>
+                        </div>
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">ROAS</div>
+                            <div class="meta-metric-value" id="metaROAS">0.0x</div>
+                        </div>
+                        <div class="meta-metric-card">
+                            <div class="meta-metric-label">CPC</div>
+                            <div class="meta-metric-value" id="metaCPC">€0.00</div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Eclub Lead Management Section -->
-            <div class="meta-section" style="margin-top: 32px;">
-                <div class="meta-section-header">
-                    <div>
-                        <div class="meta-section-title">Lead Management</div>
-                        <div class="meta-sync-info" style="font-size: 12px; color: #86868b; margin-top: 4px;">
-                            Eclub integratie - status: <span id="eclubStatus">Niet gekoppeld</span>
-                        </div>
-                    </div>
-                    <button class="meta-sync-btn" onclick="syncEclub()" style="display: none;">
-                        Sync Nu
-                    </button>
-                </div>
-
-                <div class="meta-metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Langsgekomen</div>
-                        <div class="meta-metric-value" id="eclubVisited">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Inschrijvingen</div>
-                        <div class="meta-metric-value" id="eclubRegistrations">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Wachtend op conversie</div>
-                        <div class="meta-metric-value" id="eclubPending">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Conversie percentage</div>
-                        <div class="meta-metric-value" id="eclubConversionRate">-</div>
-                    </div>
-                </div>
+    <!-- Modals -->
+    <div class="modal" id="leadsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Leads</div>
+                <button class="modal-close" onclick="closeModal('leadsModal')">&times;</button>
             </div>
-
-            <!-- Overige KPIs Section -->
-            <div class="meta-section" style="margin-top: 24px;">
-                <div class="meta-section-header">
-                    <div class="meta-section-title">Overige KPI's</div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Leden aantal</div>
-                        <div class="meta-metric-value" id="eclubActiveMembers">-</div>
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 8px;">
-                            <span id="eclubNewMembers">-</span> gestart | 
-                            <span id="eclubChurnedMembers">-</span> gestopt
-                        </div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Gemiddelde duur lidmaatschap</div>
-                        <div class="meta-metric-value" id="eclubAvgDuration">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Aantal bezoeken</div>
-                        <div class="meta-metric-value" id="eclubTotalVisits">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Retentie</div>
-                        <div class="meta-metric-value" id="eclubRetention">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Omzet per locatie</div>
-                        <div class="meta-metric-value" id="eclubRevenue">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Omzet per lid</div>
-                        <div class="meta-metric-value" id="eclubRevenuePerMember">-</div>
-                    </div>
-                </div>
+            <div class="modal-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Naam</th>
+                            <th>Email</th>
+                            <th>Telefoon</th>
+                            <th>Bron</th>
+                            <th>Datum</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTableBody"></tbody>
+                </table>
             </div>
+        </div>
+    </div>
 
-        </main>
+    <div class="modal" id="benaderdModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Benaderd</div>
+                <button class="modal-close" onclick="closeModal('benaderdModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Naam</th>
+                            <th>Email</th>
+                            <th>Telefoon</th>
+                            <th>Afspraak</th>
+                            <th>Datum</th>
+                        </tr>
+                    </thead>
+                    <tbody id="benaderdTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="lidModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Lid</div>
+                <button class="modal-close" onclick="closeModal('lidModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Lid data komt van Eclub API (nog geen credentials)</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        // User session state
         let currentUser = null;
-        
-        // Chart instances
-        let churnForecastChart, conversionFunnelChart, practiceChart, sourceChart;
+        let churnChart = null;
+        let funnelChart = null;
+        let sourceChart = null;
 
-        // Check authentication on page load
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/auth/me', { credentials: 'include' });
-                if (!res.ok) {
-                    window.location.href = '/login.html';
-                    return false;
-                }
-                const data = await res.json();
-                currentUser = data.user;
-                updateUserUI();
-                return true;
-            } catch (err) {
-                console.error('Auth check failed:', err);
-                window.location.href = '/login.html';
-                return false;
-            }
-        }
-
-        // Update user info in header
-        function updateUserUI() {
-            if (!currentUser) return;
-            
-            const userInfo = document.getElementById('userInfo');
-            const userIcon = document.getElementById('userIcon');
-            const userEmail = document.getElementById('userEmail');
-            const userRole = document.getElementById('userRole');
-            
-            // Show user info
-            userInfo.style.display = 'flex';
-            
-            // Set user icon (first letter of email)
-            userIcon.textContent = currentUser.email.charAt(0).toUpperCase();
-            
-            // Set email and role
-            userEmail.textContent = currentUser.email;
-            userRole.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Praktijk';
-            
-            // If practice user, hide admin-only features
-            if (currentUser.role === 'practice') {
-                hideAdminFeatures();
-            }
-        }
-
-        // Hide admin-only features for practice users
-        function hideAdminFeatures() {
-            // Hide ONLY the practice filter dropdown (not the whole sidebar!)
-            const practiceFilterGroup = document.getElementById('practiceFilter')?.closest('.filter-group');
-            if (practiceFilterGroup) {
-                practiceFilterGroup.style.display = 'none';
-            }
-            
-            // Hide practice performance chart (admin only)
-            const practicePerformanceContainer = document.getElementById('practicePerformanceContainer');
-            if (practicePerformanceContainer) {
-                practicePerformanceContainer.style.display = 'none';
-            }
-            
-            // Date/source/status filters remain visible for practice users
-        }
-
-        // Logout function
-        async function logout() {
-            try {
-                await fetch('/api/auth/logout', { 
-                    method: 'POST',
-                    credentials: 'include' 
-                });
-            } catch (err) {
-                console.error('Logout failed:', err);
-            }
-            window.location.href = '/login.html';
-        }
-
-        // Password change modal functions
-        function openPasswordModal() {
-            document.getElementById('passwordModal').classList.add('active');
-            document.getElementById('passwordForm').reset();
-            document.getElementById('passwordMessage').innerHTML = '';
-        }
-
-        function closePasswordModal() {
-            document.getElementById('passwordModal').classList.remove('active');
-        }
-
-        async function changePassword(event) {
-            event.preventDefault();
-            
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const messageDiv = document.getElementById('passwordMessage');
-            
-            // Validate
-            if (newPassword !== confirmPassword) {
-                messageDiv.innerHTML = '<div class="error-message">Nieuwe wachtwoorden komen niet overeen</div>';
-                return;
-            }
-            
-            if (newPassword.length < 8) {
-                messageDiv.innerHTML = '<div class="error-message">Wachtwoord moet minimaal 8 tekens zijn</div>';
-                return;
-            }
-            
-            // Check password strength
-            const hasUpper = /[A-Z]/.test(newPassword);
-            const hasLower = /[a-z]/.test(newPassword);
-            const hasNumber = /[0-9]/.test(newPassword);
-            
-            if (!hasUpper || !hasLower || !hasNumber) {
-                messageDiv.innerHTML = '<div class="error-message">Wachtwoord moet een hoofdletter, kleine letter en cijfer bevatten</div>';
-                return;
-            }
-            
-            try {
-                const res = await fetch('/api/auth/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        currentPassword,
-                        newPassword
-                    })
-                });
-                
-                const data = await res.json();
-                
-                if (res.ok) {
-                    messageDiv.innerHTML = '<div class="success-message">✅ Wachtwoord succesvol gewijzigd!</div>';
-                    setTimeout(() => {
-                        closePasswordModal();
-                    }, 2000);
-                } else {
-                    messageDiv.innerHTML = `<div class="error-message">${data.error || 'Fout bij wijzigen wachtwoord'}</div>`;
-                }
-            } catch (error) {
-                console.error('Change password error:', error);
-                messageDiv.innerHTML = '<div class="error-message">Fout bij wijzigen wachtwoord. Probeer opnieuw.</div>';
-            }
-        }
-
-        // Close modal on background click
-        document.addEventListener('click', (e) => {
-            const modal = document.getElementById('passwordModal');
-            if (e.target === modal) {
-                closePasswordModal();
-            }
-            
-            const leadsModal = document.getElementById('leadsModal');
-            if (e.target === leadsModal) {
-                closeLeadsModal();
-            }
+        // Dropdown toggles
+        document.getElementById('userInfoToggle').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('userDropdown').classList.toggle('show');
         });
 
-        // Leads modal functions
-        function closeLeadsModal() {
-            document.getElementById('leadsModal').classList.remove('active');
+        document.getElementById('marketingDropdownToggle').addEventListener('click', function() {
+            document.getElementById('marketingDropdown').classList.toggle('open');
+        });
+
+        document.addEventListener('click', function() {
+            document.getElementById('userDropdown').classList.remove('show');
+        });
+
+        // Init on page load
+        async function init() {
+            await checkAuth();
+            await loadAllData();
         }
 
-        let isLoadingLeads = false;
-        
-        async function showLeadsForStage(stage, stageName) {
-            if (isLoadingLeads) return;
-            isLoadingLeads = true;
-            
-            const modal = document.getElementById('leadsModal');
-            const title = document.getElementById('leadsModalTitle');
-            const content = document.getElementById('leadsModalContent');
-            
-            title.textContent = stageName;
-            content.innerHTML = '<div style="text-align: center; padding: 40px; color: #86868b;">Laden...</div>';
-            modal.classList.add('active');
-            
+        async function checkAuth() {
             try {
-                const queryString = buildQueryString();
-                const url = `/api/leads-by-stage?stage=${stage}${queryString.replace('?', '&')}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                if (!data.success || !data.leads || data.leads.length === 0) {
-                    content.innerHTML = '<div style="text-align: center; padding: 40px; color: #86868b;">Geen leads gevonden</div>';
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) {
+                    window.location.href = '/login.html';
                     return;
                 }
+                currentUser = await res.json();
                 
-                let html = '<table style="width: 100%; border-collapse: collapse;">';
-                html += '<thead><tr style="background: #f5f5f7; text-align: left;">';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Naam</th>';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Email</th>';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Telefoon</th>';
+                // Update UI
+                document.getElementById('userEmail').textContent = currentUser.email;
+                document.getElementById('userRole').textContent = currentUser.role;
+                document.getElementById('userAvatar').textContent = currentUser.email.charAt(0).toUpperCase();
                 
-                if (stage === 'intent') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
+                // Show/hide based on role
+                if (currentUser.role === 'admin') {
+                    document.getElementById('adminFilters').style.display = 'block';
+                    document.getElementById('praktijkenMenuItem').style.display = 'flex';
+                    await loadPractices();
+                } else {
+                    // Practice user - load only their data
+                    document.getElementById('adminFilters').style.display = 'none';
                 }
                 
-                if (stage === 'lost') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Status</th>';
-                }
-                
-                html += '</tr></thead><tbody>';
-                
-                data.leads.forEach(lead => {
-                    html += '<tr style="border-bottom: 1px solid #e5e5e5;">';
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
-                    
-                    if (stage === 'intent') {
-                        const appointmentDate = lead.appointment_date || lead.afspraak_datum;
-                        const appointmentTime = lead.appointment_time || '';
-                        let displayDate = '-';
-                        
-                        if (appointmentDate) {
-                            const date = new Date(appointmentDate);
-                            displayDate = date.toLocaleDateString('nl-NL');
-                            if (appointmentTime) {
-                                displayDate += ' ' + appointmentTime.substring(0, 5);
-                            }
-                        }
-                        
-                        html += `<td style="padding: 12px; font-size: 14px;">${displayDate}</td>`;
-                    }
-                    
-                    if (stage === 'lost') {
-                        html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${lead.status || 'Niet Geïnteresseerd'}</span></td>`;
-                    }
-                    
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table>';
-                content.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Load leads error:', error);
-                content.innerHTML = '<div style="text-align: center; padding: 40px; color: #c62828;">Fout bij laden leads</div>';
-            } finally {
-                isLoadingLeads = false;
+            } catch (e) {
+                console.error('Auth error:', e);
+                window.location.href = '/login.html';
             }
         }
-
-        // Initialize dashboard
-        async function init() {
-            // Check auth first
-            const isAuthenticated = await checkAuth();
-            if (!isAuthenticated) return;
-            
-            // Start idle detection
-            startIdleDetection();
-            
-            await loadPractices();
-            await loadKPIs();
-            await loadChurnForecast();
-            await loadConversionFunnel();
-            await loadPracticePerformance();
-            await loadSourcePerformance();
-            
-            // NEW: Enhanced dashboard features
-            await loadPipelineFunnel();
-            await loadForecastComparison();
-            await loadHotLeads();
-            await loadMetaMarketing();
-            await loadEclubData();
-        }
-
-        // Load practices for dropdown
-        // Store all practices globally for search
-        let allPractices = [];
 
         async function loadPractices() {
             try {
-                const res = await fetch('/api/churn/practices');
-                const data = await res.json();
+                const res = await fetch('/api/practices');
+                const practices = await res.json();
                 
-                if (data.success && data.practices) {
-                    allPractices = data.practices; // Store globally
-                    
-                    const select = document.getElementById('practiceFilter');
-                    select.innerHTML = '<option value="">Alle praktijken</option>';
-                    
-                    data.practices.forEach(practice => {
-                        const option = document.createElement('option');
-                        option.value = practice.code;
-                        option.textContent = practice.naam;
-                        option.dataset.naam = practice.naam.toLowerCase();
-                        select.appendChild(option);
-                    });
-
-                    // Show search box for admin only
-                    if (currentUser && currentUser.role === 'admin') {
-                        document.getElementById('practiceSearchGroup').style.display = 'block';
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading practices:', error);
+                const select = document.getElementById('practiceFilter');
+                select.innerHTML = '<option value="">Alle praktijken</option>';
+                
+                practices.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.code;
+                    opt.textContent = p.naam;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Load practices error:', e);
             }
         }
 
-        // Filter practices based on search input (admin only)
-        function filterPractices() {
-            const searchInput = document.getElementById('practiceSearch').value.toLowerCase().trim();
-            const select = document.getElementById('practiceFilter');
-            
-            if (!searchInput) {
-                // Reset - show all options
-                const options = select.getElementsByTagName('option');
-                for (let i = 0; i < options.length; i++) {
-                    options[i].style.display = '';
-                }
-                return;
-            }
-
-            // Filter and focus dropdown
-            const options = select.getElementsByTagName('option');
-            let firstMatch = null;
-
-            for (let i = 1; i < options.length; i++) { // Skip first "Alle praktijken"
-                const option = options[i];
-                const naam = option.textContent.toLowerCase();
-                
-                if (naam.includes(searchInput)) {
-                    option.style.display = '';
-                    if (!firstMatch) {
-                        firstMatch = option;
-                    }
-                } else {
-                    option.style.display = 'none';
-                }
-            }
-
-            // Auto-select first match if exists
-            if (firstMatch && allPractices.length > 0) {
-                select.value = firstMatch.value;
-                // Trigger change to update dashboard
-                select.dispatchEvent(new Event('change'));
-            }
+        async function loadAllData() {
+            await loadKPIs();
+            await loadCharts();
+            await loadMetaMarketing();
         }
 
-        // Load KPIs
         async function loadKPIs() {
             try {
-                const res = await fetch('/api/practice-performance' + buildQueryString());
-                const data = await res.json();
+                const practiceCode = currentUser.role === 'admin' 
+                    ? document.getElementById('practiceFilter').value 
+                    : currentUser.practiceCode;
                 
-                if (data.success && data.data) {
-                    // Calculate totals
-                    const totalLeads = data.data.reduce((sum, p) => sum + parseInt(p.total_leads || 0), 0);
-                    const totalConverted = data.data.reduce((sum, p) => sum + parseInt(p.lid_geworden || 0), 0);
-                    const conversionRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : 0;
-                    const activePractices = data.data.filter(p => p.total_leads > 0).length;
-                    
-                    // Update KPI cards
-                    document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
-                    document.getElementById('conversionRate').textContent = conversionRate + '%';
-                    document.getElementById('activePractices').textContent = activePractices;
-                    
-                    // Get top source
-                    const sourcesRes = await fetch('/api/sources' + buildQueryString());
-                    const sourcesData = await sourcesRes.json();
-                    if (sourcesData.success && sourcesData.sources.length > 0) {
-                        document.getElementById('topSource').textContent = sourcesData.sources[0].source || 'Onbekend';
-                    }
-                    
-                    // Calculate average time (mock for now)
-                    document.getElementById('avgTime').textContent = '12d';
-                }
-            } catch (error) {
-                console.error('Error loading KPIs:', error);
-            }
-        }
-
-        // Load Churn Forecast Chart
-        async function loadChurnForecast() {
-            try {
-                const res = await fetch('/api/churn-forecast');
-                const data = await res.json();
+                const dateFrom = document.getElementById('dateFrom')?.value || '2025-01-01';
+                const dateTo = document.getElementById('dateTo')?.value || new Date().toISOString().split('T')[0];
                 
-                if (data.success) {
-                    const allData = [...(data.historical || []), ...(data.forecast || [])];
-                    
-                    const ctx = document.getElementById('churnForecastChart');
-                    if (churnForecastChart) churnForecastChart.destroy();
-                    
-                    churnForecastChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: allData.map(d => d.month),
-                            datasets: [
-                                {
-                                    label: 'Total Members',
-                                    data: allData.map(d => d.total_members),
-                                    borderColor: '#06c',
-                                    backgroundColor: 'rgba(0,102,204,0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
-                                },
-                                {
-                                    label: 'Churned Members',
-                                    data: allData.map(d => d.churned_members),
-                                    borderColor: '#ff3b30',
-                                    backgroundColor: 'rgba(255,59,48,0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'bottom'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading churn forecast:', error);
-                showError('churnForecastChart', error.message);
-            }
-        }
-
-        // Load Conversion Funnel
-        async function loadConversionFunnel() {
-            try {
-                const res = await fetch('/api/conversion-funnel' + buildQueryString());
-                const data = await res.json();
+                let url = `/api/kpis?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+                if (practiceCode) url += `&practice=${practiceCode}`;
                 
-                if (data.success && data.data) {
-                    const ctx = document.getElementById('conversionFunnelChart');
-                    if (conversionFunnelChart) conversionFunnelChart.destroy();
-                    
-                    conversionFunnelChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: data.data.map(d => d.stage),
-                            datasets: [{
-                                label: 'Count',
-                                data: data.data.map(d => d.count),
-                                backgroundColor: [
-                                    '#06c',
-                                    '#34c759',
-                                    '#ff9500',
-                                    '#ff3b30'
-                                ]
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading funnel:', error);
-                showError('conversionFunnelChart', error.message);
-            }
-        }
-
-        // Load Practice Performance
-        async function loadPracticePerformance() {
-            try {
-                const res = await fetch('/api/practice-performance');
-                const data = await res.json();
-                
-                if (data.success && data.data) {
-                    const topPractices = data.data.slice(0, 10);
-                    
-                    const ctx = document.getElementById('practiceChart');
-                    if (practiceChart) practiceChart.destroy();
-                    
-                    practiceChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: topPractices.map(d => d.praktijk_naam || d.praktijk_code),
-                            datasets: [{
-                                label: 'Gemiddelde Leads per Maand',
-                                data: topPractices.map(d => parseFloat(d.avg_leads_per_month) || 0),
-                                backgroundColor: '#06c'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading practice performance:', error);
-            }
-        }
-
-        // Load Source Performance
-        async function loadSourcePerformance() {
-            try {
-                const res = await fetch('/api/sources' + buildQueryString());
-                const data = await res.json();
-                
-                if (data.success && data.sources) {
-                    const ctx = document.getElementById('sourceChart');
-                    if (sourceChart) sourceChart.destroy();
-                    
-                    sourceChart = new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: data.sources.map(d => d.source || 'Onbekend'),
-                            datasets: [{
-                                data: data.sources.map(d => d.count),
-                                backgroundColor: [
-                                    '#2563eb', // Blue
-                                    '#10b981', // Green
-                                    '#f59e0b', // Orange
-                                    '#8b5cf6', // Purple
-                                    '#ef4444', // Red
-                                    '#06b6d4', // Cyan
-                                    '#ec4899', // Pink
-                                    '#14b8a6', // Teal
-                                    '#f97316', // Deep Orange
-                                    '#6366f1', // Indigo
-                                    '#84cc16', // Lime
-                                    '#a855f7'  // Violet
-                                ]
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading sources:', error);
-            }
-        }
-
-        // Build query string from filters
-        function buildQueryString() {
-            const params = new URLSearchParams();
-            
-            // If practice user, force their practice code
-            if (currentUser && currentUser.role === 'practice' && currentUser.practice_code) {
-                params.append('practice', currentUser.practice_code);
-            } else if (currentUser && currentUser.role === 'admin') {
-                // Admin can filter by practice - only if explicitly selected
-                const practiceFilter = document.getElementById('practiceFilter');
-                if (practiceFilter && practiceFilter.value) {
-                    params.append('practice', practiceFilter.value);
-                }
-                // If no filter selected, show ALL (don't add practice param)
-            }
-            
-            const source = document.getElementById('sourceFilter').value;
-            if (source) params.append('source', source);
-            
-            const dateFrom = document.getElementById('dateFrom').value;
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            
-            const dateTo = document.getElementById('dateTo').value;
-            if (dateTo) params.append('dateTo', dateTo);
-            
-            const status = document.getElementById('statusFilter').value;
-            if (status) params.append('status', status);
-            
-            const queryString = params.toString();
-            return queryString ? '?' + queryString : '';
-        }
-
-        // Apply filters
-        function applyFilters() {
-            loadKPIs();
-            loadConversionFunnel();
-            loadPracticePerformance();
-            loadSourcePerformance();
-            
-            // NEW: Also reload enhanced sections
-            loadPipelineFunnel();
-            loadForecastComparison();
-            loadHotLeads();
-            loadMetaMarketing();
-            loadEclubData();
-        }
-
-        // Refresh all data
-        function refreshData() {
-            init();
-        }
-
-        // Show error message
-        function showError(elementId, message) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                const parent = element.parentElement;
-                parent.innerHTML = `<div class="error-message">Error: ${message}</div>`;
-            }
-        }
-
-        // Get current filter values
-        function getCurrentFilters() {
-            return {
-                practice: document.getElementById('practiceFilter')?.value || '',
-                source: document.getElementById('sourceFilter')?.value || '',
-                status: document.getElementById('statusFilter')?.value || '',
-                dateFrom: document.getElementById('dateFrom')?.value || '',
-                dateTo: document.getElementById('dateTo')?.value || ''
-            };
-        }
-
-        // Excel Export Function
-        async function exportToExcel() {
-            try {
-                const filters = getCurrentFilters();
-                
-                // Get practice name - for practice users, use their practice name
-                let practiceName = 'Alle praktijken';
-                if (currentUser && currentUser.role === 'practice') {
-                    // For practice users, get their practice name from the dropdown or API
-                    const practiceFilter = document.getElementById('practiceFilter');
-                    const selectedOption = Array.from(practiceFilter.options).find(
-                        opt => opt.value === currentUser.practice_code
-                    );
-                    practiceName = selectedOption ? selectedOption.text : currentUser.practice_code;
-                } else {
-                    // For admin, use selected filter
-                    practiceName = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
-                }
-                
-                const dateRange = filters.dateFrom && filters.dateTo 
-                    ? `${filters.dateFrom} tot ${filters.dateTo}` 
-                    : 'Alle data';
-
-                // Fetch all data with current filters
-                const [funnelRes, performanceRes, sourcesRes, forecastRes] = await Promise.all([
-                    fetch('/api/funnel' + buildQueryString()),
-                    fetch('/api/practice-performance' + buildQueryString()),
-                    fetch('/api/sources' + buildQueryString()),
-                    fetch('/api/churn-forecast' + buildQueryString())
-                ]);
-
-                const funnelData = await funnelRes.json();
-                const performanceData = await performanceRes.json();
-                const sourcesData = await sourcesRes.json();
-                const forecastData = await forecastRes.json();
-
-                // Create workbook
-                const wb = XLSX.utils.book_new();
-
-                // Sheet 1: Funnel Data
-                if (funnelData.success && funnelData.data) {
-                    const funnelSheet = XLSX.utils.json_to_sheet(funnelData.data.map(d => ({
-                        'Stage': d.stage,
-                        'Aantal': d.count
-                    })));
-                    XLSX.utils.book_append_sheet(wb, funnelSheet, 'Conversie Funnel');
-                }
-
-                // Sheet 2: Practice Performance
-                if (performanceData.success && performanceData.data) {
-                    const perfSheet = XLSX.utils.json_to_sheet(performanceData.data.map(d => ({
-                        'Praktijk': d.practice_name,
-                        'Totaal Leads': d.total_leads,
-                        'Afspraken': d.appointments,
-                        'Conversies': d.conversions,
-                        'Conversie %': d.conversion_rate ? `${d.conversion_rate}%` : '0%'
-                    })));
-                    XLSX.utils.book_append_sheet(wb, perfSheet, 'Praktijk Performance');
-                }
-
-                // Sheet 3: Source Analysis
-                if (sourcesData.success && sourcesData.data) {
-                    const sourcesSheet = XLSX.utils.json_to_sheet(sourcesData.data.map(d => ({
-                        'Bron': d.source || 'Onbekend',
-                        'Aantal Leads': d.count
-                    })));
-                    XLSX.utils.book_append_sheet(wb, sourcesSheet, 'Lead Bronnen');
-                }
-
-                // Sheet 4: Forecast Data
-                if (forecastData.success && forecastData.forecast) {
-                    const forecastSheet = XLSX.utils.json_to_sheet(forecastData.forecast.map(d => ({
-                        'Maand': d.month,
-                        'Voorspelde Churn': d.predicted_churn,
-                        'Risico Niveau': d.risk_level
-                    })));
-                    XLSX.utils.book_append_sheet(wb, forecastSheet, 'Churn Forecast');
-                }
-
-                // Add metadata sheet
-                const metadata = [
-                    { 'Parameter': 'Export Datum', 'Waarde': new Date().toLocaleString('nl-NL') },
-                    { 'Parameter': 'Praktijk Filter', 'Waarde': practiceName },
-                    { 'Parameter': 'Datum Bereik', 'Waarde': dateRange },
-                    { 'Parameter': 'Gegenereerd door', 'Waarde': 'Dynamic Health Analytics' }
-                ];
-                const metaSheet = XLSX.utils.json_to_sheet(metadata);
-                XLSX.utils.book_append_sheet(wb, metaSheet, 'Export Info');
-
-                // Generate filename
-                const timestamp = new Date().toISOString().split('T')[0];
-                const filename = `DHC_Analytics_${timestamp}.xlsx`;
-
-                // Download
-                XLSX.writeFile(wb, filename);
-
-                alert('✅ Rapportage succesvol geëxporteerd!');
-            } catch (error) {
-                console.error('Export error:', error);
-                alert('❌ Fout bij exporteren: ' + error.message);
-            }
-        }
-
-        // NEW: Load Pipeline Funnel
-        async function loadPipelineFunnel() {
-            try {
-                const res = await fetch('/api/funnel' + buildQueryString());
-                const data = await res.json();
-                
-                if (!data.success || !data.stages) {
-                    document.getElementById('pipelineFunnelContainer').innerHTML = 
-                        '<div style="text-align:center;color:#86868b;padding:20px;">Geen data beschikbaar</div>';
-                    return;
-                }
-                
-                // Define expected stages with defaults
-                const expectedStages = [
-                    { stage: 'awareness', stage_name: 'Leads', count: 0 },
-                    { stage: 'intent', stage_name: 'Benaderd', count: 0 },
-                    { stage: 'won', stage_name: 'Lid', count: 0 }
-                ];
-
-                // Merge with actual data
-                const stagesMap = {};
-                data.stages.forEach(stage => {
-                    stagesMap[stage.stage] = stage;
-                });
-
-                const stages = expectedStages.map(expected => {
-                    if (stagesMap[expected.stage]) {
-                        return stagesMap[expected.stage];
-                    }
-                    return expected;
-                });
-
-                const total = Math.max(stages[0]?.count || 1, 1);
-                
-                let html = '';
-                stages.forEach((stage, idx) => {
-                    const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
-                    const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
-                    // Make awareness, intent, and lost clickable
-                    const isClickable = ['awareness', 'intent', 'lost'].includes(stage.stage);
-                    const cursor = isClickable ? 'cursor: pointer;' : '';
-                    const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
-                    
-                    html += `
-                        <div class="funnel-stage">
-                            <div class="funnel-bar ${stage.stage}" style="width: ${percentage}%; ${cursor}" ${onClick}>
-                                <span>${stage.stage_name}</span>
-                                <span class="funnel-count">${stage.count}</span>
-                            </div>
-                            <div class="funnel-stats">
-                                <div>${(stage.count / total * 100).toFixed(1)}% of total</div>
-                                ${idx > 0 ? `<span class="conversion-rate">${convRate}% conversion</span>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                document.getElementById('pipelineFunnelContainer').innerHTML = html;
-            } catch (error) {
-                console.error('Pipeline funnel error:', error);
-                document.getElementById('pipelineFunnelContainer').innerHTML = 
-                    '<div style="text-align:center;color:#c62828;padding:20px;">Error loading funnel</div>';
-            }
-        }
-
-        // NEW: Load Forecast Comparison
-        async function loadForecastComparison() {
-            try {
-                const res = await fetch('/api/pipeline-metrics' + buildQueryString());
-                const data = await res.json();
-                
-                if (!data.success) return;
-                
-                const expected = data.expected_conversions || 0;
-                const actual = data.won_deals || 0;
-                const gap = actual - expected;
-                const gapPercent = expected > 0 ? ((gap / expected) * 100).toFixed(1) : 0;
-                
-                document.getElementById('forecastExpected').textContent = expected;
-                document.getElementById('forecastActual').textContent = actual;
-                document.getElementById('gapValue').textContent = 
-                    `${gap >= 0 ? '+' : ''}${gap} (${gapPercent}%)`;
-                
-                const gapDesc = document.getElementById('gapDescription');
-                if (gap >= 0) {
-                    gapDesc.textContent = 'Boven forecast - excellent performance';
-                    gapDesc.style.color = '#10b981';
-                } else if (gap > -3) {
-                    gapDesc.textContent = 'Licht onder forecast - nog bij te halen';
-                    gapDesc.style.color = '#f59e0b';
-                } else {
-                    gapDesc.textContent = 'Onder forecast - actie vereist';
-                    gapDesc.style.color = '#ef4444';
-                }
-            } catch (error) {
-                console.error('Forecast comparison error:', error);
-            }
-        }
-
-        // NEW: Load Hot Leads
-        async function loadHotLeads() {
-            try {
-                // Use buildQueryString to apply practice isolation
-                const queryString = buildQueryString();
-                const url = `/api/hot-leads?limit=5${queryString ? '&' + queryString.substring(1) : ''}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                const container = document.getElementById('hotLeadsList');
+                document.getElementById('totalLeads').textContent = data.total_leads || 0;
+                document.getElementById('conversionRatio').textContent = `${(data.conversion_ratio || 0).toFixed(1)}%`;
+                document.getElementById('activePractices').textContent = data.active_practices || 0;
+                document.getElementById('avgTime').textContent = `${data.avg_time_to_conversion || 0}d`;
+                document.getElementById('topSource').textContent = data.top_source || '-';
                 
-                if (!data.success || !data.leads || data.leads.length === 0) {
-                    container.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:12px;">Geen hot leads</div>';
-                    return;
-                }
-                
-                let html = '';
-                data.leads.forEach(lead => {
-                    html += `
-                        <div class="hot-lead-item">
-                            <div class="hot-lead-name">${lead.volledige_naam}</div>
-                            <div class="hot-lead-meta">
-                                <span>${lead.praktijk_naam || 'Geen praktijk'}</span>
-                                <span>${lead.funnel_stage}</span>
-                                <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
-                                <span>€${parseFloat(lead.expected_value || 0).toFixed(0)}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            } catch (error) {
-                console.error('Hot leads error:', error);
-                document.getElementById('hotLeadsList').innerHTML = 
-                    '<div style="text-align:center;color:#c62828;padding:20px;font-size:12px;">Error loading hot leads</div>';
+            } catch (e) {
+                console.error('Load KPIs error:', e);
             }
         }
 
-        // ECLUB FUNCTIONS
-        async function loadEclubData() {
-            try {
-                const practice = document.getElementById('practiceFilter').value;
-                if (!practice) return;
-
-                const dateFrom = document.getElementById('dateFrom').value;
-                const dateTo = document.getElementById('dateTo').value;
-                
-                const queryParams = new URLSearchParams();
-                if (dateFrom) queryParams.append('dateFrom', dateFrom);
-                if (dateTo) queryParams.append('dateTo', dateTo);
-                
-                const queryString = queryParams.toString();
-                const url = `/api/eclub/summary/${practice}${queryString ? '?' + queryString : ''}`;
-                
-                const res = await fetch(url, { credentials: 'include' });
-                const response = await res.json();
-                
-                if (!response.success) return;
-                
-                const data = response.data;
-                const enabled = response.eclub_enabled;
-                
-                document.getElementById('eclubStatus').textContent = enabled ? 'Gekoppeld' : 'Niet gekoppeld';
-                document.getElementById('eclubStatus').style.color = enabled ? '#10b981' : '#86868b';
-                
-                // Lead Management metrics
-                const visited = parseInt(data.active_members || 0) + parseInt(data.churned_members || 0);
-                const registrations = parseInt(data.active_members || 0);
-                const pending = 0; // Calculated from leads table later
-                const convRate = visited > 0 ? ((registrations / visited) * 100).toFixed(1) : '0.0';
-                
-                document.getElementById('eclubVisited').textContent = visited;
-                document.getElementById('eclubRegistrations').textContent = registrations;
-                document.getElementById('eclubPending').textContent = pending;
-                document.getElementById('eclubConversionRate').textContent = convRate + '%';
-                
-                // Overige KPIs
-                document.getElementById('eclubActiveMembers').textContent = data.active_members || 0;
-                document.getElementById('eclubNewMembers').textContent = data.new_members || 0;
-                document.getElementById('eclubChurnedMembers').textContent = data.churned_members || 0;
-                
-                const avgDays = parseInt(data.avg_membership_days || 0);
-                const avgMonths = Math.round(avgDays / 30);
-                document.getElementById('eclubAvgDuration').textContent = avgMonths > 0 ? avgMonths + ' mnd' : '-';
-                
-                document.getElementById('eclubTotalVisits').textContent = data.total_visits || 0;
-                
-                const activeMembers = parseInt(data.active_members || 0);
-                const totalMembers = activeMembers + parseInt(data.churned_members || 0);
-                const retention = totalMembers > 0 ? ((activeMembers / totalMembers) * 100).toFixed(1) : '0.0';
-                document.getElementById('eclubRetention').textContent = retention + '%';
-                
-                const monthlyRevenue = parseFloat(data.total_monthly_revenue || 0);
-                document.getElementById('eclubRevenue').textContent = monthlyRevenue > 0 ? '€' + monthlyRevenue.toFixed(0) : '-';
-                
-                const revenuePerMember = activeMembers > 0 ? (monthlyRevenue / activeMembers) : 0;
-                document.getElementById('eclubRevenuePerMember').textContent = revenuePerMember > 0 ? '€' + revenuePerMember.toFixed(0) : '-';
-                
-            } catch (error) {
-                console.error('Eclub data error:', error);
-            }
+        async function loadCharts() {
+            // Placeholder - implement chart loading
+            console.log('Charts loading...');
         }
 
-        async function syncEclub() {
-            const practice = document.getElementById('practiceFilter').value;
-            if (!practice) {
-                alert('Selecteer eerst een praktijk');
-                return;
-            }
-            
-            try {
-                const res = await fetch(`/api/eclub/sync/${practice}`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    alert('Eclub data gesynchroniseerd');
-                    await loadEclubData();
-                } else {
-                    alert('Sync mislukt: ' + (data.error || 'Onbekende fout'));
-                }
-            } catch (error) {
-                console.error('Eclub sync error:', error);
-                alert('Fout bij synchroniseren');
-            }
-        }
-
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', init);
-
-        // ============================================
-        // IDLE DETECTION & AUTO-LOGOUT
-        // ============================================
-
-        let idleTimer = null;
-        let heartbeatInterval = null;
-        let lastActivity = Date.now();
-        const IDLE_TIMEOUT = 60 * 60 * 1000; // 1 hour
-        const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 minutes
-        const WARNING_TIME = 5 * 60 * 1000; // Warn 5 min before logout
-
-        function startIdleDetection() {
-            // Track user activity
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-            
-            activityEvents.forEach(event => {
-                document.addEventListener(event, onActivity, true);
-            });
-
-            // Start heartbeat to keep session alive
-            heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
-
-            // Start idle checker
-            checkIdle();
-        }
-
-        function onActivity() {
-            lastActivity = Date.now();
-        }
-
-        async function sendHeartbeat() {
-            try {
-                // Only send heartbeat if there was recent activity
-                const idleTime = Date.now() - lastActivity;
-                if (idleTime < HEARTBEAT_INTERVAL) {
-                    await fetch('/api/auth/heartbeat', {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
-                }
-            } catch (error) {
-                console.error('Heartbeat failed:', error);
-            }
-        }
-
-        function checkIdle() {
-            const idleTime = Date.now() - lastActivity;
-            
-            if (idleTime >= IDLE_TIMEOUT) {
-                // Auto logout
-                handleIdleLogout();
-            } else if (idleTime >= IDLE_TIMEOUT - WARNING_TIME) {
-                // Show warning
-                showIdleWarning(Math.floor((IDLE_TIMEOUT - idleTime) / 1000));
-            }
-
-            // Check again in 10 seconds
-            idleTimer = setTimeout(checkIdle, 10000);
-        }
-
-        function showIdleWarning(secondsLeft) {
-            const minutes = Math.ceil(secondsLeft / 60);
-            
-            // Only show once
-            if (document.getElementById('idleWarning')) return;
-
-            const warning = document.createElement('div');
-            warning.id = 'idleWarning';
-            warning.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                background: #ff9800;
-                color: white;
-                padding: 16px 24px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 10000;
-                font-size: 14px;
-                max-width: 300px;
-            `;
-            warning.innerHTML = `
-                <strong>⚠️ Sessie verloopt binnenkort</strong><br>
-                Je wordt over ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} uitgelogd wegens inactiviteit.
-            `;
-            document.body.appendChild(warning);
-
-            // Remove warning on activity
-            const removeWarning = () => {
-                warning?.remove();
-                activityEvents.forEach(event => {
-                    document.removeEventListener(event, removeWarning, true);
-                });
-            };
-
-            const activityEvents = ['mousedown', 'keypress', 'click'];
-            activityEvents.forEach(event => {
-                document.addEventListener(event, removeWarning, true);
-            });
-        }
-
-        async function handleIdleLogout() {
-            // Clear intervals
-            if (heartbeatInterval) clearInterval(heartbeatInterval);
-            if (idleTimer) clearTimeout(idleTimer);
-
-            // Logout
-            try {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
-
-            // Redirect with message
-            alert('Je bent uitgelogd wegens inactiviteit.');
-            window.location.href = '/login.html';
-        }
-
-        // ============================================
-        // META MARKETING FUNCTIONS
-        // ============================================
-
-        let metaChart = null;
-
-        // Load Meta Marketing data
         async function loadMetaMarketing() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
                 : currentUser.practiceCode;
-                
+            
             if (!practiceCode) {
                 document.getElementById('metaMarketingSection').style.display = 'none';
                 return;
             }
             
-            const dateFrom = document.getElementById('dateFrom').value || '2025-01-01';
-            const dateTo = document.getElementById('dateTo').value || new Date().toISOString().split('T')[0];
+            const dateFrom = document.getElementById('dateFrom')?.value || '2025-01-01';
+            const dateTo = document.getElementById('dateTo')?.value || new Date().toISOString().split('T')[0];
             
             try {
-                // Get summary (conversies komen uit Meta API via sync)
-                const summaryRes = await fetch(
-                    `/api/meta/summary/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
-                );
+                const summaryRes = await fetch(`/api/meta/summary/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`);
                 const summary = await summaryRes.json();
                 
-                // Check if Meta enabled
                 if (!summary.meta_enabled) {
                     document.getElementById('metaMarketingSection').style.display = 'none';
                     return;
                 }
                 
-                // Get verified leads from database (bron = Facebook or Instagram)
+                // Get verified leads from database
                 try {
                     const leadsRes = await fetch(`/api/leads`);
                     const leadsData = await leadsRes.json();
                     
-                    // API returns array directly
                     if (Array.isArray(leadsData)) {
-                        // Filter: only Soestdijk + Facebook/Instagram
                         const metaLeads = leadsData.filter(lead => {
-                            // Match practice
                             if (lead.praktijk_code !== practiceCode) return false;
-                            
-                            // Match bron (Facebook or Instagram)
                             const bron = (lead.bron || '').toLowerCase();
                             return bron === 'facebook' || bron === 'instagram';
                         });
-                        
-                        // Count = 7
                         summary.verified_leads = metaLeads.length;
                     } else {
                         summary.verified_leads = 0;
@@ -2393,74 +960,30 @@
                     summary.verified_leads = 0;
                 }
                 
-                // Show section
                 document.getElementById('metaMarketingSection').style.display = 'block';
+                document.getElementById('metaMarketingNav').style.display = 'block';
                 displayMetaSummary(summary);
                 
-                // Get campaigns
-                const campaignsRes = await fetch(
-                    `/api/meta/campaigns/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
-                );
-                const campaigns = await campaignsRes.json();
-                
-                displayMetaCampaigns(campaigns);
-                displayMetaChart(campaigns);
-                
-                // Update sync time
                 document.getElementById('metaLastSync').textContent = 
                     `Laatste sync: ${new Date().toLocaleString('nl-NL')}`;
                     
             } catch (error) {
                 console.error('Meta marketing error:', error);
-                // Show section but with error message
-                document.getElementById('metaMarketingSection').style.display = 'block';
-                document.getElementById('metaCampaignsBody').innerHTML = `
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.8); padding: 24px;">
-                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 600; color: #1d1d1f;">Meta data niet beschikbaar</div>
-                            <div style="font-size: 12px;">Configureer eerst Meta credentials voor deze praktijk</div>
-                        </td>
-                    </tr>
-                `;
+                document.getElementById('metaMarketingSection').style.display = 'none';
             }
         }
 
-        // Display Meta summary metrics
         function displayMetaSummary(data) {
-            // Ad Spend
-            document.getElementById('metaTotalSpend').textContent = 
-                `€${parseFloat(data.total_spend || 0).toFixed(2)}`;
+            document.getElementById('metaTotalSpend').textContent = `€${parseFloat(data.total_spend || 0).toFixed(2)}`;
+            document.getElementById('metaImpressions').textContent = formatNumber(data.total_impressions || 0);
+            document.getElementById('metaClicks').textContent = formatNumber(data.total_clicks || 0);
+            document.getElementById('metaCTR').textContent = `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
+            document.getElementById('metaConversions').textContent = data.total_conversions || 0;
+            document.getElementById('metaVerifiedLeads').textContent = data.verified_leads || 0;
+            document.getElementById('metaCostPerLead').textContent = `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
+            document.getElementById('metaCPC').textContent = `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
             
-            // Impressions
-            document.getElementById('metaImpressions').textContent = 
-                formatNumber(data.total_impressions || 0);
-            
-            // Clicks
-            document.getElementById('metaClicks').textContent = 
-                formatNumber(data.total_clicks || 0);
-            
-            // CTR
-            document.getElementById('metaCTR').textContent = 
-                `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
-            
-            // Conversions (Meta PageViews)
-            document.getElementById('metaConversions').textContent = 
-                data.total_conversions || 0;
-            
-            // Leads (Meta) - Verified leads from database with bron Facebook/Instagram
-            document.getElementById('metaVerifiedLeads').textContent = 
-                data.verified_leads || 0;
-            
-            // Cost Per Lead
-            document.getElementById('metaCostPerLead').textContent = 
-                `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
-            
-            // CPC
-            document.getElementById('metaCPC').textContent = 
-                `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
-            
-            // ROAS (estimated)
-            const estimatedLeadValue = 150; // Average patient lifetime value
+            const estimatedLeadValue = 150;
             const totalSpend = parseFloat(data.total_spend || 0);
             const totalConversions = parseInt(data.total_conversions || 0);
             const roas = totalSpend > 0 
@@ -2469,302 +992,114 @@
             document.getElementById('metaROAS').textContent = `${roas}x`;
         }
 
-        // Display Meta campaigns table
-        function displayMetaCampaigns(campaigns) {
-            const tbody = document.getElementById('metaCampaignsBody');
-            
-            if (!campaigns || campaigns.length === 0) {
-                tbody.innerHTML = `
+        function formatNumber(num) {
+            if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        async function openLeadsModal() {
+            try {
+                const practiceCode = currentUser.role === 'admin' 
+                    ? document.getElementById('practiceFilter').value 
+                    : currentUser.practiceCode;
+                
+                let url = '/api/leads-by-stage?stage=awareness';
+                if (practiceCode) url += `&practice=${practiceCode}`;
+                
+                const res = await fetch(url);
+                const leads = await res.json();
+                
+                const tbody = document.getElementById('leadsTableBody');
+                tbody.innerHTML = leads.map(lead => `
                     <tr>
-                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6); padding: 24px;">
-                            Geen actieve campagnes in geselecteerde periode
-                        </td>
+                        <td>${lead.volledige_naam || '-'}</td>
+                        <td>${lead.emailadres || '-'}</td>
+                        <td>${lead.telefoon || '-'}</td>
+                        <td>${lead.bron || '-'}</td>
+                        <td>${new Date(lead.aangemaakt_op).toLocaleDateString('nl-NL')}</td>
                     </tr>
-                `;
-                return;
+                `).join('');
+                
+                document.getElementById('leadsModal').classList.add('show');
+            } catch (e) {
+                console.error('Load leads error:', e);
             }
-            
-            tbody.innerHTML = campaigns.slice(0, 10).map(campaign => `
-                <tr>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${campaign.campaign_name}">
-                        ${campaign.campaign_name}
-                    </td>
-                    <td>€${parseFloat(campaign.spend || 0).toFixed(2)}</td>
-                    <td>${campaign.conversions || 0}</td>
-                    <td>€${parseFloat(campaign.cost_per_conversion || 0).toFixed(2)}</td>
-                </tr>
-            `).join('');
         }
 
-        // Display Meta chart
-        function displayMetaChart(campaigns) {
-            const ctx = document.getElementById('metaCampaignChart');
-            if (!ctx) return;
-            
-            // Destroy existing chart
-            if (metaChart) {
-                metaChart.destroy();
+        async function openBenaderdModal() {
+            try {
+                const practiceCode = currentUser.role === 'admin' 
+                    ? document.getElementById('practiceFilter').value 
+                    : currentUser.practiceCode;
+                
+                let url = '/api/leads-by-stage?stage=intent';
+                if (practiceCode) url += `&practice=${practiceCode}`;
+                
+                const res = await fetch(url);
+                const leads = await res.json();
+                
+                const tbody = document.getElementById('benaderdTableBody');
+                tbody.innerHTML = leads.map(lead => `
+                    <tr>
+                        <td>${lead.volledige_naam || '-'}</td>
+                        <td>${lead.emailadres || '-'}</td>
+                        <td>${lead.telefoon || '-'}</td>
+                        <td>${lead.appointment_date || '-'}</td>
+                        <td>${new Date(lead.aangemaakt_op).toLocaleDateString('nl-NL')}</td>
+                    </tr>
+                `).join('');
+                
+                document.getElementById('benaderdModal').classList.add('show');
+            } catch (e) {
+                console.error('Load benaderd error:', e);
             }
-            
-            if (!campaigns || campaigns.length === 0) {
-                ctx.parentElement.innerHTML = `
-                    <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 40px;">
-                        Geen campagne data beschikbaar
-                    </div>
-                `;
-                return;
-            }
-            
-            // Limit to top 10 campaigns by spend
-            const topCampaigns = campaigns.slice(0, 10);
-            
-            metaChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: topCampaigns.map(c => c.campaign_name.substring(0, 25)),
-                    datasets: [
-                        {
-                            label: 'Ad Spend (€)',
-                            data: topCampaigns.map(c => parseFloat(c.spend || 0)),
-                            backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                            borderColor: '#06c',
-                            borderWidth: 2,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Conversions',
-                            data: topCampaigns.map(c => c.conversions || 0),
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            borderColor: '#10b981',
-                            borderWidth: 2,
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: { 
-                                color: '#1d1d1f',
-                                font: {
-                                    size: 13
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { 
-                                color: '#86868b',
-                                maxRotation: 45,
-                                minRotation: 45,
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { 
-                                color: '#f5f5f7',
-                                drawBorder: false
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            position: 'left',
-                            title: { 
-                                display: true, 
-                                text: 'Spend (€)', 
-                                color: '#86868b',
-                                font: {
-                                    size: 12,
-                                    weight: 500
-                                }
-                            },
-                            ticks: { 
-                                color: '#86868b',
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { 
-                                color: '#f5f5f7',
-                                drawBorder: false
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            title: { 
-                                display: true, 
-                                text: 'Conversions', 
-                                color: '#86868b',
-                                font: {
-                                    size: 12,
-                                    weight: 500
-                                }
-                            },
-                            ticks: { 
-                                color: '#86868b',
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { drawOnChartArea: false }
-                        }
-                    }
-                }
-            });
         }
 
-        // Manual sync Meta data
+        function openLidModal() {
+            document.getElementById('lidModal').classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
         async function syncMetaData() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
                 : currentUser.practiceCode;
-                
+            
             if (!practiceCode) {
                 alert('Selecteer eerst een praktijk');
                 return;
             }
             
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '⏳ Syncing...';
-            
             try {
-                const res = await fetch(`/api/meta/sync/${practiceCode}`, { 
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                if (!res.ok) {
-                    throw new Error('Sync failed');
-                }
-                
+                const res = await fetch(`/api/meta/sync/${practiceCode}`, { method: 'POST' });
+                const result = await res.json();
+                alert('Meta sync succesvol');
                 await loadMetaMarketing();
-                alert('Meta data gesynchroniseerd!');
-            } catch (error) {
-                console.error('Sync error:', error);
-                alert('Sync mislukt: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+            } catch (e) {
+                alert('Meta sync mislukt: ' + e.message);
             }
         }
 
-        // Helper: Format large numbers
-        function formatNumber(num) {
-            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
+        function syncEclubData() {
+            alert('Eclub sync - nog geen API credentials');
         }
 
-        // ============================================
-        // ECLUB SYNC FUNCTIONS
-        // ============================================
-
-        // Load Eclub data for selected practice
-        async function loadEclubData() {
-            const practiceCode = document.getElementById('practiceFilter').value;
-            
-            if (!practiceCode) {
-                document.getElementById('eclubSyncSection').style.display = 'none';
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/eclub/summary/${practiceCode}`);
-                const data = await res.json();
-
-                if (data.success && data.eclub_enabled) {
-                    document.getElementById('eclubSyncSection').style.display = 'block';
-                    document.getElementById('eclubMemberCount').textContent = 
-                        `${data.data.active_members} actief, ${data.data.frozen_members} bevroren`;
-                    
-                    if (data.data.last_sync) {
-                        const lastSync = new Date(data.data.last_sync);
-                        document.getElementById('lastSyncTime').textContent = 
-                            lastSync.toLocaleString('nl-NL');
-                    } else {
-                        document.getElementById('lastSyncTime').textContent = 'Nog niet gesynchroniseerd';
-                    }
-                } else {
-                    document.getElementById('eclubSyncSection').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error loading Eclub data:', error);
-                document.getElementById('eclubSyncSection').style.display = 'none';
-            }
+        function exportReport() {
+            alert('Rapportage export - nog te implementeren');
         }
 
-        // Sync Eclub data
-        async function syncEclubData() {
-            const practiceCode = document.getElementById('practiceFilter').value;
-            
-            if (!practiceCode) {
-                alert('Selecteer eerst een praktijk');
-                return;
-            }
-
-            const btn = document.getElementById('btnEclubSync');
-            const statusDiv = document.getElementById('syncStatus');
-            const btnText = document.getElementById('syncButtonText');
-            
-            // Disable button
-            btn.disabled = true;
-            btnText.textContent = '⏳ Synchroniseren...';
-            statusDiv.style.display = 'none';
-
-            try {
-                const res = await fetch(`/api/eclub/sync/${practiceCode}`, {
-                    method: 'POST'
-                });
-                
-                const data = await res.json();
-
-                if (data.success) {
-                    statusDiv.innerHTML = `
-                        <div style="color: #10b981; font-weight: 600;">
-                            ✅ ${data.recordsSynced} leden gesynchroniseerd
-                        </div>
-                    `;
-                    statusDiv.style.display = 'block';
-
-                    // Reload Eclub data
-                    setTimeout(() => {
-                        loadEclubData();
-                        statusDiv.style.display = 'none';
-                    }, 3000);
-                } else {
-                    statusDiv.innerHTML = `
-                        <div style="color: #ef4444; font-weight: 600;">
-                            ❌ Sync mislukt: ${data.error}
-                        </div>
-                    `;
-                    statusDiv.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Sync error:', error);
-                statusDiv.innerHTML = `
-                    <div style="color: #ef4444; font-weight: 600;">
-                        ❌ Fout: ${error.message}
-                    </div>
-                `;
-                statusDiv.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btnText.textContent = '🔄 Sync Leden';
-            }
+        function logout() {
+            fetch('/api/auth/logout', { method: 'POST' })
+                .then(() => window.location.href = '/login.html');
         }
 
-        // Update applyFilters to also load Eclub data
-        const originalApplyFilters = applyFilters;
-        applyFilters = function() {
-            originalApplyFilters();
-            loadEclubData();
-        };
+        // Init
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
