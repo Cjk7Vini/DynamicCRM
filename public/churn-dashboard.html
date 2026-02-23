@@ -834,7 +834,7 @@
 
         async function checkAuth() {
             try {
-                const res = await fetch('/api/auth/me');
+                const res = await fetch('/api/auth/me', { credentials: 'include' });
                 if (!res.ok) {
                     window.location.href = '/login.html';
                     return;
@@ -1094,7 +1094,7 @@
         }
 
         function logout() {
-            fetch('/api/auth/logout', { method: 'POST' })
+            fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
                 .then(() => window.location.href = '/login.html');
         }
 
