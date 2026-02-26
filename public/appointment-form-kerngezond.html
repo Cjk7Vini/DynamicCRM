@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Afspraak Plannen</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --success: #10b981;
+      --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-gradient);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(17, 24, 39, 0.15);
+      padding: 40px 30px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 24px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .lead-info {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .lead-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+    .lead-info-label {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .lead-info-value {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    input[type="date"],
+    input[type="time"],
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border 0.2s;
+    }
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+    }
+    button {
+      width: 100%;
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      filter: brightness(0.9);
+      transform: translateY(-1px);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .message.error {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+      display: block;
+    }
+    .message.success {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="icon">📅</div>
+        <h1>Afspraak Plannen</h1>
+        <p class="subtitle">Plan de afspraak met je lead</p>
+      </div>
+
+      <div class="lead-info" id="leadInfo">
+        <div class="lead-info-row">
+          <span class="lead-info-label">Naam:</span>
+          <span class="lead-info-value" id="leadName">-</span>
+        </div>
+        <div class="lead-info-row">
+          <span class="lead-info-label">Email:</span>
+          <span class="lead-info-value" id="leadEmail">-</span>
+        </div>
+        <div class="lead-info-row">
+          <span class="lead-info-label">Telefoon:</span>
+          <span class="lead-info-value" id="leadPhone">-</span>
+        </div>
+      </div>
+
+      <form id="appointmentForm">
+        <div class="form-group">
+          <label for="date">Afspraak Datum *</label>
+          <input type="date" id="date" name="date" required />
+        </div>
+
+        <div class="form-group">
+          <label for="time">Afspraak Tijd *</label>
+          <input type="time" id="time" name="time" required />
+        </div>
+
+        <div class="form-group">
+          <label for="type">Type Afspraak *</label>
+          <select id="type" name="type" required style="width:100%;padding:12px;border:2px solid var(--border);border-radius:10px;font-size:16px;background:white;cursor:pointer;">
+            <option value="">-- Kies type afspraak --</option>
+            <option value="Gratis Fitnesscheck-up - 60 minuten (In 60 minuten brengen we samen in kaart waar jouw verbeterpunten liggen en wat jij nodig hebt om gezonder en fitter te bewegen)">Gratis Fitnesscheck-up - 60 minuten (In 60 minuten brengen we samen in kaart waar jouw verbeterpunten liggen en wat jij nodig hebt om gezonder en fitter te bewegen)</option>
+            <option value="Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)">Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Opmerkingen (optioneel)</label>
+          <textarea id="notes" name="notes" placeholder="Bijv. kom 10 minuten eerder, neem sportkleding mee..."></textarea>
+        </div>
+
+        <button type="submit" id="submitBtn">Afspraak Bevestigen</button>
+        <div id="message" class="message"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get('lead_id');
+    const practiceCode = params.get('practice_code');
+    const token = params.get('token');
+
+    if (!leadId || !practiceCode || !token) {
+      document.getElementById('message').textContent = 'Ongeldige link - ontbrekende parameters';
+      document.getElementById('message').className = 'message error';
+      document.getElementById('appointmentForm').style.display = 'none';
+    }
+
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').min = today;
+
+    // Fetch lead info
+    async function loadLeadInfo() {
+      try {
+        const response = await fetch(`/api/lead-info?lead_id=${leadId}&practice_code=${practiceCode}&token=${token}`);
+        if (!response.ok) throw new Error('Kon lead info niet ophalen');
+        
+        const data = await response.json();
+        document.getElementById('leadName').textContent = data.volledige_naam || '-';
+        document.getElementById('leadEmail').textContent = data.emailadres || '-';
+        document.getElementById('leadPhone').textContent = data.telefoon || '-';
+      } catch (err) {
+        console.error(err);
+        document.getElementById('leadInfo').innerHTML = '<p style="color:#b91c1c;text-align:center">Kon lead gegevens niet laden</p>';
+      }
+    }
+
+    loadLeadInfo();
+
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('submitBtn');
+      const message = document.getElementById('message');
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Bezig met opslaan...';
+      message.style.display = 'none';
+
+      const formData = {
+        lead_id: leadId,
+        practice_code: practiceCode,
+        token: token,
+        date: document.getElementById('date').value,
+        time: document.getElementById('time').value,
+        type: document.getElementById('type').value,
+        notes: document.getElementById('notes').value
+      };
+
+      try {
+        const response = await fetch('/api/confirm-appointment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Er ging iets mis');
+        }
+
+        message.textContent = '✅ Afspraak bevestigd! De klant ontvangt een bevestigingsmail.';
+        message.className = 'message success';
+        
+        setTimeout(() => {
+          window.location.href = `/success.html?name=${encodeURIComponent(result.lead_name)}&lead_id=${leadId}&practice_code=${practiceCode}&practice_name=${encodeURIComponent(result.practice_name)}`;
+        }, 2000);
+
+      } catch (err) {
+        message.textContent = '❌ ' + err.message;
+        message.className = 'message error';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Afspraak Bevestigen';
+      }
+    });
+  </script>
+</body>
+</html>
