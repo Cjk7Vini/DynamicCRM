@@ -144,11 +144,13 @@ app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 const metaService = new MetaService(withReadConnection, withWriteConnection);
 const eclubService = new EclubService(withReadConnection, withWriteConnection);
 
-// ✅ FIX: Homepage redirect naar landing.html in plaats van form.html
-app.get('/', (req, res) => {
-  const q = req.url.includes('?') ? req.url.split('?')[1] : '';
-  res.redirect(302, q ? `/landing.html?${q}` : '/landing.html');
-});
+// ✅ FIX: Serve index.html as homepage (removed landing.html redirect)
+// Root route now serves index.html by default via express.static
+// app.get('/', (req, res) => {
+//   const q = req.url.includes('?') ? req.url.split('?')[1] : '';
+//   res.redirect(302, q ? `/landing.html?${q}` : '/landing.html');
+// });
+
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
 app.get('/dashboard', (_req, res) => res.redirect(302, '/churn-dashboard.html'));
 app.get('/training', (_req, res) => res.redirect(302, '/training-form.html'));
