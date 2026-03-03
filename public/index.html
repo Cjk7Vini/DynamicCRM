@@ -15,27 +15,22 @@
         .nav-list a { color: white; text-decoration: none; font-weight: 600; font-size: 14px; transition: color 0.3s; }
         .nav-list a:hover { color: var(--secondary); }
         .hero { 
-            background: linear-gradient(135deg, rgba(26, 29, 33, 0.95) 0%, rgba(42, 45, 49, 0.95) 100%), 
-                        url('images/dynamic-logo-2.png') center/contain no-repeat;
-            background-size: 600px;
-            padding: 120px 60px; 
+            background: linear-gradient(135deg, var(--primary) 0%, #2a2d31 100%);
+            padding: 80px 60px 120px; 
             color: white; 
             text-align: center; 
             position: relative;
         }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('images/dynamic-logo-2.png') center/600px no-repeat;
-            opacity: 0.08;
-            z-index: 0;
+        .hero-logo {
+            max-width: 300px;
+            margin: 0 auto 40px;
+            opacity: 0.9;
         }
-        .hero > * { position: relative; z-index: 1; }
-        .hero-label { color: var(--secondary); font-weight: 700; font-size: 14px; letter-spacing: 2px; margin-bottom: 20px; }
+        .hero-logo img {
+            width: 100%;
+            height: auto;
+        }
+        .hero-label { color: var(--secondary); font-weight: 600; font-size: 13px; letter-spacing: 1.5px; margin-bottom: 20px; }
         .hero h1 { font-size: 48px; max-width: 1100px; margin: 0 auto 30px; line-height: 1.3; }
         .hero p { font-size: 20px; max-width: 900px; margin: 0 auto 40px; opacity: 0.9; }
         .gradient-text { background: linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
@@ -78,9 +73,12 @@
     </header>
 
     <section class="hero">
+        <div class="hero-logo">
+            <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy">
+        </div>
         <div class="hero-label">De transitiepartner voor preventieve leefstijlzorg</div>
-        <h1>Dynamic Health Consultancy begeleidt <span class="gradient-text">praktijken en leefstijlcentra</span> in de overgang van curatieve zorg naar preventieve leefstijlzorg</h1>
-        <p>We verbinden strategie, teamontwikkeling, marketing en implementatie in één geïntegreerd traject zodat jouw organisatie duurzaam kan groeien in leden, omzet én maatschappelijke impact.</p>
+        <h1>We begeleiden praktijken en leefstijlcentra in de overgang van curatieve zorg naar <span class="gradient-text">preventieve leefstijlzorg</span></h1>
+        <p>We verbinden strategie, teamontwikkeling, marketing en implementatie in één traject. Zodat jouw organisatie duurzaam kan groeien in leden, omzet én maatschappelijke impact.</p>
         <div class="hero-cta">
             <a href="diensten.html" class="btn-gradient">Ontdek onze aanpak</a>
             <a href="mailto:info@dynamic-health-consultancy.nl" class="btn-outline">Plan een adviesgesprek</a>
@@ -132,7 +130,7 @@
     <section class="why-section section">
         <div class="why-content">
             <div class="section-header">
-                <h2>Waarom DHC?</h2>
+                <h2>Waarom wij?</h2>
             </div>
             <ul class="why-list">
                 <li>Strategisch én praktisch</li>
