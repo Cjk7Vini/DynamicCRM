@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan je Afspraak - Vitaal Fysiotherapie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #20294e;
+            --orange: #ec652a;
+            --tiffany: #89ccca;
+            --background: #fcf8f3;
+            --text-dark: #393939;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo img {
+            max-width: 180px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Open Sans', sans-serif;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--orange);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--orange);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(236, 101, 42, 0.3);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(236, 101, 42, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .required {
+            color: var(--orange);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="images/Logo Vitaal.jpg" alt="Vitaal Fysiotherapie">
+        </div>
+        
+        <h1>Plan je gratis kennismaking</h1>
+        <p class="subtitle">Vul onderstaand formulier in en we nemen zo snel mogelijk contact met je op.</p>
+
+        <form id="appointmentForm" action="/api/submit-lead" method="POST">
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="T6PV9A">
+
+            <div class="form-group">
+                <label for="voornaam">Voornaam <span class="required">*</span></label>
+                <input type="text" id="voornaam" name="voornaam" required>
+                <span class="error-message" id="error-voornaam">Vul je voornaam in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="achternaam">Achternaam <span class="required">*</span></label>
+                <input type="text" id="achternaam" name="achternaam" required>
+                <span class="error-message" id="error-achternaam">Vul je achternaam in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="email">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="email" name="email" required>
+                <span class="error-message" id="error-email">Vul een geldig e-mailadres in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required>
+                <span class="error-message" id="error-telefoon">Vul je telefoonnummer in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="dienst">Waar ben je in geïnteresseerd? <span class="required">*</span></label>
+                <select id="dienst" name="dienst" required>
+                    <option value="">Maak een keuze</option>
+                    <option value="Fysiotherapie">Fysiotherapie</option>
+                    <option value="Fitness & Training">Fitness & Training</option>
+                    <option value="Beide">Beide: Fysiotherapie & Fitness</option>
+                    <option value="Vraag">Ik heb een vraag</option>
+                </select>
+                <span class="error-message" id="error-dienst">Maak een keuze</span>
+            </div>
+
+            <div class="form-group">
+                <label for="opmerking">Opmerking (optioneel)</label>
+                <textarea id="opmerking" name="opmerking" placeholder="Vertel ons waar we je mee kunnen helpen..."></textarea>
+            </div>
+
+            <button type="submit" class="submit-btn">Verstuur aanvraag</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('.submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Bezig met versturen...';
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/api/submit-lead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    window.location.href = 'thankyou.html';
+                } else {
+                    alert('Er ging iets mis. Probeer het opnieuw.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Verstuur aanvraag';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Er ging iets mis. Probeer het opnieuw.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verstuur aanvraag';
+            }
+        });
+
+        // Client-side validation
+        document.querySelectorAll('input[required], select[required]').forEach(field => {
+            field.addEventListener('blur', function() {
+                const errorMsg = document.getElementById(`error-${this.id}`);
+                if (!this.value.trim()) {
+                    this.style.borderColor = '#d32f2f';
+                    if (errorMsg) errorMsg.style.display = 'block';
+                } else {
+                    this.style.borderColor = '#e0e0e0';
+                    if (errorMsg) errorMsg.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

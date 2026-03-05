@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start je Vitale Reis - Vitaal Fysiotherapie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #20294e;
+            --orange: #ec652a;
+            --tiffany: #89ccca;
+            --sunset: #dec8c8;
+            --background: #fcf8f3;
+            --body-text: #393939;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            color: var(--body-text);
+            line-height: 1.6;
+            font-size: 10pt;
+        }
+
+        .hero {
+            position: relative;
+            height: 100vh;
+            min-height: 600px;
+            background: linear-gradient(135deg, rgba(32, 41, 78, 0.92), rgba(32, 41, 78, 0.85)),
+                        url('images/Vitaal vernieuw_de_gym-38.jpg') center/cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-logo {
+            max-width: 200px;
+            margin-bottom: 30px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 20px;
+            margin-bottom: 40px;
+            opacity: 0.95;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: var(--orange);
+            color: white;
+            padding: 18px 50px;
+            font-size: 18px;
+            font-weight: 700;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(236, 101, 42, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(236, 101, 42, 0.4);
+        }
+
+        .content-section {
+            padding: 80px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .content-section:nth-child(even) {
+            background: var(--background);
+        }
+
+        .section-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .section-content.reverse {
+            direction: rtl;
+        }
+
+        .section-content.reverse > * {
+            direction: ltr;
+        }
+
+        .content-text h2 {
+            font-size: 36px;
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .content-text p {
+            font-size: 16px;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+
+        .content-image {
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .highlight {
+            color: var(--orange);
+            font-weight: 600;
+        }
+
+        .final-cta {
+            background: var(--primary);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .final-cta h2 {
+            font-size: 42px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .final-cta p {
+            font-size: 20px;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .hero p { font-size: 16px; }
+            .section-content { grid-template-columns: 1fr; gap: 30px; }
+            .section-content.reverse { direction: ltr; }
+            .content-text h2 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="hero-content">
+            <img src="images/Logo Vitaal.jpg" alt="Vitaal Fysiotherapie" class="hero-logo">
+            <h1>Word weer de beste versie van jezelf</h1>
+            <p>Bij Vitaal Fysiotherapie helpen we je sterker, fitter en gezonder te worden. Met persoonlijke begeleiding en moderne trainingsmogelijkheden.</p>
+            <a href="form-vitaal-fysiotherapie.html" class="cta-button">Plan je gratis kennismaking</a>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-content">
+            <div class="content-text">
+                <h2>Samen in beweging</h2>
+                <p>Of je nu wilt herstellen van een blessure, fitter wilt worden of gewoon gezonder wilt leven: wij staan voor je klaar.</p>
+                <p>Onze fysiotherapeuten en trainers werken nauw samen om jou de beste begeleiding te bieden. <span class="highlight">Persoonlijk, professioneel en met resultaat.</span></p>
+                <p>We combineren fysiotherapie met modern fitness, zodat je niet alleen klachtenvrij wordt, maar ook sterker en vitaler.</p>
+            </div>
+            <div class="content-visual">
+                <img src="images/Vitaal vernieuw_de_gym-45.jpg" alt="Samen in beweging" class="content-image">
+            </div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-content reverse">
+            <div class="content-text">
+                <h2>Voor wie zijn wij er?</h2>
+                <p>Vitaal Fysiotherapie is er voor iedereen die wil bewegen, of je nu 25 of 75 bent.</p>
+                <p><span class="highlight">Herstel van blessures?</span> We helpen je weer pijnvrij te bewegen.</p>
+                <p><span class="highlight">Fitter worden?</span> Onze trainers maken een plan op maat.</p>
+                <p><span class="highlight">Gezonder leven?</span> We begeleiden je naar duurzame resultaten.</p>
+                <p>Je hoeft geen topsporter te zijn. Iedereen is welkom, ongeacht je niveau.</p>
+            </div>
+            <div class="content-visual">
+                <img src="images/Vitaal vernieuw_de_gym-65.jpg" alt="Voor wie" class="content-image">
+            </div>
+        </div>
+    </section>
+
+    <section class="final-cta">
+        <h2>Klaar om te starten?</h2>
+        <p>Plan een gratis kennismakingsgesprek en ontdek wat we voor jou kunnen betekenen.</p>
+        <a href="form-vitaal-fysiotherapie.html" class="cta-button">Plan nu je afspraak</a>
+    </section>
+</body>
+</html>
