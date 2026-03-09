@@ -146,25 +146,19 @@
         <h1>Plan je gratis kennismaking</h1>
         <p class="subtitle">Vul onderstaand formulier in en we nemen zo snel mogelijk contact met je op.</p>
 
-        <form id="appointmentForm" action="/api/submit-lead" method="POST">
+        <form id="appointmentForm" action="/leads" method="POST">
             <input type="hidden" id="praktijk_code" name="praktijk_code" value="T6PV9A">
 
             <div class="form-group">
-                <label for="voornaam">Voornaam <span class="required">*</span></label>
-                <input type="text" id="voornaam" name="voornaam" required>
-                <span class="error-message" id="error-voornaam">Vul je voornaam in</span>
+                <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required>
+                <span class="error-message" id="error-volledige_naam">Vul je volledige naam in</span>
             </div>
 
             <div class="form-group">
-                <label for="achternaam">Achternaam <span class="required">*</span></label>
-                <input type="text" id="achternaam" name="achternaam" required>
-                <span class="error-message" id="error-achternaam">Vul je achternaam in</span>
-            </div>
-
-            <div class="form-group">
-                <label for="email">E-mailadres <span class="required">*</span></label>
-                <input type="email" id="email" name="email" required>
-                <span class="error-message" id="error-email">Vul een geldig e-mailadres in</span>
+                <label for="emailadres">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="emailadres" name="emailadres" required>
+                <span class="error-message" id="error-emailadres">Vul een geldig e-mailadres in</span>
             </div>
 
             <div class="form-group">
@@ -174,15 +168,15 @@
             </div>
 
             <div class="form-group">
-                <label for="dienst">Waar ben je in geïnteresseerd? <span class="required">*</span></label>
-                <select id="dienst" name="dienst" required>
+                <label for="doel">Waar ben je in geïnteresseerd? <span class="required">*</span></label>
+                <select id="doel" name="doel" required>
                     <option value="">Maak een keuze</option>
                     <option value="Fysiotherapie">Fysiotherapie</option>
                     <option value="Fitness & Training">Fitness & Training</option>
                     <option value="Beide">Beide: Fysiotherapie & Fitness</option>
                     <option value="Vraag">Ik heb een vraag</option>
                 </select>
-                <span class="error-message" id="error-dienst">Maak een keuze</span>
+                <span class="error-message" id="error-doel">Maak een keuze</span>
             </div>
 
             <div class="form-group">
@@ -202,6 +196,13 @@
                 <textarea id="opmerking" name="opmerking" placeholder="Vertel ons waar we je mee kunnen helpen..."></textarea>
             </div>
 
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                    Ik ga akkoord met de voorwaarden
+                </label>
+            </div>
+
             <button type="submit" class="submit-btn">Verstuur aanvraag</button>
         </form>
     </div>
@@ -218,7 +219,7 @@
             const data = Object.fromEntries(formData);
             
             try {
-                const response = await fetch('/api/submit-lead', {
+                const response = await fetch('/leads', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
