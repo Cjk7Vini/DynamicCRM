@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start met Werken aan je Fitheid - Gezond & Vitaal Krommenie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600;700&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            color: #333;
+            line-height: 1.7;
+            background: #ffffff;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            color: #337A7C;
+        }
+
+        h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 300;
+            font-size: 18px;
+            color: #666;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, rgba(51, 122, 124, 0.95), rgba(91, 192, 204, 0.9)),
+                        url('images/20260209_102542.jpg') center/cover;
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .hero-logo {
+            max-width: 200px;
+            margin-bottom: 30px;
+            filter: brightness(0) invert(1);
+        }
+
+        .hero h1 {
+            font-size: 42px;
+            color: white;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+
+        .hero .subtitle {
+            font-size: 20px;
+            color: #F5EBE2;
+            margin-bottom: 30px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            max-width: 900px;
+            margin: 30px auto;
+        }
+
+        .benefit-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: #DEDC00;
+            color: #333;
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif;
+            text-decoration: none;
+            border-radius: 50px;
+            margin-top: 20px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(222, 220, 0, 0.4);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 30px rgba(222, 220, 0, 0.5);
+        }
+
+        .limited {
+            font-size: 14px;
+            color: #F5EBE2;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        /* Content Sections */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .content-section {
+            margin-bottom: 60px;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+            margin: 40px 0;
+        }
+
+        .two-column img {
+            width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .text-block p {
+            margin-bottom: 15px;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .text-block strong {
+            color: #337A7C;
+            font-weight: 400;
+        }
+
+        /* Steps */
+        .steps {
+            background: #F5EBE2;
+            padding: 60px 20px;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            max-width: 1100px;
+            margin: 40px auto 0;
+        }
+
+        .step-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            border-top: 5px solid #337A7C;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #5BC0CC;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 15px;
+        }
+
+        .step-card h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .step-card p {
+            font-size: 15px;
+            color: #666;
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .checklist li {
+            padding: 12px 0;
+            padding-left: 35px;
+            position: relative;
+            font-size: 16px;
+        }
+
+        .checklist li:before {
+            content: "✔";
+            position: absolute;
+            left: 0;
+            color: #DEDC00;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        /* FAQ */
+        .faq {
+            background: white;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            margin-bottom: 25px;
+            padding: 25px;
+            background: #F5EBE2;
+            border-radius: 10px;
+        }
+
+        .faq-item h3 {
+            color: #337A7C;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .faq-item p {
+            color: #555;
+            font-size: 15px;
+        }
+
+        /* Final CTA */
+        .final-cta {
+            background: linear-gradient(135deg, #337A7C, #5BC0CC);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .final-cta h2 {
+            color: white;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .final-cta p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #F5EBE2;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+
+            .step-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h2 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <img src="images/Gezond-Vitaal-Petrol-krommenie.png" alt="Gezond & Vitaal Krommenie" class="hero-logo">
+        <h1>Start vandaag met werken aan jouw fitheid en vitaliteit</h1>
+        <p class="subtitle">Wil je fitter en sterker worden, maar wel op een manier die veilig, rustig en overzichtelijk voelt? Bij ons train je individueel, op je eigen tempo, met professionele begeleiding in een vertrouwde omgeving.</p>
+        
+        <div class="benefits-grid">
+            <div class="benefit-item">✔ Bewegen zonder druk</div>
+            <div class="benefit-item">✔ Persoonlijke begeleiding van fitcoaches</div>
+            <div class="benefit-item">✔ Fysiotherapeut altijd dichtbij voor advies</div>
+            <div class="benefit-item">✔ Inclusief gratis vitaliteitscheck (t.w.v. €50)</div>
+        </div>
+
+        <a href="form-gezond-vitaal-krommenie.html" class="cta-button">Plan je gratis vitaliteitscheck</a>
+        <p class="limited">Beperkt aantal plaatsen beschikbaar</p>
+    </section>
+
+    <!-- Wat bieden wij -->
+    <div class="container">
+        <section class="content-section">
+            <h2>Wat bieden wij?</h2>
+            <div class="two-column">
+                <div class="text-block">
+                    <p>Wij bieden geen standaard programma of groepslessen, maar persoonlijke begeleiding bij verantwoord bewegen.</p>
+                    <p>Je werkt aan je kracht, conditie en mobiliteit met een individueel trainingsplan, afgestemd op jouw lichaam en doelen.</p>
+                    <p><strong>Je traint zelfstandig, maar nooit alleen:</strong> onze fitcoaches zijn altijd aanwezig om mee te kijken, oefeningen aan te passen en vragen te beantwoorden.</p>
+                </div>
+                <img src="images/20260209_102629.jpg" alt="Training begeleiding">
+            </div>
+            
+            <div class="two-column">
+                <img src="images/20260209_102736.jpg" alt="Fysiotherapie praktijk">
+                <div class="text-block">
+                    <p><strong>De fysiotherapeut is in de praktijk aanwezig voor:</strong></p>
+                    <ul class="checklist">
+                        <li>overleg of advies</li>
+                        <li>beoordeling bij klachten</li>
+                        <li>eventuele aanvullende fysiotherapeutische begeleiding</li>
+                    </ul>
+                    <p>Zo combineer je de vrijheid van zelfstandig trainen met de zekerheid van deskundigheid dichtbij.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Zo werkt het -->
+    <section class="steps">
+        <div class="container">
+            <h2 style="text-align: center;">Zo werkt het</h2>
+            <div class="step-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Gratis vitaliteitscheck (t.w.v. €50)</h3>
+                    <p>We starten met een uitgebreide check van je conditie, kracht en mobiliteit. We bespreken je doelen en eventuele klachten.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Persoonlijk trainingsplan</h3>
+                    <p>Op basis van de vitaliteitscheck maken we een plan dat past bij jouw lichaam, niveau en wensen.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Individueel trainen met begeleiding</h3>
+                    <p>Je traint op momenten die voor jou prettig zijn. Onze fitcoaches lopen rond en begeleiden waar nodig.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>Regelmatige check-ups</h3>
+                    <p>Elke 6 weken een check-up om voortgang te bespreken. Na 12 weken een uitgebreide evaluatie en bijgesteld plan. Zo blijf je veilig vooruitgaan en werken we doelgericht aan resultaat.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Voor wie -->
+    <div class="container">
+        <section class="content-section">
+            <h2>Voor wie is dit geschikt?</h2>
+            <p>Deze vorm van trainen is ideaal als je:</p>
+            <ul class="checklist">
+                <li>Meer wilt bewegen, maar rustig wilt beginnen</li>
+                <li>Graag zelfstandig traint, zonder groepsdruk</li>
+                <li>Zeker wilt weten dat je oefeningen goed en veilig uitvoert</li>
+                <li>Fysieke klachten hebt of klachten wilt voorkomen</li>
+                <li>Liever traint in een vertrouwde praktijk dan in een sportschool</li>
+            </ul>
+            <p><strong>Je hoeft geen sportervaring te hebben, we sluiten aan bij waar jij nu staat.</strong></p>
+        </section>
+
+        <section class="content-section">
+            <h2>Wat levert het je op?</h2>
+            <ul class="checklist">
+                <li>Meer kracht en stabiliteit</li>
+                <li>Betere conditie</li>
+                <li>Minder stijfheid en klachten</li>
+                <li>Meer vertrouwen in je lichaam</li>
+                <li>Bewegen dat vol te houden is</li>
+            </ul>
+            <p><strong>Geen snelle beloftes, maar duurzaam resultaat.</strong></p>
+        </section>
+
+        <!-- FAQ -->
+        <section class="content-section">
+            <h2 style="text-align: center;">Veelgestelde vragen</h2>
+            <div class="faq">
+                <div class="faq-item">
+                    <h3>Train ik in een groep?</h3>
+                    <p>Nee. Je traint individueel volgens je eigen plan. Dat geeft rust, overzicht en ruimte om op je eigen tempo te werken.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Wie begeleidt mij tijdens het trainen?</h3>
+                    <p>Onze fitcoaches zijn aanwezig tijdens de trainingen. Zij helpen je met uitleg, techniek en aanpassingen. De fysiotherapeut is altijd dichtbij voor advies of verdere begeleiding als dat nodig is.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Wat is een vitaliteitscheck?</h3>
+                    <p>Dit is een uitgebreide meting van onder andere kracht, conditie en mobiliteit. Zo krijgen we een goed beeld van jouw startpunt. De eerste vitaliteitscheck is gratis (t.w.v. €50).</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Hoe vaak train ik?</h3>
+                    <p>Dat stemmen we af op jouw doelen en mogelijkheden. Tijdens de intake bespreken we wat voor jou passend en haalbaar is.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Wat kost het trainen?</h3>
+                    <p>Je kiest bij ons niet voor een vast programma, maar voor begeleiding die past bij jou. Tijdens het kennismakingsgesprek leggen we rustig uit welke mogelijkheden er zijn en wat daarbij hoort.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Waar train ik?</h3>
+                    <p>In onze fysiotherapiepraktijk, in een rustige en veilige omgeving.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <h2>Klaar om te starten?</h2>
+        <p>Gun jezelf aandacht voor je gezondheid op een manier die prettig en verantwoord voelt.</p>
+        <a href="form-gezond-vitaal-krommenie.html" class="cta-button">Plan je gratis vitaliteitscheck</a>
+        <p class="limited">Beperkt aantal plaatsen beschikbaar</p>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background: #1a1a1a; color: #999; padding: 30px 20px; text-align: center; font-size: 14px;">
+        <p style="margin: 0;">Copyright © Dynamic Health Consultancy</p>
+    </footer>
+</body>
+</html>

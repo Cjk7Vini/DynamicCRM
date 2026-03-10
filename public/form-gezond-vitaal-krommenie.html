@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan je Gratis Vitaliteitscheck - Gezond & Vitaal Krommenie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600;700&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --petrol: #337A7C;
+            --turquoise: #5BC0CC;
+            --lime: #DEDC00;
+            --olijf: #959C70;
+            --beige: #F5EBE2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            background: var(--beige);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            padding: 50px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo img {
+            max-width: 200px;
+        }
+
+        h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            color: var(--petrol);
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 400;
+            color: var(--petrol);
+            font-size: 15px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--turquoise);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .required {
+            color: var(--petrol);
+            font-weight: bold;
+        }
+
+        .checkbox-group {
+            margin: 25px 0;
+            padding: 20px;
+            background: var(--beige);
+            border-radius: 8px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: flex-start;
+            font-weight: 300;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+            margin-top: 3px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--lime);
+            color: #333;
+            padding: 16px;
+            border: none;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(222, 220, 0, 0.3);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(222, 220, 0, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="images/Gezond-Vitaal-Petrol-krommenie.png" alt="Gezond & Vitaal Krommenie">
+        </div>
+        
+        <h1>Plan je gratis vitaliteitscheck</h1>
+        <p class="subtitle">Vul onderstaand formulier in en we nemen zo snel mogelijk contact met je op.</p>
+
+        <form id="leadForm" action="/leads" method="POST">
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="952A92">
+
+            <div class="form-group">
+                <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required>
+                <span class="error-message" id="error-volledige_naam">Vul je volledige naam in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="emailadres">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="emailadres" name="emailadres" required>
+                <span class="error-message" id="error-emailadres">Vul een geldig e-mailadres in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="0612345678">
+                <span class="error-message" id="error-telefoon">Vul je telefoonnummer in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="doel">Waar wil je aan werken? <span class="required">*</span></label>
+                <select id="doel" name="doel" required>
+                    <option value="">Maak een keuze</option>
+                    <option value="Meer kracht en stabiliteit">Meer kracht en stabiliteit</option>
+                    <option value="Betere conditie">Betere conditie</option>
+                    <option value="Minder stijfheid en klachten">Minder stijfheid en klachten</option>
+                    <option value="Meer vertrouwen in mijn lichaam">Meer vertrouwen in mijn lichaam</option>
+                    <option value="Anders">Anders</option>
+                </select>
+                <span class="error-message" id="error-doel">Maak een keuze</span>
+            </div>
+
+            <div class="form-group">
+                <label for="bron">Hoe heb je ons gevonden?</label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Anders">Anders</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="opmerking">Eventuele opmerkingen of vragen</label>
+                <textarea id="opmerking" name="opmerking" placeholder="Bijvoorbeeld: ik heb rugklachten, of: ik wil graag op dinsdagmiddag trainen..."></textarea>
+            </div>
+
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                    <span>Ik geef toestemming om contact met mij op te nemen voor een kennismakingsgesprek en meer informatie over de trainingsmogelijkheden.</span>
+                </label>
+            </div>
+
+            <button type="submit" class="submit-btn">Verstuur aanvraag</button>
+        </form>
+    </div>
+
+    <!-- Footer -->
+    <footer style="background: #1a1a1a; color: #999; padding: 30px 20px; text-align: center; font-size: 14px; margin-top: 40px;">
+        <p style="margin: 0;">Copyright © Dynamic Health Consultancy</p>
+    </footer>
+
+    <script>
+        document.getElementById('leadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('.submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Bezig met versturen...';
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/leads', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    window.location.href = 'thankyou.html';
+                } else {
+                    const errorData = await response.json();
+                    alert('Er ging iets mis: ' + (errorData.error || 'Probeer het opnieuw'));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Verstuur aanvraag';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Er ging iets mis. Controleer je internetverbinding en probeer het opnieuw.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verstuur aanvraag';
+            }
+        });
+
+        // Client-side validation
+        document.querySelectorAll('input[required], select[required]').forEach(field => {
+            field.addEventListener('blur', function() {
+                const errorMsg = document.getElementById(`error-${this.id}`);
+                if (!this.value.trim()) {
+                    this.style.borderColor = '#d32f2f';
+                    if (errorMsg) errorMsg.style.display = 'block';
+                } else {
+                    this.style.borderColor = '#e0e0e0';
+                    if (errorMsg) errorMsg.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
