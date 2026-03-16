@@ -47,7 +47,7 @@ class MetaService {
               since: dateFrom,
               until: dateTo
             }),
-            time_increment: 1, // Daily breakdown
+            time_increment: 1,
             limit: 100
           },
           timeout: 30000
@@ -88,9 +88,6 @@ class MetaService {
       );
 
       console.log(`✅ Pixel data retrieved`);
-      
-      // Note: Custom conversion data is aggregated at campaign level
-      // We'll rely on the actions data from campaign insights
       return response.data || {};
       
     } catch (error) {
@@ -103,17 +100,14 @@ class MetaService {
   parseConversions(actions) {
     if (!actions || !Array.isArray(actions)) return 0;
     
-    // Look for ANY conversion actions (including custom conversions)
-    // Custom conversions appear as: offsite_conversion.custom.{conversion_id}
     const conversionActions = actions.filter(a => 
       a.action_type === 'lead' || 
       a.action_type === 'offsite_conversion.fb_pixel_lead' ||
       a.action_type === 'onsite_conversion.lead_grouped' ||
-      a.action_type.includes('offsite_conversion.custom') || // Custom conversions!
+      a.action_type.includes('offsite_conversion.custom') ||
       a.action_type.includes('offsite_conversion.fb_pixel_custom')
     );
     
-    // Sum all conversion values
     const totalConversions = conversionActions.reduce((sum, action) => {
       return sum + (parseInt(action.value) || 0);
     }, 0);
@@ -125,7 +119,6 @@ class MetaService {
   parseCostPerConversion(costPerActionType) {
     if (!costPerActionType || !Array.isArray(costPerActionType)) return 0;
     
-    // Look for ANY conversion cost (including custom conversions)
     const conversionCosts = costPerActionType.filter(c => 
       c.action_type === 'lead' ||
       c.action_type === 'offsite_conversion.fb_pixel_lead' ||
@@ -134,7 +127,6 @@ class MetaService {
       c.action_type.includes('offsite_conversion.fb_pixel_custom')
     );
     
-    // Return first found cost, or 0
     return conversionCosts.length > 0 ? parseFloat(conversionCosts[0].value) || 0 : 0;
   }
 
@@ -146,16 +138,39 @@ class MetaService {
       // Get credentials from env
       const { accessToken, adAccountId } = this.getCredentials(practiceCode);
 
-      // Fetch insights
-      const insights = await this.fetchCampaignInsights(
+      // Get campaign name filter for this practice
+      const practiceResult = await this.readConn(async (client) => {
+        return await client.query(
+          'SELECT meta_campaign_name FROM praktijken WHERE code = $1',
+          [practiceCode]
+        );
+      });
+
+      const campaignNameFilter = practiceResult.rows[0]?.meta_campaign_name || null;
+
+      if (!campaignNameFilter) {
+        console.log(`⚠️ No campaign name configured for ${practiceCode}, skipping sync`);
+        return { success: true, synced: 0, message: 'No campaign name configured for this practice' };
+      }
+
+      // Fetch ALL insights from the ad account
+      const allInsights = await this.fetchCampaignInsights(
         adAccountId,
         accessToken,
         dateFrom,
         dateTo
       );
 
-      if (!insights || insights.length === 0) {
-        console.log(`⚠️ No campaigns found for ${practiceCode} in date range`);
+      // Filter to only campaigns belonging to this practice
+      const insights = (allInsights || []).filter(campaign =>
+        campaign.campaign_name &&
+        campaign.campaign_name.toLowerCase().includes(campaignNameFilter.toLowerCase())
+      );
+
+      console.log(`🎯 Filtered to ${insights.length}/${allInsights.length} campaigns matching "${campaignNameFilter}" for ${practiceCode}`);
+
+      if (insights.length === 0) {
+        console.log(`⚠️ No matching campaigns found for ${practiceCode}`);
         return { success: true, synced: 0, message: 'No campaigns in date range' };
       }
 
@@ -269,7 +284,6 @@ class MetaService {
     
     for (const practice of result.rows) {
       try {
-        // Last 30 days
         const dateFrom = new Date();
         dateFrom.setDate(dateFrom.getDate() - 30);
         
