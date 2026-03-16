@@ -347,9 +347,6 @@
             <div style="margin-bottom: 20px;">
                 <img src="images/kerngezond-logo.png" alt="KernGezond Lelystad" style="max-width: 200px; height: auto;">
             </div>
-            <div class="practice-badge" id="practiceBadge" style="display: none;">
-                Via jouw fysiotherapeut
-            </div>
             <h1>Meld je aan voor gratis informatie</h1>
             <p class="form-subtitle">Vul het formulier in en ontvang direct alle informatie</p>
         </div>
@@ -521,39 +518,7 @@
             }
         }
 
-        // Extra script voor practice naam display
-        (function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const practiceCode = urlParams.get('s') || urlParams.get('praktijk') || urlParams.get('p');
-            
-            // Practice data voor display
-            const practiceData = {
-                'S7F2MW': {
-                    name: 'Fysiotherapie Soestdijk',
-                    location: 'Soestdijk'
-                },
-                '5691C2': {
-                    name: 'Fysiotherapie Joure',
-                    location: 'Joure'
-                },
-                'K9X3QY': {
-                    name: 'Fysiopraktijk De Jong',
-                    location: 'De Jong'
-                }
-            };
-
-            // Toon practice badge als bekend
-            if (practiceCode && practiceData[practiceCode]) {
-                const badge = document.getElementById('practiceBadge');
-                badge.style.display = 'inline-block';
-                badge.textContent = `Via ${practiceData[practiceCode].name}`;
-                
-                // Update page title
-                document.title = `Aanmelden - ${practiceData[practiceCode].name}`;
-            }
-            
-            console.log('Form loaded with practice code:', practiceCode || 'none');
-        })();
+        // Extra script voor practice naam display - VERWIJDERD (logo vervangt badge)
     </script>
 </body>
 </html>
