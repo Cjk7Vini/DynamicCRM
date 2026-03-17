@@ -432,32 +432,54 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 12px 0;
+            padding: 8px 0;
             border-bottom: 1px solid var(--border);
-            cursor: default;
         }
 
         .funnel-stage:last-child { border-bottom: none; }
-        .funnel-stage.clickable { cursor: pointer; }
-        .funnel-stage.clickable:hover { background: var(--surface-2); margin: 0 -20px; padding-left: 20px; padding-right: 20px; border-radius: var(--radius-sm); }
 
         .funnel-bar-wrap {
             flex: 1;
-            height: 8px;
-            background: var(--bg);
-            border-radius: 4px;
-            overflow: hidden;
         }
 
         .funnel-bar {
-            height: 100%;
-            border-radius: 4px;
+            min-width: 80px;
+            height: 44px;
+            border-radius: 6px;
             transition: width .4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
         }
 
-        .funnel-label { font-size: 13px; font-weight: 500; width: 80px; flex-shrink: 0; }
-        .funnel-count { font-size: 14px; font-weight: 700; width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
-        .funnel-pct { font-size: 12px; color: var(--text-3); width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+        .funnel-bar.awareness  { background: #1a56db; }
+        .funnel-bar.intent     { background: #0891b2; }
+        .funnel-bar.won        { background: #16a34a; }
+        .funnel-bar.lost       { background: #dc2626; }
+        .funnel-bar.contacted  { background: #0891b2; }
+        .funnel-bar.consideration { background: #d97706; }
+
+        .funnel-bar:hover { filter: brightness(1.08); }
+
+        .funnel-count { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: white; }
+
+        .funnel-stats {
+            min-width: 120px;
+            text-align: right;
+            font-size: 12px;
+            color: var(--text-3);
+        }
+
+        .conversion-rate {
+            display: block;
+            font-weight: 600;
+            color: #16a34a;
+            margin-top: 2px;
+        }
 
         /* ── HOT LEADS TABLE ──────────────────────── */
         .table { width: 100%; border-collapse: collapse; }
@@ -918,13 +940,7 @@
             </div>
         </div>
 
-        <div class="sidebar-section-label" style="margin-top:8px;">Data</div>
-        <div class="sidebar-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-            </svg>
-            eClub Data
-        </div>
+
     </nav>
 
     <!-- Filters -->
