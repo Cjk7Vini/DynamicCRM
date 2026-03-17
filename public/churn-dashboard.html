@@ -1162,7 +1162,7 @@
                             Eclub integratie - status: <span id="eclubStatus">Niet gekoppeld</span>
                         </div>
                     </div>
-                    <button class="meta-sync-btn" onclick="syncEclub()" style="display: none;">
+                    <button class="meta-sync-btn" onclick="syncEclub()">
                         Sync Nu
                     </button>
                 </div>
@@ -2123,62 +2123,40 @@
                 const practice = document.getElementById('practiceFilter').value;
                 if (!practice) return;
 
-                const dateFrom = document.getElementById('dateFrom').value;
-                const dateTo = document.getElementById('dateTo').value;
-                
-                const queryParams = new URLSearchParams();
-                if (dateFrom) queryParams.append('dateFrom', dateFrom);
-                if (dateTo) queryParams.append('dateTo', dateTo);
-                
-                const queryString = queryParams.toString();
-                const url = `/api/eclub/summary/${practice}${queryString ? '?' + queryString : ''}`;
-                
-                const res = await fetch(url, { credentials: 'include' });
+                const res = await fetch(`/api/eclub/kpis/${practice}`, { credentials: 'include' });
                 const response = await res.json();
-                
-                if (!response.success) return;
-                
-                const data = response.data;
-                const enabled = response.eclub_enabled;
-                
-                document.getElementById('eclubStatus').textContent = enabled ? 'Gekoppeld' : 'Niet gekoppeld';
-                document.getElementById('eclubStatus').style.color = enabled ? '#10b981' : '#86868b';
-                
+
+                if (!response.success) {
+                    document.getElementById('eclubStatus').textContent = 'Fout bij ophalen';
+                    document.getElementById('eclubStatus').style.color = '#ef4444';
+                    return;
+                }
+
+                const d = response.data;
+
+                document.getElementById('eclubStatus').textContent = 'Gekoppeld';
+                document.getElementById('eclubStatus').style.color = '#10b981';
+
                 // Lead Management metrics
-                const visited = parseInt(data.active_members || 0) + parseInt(data.churned_members || 0);
-                const registrations = parseInt(data.active_members || 0);
-                const pending = 0; // Calculated from leads table later
-                const convRate = visited > 0 ? ((registrations / visited) * 100).toFixed(1) : '0.0';
-                
-                document.getElementById('eclubVisited').textContent = visited;
-                document.getElementById('eclubRegistrations').textContent = registrations;
-                document.getElementById('eclubPending').textContent = pending;
-                document.getElementById('eclubConversionRate').textContent = convRate + '%';
-                
+                document.getElementById('eclubVisited').textContent = d.leden_actief || 0;
+                document.getElementById('eclubRegistrations').textContent = d.leden_gestart || 0;
+                document.getElementById('eclubPending').textContent = d.leden_bevroren || 0;
+                document.getElementById('eclubConversionRate').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
+
                 // Overige KPIs
-                document.getElementById('eclubActiveMembers').textContent = data.active_members || 0;
-                document.getElementById('eclubNewMembers').textContent = data.new_members || 0;
-                document.getElementById('eclubChurnedMembers').textContent = data.churned_members || 0;
-                
-                const avgDays = parseInt(data.avg_membership_days || 0);
-                const avgMonths = Math.round(avgDays / 30);
-                document.getElementById('eclubAvgDuration').textContent = avgMonths > 0 ? avgMonths + ' mnd' : '-';
-                
-                document.getElementById('eclubTotalVisits').textContent = data.total_visits || 0;
-                
-                const activeMembers = parseInt(data.active_members || 0);
-                const totalMembers = activeMembers + parseInt(data.churned_members || 0);
-                const retention = totalMembers > 0 ? ((activeMembers / totalMembers) * 100).toFixed(1) : '0.0';
-                document.getElementById('eclubRetention').textContent = retention + '%';
-                
-                const monthlyRevenue = parseFloat(data.total_monthly_revenue || 0);
-                document.getElementById('eclubRevenue').textContent = monthlyRevenue > 0 ? '€' + monthlyRevenue.toFixed(0) : '-';
-                
-                const revenuePerMember = activeMembers > 0 ? (monthlyRevenue / activeMembers) : 0;
-                document.getElementById('eclubRevenuePerMember').textContent = revenuePerMember > 0 ? '€' + revenuePerMember.toFixed(0) : '-';
-                
+                document.getElementById('eclubActiveMembers').textContent = d.leden_actief || 0;
+                document.getElementById('eclubNewMembers').textContent = d.leden_gestart || 0;
+                document.getElementById('eclubChurnedMembers').textContent = d.leden_gestopt || 0;
+                document.getElementById('eclubAvgDuration').textContent = d.gem_duur_lidmaatschap_maanden > 0 ? Math.round(d.gem_duur_lidmaatschap_maanden) + ' mnd' : '-';
+                document.getElementById('eclubTotalVisits').textContent = d.totaal_bezoeken || 0;
+                document.getElementById('eclubRetention').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
+                document.getElementById('eclubRevenue').textContent = d.omzet_excl_btw > 0 ? '€' + parseFloat(d.omzet_excl_btw).toFixed(0) : '-';
+                document.getElementById('eclubRevenuePerMember').textContent = d.omzet_per_lid > 0 ? '€' + parseFloat(d.omzet_per_lid).toFixed(0) : '-';
+
             } catch (error) {
                 console.error('Eclub data error:', error);
+                document.getElementById('eclubStatus').textContent = 'Fout';
+                document.getElementById('eclubStatus').style.color = '#ef4444';
             }
         }
 
@@ -2188,24 +2166,18 @@
                 alert('Selecteer eerst een praktijk');
                 return;
             }
-            
+
+            const btn = document.querySelector('.meta-sync-btn[onclick="syncEclub()"]');
+            if (btn) { btn.disabled = true; btn.textContent = 'Laden...'; }
+
             try {
-                const res = await fetch(`/api/eclub/sync/${practice}`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    alert('Eclub data gesynchroniseerd');
-                    await loadEclubData();
-                } else {
-                    alert('Sync mislukt: ' + (data.error || 'Onbekende fout'));
-                }
+                await loadEclubData();
+                if (btn) btn.textContent = 'Vernieuwd ✓';
+                setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; } }, 2000);
             } catch (error) {
                 console.error('Eclub sync error:', error);
-                alert('Fout bij synchroniseren');
+                alert('Fout bij laden: ' + error.message);
+                if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; }
             }
         }
 
