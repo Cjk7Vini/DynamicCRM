@@ -3,1290 +3,1261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Health Analytics - Churn & Conversie Dashboard</title>
+    <title>Dynamic Health — Analytics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:          #f4f4f6;
+            --surface:     #ffffff;
+            --surface-2:   #f9f9fb;
+            --border:      #e4e4e8;
+            --border-2:    #d0d0d6;
+            --text-1:      #0f0f12;
+            --text-2:      #5a5a72;
+            --text-3:      #9090a8;
+            --accent:      #333399;
+            --accent-2:    #3399cc;
+            --green:       #99cc33;
+            --red:         #e5334a;
+            --amber:       #f59e0b;
+            --sidebar-w:   240px;
+            --header-h:    60px;
+            --radius:      10px;
+            --radius-sm:   6px;
+            --shadow:      0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+            --shadow-md:   0 4px 16px rgba(0,0,0,.08);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
-            line-height: 1.5;
-        }
-        
-        .header {
-            background: white;
-            border-bottom: 1px solid #d2d2d7;
-            padding: 16px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        
-        .header-left { 
-            display: flex; 
-            align-items: center; 
-            gap: 20px; 
-        }
-        
-        .logo { 
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 20px; 
-            font-weight: 700; 
-            color: #06c; 
-        }
-        
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-        }
-        
-        .header-title { 
-            font-size: 16px; 
-            font-weight: 400;
-            color: #86868b;
-        }
-        
-        .header-right { 
-            display: flex; 
-            gap: 16px; 
-            align-items: center; 
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 12px;
-            background: #f5f5f7;
-            border-radius: 8px;
+            font-family: 'DM Sans', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
             font-size: 14px;
-        }
-        
-        .user-icon {
-            width: 32px;
-            height: 32px;
-            background: #06c;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-        }
-        
-        .user-email {
-            color: #1d1d1f;
-            font-weight: 500;
-        }
-        
-        .user-role {
-            color: #86868b;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        
-        .btn-logout {
-            padding: 8px 16px;
-            background: #ff3b30;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .btn-logout:hover {
-            background: #ff453a;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary { 
-            background: #06c; 
-            color: white; 
-        }
-        
-        .btn-primary:hover { 
-            background: #0077ed; 
-        }
-        
-        .btn-secondary { 
-            background: white; 
-            color: #1d1d1f; 
-            border: 1px solid #d2d2d7; 
-        }
-        
-        .btn-secondary:hover { 
-            background: #f5f5f7; 
+            line-height: 1.55;
         }
 
-        /* Power BI Style Sidebar */
-        .dashboard-container {
-            display: flex;
-            height: calc(100vh - 60px);
-        }
-
+        /* ── SIDEBAR ─────────────────────────────── */
         .sidebar {
-            width: 220px;
-            background: white;
-            border-right: 1px solid #e0e0e0;
-            padding: 20px 0;
+            position: fixed;
+            inset: 0 auto 0 0;
+            width: var(--sidebar-w);
+            background: var(--accent);
+            display: flex;
+            flex-direction: column;
+            z-index: 200;
             overflow-y: auto;
         }
 
-        .sidebar-section {
+        .sidebar-brand {
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            gap: 10px;
             padding: 0 20px;
-            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255,255,255,.12);
+            flex-shrink: 0;
         }
 
-        .sidebar-title {
-            font-size: 11px;
+        .sidebar-brand-icon {
+            width: 28px; height: 28px;
+            background: white;
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-brand-icon svg { width: 16px; height: 16px; }
+
+        .sidebar-brand-name {
+            color: white;
+            font-size: 15px;
             font-weight: 600;
+            letter-spacing: -0.2px;
+        }
+
+        .sidebar-nav {
+            padding: 16px 0;
+            flex: 1;
+        }
+
+        .sidebar-section-label {
+            padding: 8px 20px 4px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
             text-transform: uppercase;
-            color: #86868b;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
+            color: rgba(255,255,255,.4);
         }
 
-        .filter-group {
-            margin-bottom: 20px;
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 20px;
+            color: rgba(255,255,255,.7);
+            font-size: 13.5px;
+            font-weight: 400;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: color .15s, background .15s, border-color .15s;
+            text-decoration: none;
         }
 
-        .filter-label {
-            font-size: 13px;
+        .sidebar-item:hover {
+            background: rgba(255,255,255,.08);
+            color: white;
+        }
+
+        .sidebar-item.active {
+            background: rgba(255,255,255,.12);
+            color: white;
+            border-left-color: var(--green);
             font-weight: 500;
-            color: #1d1d1f;
+        }
+
+        .sidebar-item svg {
+            width: 16px; height: 16px;
+            flex-shrink: 0;
+            opacity: .7;
+        }
+
+        .sidebar-item.active svg { opacity: 1; }
+
+        /* Dropdown in sidebar */
+        .sidebar-dropdown { overflow: hidden; }
+
+        .sidebar-dropdown-items { display: none; }
+        .sidebar-dropdown.open .sidebar-dropdown-items { display: block; }
+
+        .sidebar-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 20px 7px 46px;
+            color: rgba(255,255,255,.6);
+            font-size: 13px;
+            cursor: pointer;
+            transition: color .15s, background .15s;
+        }
+
+        .sidebar-dropdown-item:hover {
+            background: rgba(255,255,255,.07);
+            color: white;
+        }
+
+        .sidebar-dropdown-arrow {
+            margin-left: auto;
+            transition: transform .2s;
+            opacity: .5;
+        }
+
+        .sidebar-dropdown.open .sidebar-dropdown-arrow { transform: rotate(180deg); }
+
+        .sidebar-footer {
+            padding: 16px 0;
+            border-top: 1px solid rgba(255,255,255,.12);
+        }
+
+        /* Filter section in sidebar */
+        .sidebar-filters {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255,255,255,.12);
+        }
+
+        .sidebar-filter-label {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.4);
             margin-bottom: 8px;
             display: block;
         }
 
-        select, input[type="date"] {
+        .sidebar-select {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d2d2d7;
-            border-radius: 6px;
+            padding: 7px 10px;
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: var(--radius-sm);
+            color: white;
             font-size: 13px;
-            background: white;
+            font-family: inherit;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,.6)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+            margin-bottom: 8px;
+            cursor: pointer;
         }
 
-        select:focus, input[type="date"]:focus {
-            outline: none;
-            border-color: #06c;
-            box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+        .sidebar-select:focus { outline: none; border-color: rgba(255,255,255,.4); }
+        .sidebar-select option { background: var(--accent); }
+
+        .sidebar-input {
+            width: 100%;
+            padding: 7px 10px;
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: var(--radius-sm);
+            color: white;
+            font-size: 13px;
+            font-family: inherit;
+            margin-bottom: 8px;
         }
 
-        /* Main Content Area */
-        .main-content {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
-            background: #f5f5f7;
+        .sidebar-input::placeholder { color: rgba(255,255,255,.35); }
+        .sidebar-input:focus { outline: none; border-color: rgba(255,255,255,.4); }
+
+        .sidebar-input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) opacity(0.5);
         }
 
-        /* KPI Cards */
+        /* Eclub sync in sidebar */
+        .sidebar-sync-section {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255,255,255,.12);
+        }
+
+        /* ── TOPBAR ───────────────────────────────── */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: var(--sidebar-w);
+            right: 0;
+            height: var(--header-h);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            z-index: 100;
+        }
+
+        .topbar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-1);
+            letter-spacing: -0.3px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all .15s;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: var(--border);
+            color: var(--text-2);
+        }
+
+        .btn-ghost:hover { background: var(--bg); color: var(--text-1); }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover { background: #2a2a80; }
+
+        .btn-danger {
+            background: transparent;
+            border-color: var(--border);
+            color: var(--red);
+        }
+
+        .btn-danger:hover { background: #fef2f3; border-color: var(--red); }
+
+        .btn-sync-green {
+            background: var(--green);
+            color: #1a3300;
+            font-weight: 600;
+        }
+
+        .btn-sync-green:hover { background: #88bb2a; }
+        .btn-sync-green:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; }
+
+        /* user avatar */
+        .user-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--accent-2);
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-details { line-height: 1.3; }
+        .user-email { font-size: 13px; font-weight: 500; color: var(--text-1); }
+        .user-role { font-size: 11px; color: var(--text-3); }
+
+        /* ── MAIN ─────────────────────────────────── */
+        .main {
+            margin-left: var(--sidebar-w);
+            margin-top: var(--header-h);
+            padding: 28px;
+            min-height: calc(100vh - var(--header-h));
+        }
+
+        /* ── CARDS ────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-1);
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: var(--text-3);
+            margin-top: 2px;
+        }
+
+        .card-body { padding: 20px; }
+
+        /* ── KPI GRID ─────────────────────────────── */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
             margin-bottom: 24px;
         }
 
         .kpi-card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            border: 1px solid #e0e0e0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow);
         }
 
         .kpi-label {
             font-size: 11px;
             font-weight: 600;
-            text-transform: uppercase;
-            color: #86868b;
-            margin-bottom: 8px;
             letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-3);
+            margin-bottom: 8px;
         }
 
         .kpi-value {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 700;
-            color: #1d1d1f;
-            line-height: 1;
+            color: var(--text-1);
+            letter-spacing: -1px;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* Smaller font for TOP BRON to handle long source names */
-        #topSource {
-            font-size: 20px !important;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 100%;
-        }
-
-        .kpi-subtitle {
-            font-size: 13px;
-            color: #86868b;
+        .kpi-sub {
+            font-size: 11px;
+            color: var(--text-3);
             margin-top: 4px;
         }
 
-        /* Charts Grid */
-        .charts-grid {
+        /* ── CHARTS ROW ───────────────────────────── */
+        .charts-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 24px;
-        }
-
-        .chart-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            border: 1px solid #e0e0e0;
-        }
-
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
-
-        .chart-subtitle {
-            font-size: 12px;
-            color: #86868b;
-            margin-bottom: 16px;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 300px;
-        }
-
-        /* Error & Loading States */
-        .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            border-left: 4px solid #c62828;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #86868b;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #86868b;
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.3;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                border-right: none;
-                border-bottom: 1px solid #e0e0e0;
-            }
-            
-            .dashboard-container {
-                flex-direction: column;
-            }
-            
-            .kpi-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Pipeline Funnel Styles */
-        .funnel-stage {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            gap: 12px;
-        }
-
-        .funnel-bar {
-            flex: 1;
-            height: 50px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            color: white;
-            font-weight: 600;
-            transition: all 0.2s;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .funnel-bar:hover {
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        .funnel-bar.awareness { background: #3b82f6; }
-        .funnel-bar.contacted { background: #10b981; }
-        .funnel-bar.interest { background: #06b6d4; }
-        .funnel-bar.intent { background: #10b981; }
-        .funnel-bar.consideration { background: #f59e0b; }
-        .funnel-bar.decision { background: #ef4444; }
-        .funnel-bar.won { background: #22c55e; }
-        .funnel-bar.lost { 
-            background: #dc2626 !important; 
-            color: white !important;
-        }
-
-        .funnel-count {
-            margin-left: auto;
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        .funnel-stats {
-            min-width: 120px;
-            text-align: right;
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        .conversion-rate {
-            display: block;
-            font-weight: 600;
-            color: #10b981;
-            margin-top: 4px;
-        }
-
-        /* Hot Leads List */
-        .hot-lead-item {
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            border-left: 3px solid #ef4444;
-        }
-
-        .hot-lead-name {
-            font-weight: 600;
-            font-size: 14px;
-            color: #1e293b;
-            margin-bottom: 4px;
-        }
-
-        .hot-lead-meta {
-            font-size: 12px;
-            color: #64748b;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .hot-lead-likelihood {
-            color: #ef4444;
-            font-weight: 600;
-        }
-
-        /* Meta Marketing Section */
-        .meta-marketing-section {
-            margin-top: 32px;
-            padding: 0;
-        }
-
-        .meta-section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding: 24px;
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #d2d2d7;
-        }
-
-        .meta-section-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1d1d1f;
-        }
-
-        .meta-sync-info {
-            font-size: 12px;
-            color: #86868b;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .btn-sync {
-            padding: 8px 16px;
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            color: #1d1d1f;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .btn-sync:hover {
-            background: #f5f5f7;
-            border-color: #06c;
-            color: #06c;
-        }
-
-        .meta-sync-btn {
-            padding: 8px 20px;
-            background: #10b981;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .meta-sync-btn:hover {
-            background: #059669;
-            transform: translateY(-1px);
-        }
-
-        .meta-sync-btn:disabled {
-            background: #d1d5db;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .meta-metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: 2fr 1fr;
             gap: 16px;
             margin-bottom: 24px;
         }
 
-        .meta-metric-card {
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s ease;
+        .chart-wrap {
+            position: relative;
+            height: 280px;
         }
 
-        .meta-metric-card:hover {
-            border-color: #06c;
-            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
-        }
-
-        .meta-metric-card.highlight {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-color: #06c;
-        }
-
-        .meta-metric-label {
+        /* ── SECTION TITLE ────────────────────────── */
+        .section-title {
             font-size: 13px;
-            color: #86868b;
-            font-weight: 500;
-            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-2);
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            margin-top: 28px;
         }
 
-        .meta-metric-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #1d1d1f;
-            margin: 4px 0;
+        .section-title:first-child { margin-top: 0; }
+
+        /* ── PIPELINE FUNNEL ──────────────────────── */
+        .funnel-container { padding: 0 20px 20px; }
+
+        .funnel-stage {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: default;
         }
 
-        .meta-metric-change {
-            font-size: 12px;
-            margin-top: 8px;
-            padding: 4px 8px;
+        .funnel-stage:last-child { border-bottom: none; }
+        .funnel-stage.clickable { cursor: pointer; }
+        .funnel-stage.clickable:hover { background: var(--surface-2); margin: 0 -20px; padding-left: 20px; padding-right: 20px; border-radius: var(--radius-sm); }
+
+        .funnel-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: var(--bg);
             border-radius: 4px;
-            display: inline-block;
-            font-weight: 500;
+            overflow: hidden;
         }
 
-        .meta-metric-change.positive {
-            background: #d1fae5;
-            color: #065f46;
+        .funnel-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .4s ease;
         }
 
-        .meta-metric-change.negative {
-            background: #fee2e2;
-            color: #991b1b;
-        }
+        .funnel-label { font-size: 13px; font-weight: 500; width: 80px; flex-shrink: 0; }
+        .funnel-count { font-size: 14px; font-weight: 700; width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+        .funnel-pct { font-size: 12px; color: var(--text-3); width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 
-        .meta-charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
+        /* ── HOT LEADS TABLE ──────────────────────── */
+        .table { width: 100%; border-collapse: collapse; }
 
-        .meta-chart-container {
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 12px;
-            padding: 24px;
-        }
-
-        .meta-chart-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
-
-        .meta-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .meta-table th {
-            background: #f5f5f7;
-            color: #1d1d1f;
-            padding: 12px;
+        .table th {
             text-align: left;
-            font-size: 13px;
+            padding: 8px 12px;
+            font-size: 11px;
             font-weight: 600;
-            border-bottom: 1px solid #d2d2d7;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--text-3);
+            border-bottom: 1px solid var(--border);
         }
 
-        .meta-table td {
-            color: #1d1d1f;
-            padding: 12px;
-            border-bottom: 1px solid #f5f5f7;
-            font-size: 14px;
+        .table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-1);
         }
 
-        .meta-table tbody tr:hover {
-            background: #f5f5f7;
+        .table tr:last-child td { border-bottom: none; }
+        .table tr:hover td { background: var(--surface-2); }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
         }
 
-        .meta-table tbody tr:last-child td {
-            border-bottom: none;
+        .badge-blue { background: #e8f0fe; color: #1a56db; }
+        .badge-green { background: #e6f6ec; color: #1a7c3e; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fde8eb; color: #9b1c2e; }
+
+        /* ── META & ECLUB SECTIONS ────────────────── */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
         }
 
-        @media (max-width: 768px) {
-            .meta-charts-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .meta-metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        .metric-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
         }
 
-        /* Password Change Modal */
+        .metric-card.highlight {
+            background: #eef3ff;
+            border-color: #c7d7fd;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-3);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-1);
+            letter-spacing: -0.5px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .meta-campaigns-table { margin-top: 16px; }
+
+        /* eclub period selector */
+        .eclub-period-selectors {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .period-select {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-family: inherit;
+            color: var(--text-1);
+            background: white;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5a72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 24px;
+        }
+
+        .period-select:focus { outline: none; border-color: var(--accent); }
+
+        /* eclub status dot */
+        .status-dot {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-dot.green { background: var(--green); }
+        .status-dot.red { background: var(--red); }
+        .status-dot.amber { background: var(--amber); }
+
+        /* ── MODALS ───────────────────────────────── */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 10000;
-            align-items: center;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 500;
+            backdrop-filter: blur(2px);
             justify-content: center;
+            align-items: center;
         }
 
-        .modal.active {
-            display: flex;
-        }
+        .modal.active { display: flex; }
 
         .modal-content {
-            background: white;
-            border-radius: 12px;
-            padding: 32px;
-            max-width: 450px;
+            background: var(--surface);
+            border-radius: 14px;
+            box-shadow: var(--shadow-md);
             width: 90%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 560px;
+            overflow: hidden;
         }
 
         .modal-header {
-            font-size: 20px;
+            padding: 20px 24px 16px;
+            font-size: 16px;
             font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .form-group {
-            margin-bottom: 20px;
+        .modal-body { padding: 20px 24px; }
+        .modal-footer {
+            padding: 14px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
         }
+
+        .form-group { margin-bottom: 16px; }
 
         .form-group label {
             display: block;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
-            color: #1d1d1f;
-            margin-bottom: 8px;
+            color: var(--text-2);
+            margin-bottom: 5px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-size: 14px;
+            font-family: inherit;
+            color: var(--text-1);
+            transition: border-color .15s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #06c;
-            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(51,51,153,.1);
         }
 
         .password-requirements {
-            font-size: 12px;
-            color: #86868b;
+            font-size: 11px;
+            color: var(--text-3);
             margin-top: 4px;
         }
 
-        .modal-buttons {
-            display: flex;
+        #passwordMessage, #idleWarning {
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+
+        /* idle warning */
+        #idleWarning {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--surface);
+            border: 1px solid var(--amber);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            padding: 16px 20px;
+            z-index: 400;
+            max-width: 320px;
+        }
+
+        #idleWarning.show { display: block; }
+
+        /* leads modal */
+        #leadsModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 500;
+            backdrop-filter: blur(2px);
+            justify-content: center;
+            align-items: center;
+        }
+
+        #leadsModal.active { display: flex; }
+
+        /* ── PRACTICE PERFORMANCE ─────────────────── */
+        #practicePerformanceChart {
+            height: 200px;
+        }
+
+        /* ── RESPONSIVE ───────────────────────────── */
+        @media (max-width: 900px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+            .sidebar { transform: translateX(-100%); }
+            .main, .topbar { margin-left: 0; left: 0; }
+        }
+
+        /* ── FORECAST ─────────────────────────────── */
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 24px;
+            margin-bottom: 16px;
         }
 
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
+        .forecast-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+        }
+
+        .forecast-label {
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-3);
+            margin-bottom: 4px;
+        }
+
+        .forecast-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-1);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .forecast-sub {
+            font-size: 11px;
+            color: var(--text-3);
+            margin-top: 2px;
+        }
+
+        /* ── SOURCE CHART ─────────────────────────── */
+        #sourceChart { height: 200px !important; }
+
+        /* ── SCROLLBAR ────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+        /* btn-logout alias */
+        .btn-logout {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
             cursor: pointer;
+            transition: all .15s;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--red);
         }
 
-        .btn-change {
-            background: #06c;
-            color: white;
-        }
+        .btn-logout:hover { background: #fef2f3; border-color: var(--red); }
 
-        .btn-change:hover {
-            background: #0051a3;
-        }
-
-        .btn-cancel {
-            background: #f5f5f7;
-            color: #1d1d1f;
-        }
-
-        .btn-cancel:hover {
-            background: #e8e8ed;
-        }
-
-        .error-message {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .success-message {
-            background: #d1fae5;
-            color: #065f46;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        /* Eclub Sync Button */
+        /* btn-sync alias */
         .btn-sync {
-            width: 100%;
-            padding: 12px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all .15s;
+            border: 1px solid var(--border);
+            background: white;
+            color: var(--text-2);
         }
 
-        .btn-sync:hover {
-            background: #059669;
-            transform: translateY(-1px);
-        }
+        .btn-sync:hover { background: var(--bg); color: var(--text-1); }
+        .btn-sync:disabled { opacity: .5; cursor: not-allowed; }
 
-        .btn-sync:disabled {
-            background: #d1d5db;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .sync-info {
-            padding: 12px;
-            background: #f5f5f7;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-
-        /* Status Badge Fix - Ensure proper contrast */
-        .status-badge,
-        .badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
+        /* meta-sync-btn alias */
+        .meta-sync-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
             font-weight: 600;
-            display: inline-block;
-            color: white !important;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all .15s;
+            border: none;
+            background: var(--green);
+            color: #1a3300;
         }
 
-        .badge-active,
-        .status-active {
-            background: #10b981 !important;
-        }
-
-        .badge-frozen,
-        .status-frozen {
-            background: #f59e0b !important;
-        }
-
-        .badge-cancelled,
-        .status-cancelled,
-        .badge-lost {
-            background: #ef4444 !important;
-        }
-
-        .badge-default {
-            background: #6b7280 !important;
-        }
+        .meta-sync-btn:hover { background: #88bb2a; }
+        .meta-sync-btn:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">
-            <div class="logo">
-                <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="6" fill="#06c"/>
-                    <path d="M16 8L24 16L16 24L8 16L16 8Z" fill="white"/>
-                </svg>
-                Dynamic Health
-            </div>
-            <div class="header-title">Churn & Conversie Analytics</div>
+
+<!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#333399"/>
+            </svg>
         </div>
-        <div class="header-right">
-            <div class="user-info" id="userInfo" style="display: none;">
-                <div class="user-icon" id="userIcon">A</div>
-                <div>
-                    <div class="user-email" id="userEmail">Loading...</div>
-                    <div class="user-role" id="userRole">...</div>
-                </div>
-            </div>
-            <button class="btn btn-secondary" onclick="exportToExcel()" style="margin-right: 12px;">📊 Export Rapportage</button>
-            <button class="btn btn-primary" onclick="refreshData()">↻ Vernieuwen</button>
-            <button class="btn btn-secondary" onclick="openPasswordModal()" style="margin-right: 12px;">🔒 Wachtwoord</button>
-            <button class="btn-logout" onclick="logout()">Uitloggen</button>
-        </div>
+        <span class="sidebar-brand-name">Dynamic Health</span>
     </div>
 
-    <!-- Password Change Modal -->
-    <div class="modal" id="passwordModal">
-        <div class="modal-content">
-            <div class="modal-header">Wachtwoord Wijzigen</div>
-            
+    <nav class="sidebar-nav">
+        <div class="sidebar-section-label">Overzicht</div>
+        <div class="sidebar-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+            Dashboard
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:8px;">Marketing</div>
+        <div class="sidebar-dropdown" id="marketingDropdown">
+            <div class="sidebar-item" onclick="toggleDropdown('marketingDropdown')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                Marketing
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+            <div class="sidebar-dropdown-items">
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Leads</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:8px;">Data</div>
+        <div class="sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+            </svg>
+            eClub Data
+        </div>
+    </nav>
+
+    <!-- Filters -->
+    <div class="sidebar-filters">
+        <span class="sidebar-filter-label">Filters</span>
+
+        <select id="practiceFilter" class="sidebar-select" onchange="applyFilters()">
+            <option value="">Alle praktijken</option>
+        </select>
+
+        <div id="practiceSearchGroup" style="display:none;">
+            <input type="text" id="practiceSearch" class="sidebar-input"
+                placeholder="Zoek praktijk..."
+                oninput="filterPractices()">
+        </div>
+
+        <input type="date" id="dateFrom" class="sidebar-input" onchange="applyFilters()" title="Van datum">
+        <input type="date" id="dateTo" class="sidebar-input" onchange="applyFilters()" title="Tot datum">
+
+        <select id="sourceFilter" class="sidebar-select" onchange="applyFilters()">
+            <option value="">Alle bronnen</option>
+            <option value="Facebook">Facebook</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Google">Google</option>
+            <option value="Vrienden/Familie">Vrienden/Familie</option>
+            <option value="Voucher">Voucher</option>
+        </select>
+
+        <select id="statusFilter" class="sidebar-select" onchange="applyFilters()">
+            <option value="">Alle statussen</option>
+            <option value="new">Nieuw</option>
+            <option value="contacted">Benaderd</option>
+            <option value="converted">Lid geworden</option>
+        </select>
+    </div>
+
+    <!-- eClub sidebar sync -->
+    <div class="sidebar-sync-section" id="eclubSyncSection" style="display:none;">
+        <span class="sidebar-filter-label">eClub Sync</span>
+        <div style="font-size:12px; color:rgba(255,255,255,.5); margin-bottom:8px;">
+            Laatste sync: <span id="lastSyncTime">—</span><br>
+            Leden: <span id="eclubMemberCount">—</span>
+        </div>
+        <button id="btnEclubSync" class="btn btn-ghost" style="width:100%; background:rgba(255,255,255,.1); color:white; border-color:rgba(255,255,255,.2);" onclick="syncEclubData()">
+            <span id="syncButtonText">Sync leden</span>
+        </button>
+        <div id="syncStatus" style="margin-top:8px; font-size:12px; display:none;"></div>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-item" onclick="logout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Uitloggen
+        </div>
+    </div>
+</aside>
+
+<!-- ── TOPBAR ────────────────────────────────────────────────────── -->
+<header class="topbar">
+    <span class="topbar-title">Churn & Conversie Analytics</span>
+    <div class="topbar-right">
+        <div class="user-info" id="userInfo" style="display:none;">
+            <div class="user-avatar" id="userIcon">A</div>
+            <div class="user-details">
+                <div class="user-email" id="userEmail">—</div>
+                <div class="user-role" id="userRole">—</div>
+            </div>
+        </div>
+        <button class="btn btn-ghost" onclick="exportToExcel()">Export</button>
+        <button class="btn btn-ghost" onclick="refreshData()">↻ Vernieuwen</button>
+        <button class="btn btn-ghost" onclick="openPasswordModal()">Wachtwoord</button>
+        <button class="btn-logout" onclick="logout()">Uitloggen</button>
+    </div>
+</header>
+
+<!-- ── WACHTWOORD MODAL ──────────────────────────────────────────── -->
+<div class="modal" id="passwordModal">
+    <div class="modal-content">
+        <div class="modal-header">Wachtwoord wijzigen</div>
+        <div class="modal-body">
             <div id="passwordMessage"></div>
-            
             <form id="passwordForm" onsubmit="changePassword(event)">
                 <div class="form-group">
-                    <label for="currentPassword">Huidig Wachtwoord</label>
+                    <label>Huidig wachtwoord</label>
                     <input type="password" id="currentPassword" required autocomplete="current-password">
                 </div>
-                
                 <div class="form-group">
-                    <label for="newPassword">Nieuw Wachtwoord</label>
+                    <label>Nieuw wachtwoord</label>
                     <input type="password" id="newPassword" required minlength="8" autocomplete="new-password">
-                    <div class="password-requirements">
-                        Minimaal 8 tekens, inclusief hoofdletter, kleine letter en cijfer
-                    </div>
+                    <div class="password-requirements">Minimaal 8 tekens, inclusief hoofdletter, kleine letter en cijfer</div>
                 </div>
-                
                 <div class="form-group">
-                    <label for="confirmPassword">Bevestig Nieuw Wachtwoord</label>
+                    <label>Bevestig nieuw wachtwoord</label>
                     <input type="password" id="confirmPassword" required autocomplete="new-password">
                 </div>
-                
-                <div class="modal-buttons">
-                    <button type="button" class="btn-cancel" onclick="closePasswordModal()">Annuleren</button>
-                    <button type="submit" class="btn-change">Wijzigen</button>
+                <div class="modal-footer" style="padding: 0; border: none; margin-top: 4px;">
+                    <button type="button" class="btn btn-ghost" onclick="closePasswordModal()">Annuleren</button>
+                    <button type="submit" class="btn btn-primary">Opslaan</button>
                 </div>
             </form>
         </div>
     </div>
+</div>
 
-    <!-- Leads List Modal -->
-    <div class="modal" id="leadsModal">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <span id="leadsModalTitle">Leads</span>
-                <button onclick="closeLeadsModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; float: right; margin-top: -8px;">&times;</button>
+<!-- ── LEADS MODAL ───────────────────────────────────────────────── -->
+<div id="leadsModal">
+    <div class="modal-content" style="max-width:800px;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="leadsModalTitle">Leads</span>
+            <button onclick="closeLeadsModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-3); line-height:1;">&times;</button>
+        </div>
+        <div id="leadsModalContent" style="max-height:500px; overflow-y:auto; padding: 4px 0;"></div>
+    </div>
+</div>
+
+<!-- ── IDLE WARNING ──────────────────────────────────────────────── -->
+<div id="idleWarning">
+    <div style="font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:6px;">Sessie verloopt</div>
+    <div id="idleWarningText" style="font-size:13px; color:var(--text-2); margin-bottom:12px;"></div>
+    <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" onclick="onActivity()" style="flex:1;">Actief blijven</button>
+        <button class="btn btn-ghost" onclick="handleIdleLogout()">Uitloggen</button>
+    </div>
+</div>
+
+<!-- ── MAIN CONTENT ──────────────────────────────────────────────── -->
+<main class="main">
+
+    <!-- KPI row -->
+    <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card">
+            <div class="kpi-label">Totaal leads</div>
+            <div class="kpi-value" id="totalLeads">—</div>
+            <div class="kpi-sub">Alle leads in database</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Conversie ratio</div>
+            <div class="kpi-value" id="conversionRate">—</div>
+            <div class="kpi-sub">Lead → Lid geworden</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Actieve praktijken</div>
+            <div class="kpi-value" id="activePractices">—</div>
+            <div class="kpi-sub">Praktijken met leads</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Gem. leads/maand</div>
+            <div class="kpi-value" id="avgLeadsPerMonth">—</div>
+            <div class="kpi-sub">Huidige praktijk</div>
+        </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-row">
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Churn Forecast</div>
+                    <div class="card-subtitle">Ledenverloop per maand (eClub)</div>
+                </div>
             </div>
-            
-            <div id="leadsModalContent" style="max-height: 500px; overflow-y: auto;">
-                <div style="text-align: center; padding: 40px; color: #86868b;">Laden...</div>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="churnForecastChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Lead bronnen</div>
+            </div>
+            <div class="card-body">
+                <div class="chart-wrap" style="height:200px;">
+                    <canvas id="sourceChart"></canvas>
+                </div>
+                <div id="topSource" style="margin-top:12px; font-size:12px; color:var(--text-3);">Top bron: <strong id="topSourceName">—</strong></div>
             </div>
         </div>
     </div>
 
-    <div class="dashboard-container">
-        <!-- Sidebar Filters -->
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-title">Filters</div>
-                
-                <div class="filter-group">
-                    <label class="filter-label" for="practiceFilter">Praktijk</label>
-                    <select id="practiceFilter" onchange="applyFilters()">
-                        <option value="">Alle praktijken</option>
-                    </select>
-                </div>
+    <!-- Sales pipeline + forecast row -->
+    <div class="charts-row">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Sales pipeline</div>
+            </div>
+            <div id="funnelContainer" class="funnel-container"></div>
+        </div>
 
-                <!-- Practice Search (Admin Only) -->
-                <div class="filter-group" id="practiceSearchGroup" style="display: none;">
-                    <label class="filter-label" for="practiceSearch">Zoek praktijk</label>
-                    <input 
-                        type="text" 
-                        id="practiceSearch" 
-                        placeholder="Type om te zoeken..."
-                        oninput="filterPractices()"
-                        style="width: 100%; padding: 8px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 14px;"
-                    >
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Verwacht vs werkelijk</div>
+            </div>
+            <div class="card-body">
+                <div class="forecast-grid">
+                    <div class="forecast-card">
+                        <div class="forecast-label">Verwacht</div>
+                        <div class="forecast-value" id="forecastExpected">—</div>
+                        <div class="forecast-sub">Op basis van likelihood</div>
+                    </div>
+                    <div class="forecast-card">
+                        <div class="forecast-label">Actueel</div>
+                        <div class="forecast-value" id="forecastActual">—</div>
+                        <div class="forecast-sub">Daadwerkelijk gewonnen</div>
+                    </div>
                 </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="dateFrom">Van datum</label>
-                    <input type="date" id="dateFrom" onchange="applyFilters()">
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="dateTo">Tot datum</label>
-                    <input type="date" id="dateTo" onchange="applyFilters()">
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="sourceFilter">Bron</label>
-                    <select id="sourceFilter" onchange="applyFilters()">
-                        <option value="">Alle bronnen</option>
-                        <option value="Facebook">Facebook</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="Google">Google</option>
-                        <option value="Vrienden/Familie">Vrienden/Familie</option>
-                        <option value="Voucher">Voucher</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="statusFilter">Status</label>
-                    <select id="statusFilter" onchange="applyFilters()">
-                        <option value="">Alle statussen</option>
-                        <option value="Nieuw">Nieuw</option>
-                        <option value="Gebeld">Gebeld</option>
-                        <option value="Afspraak Gepland">Afspraak Gepland</option>
-                        <option value="Geweest">Geweest</option>
-                        <option value="Lid Geworden">Lid Geworden</option>
-                        <option value="Niet Geïnteresseerd">Niet Geïnteresseerd</option>
-                    </select>
+                <div id="forecastGap" style="font-size:13px; color:var(--text-2); margin-top:4px;"></div>
+                <div class="chart-wrap" style="height:140px; margin-top:12px;">
+                    <canvas id="forecastChart"></canvas>
                 </div>
             </div>
-
-            <!-- Eclub Sync Section -->
-            <div class="sidebar-section" id="eclubSyncSection" style="display: none;">
-                <div class="sidebar-title">Eclub Sync</div>
-                
-                <div class="sync-info" id="eclubSyncInfo">
-                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
-                        Laatste sync: <span id="lastSyncTime">-</span>
-                    </div>
-                    <div style="font-size: 13px; color: #86868b; margin-bottom: 12px;">
-                        Leden: <span id="eclubMemberCount">-</span>
-                    </div>
-                </div>
-
-                <button id="btnEclubSync" class="btn-sync" onclick="syncEclubData()">
-                    <span id="syncButtonText">🔄 Sync Leden</span>
-                </button>
-
-                <div id="syncStatus" style="margin-top: 12px; font-size: 13px; display: none;"></div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- KPI Cards -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Totaal Leads</div>
-                    <div class="kpi-value" id="totalLeads">-</div>
-                    <div class="kpi-subtitle">Alle leads in database</div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Conversie Ratio</div>
-                    <div class="kpi-value" id="conversionRate">-</div>
-                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Actieve Praktijken</div>
-                    <div class="kpi-value" id="activePractices">-</div>
-                    <div class="kpi-subtitle">Praktijken met leads</div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Gemiddelde Tijd</div>
-                    <div class="kpi-value" id="avgTime">-</div>
-                    <div class="kpi-subtitle">Lead → Lid Geworden</div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-label">Top Bron</div>
-                    <div class="kpi-value" id="topSource">-</div>
-                    <div class="kpi-subtitle">Meeste leads</div>
-                </div>
-            </div>
-
-            <!-- Charts Grid -->
-            <div class="charts-grid">
-                <!-- Churn Forecast -->
-                <div class="chart-container">
-                    <div class="chart-title">Churn Forecast</div>
-                    <div class="chart-subtitle">Voorspelling ledenaantal & uitval</div>
-                    <div class="chart-wrapper">
-                        <canvas id="churnForecastChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Conversion Funnel -->
-                <div class="chart-container">
-                    <div class="chart-title">Conversie Funnel</div>
-                    <div class="chart-subtitle">Lead journey van klik tot lid</div>
-                    <div class="chart-wrapper">
-                        <canvas id="conversionFunnelChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Practice Performance -->
-                <div class="chart-container" id="practicePerformanceContainer">
-                    <div class="chart-title">Praktijk Performance</div>
-                    <div class="chart-subtitle">Top 10 praktijken naar totale leads</div>
-                    <div class="chart-wrapper">
-                        <canvas id="practiceChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Source Distribution -->
-                <div class="chart-container">
-                    <div class="chart-title">Lead Bronnen</div>
-                    <div class="chart-subtitle">Distributie per marketing kanaal</div>
-                    <div class="chart-wrapper">
-                        <canvas id="sourceChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ENHANCED: Pipeline Funnel Section -->
-            <div class="chart-container" style="grid-column: 1 / -1; margin-top: 20px;">
-                <div class="chart-title">Sales Pipeline - Lead Lifecycle</div>
-                <div class="chart-subtitle">Van awareness tot conversie - zie waar leads uitvallen</div>
-                
-                <div id="pipelineFunnelContainer" style="padding: 20px 0;">
-                    <div class="loading">Data laden...</div>
-                </div>
-            </div>
-
-            <!-- ENHANCED: Forecast vs Actual -->
-            <div class="charts-grid" style="margin-top: 20px;">
-                <div class="chart-container">
-                    <div class="chart-title">Forecast vs Actueel</div>
-                    <div class="chart-subtitle">Verwachte vs werkelijke conversies</div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-                        <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border: 2px solid #93c5fd;">
-                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">VERWACHT</div>
-                            <div id="forecastExpected" style="font-size: 32px; font-weight: 700; color: #2563eb;">-</div>
-                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Op basis van likelihood</div>
-                        </div>
-                        
-                        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border: 2px solid #86efac;">
-                            <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">ACTUEEL</div>
-                            <div id="forecastActual" style="font-size: 32px; font-weight: 700; color: #10b981;">-</div>
-                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Daadwerkelijk gewonnen</div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; text-align: center; margin-top: 16px;">
-                        <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 4px;">GAP ANALYSE</div>
-                        <div id="gapValue" style="font-size: 24px; font-weight: 700; color: #92400e;">-</div>
-                        <div id="gapDescription" style="font-size: 12px; color: #78350f; margin-top: 4px;">-</div>
-                    </div>
-                </div>
-
-                <!-- Hot Leads -->
-                <div class="chart-container">
-                    <div class="chart-title">Hot Leads</div>
-                    <div class="chart-subtitle">Hoge conversiekans (70%+)</div>
-                    
-                    <div id="hotLeadsList" style="margin-top: 16px;">
-                        <div class="loading">Data laden...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Meta Marketing Section -->
-            <div class="meta-marketing-section" id="metaMarketingSection" style="display: none;">
-                <div class="meta-section-header">
-                    <div class="meta-section-title">
-                        Meta Marketing Performance
-                    </div>
-                    <div class="meta-sync-info">
-                        <span id="metaLastSync">Laatste sync: --</span>
-                        <button class="btn-sync" onclick="syncMetaData()">
-                            Sync Nu
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Metrics Grid -->
-                <div class="meta-metrics-grid">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Total Ad Spend</div>
-                        <div class="meta-metric-value" id="metaTotalSpend">€0.00</div>
-                        <div class="meta-metric-change" id="metaSpendChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Impressions</div>
-                        <div class="meta-metric-value" id="metaImpressions">0</div>
-                        <div class="meta-metric-change" id="metaImpressionsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Clicks</div>
-                        <div class="meta-metric-value" id="metaClicks">0</div>
-                        <div class="meta-metric-change" id="metaClicksChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">CTR</div>
-                        <div class="meta-metric-value" id="metaCTR">0.00%</div>
-                        <div class="meta-metric-change" id="metaCTRChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Conversions</div>
-                        <div class="meta-metric-value" id="metaConversions">0</div>
-                        <div class="meta-metric-change" id="metaConversionsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Leads (Meta)</div>
-                        <div class="meta-metric-value" id="metaVerifiedLeads">0</div>
-                        <div class="meta-metric-change" id="metaVerifiedLeadsChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card highlight">
-                        <div class="meta-metric-label">Cost Per Lead</div>
-                        <div class="meta-metric-value" id="metaCostPerLead">€0.00</div>
-                        <div class="meta-metric-change" id="metaCostChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">ROAS</div>
-                        <div class="meta-metric-value" id="metaROAS">0.0x</div>
-                        <div class="meta-metric-change" id="metaROASChange"></div>
-                    </div>
-
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">CPC</div>
-                        <div class="meta-metric-value" id="metaCPC">€0.00</div>
-                        <div class="meta-metric-change" id="metaCPCChange"></div>
-                    </div>
-                </div>
-
-                <!-- Charts -->
-                <div class="meta-charts-grid">
-                    <div class="meta-chart-container">
-                        <div class="meta-chart-title">Campaign Performance</div>
-                        <div style="max-height: 400px; overflow-y: auto;">
-                            <canvas id="metaCampaignChart"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="meta-chart-container">
-                        <div class="meta-chart-title">Active Campaigns</div>
-                        <table class="meta-table">
-                            <thead>
-                                <tr>
-                                    <th>Campaign</th>
-                                    <th>Spend</th>
-                                    <th>Leads</th>
-                                    <th>CPL</th>
-                                </tr>
-                            </thead>
-                            <tbody id="metaCampaignsBody">
-                                <tr>
-                                    <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6);">
-                                        Loading...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Eclub Lead Management Section -->
-            <div class="meta-section" style="margin-top: 32px;">
-                <div class="meta-section-header">
-                    <div>
-                        <div class="meta-section-title">eClub Ledendata</div>
-                        <div class="meta-sync-info" style="font-size: 12px; color: #86868b; margin-top: 4px;">
-                            Eclub integratie - status: <span id="eclubStatus">Niet gekoppeld</span>
-                        </div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <!-- Periode type selector -->
-                        <select id="eclubPeriodeType" onchange="onEclubPeriodeTypeChange()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
-                            <option value="maand">Maand</option>
-                            <option value="kwartaal">Kwartaal</option>
-                            <option value="jaar">Jaar</option>
-                        </select>
-
-                        <!-- Maand selector -->
-                        <select id="eclubMaandSelect" onchange="syncEclub()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
-                            <option value="1">Januari</option>
-                            <option value="2">Februari</option>
-                            <option value="3">Maart</option>
-                            <option value="4">April</option>
-                            <option value="5">Mei</option>
-                            <option value="6">Juni</option>
-                            <option value="7">Juli</option>
-                            <option value="8">Augustus</option>
-                            <option value="9">September</option>
-                            <option value="10">Oktober</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-
-                        <!-- Kwartaal selector (verborgen) -->
-                        <select id="eclubKwartaalSelect" onchange="syncEclub()" style="display:none; padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
-                            <option value="1">Q1 (jan-mrt)</option>
-                            <option value="2">Q2 (apr-jun)</option>
-                            <option value="3">Q3 (jul-sep)</option>
-                            <option value="4">Q4 (okt-dec)</option>
-                        </select>
-
-                        <!-- Jaar selector -->
-                        <select id="eclubJaarSelect" onchange="syncEclub()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;" id="eclubJaarSelect">
-                        </select>
-
-                        <button class="meta-sync-btn" onclick="syncEclub()">
-                            Sync Nu
-                        </button>
-                    </div>
-                </div>
-
-                <div class="meta-metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Actieve leden</div>
-                        <div class="meta-metric-value" id="eclubVisited">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Nieuwe leden</div>
-                        <div class="meta-metric-value" id="eclubRegistrations">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Gestopt</div>
-                        <div class="meta-metric-value" id="eclubPending">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Churn %</div>
-                        <div class="meta-metric-value" id="eclubConversionRate">-</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Overige KPIs Section -->
-            <div class="meta-section" style="margin-top: 24px;">
-                <div class="meta-section-header">
-                    <div class="meta-section-title">Overige KPI's</div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Leden aantal</div>
-                        <div class="meta-metric-value" id="eclubActiveMembers">-</div>
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 8px;">
-                            <span id="eclubNewMembers">-</span> gestart | 
-                            <span id="eclubChurnedMembers">-</span> gestopt
-                        </div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Gemiddelde duur lidmaatschap</div>
-                        <div class="meta-metric-value" id="eclubAvgDuration">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Aantal bezoeken</div>
-                        <div class="meta-metric-value" id="eclubTotalVisits">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Retentie</div>
-                        <div class="meta-metric-value" id="eclubRetention">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Omzet per locatie</div>
-                        <div class="meta-metric-value" id="eclubRevenue">-</div>
-                    </div>
-                    <div class="meta-metric-card">
-                        <div class="meta-metric-label">Omzet per lid</div>
-                        <div class="meta-metric-value" id="eclubRevenuePerMember">-</div>
-                    </div>
-                </div>
-            </div>
-
-        </main>
+        </div>
     </div>
+
+    <!-- Practice performance + hot leads -->
+    <div class="charts-row">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Praktijk prestaties</div>
+            </div>
+            <div class="card-body">
+                <div class="chart-wrap" style="height:200px;">
+                    <canvas id="practiceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Hot leads</div>
+                <div class="badge badge-amber" id="hotLeadsCount">0</div>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <table class="table" id="hotLeadsTable">
+                    <thead>
+                        <tr>
+                            <th>Naam</th>
+                            <th>Kans</th>
+                            <th>Stadium</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hotLeadsBody">
+                        <tr><td colspan="3" style="text-align:center; color:var(--text-3); padding:24px;">Laden...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meta Marketing -->
+    <div class="card" id="metaMarketingSection" style="display:none; margin-bottom:24px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Meta Marketing Performance</div>
+                <div class="card-subtitle" id="metaLastSync">Laatste sync: —</div>
+            </div>
+            <button class="btn btn-sync" onclick="syncMetaData()">Sync Nu</button>
+        </div>
+        <div class="card-body">
+            <div class="metrics-grid" id="metaMetricsGrid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Ad Spend</div>
+                    <div class="metric-value" id="metaTotalSpend">€0,00</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Impressions</div>
+                    <div class="metric-value" id="metaImpressions">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Clicks</div>
+                    <div class="metric-value" id="metaClicks">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">CTR</div>
+                    <div class="metric-value" id="metaCTR">0%</div>
+                </div>
+                <div class="metric-card highlight">
+                    <div class="metric-label">Conversions</div>
+                    <div class="metric-value" id="metaConversions">0</div>
+                </div>
+                <div class="metric-card highlight">
+                    <div class="metric-label">Leads (Meta)</div>
+                    <div class="metric-value" id="metaLeads">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Cost per Lead</div>
+                    <div class="metric-value" id="metaCPL">€0,00</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">ROAS</div>
+                    <div class="metric-value" id="metaROAS">0x</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">CPC</div>
+                    <div class="metric-value" id="metaCPC">€0,00</div>
+                </div>
+            </div>
+            <div class="meta-campaigns-table">
+                <div style="font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px;">Active Campaigns</div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Campaign</th>
+                            <th>Spend</th>
+                            <th>Leads</th>
+                            <th>CPL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metaCampaignsBody">
+                        <tr><td colspan="4" style="text-align:center; color:var(--text-3); padding:16px;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="chart-wrap" style="height:180px; margin-top:16px;">
+                <canvas id="metaChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- eClub Ledendata -->
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">eClub Ledendata</div>
+                <div class="card-subtitle">
+                    <span class="status-dot" id="eclubStatusDot"></span>
+                    <span id="eclubStatus">Niet gekoppeld</span>
+                </div>
+            </div>
+            <div class="eclub-period-selectors">
+                <select id="eclubPeriodeType" class="period-select" onchange="onEclubPeriodeTypeChange()">
+                    <option value="maand">Maand</option>
+                    <option value="kwartaal">Kwartaal</option>
+                    <option value="jaar">Jaar</option>
+                </select>
+                <select id="eclubMaandSelect" class="period-select" onchange="syncEclub()">
+                    <option value="1">Januari</option><option value="2">Februari</option>
+                    <option value="3">Maart</option><option value="4">April</option>
+                    <option value="5">Mei</option><option value="6">Juni</option>
+                    <option value="7">Juli</option><option value="8">Augustus</option>
+                    <option value="9">September</option><option value="10">Oktober</option>
+                    <option value="11">November</option><option value="12">December</option>
+                </select>
+                <select id="eclubKwartaalSelect" class="period-select" onchange="syncEclub()" style="display:none;">
+                    <option value="1">Q1 (jan–mrt)</option><option value="2">Q2 (apr–jun)</option>
+                    <option value="3">Q3 (jul–sep)</option><option value="4">Q4 (okt–dec)</option>
+                </select>
+                <select id="eclubJaarSelect" class="period-select" onchange="syncEclub()"></select>
+                <button class="meta-sync-btn" onclick="syncEclub()">Sync Nu</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
+                <div class="metric-card highlight">
+                    <div class="metric-label">Actieve leden</div>
+                    <div class="metric-value" id="eclubVisited">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Nieuwe leden</div>
+                    <div class="metric-value" id="eclubRegistrations">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Gestopt</div>
+                    <div class="metric-value" id="eclubPending">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Churn %</div>
+                    <div class="metric-value" id="eclubConversionRate">—</div>
+                </div>
+            </div>
+
+            <div style="font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px;">Overige KPI's</div>
+            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="metric-card">
+                    <div class="metric-label">Leden aantal</div>
+                    <div class="metric-value" id="eclubActiveMembers">—</div>
+                    <div class="kpi-sub"><span id="eclubNewMembers">—</span> gestart | <span id="eclubChurnedMembers">—</span> gestopt</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Gem. duur lidmaatschap</div>
+                    <div class="metric-value" id="eclubAvgDuration">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Aantal bezoeken</div>
+                    <div class="metric-value" id="eclubTotalVisits">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Retentie</div>
+                    <div class="metric-value" id="eclubRetention">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Omzet per locatie</div>
+                    <div class="metric-value" id="eclubRevenue">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Omzet per lid</div>
+                    <div class="metric-value" id="eclubRevenuePerMember">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
 
     <script>
         // User session state
@@ -2809,6 +2780,29 @@
 
         // Initialiseer periode selector
         initEclubPeriodeSelector();
+
+        // Sidebar dropdown toggle
+        function toggleDropdown(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('open');
+        }
+
+        // Patch eclubStatus to also update dot color
+        const _origLoadEclubData = loadEclubData;
+        loadEclubData = async function() {
+            await _origLoadEclubData.apply(this, arguments);
+            const status = document.getElementById('eclubStatus');
+            const dot    = document.getElementById('eclubStatusDot');
+            if (!status || !dot) return;
+            if (status.textContent === 'Gekoppeld') {
+                dot.className = 'status-dot green';
+            } else if (status.textContent.startsWith('Fout')) {
+                dot.className = 'status-dot red';
+            } else {
+                dot.className = 'status-dot amber';
+            }
+        };
+
     </script>
 </body>
 </html>
