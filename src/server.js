@@ -3268,6 +3268,31 @@ app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/eclub/kpis/:practiceCode - KPI's ophalen via nieuwe endpoints
+app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const { jaar, maand } = req.query;
+
+    // Toegangscheck
+    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+
+    const kpis = await eclubService.getKPIs(
+      practiceCode,
+      jaar  ? parseInt(jaar)  : null,
+      maand ? parseInt(maand) : null
+    );
+
+    res.json({ success: true, data: kpis });
+
+  } catch (error) {
+    console.error('eClub KPI error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
