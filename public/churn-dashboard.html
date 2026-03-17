@@ -1434,19 +1434,17 @@
 
         // Hide admin-only features for practice users
         function hideAdminFeatures() {
-            // Hide ONLY the practice filter dropdown (not the whole sidebar!)
-            const practiceFilterGroup = document.getElementById('practiceFilter')?.closest('.filter-group');
-            if (practiceFilterGroup) {
-                practiceFilterGroup.style.display = 'none';
-            }
-            
-            // Hide practice performance chart (admin only)
+            // Verberg praktijk dropdown
+            const practiceFilter = document.getElementById('practiceFilter');
+            if (practiceFilter) practiceFilter.style.display = 'none';
+
+            // Verberg zoekbalk praktijken
+            const practiceSearchGroup = document.getElementById('practiceSearchGroup');
+            if (practiceSearchGroup) practiceSearchGroup.style.display = 'none';
+
+            // Verberg praktijk performance chart
             const practicePerformanceContainer = document.getElementById('practicePerformanceContainer');
-            if (practicePerformanceContainer) {
-                practicePerformanceContainer.style.display = 'none';
-            }
-            
-            // Date/source/status filters remain visible for practice users
+            if (practicePerformanceContainer) practicePerformanceContainer.style.display = 'none';
         }
 
         // Logout function
