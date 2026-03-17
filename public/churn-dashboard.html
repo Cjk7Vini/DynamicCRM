@@ -19,8 +19,8 @@
             --text-1:      #0f0f12;
             --text-2:      #5a5a72;
             --text-3:      #9090a8;
-            --accent:      #333399;
-            --accent-2:    #3399cc;
+            --accent:      #1a56db;
+            --accent-2:    #3b82f6;
             --green:       #99cc33;
             --red:         #e5334a;
             --amber:       #f59e0b;
@@ -739,6 +739,79 @@
         /* ── SOURCE CHART ─────────────────────────── */
         #sourceChart { height: 200px !important; }
 
+
+        /* ── USER DROPDOWN ────────────────────────── */
+        .user-dropdown-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 12px 6px 6px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s;
+            font-family: inherit;
+            color: var(--text-1);
+        }
+
+        .user-dropdown-btn:hover {
+            background: var(--bg);
+            border-color: var(--border-2);
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 240px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.10);
+            z-index: 300;
+            overflow: hidden;
+            animation: dropdownFade .15s ease;
+        }
+
+        @keyframes dropdownFade {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-section-label {
+            padding: 8px 14px 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            color: var(--text-3);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            font-size: 13.5px;
+            color: var(--text-1);
+            cursor: pointer;
+            transition: background .12s;
+        }
+
+        .dropdown-item svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-3); }
+
+        .dropdown-item:hover { background: var(--bg); }
+
+        .dropdown-item-danger { color: var(--red); }
+        .dropdown-item-danger svg { color: var(--red); }
+        .dropdown-item-danger:hover { background: #fef2f3; }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
         /* ── SCROLLBAR ────────────────────────────── */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -811,7 +884,7 @@
     <div class="sidebar-brand">
         <div class="sidebar-brand-icon">
             <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#333399"/>
+                <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#1a56db"/>
             </svg>
         </div>
         <span class="sidebar-brand-name">Dynamic Health</span>
@@ -901,31 +974,67 @@
         <div id="syncStatus" style="margin-top:8px; font-size:12px; display:none;"></div>
     </div>
 
-    <div class="sidebar-footer">
-        <div class="sidebar-item" onclick="logout()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-            </svg>
-            Uitloggen
-        </div>
-    </div>
+
 </aside>
 
 <!-- ── TOPBAR ────────────────────────────────────────────────────── -->
 <header class="topbar">
     <span class="topbar-title">Churn & Conversie Analytics</span>
     <div class="topbar-right">
-        <div class="user-info" id="userInfo" style="display:none;">
-            <div class="user-avatar" id="userIcon">A</div>
-            <div class="user-details">
-                <div class="user-email" id="userEmail">—</div>
-                <div class="user-role" id="userRole">—</div>
+        <button class="btn btn-ghost" onclick="refreshData()">↻ Vernieuwen</button>
+
+        <!-- User dropdown button -->
+        <div class="user-dropdown-wrap" id="userInfo" style="display:none; position:relative;">
+            <button class="user-dropdown-btn" onclick="toggleUserMenu()" id="userDropdownBtn">
+                <div class="user-avatar" id="userIcon">A</div>
+                <div class="user-details">
+                    <div class="user-email" id="userEmail">—</div>
+                    <div class="user-role" id="userRole">—</div>
+                </div>
+                <svg style="width:14px;height:14px;flex-shrink:0;transition:transform .2s;" id="userDropdownArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <div class="user-dropdown-menu" id="userDropdownMenu" style="display:none;">
+                <div class="dropdown-section-label">Account</div>
+                <div class="dropdown-item" onclick="openPasswordModal(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    Wachtwoord wijzigen
+                </div>
+
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-section-label">Export</div>
+
+                <div class="dropdown-item" onclick="exportToExcel(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Leads exporteren
+                </div>
+                <div class="dropdown-item" onclick="exportMetaData(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Meta data exporteren
+                </div>
+                <div class="dropdown-item" onclick="exportEclubData(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                    eClub data exporteren
+                </div>
+
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-section-label">Sync</div>
+                <div class="dropdown-item" onclick="syncMetaData(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                    Sync Meta
+                </div>
+                <div class="dropdown-item" onclick="syncEclub(); closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                    Sync eClub
+                </div>
+
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item dropdown-item-danger" onclick="logout()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                    Uitloggen
+                </div>
             </div>
         </div>
-        <button class="btn btn-ghost" onclick="exportToExcel()">Export</button>
-        <button class="btn btn-ghost" onclick="refreshData()">↻ Vernieuwen</button>
-        <button class="btn btn-ghost" onclick="openPasswordModal()">Wachtwoord</button>
-        <button class="btn-logout" onclick="logout()">Uitloggen</button>
     </div>
 </header>
 
@@ -1041,7 +1150,7 @@
             <div class="card-header">
                 <div class="card-title">Sales pipeline</div>
             </div>
-            <div id="funnelContainer" class="funnel-container"></div>
+            <div id="pipelineFunnelContainer" class="funnel-container"></div>
         </div>
 
         <div class="card">
@@ -1061,9 +1170,10 @@
                         <div class="forecast-sub">Daadwerkelijk gewonnen</div>
                     </div>
                 </div>
-                <div id="forecastGap" style="font-size:13px; color:var(--text-2); margin-top:4px;"></div>
+                <div id="gapDescription" style="font-size:12px;color:var(--text-3);margin-top:2px;"></div>
+            <div id="gapValue" style="font-size:22px;font-weight:700;" style="font-size:13px; color:var(--text-2); margin-top:4px;"></div>
                 <div class="chart-wrap" style="height:140px; margin-top:12px;">
-                    <canvas id="forecastChart"></canvas>
+                    <canvas id="conversionFunnelChart"></canvas>
                 </div>
             </div>
         </div>
@@ -1075,7 +1185,7 @@
             <div class="card-header">
                 <div class="card-title">Praktijk prestaties</div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="practicePerformanceContainer">
                 <div class="chart-wrap" style="height:200px;">
                     <canvas id="practiceChart"></canvas>
                 </div>
@@ -1097,12 +1207,12 @@
                         </tr>
                     </thead>
                     <tbody id="hotLeadsBody">
-                        <tr><td colspan="3" style="text-align:center; color:var(--text-3); padding:24px;">Laden...</td></tr>
+                        <tr><td colspan="3" style="text-align:center; color:var(--text-3); padding:24px;" id="hotLeadsList">Laden...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
+    <span id="avgTime" style="display:none;"></span>
 
     <!-- Meta Marketing -->
     <div class="card" id="metaMarketingSection" style="display:none; margin-bottom:24px;">
@@ -1137,11 +1247,11 @@
                 </div>
                 <div class="metric-card highlight">
                     <div class="metric-label">Leads (Meta)</div>
-                    <div class="metric-value" id="metaLeads">0</div>
+                    <div class="metric-value" id="metaVerifiedLeads">0</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Cost per Lead</div>
-                    <div class="metric-value" id="metaCPL">€0,00</div>
+                    <div class="metric-value" id="metaCostPerLead">€0,00</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">ROAS</div>
@@ -1169,7 +1279,7 @@
                 </table>
             </div>
             <div class="chart-wrap" style="height:180px; margin-top:16px;">
-                <canvas id="metaChart"></canvas>
+                <canvas id="metaCampaignChart"></canvas>
             </div>
         </div>
     </div>
@@ -2785,6 +2895,96 @@
         function toggleDropdown(id) {
             const el = document.getElementById(id);
             if (el) el.classList.toggle('open');
+        }
+
+        // User dropdown menu
+        function toggleUserMenu() {
+            const menu = document.getElementById('userDropdownMenu');
+            const arrow = document.getElementById('userDropdownArrow');
+            const isOpen = menu.style.display !== 'none';
+            menu.style.display = isOpen ? 'none' : 'block';
+            if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+        }
+
+        function closeUserMenu() {
+            const menu = document.getElementById('userDropdownMenu');
+            const arrow = document.getElementById('userDropdownArrow');
+            if (menu) menu.style.display = 'none';
+            if (arrow) arrow.style.transform = '';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrap = document.getElementById('userInfo');
+            if (wrap && !wrap.contains(e.target)) closeUserMenu();
+        });
+
+        // Meta data export
+        async function exportMetaData() {
+            try {
+                const practice = document.getElementById('practiceFilter')?.value || '';
+                const dateFrom = document.getElementById('dateFrom')?.value || '';
+                const dateTo   = document.getElementById('dateTo')?.value || '';
+                let url = `/api/meta/summary/${practice}`;
+                if (dateFrom || dateTo) url += `?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+
+                const res  = await fetch(url, { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) { alert('Geen Meta data beschikbaar'); return; }
+
+                const d = data.data || {};
+                const ws = XLSX.utils.aoa_to_sheet([
+                    ['Meta Marketing Export', new Date().toLocaleDateString('nl-NL')],
+                    [],
+                    ['KPI', 'Waarde'],
+                    ['Total Ad Spend', d.total_spend || 0],
+                    ['Impressions',    d.total_impressions || 0],
+                    ['Clicks',         d.total_clicks || 0],
+                    ['CTR',            (d.avg_ctr || 0) + '%'],
+                    ['Conversions',    d.total_conversions || 0],
+                    ['Cost per Lead',  d.avg_cost_per_lead || 0],
+                    ['CPC',            d.avg_cpc || 0],
+                ]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Meta Marketing');
+                XLSX.writeFile(wb, `meta-export-${practice || 'alle'}-${new Date().toISOString().slice(0,10)}.xlsx`);
+            } catch(e) { alert('Fout bij exporteren Meta data: ' + e.message); }
+        }
+
+        // eClub data export
+        async function exportEclubData() {
+            try {
+                const practice = document.getElementById('practiceFilter')?.value || '';
+                if (!practice) { alert('Selecteer eerst een praktijk'); return; }
+
+                const { jaar, maandTot } = getEclubPeriode();
+                const res  = await fetch(`/api/eclub/kpis/${practice}?jaar=${jaar}&maand=${maandTot}`, { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) { alert('Geen eClub data beschikbaar'); return; }
+
+                const d = data.data;
+                const ws = XLSX.utils.aoa_to_sheet([
+                    ['eClub Export', d.periode, new Date().toLocaleDateString('nl-NL')],
+                    [],
+                    ['KPI', 'Waarde'],
+                    ['Actieve leden',              d.leden_actief],
+                    ['Nieuwe leden',               d.leden_gestart],
+                    ['Gestopte leden',             d.leden_gestopt],
+                    ['Bevroren leden',             d.leden_bevroren],
+                    ['Netto ledengroei',           d.netto_ledengroei],
+                    ['Totaal bezoeken',            d.totaal_bezoeken],
+                    ['Gem. bezoeken per lid',      d.gem_bezoeken_lid],
+                    ['Gem. duur lidmaatschap (mnd)', d.gem_duur_lidmaatschap_maanden],
+                    ['Omzet excl. BTW',            d.omzet_excl_btw],
+                    ['Omzet incl. BTW',            d.omzet_incl_btw],
+                    ['Omzet per lid',              d.omzet_per_lid],
+                    ['Retentie %',                 d.retentie_pct],
+                    ['Churn %',                    d.churn_pct],
+                ]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'eClub KPIs');
+                XLSX.writeFile(wb, `eclub-export-${practice}-${d.periode}.xlsx`);
+            } catch(e) { alert('Fout bij exporteren eClub data: ' + e.message); }
         }
 
         // Patch eclubStatus to also update dot color
