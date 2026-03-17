@@ -1180,7 +1180,7 @@
             <div class="meta-section" style="margin-top: 32px;">
                 <div class="meta-section-header">
                     <div>
-                        <div class="meta-section-title">Lead Management</div>
+                        <div class="meta-section-title">eClub Ledendata</div>
                         <div class="meta-sync-info" style="font-size: 12px; color: #86868b; margin-top: 4px;">
                             Eclub integratie - status: <span id="eclubStatus">Niet gekoppeld</span>
                         </div>
@@ -1192,19 +1192,19 @@
 
                 <div class="meta-metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
                     <div class="meta-metric-card">
-                        <div class="meta-metric-label">Langsgekomen</div>
+                        <div class="meta-metric-label">Actieve leden</div>
                         <div class="meta-metric-value" id="eclubVisited">-</div>
                     </div>
                     <div class="meta-metric-card">
-                        <div class="meta-metric-label">Inschrijvingen</div>
+                        <div class="meta-metric-label">Nieuwe leden</div>
                         <div class="meta-metric-value" id="eclubRegistrations">-</div>
                     </div>
                     <div class="meta-metric-card">
-                        <div class="meta-metric-label">Wachtend op conversie</div>
+                        <div class="meta-metric-label">Gestopt</div>
                         <div class="meta-metric-value" id="eclubPending">-</div>
                     </div>
                     <div class="meta-metric-card">
-                        <div class="meta-metric-label">Conversie percentage</div>
+                        <div class="meta-metric-label">Churn %</div>
                         <div class="meta-metric-value" id="eclubConversionRate">-</div>
                     </div>
                 </div>
@@ -2163,8 +2163,8 @@
                 // Lead Management metrics
                 document.getElementById('eclubVisited').textContent = d.leden_actief || 0;
                 document.getElementById('eclubRegistrations').textContent = d.leden_gestart || 0;
-                document.getElementById('eclubPending').textContent = d.leden_bevroren || 0;
-                document.getElementById('eclubConversionRate').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
+                document.getElementById('eclubPending').textContent = d.leden_gestopt || 0;
+                document.getElementById('eclubConversionRate').textContent = d.churn_pct > 0 ? d.churn_pct + '%' : '0%';
 
                 // Overige KPIs
                 document.getElementById('eclubActiveMembers').textContent = d.leden_actief || 0;
