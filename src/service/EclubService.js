@@ -222,10 +222,17 @@ export default class EclubService {
     console.log(`📅 [ECLUB] Periode: ${j}-${String(m).padStart(2, '0')} | branchId: ${branchId}`);
 
     // Alle API calls parallel uitvoeren voor snelheid
+    // MemberVisits is optioneel — 404 = geen toegangspunten geconfigureerd
     const [statusRijen, totalVisits, revenue] = await Promise.all([
       this.getMembershipStatusTweeMananden(branchId, j, m),
-      this.getMemberVisits(branchId, j, m),
-      this.getRevenue(branchId, j, m)
+      this.getMemberVisits(branchId, j, m).catch(err => {
+        console.warn(`⚠️ [ECLUB] MemberVisits niet beschikbaar voor branchId ${branchId}: ${err.message}`);
+        return 0;
+      }),
+      this.getRevenue(branchId, j, m).catch(err => {
+        console.warn(`⚠️ [ECLUB] Revenue niet beschikbaar voor branchId ${branchId}: ${err.message}`);
+        return { excl: 0, incl: 0, rows: [] };
+      })
     ]);
 
     // statusRijen[0] = vorige maand (voor begin-leden retentie/churn)
