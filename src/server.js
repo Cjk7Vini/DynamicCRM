@@ -3118,155 +3118,9 @@ app.post('/api/meta/sync-all', async (req, res) => {
 // Member data from Eclub integration
 // ============================================
 
-// GET /api/eclub/summary/:practiceCode - Member summary stats
-app.get('/api/eclub/summary/:practiceCode', requireAuth, async (req, res) => {
-  try {
-    const { practiceCode } = req.params;
-    const { dateFrom, dateTo } = req.query;
-
-    // Check access
-    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
-      return res.status(403).json({ error: 'Geen toegang' });
-    }
-
-    const summary = await eclubService.getMemberSummary(practiceCode, dateFrom, dateTo);
-
-    res.json({
-      success: true,
-      data: summary,
-      eclub_enabled: eclubService.isEclubEnabled(practiceCode)
-    });
-
-  } catch (error) {
-    console.error('Eclub summary error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/eclub/members/:practiceCode - Member list
-app.get('/api/eclub/members/:practiceCode', requireAuth, async (req, res) => {
-  try {
-    const { practiceCode } = req.params;
-    const { status } = req.query;
-
-    // Check access
-    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
-      return res.status(403).json({ error: 'Geen toegang' });
-    }
-
-    const members = await eclubService.getMemberList(practiceCode, status);
-
-    res.json({
-      success: true,
-      members: members
-    });
-
-  } catch (error) {
-    console.error('Eclub members error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/eclub/sync/:practiceCode - Manual sync (admin only)
-app.post('/api/eclub/sync/:practiceCode', requireAuth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin toegang vereist' });
-    }
-
-    const { practiceCode } = req.params;
-    const result = await eclubService.syncPractice(practiceCode);
-
-    res.json(result);
-
-  } catch (error) {
-    console.error('Eclub sync error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/eclub/sync-all - Sync all practices (admin only)
-app.post('/api/eclub/sync-all', requireAuth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin toegang vereist' });
-    }
-
-    const results = await eclubService.syncAllPractices();
-
-    res.json({
-      success: true,
-      results: results
-    });
-
-  } catch (error) {
-    console.error('Eclub sync all error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ============================================
-// ECLUB TEST ENDPOINTS (for demo/debugging)
+// ECLUB API ENDPOINTS
 // ============================================
-
-// Test Eclub authentication
-app.get('/api/eclub/test-auth', async (req, res) => {
-  try {
-    const result = await eclubService.testAuthentication();
-    res.json(result);
-  } catch (error) {
-    console.error('Eclub auth test error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
-  }
-});
-
-// Get available branches
-app.get('/api/eclub/branches', requireAuth, async (req, res) => {
-  try {
-    // Check admin auth
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const branches = await eclubService.getBranches();
-    
-    res.json({
-      success: true,
-      branches: branches,
-      count: branches.length
-    });
-
-  } catch (error) {
-    console.error('Get branches error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
-  }
-});
-
-// Clear Eclub caches
-app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    eclubService.clearCaches();
-    
-    res.json({
-      success: true,
-      message: 'All Eclub caches cleared'
-    });
-
-  } catch (error) {
-    console.error('Clear cache error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // GET /api/eclub/kpis/:practiceCode - KPI's ophalen via nieuwe endpoints
 app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
@@ -3274,7 +3128,6 @@ app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
     const { practiceCode } = req.params;
     const { jaar, maand } = req.query;
 
-    // Toegangscheck
     if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
       return res.status(403).json({ error: 'Geen toegang' });
     }
@@ -3290,6 +3143,66 @@ app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('eClub KPI error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/eclub/summary/:practiceCode - Doorsturen naar KPI endpoint (backwards compat)
+app.get('/api/eclub/summary/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+
+    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+
+    const kpis = await eclubService.getKPIs(practiceCode);
+
+    res.json({
+      success: true,
+      data: {
+        active_members:       kpis.leden_actief,
+        new_members:          kpis.leden_gestart,
+        churned_members:      kpis.leden_gestopt,
+        frozen_members:       kpis.leden_bevroren,
+        total_visits:         kpis.totaal_bezoeken,
+        avg_visits_per_member: kpis.gem_bezoeken_lid,
+        avg_membership_months: kpis.gem_duur_lidmaatschap_maanden,
+        total_monthly_revenue: kpis.omzet_excl_btw,
+        revenue_per_member:   kpis.omzet_per_lid,
+        retention_pct:        kpis.retentie_pct,
+        churn_pct:            kpis.churn_pct
+      },
+      eclub_enabled: true
+    });
+
+  } catch (error) {
+    console.error('Eclub summary error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/eclub/test-auth - Test authenticatie
+app.get('/api/eclub/test-auth', async (req, res) => {
+  try {
+    const result = await eclubService.testAuthentication();
+    res.json(result);
+  } catch (error) {
+    console.error('Eclub auth test error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/eclub/clear-cache - Cache leegmaken (admin only)
+app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    eclubService.clearCaches();
+    res.json({ success: true, message: 'Eclub cache leeggemaakt' });
+  } catch (error) {
+    console.error('Clear cache error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
