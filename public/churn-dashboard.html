@@ -1185,9 +1185,46 @@
                             Eclub integratie - status: <span id="eclubStatus">Niet gekoppeld</span>
                         </div>
                     </div>
-                    <button class="meta-sync-btn" onclick="syncEclub()">
-                        Sync Nu
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <!-- Periode type selector -->
+                        <select id="eclubPeriodeType" onchange="onEclubPeriodeTypeChange()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
+                            <option value="maand">Maand</option>
+                            <option value="kwartaal">Kwartaal</option>
+                            <option value="jaar">Jaar</option>
+                        </select>
+
+                        <!-- Maand selector -->
+                        <select id="eclubMaandSelect" onchange="syncEclub()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
+                            <option value="1">Januari</option>
+                            <option value="2">Februari</option>
+                            <option value="3">Maart</option>
+                            <option value="4">April</option>
+                            <option value="5">Mei</option>
+                            <option value="6">Juni</option>
+                            <option value="7">Juli</option>
+                            <option value="8">Augustus</option>
+                            <option value="9">September</option>
+                            <option value="10">Oktober</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+
+                        <!-- Kwartaal selector (verborgen) -->
+                        <select id="eclubKwartaalSelect" onchange="syncEclub()" style="display:none; padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;">
+                            <option value="1">Q1 (jan-mrt)</option>
+                            <option value="2">Q2 (apr-jun)</option>
+                            <option value="3">Q3 (jul-sep)</option>
+                            <option value="4">Q4 (okt-dec)</option>
+                        </select>
+
+                        <!-- Jaar selector -->
+                        <select id="eclubJaarSelect" onchange="syncEclub()" style="padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px; color: #1d1d1f; background: white; cursor: pointer;" id="eclubJaarSelect">
+                        </select>
+
+                        <button class="meta-sync-btn" onclick="syncEclub()">
+                            Sync Nu
+                        </button>
+                    </div>
                 </div>
 
                 <div class="meta-metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
@@ -2190,12 +2227,70 @@
         }
 
         // ECLUB FUNCTIONS
+        // Initialiseer jaar selector en stel huidige periode in
+        function initEclubPeriodeSelector() {
+            const nu = new Date();
+            const huidigJaar  = nu.getFullYear();
+            const huidigMaand = nu.getMonth() + 1;
+
+            // Vul jaar selector: huidig jaar t/m 3 jaar terug
+            const jaarSelect = document.getElementById('eclubJaarSelect');
+            if (jaarSelect) {
+                jaarSelect.innerHTML = '';
+                for (let j = huidigJaar; j >= huidigJaar - 3; j--) {
+                    const opt = document.createElement('option');
+                    opt.value = j;
+                    opt.textContent = j;
+                    jaarSelect.appendChild(opt);
+                }
+            }
+
+            // Stel huidige maand in
+            const maandSelect = document.getElementById('eclubMaandSelect');
+            if (maandSelect) maandSelect.value = huidigMaand;
+
+            // Stel huidig kwartaal in
+            const kwartaalSelect = document.getElementById('eclubKwartaalSelect');
+            if (kwartaalSelect) kwartaalSelect.value = Math.ceil(huidigMaand / 3);
+        }
+
+        function onEclubPeriodeTypeChange() {
+            const type = document.getElementById('eclubPeriodeType').value;
+            document.getElementById('eclubMaandSelect').style.display    = type === 'maand'    ? 'block' : 'none';
+            document.getElementById('eclubKwartaalSelect').style.display = type === 'kwartaal' ? 'block' : 'none';
+            syncEclub();
+        }
+
+        // Geeft { jaar, maandVan, maandTot } terug op basis van huidige selector
+        function getEclubPeriode() {
+            const type = document.getElementById('eclubPeriodeType')?.value || 'maand';
+            const jaar = parseInt(document.getElementById('eclubJaarSelect')?.value || new Date().getFullYear());
+
+            if (type === 'maand') {
+                const maand = parseInt(document.getElementById('eclubMaandSelect')?.value || (new Date().getMonth() + 1));
+                return { jaar, maandVan: maand, maandTot: maand };
+            }
+            if (type === 'kwartaal') {
+                const q = parseInt(document.getElementById('eclubKwartaalSelect')?.value || 1);
+                return { jaar, maandVan: (q - 1) * 3 + 1, maandTot: q * 3 };
+            }
+            // Jaar
+            return { jaar, maandVan: 1, maandTot: 12 };
+        }
+
         async function loadEclubData() {
             try {
                 const practice = document.getElementById('practiceFilter').value;
                 if (!practice) return;
 
-                const res = await fetch(`/api/eclub/kpis/${practice}`, { credentials: 'include' });
+                const { jaar, maandVan, maandTot } = getEclubPeriode();
+
+                // Voor kwartaal/jaar: gemiddelde over de maanden heen
+                // We halen altijd de laatste maand van de periode op als huidig snapshot
+                const res = await fetch(
+                    `/api/eclub/kpis/${practice}?jaar=${jaar}&maand=${maandTot}`,
+                    { credentials: 'include' }
+                );
                 const response = await res.json();
 
                 if (!response.success) {
@@ -2209,21 +2304,19 @@
                 document.getElementById('eclubStatus').textContent = 'Gekoppeld';
                 document.getElementById('eclubStatus').style.color = '#10b981';
 
-                // Lead Management metrics
-                document.getElementById('eclubVisited').textContent = d.leden_actief || 0;
-                document.getElementById('eclubRegistrations').textContent = d.leden_gestart || 0;
-                document.getElementById('eclubPending').textContent = d.leden_gestopt || 0;
+                document.getElementById('eclubVisited').textContent      = d.leden_actief   || 0;
+                document.getElementById('eclubRegistrations').textContent = d.leden_gestart  || 0;
+                document.getElementById('eclubPending').textContent       = d.leden_gestopt  || 0;
                 document.getElementById('eclubConversionRate').textContent = d.churn_pct > 0 ? d.churn_pct + '%' : '0%';
 
-                // Overige KPIs
-                document.getElementById('eclubActiveMembers').textContent = d.leden_actief || 0;
-                document.getElementById('eclubNewMembers').textContent = d.leden_gestart || 0;
-                document.getElementById('eclubChurnedMembers').textContent = d.leden_gestopt || 0;
-                document.getElementById('eclubAvgDuration').textContent = d.gem_duur_lidmaatschap_maanden > 0 ? Math.round(d.gem_duur_lidmaatschap_maanden) + ' mnd' : '-';
-                document.getElementById('eclubTotalVisits').textContent = d.totaal_bezoeken || 0;
-                document.getElementById('eclubRetention').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
-                document.getElementById('eclubRevenue').textContent = d.omzet_excl_btw > 0 ? '€' + parseFloat(d.omzet_excl_btw).toFixed(0) : '-';
-                document.getElementById('eclubRevenuePerMember').textContent = d.omzet_per_lid > 0 ? '€' + parseFloat(d.omzet_per_lid).toFixed(0) : '-';
+                document.getElementById('eclubActiveMembers').textContent   = d.leden_actief || 0;
+                document.getElementById('eclubNewMembers').textContent      = d.leden_gestart || 0;
+                document.getElementById('eclubChurnedMembers').textContent  = d.leden_gestopt || 0;
+                document.getElementById('eclubAvgDuration').textContent     = d.gem_duur_lidmaatschap_maanden > 0 ? Math.round(d.gem_duur_lidmaatschap_maanden) + ' mnd' : '-';
+                document.getElementById('eclubTotalVisits').textContent     = d.totaal_bezoeken || 0;
+                document.getElementById('eclubRetention').textContent       = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
+                document.getElementById('eclubRevenue').textContent         = d.omzet_excl_btw > 0 ? '€' + parseFloat(d.omzet_excl_btw).toFixed(2) : '-';
+                document.getElementById('eclubRevenuePerMember').textContent = d.omzet_per_lid > 0 ? '€' + parseFloat(d.omzet_per_lid).toFixed(2) : '-';
 
             } catch (error) {
                 console.error('Eclub data error:', error);
@@ -2713,6 +2806,9 @@
             loadEclubData();
             loadChurnForecast();
         };
+
+        // Initialiseer periode selector
+        initEclubPeriodeSelector();
     </script>
 </body>
 </html>
