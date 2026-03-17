@@ -1628,60 +1628,109 @@
             }
         }
 
-        // Load Churn Forecast Chart
+        // Load Churn Forecast Chart - eClub historische data
         async function loadChurnForecast() {
             try {
-                const res = await fetch('/api/churn-forecast');
-                const data = await res.json();
-                
-                if (data.success) {
-                    const allData = [...(data.historical || []), ...(data.forecast || [])];
-                    
+                const practice = document.getElementById('practiceFilter')?.value;
+
+                // Zonder praktijk: lege grafiek tonen
+                if (!practice) {
                     const ctx = document.getElementById('churnForecastChart');
                     if (churnForecastChart) churnForecastChart.destroy();
-                    
                     churnForecastChart = new Chart(ctx, {
                         type: 'line',
-                        data: {
-                            labels: allData.map(d => d.month),
-                            datasets: [
-                                {
-                                    label: 'Total Members',
-                                    data: allData.map(d => d.total_members),
-                                    borderColor: '#06c',
-                                    backgroundColor: 'rgba(0,102,204,0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
-                                },
-                                {
-                                    label: 'Churned Members',
-                                    data: allData.map(d => d.churned_members),
-                                    borderColor: '#ff3b30',
-                                    backgroundColor: 'rgba(255,59,48,0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    borderDash: allData.map((d, i) => d.is_forecast ? [5, 5] : [])
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'bottom'
-                                }
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                    return;
+                }
+
+                const res = await fetch(`/api/eclub/history/${practice}`, { credentials: 'include' });
+                const data = await res.json();
+
+                const ctx = document.getElementById('churnForecastChart');
+                if (churnForecastChart) churnForecastChart.destroy();
+
+                if (!data.success || !data.data || data.data.length === 0) {
+                    // Fallback naar oude endpoint als geen eclub data
+                    const fallback = await fetch('/api/churn-forecast');
+                    const fallbackData = await fallback.json();
+                    if (fallbackData.success) {
+                        const allData = [...(fallbackData.historical || []), ...(fallbackData.forecast || [])];
+                        churnForecastChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: allData.map(d => d.month),
+                                datasets: [
+                                    { label: 'Total Members', data: allData.map(d => d.total_members),
+                                      borderColor: '#06c', backgroundColor: 'rgba(0,102,204,0.1)', borderWidth: 2, tension: 0.4 },
+                                    { label: 'Churned Members', data: allData.map(d => d.churned_members),
+                                      borderColor: '#ff3b30', backgroundColor: 'rgba(255,59,48,0.1)', borderWidth: 2, tension: 0.4 }
+                                ]
                             },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
+                            options: { responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: true, position: 'bottom' } },
+                                scales: { y: { beginAtZero: true } } }
+                        });
+                    }
+                    return;
+                }
+
+                // Echte eClub data
+                const history = data.data;
+
+                churnForecastChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: history.map(d => d.periode),
+                        datasets: [
+                            {
+                                label: 'Actieve leden',
+                                data: history.map(d => d.subscribed),
+                                borderColor: '#06c',
+                                backgroundColor: 'rgba(0,102,204,0.1)',
+                                borderWidth: 2,
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: 'Gestopt',
+                                data: history.map(d => d.expiring),
+                                borderColor: '#ff3b30',
+                                backgroundColor: 'rgba(255,59,48,0.1)',
+                                borderWidth: 2,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Nieuw',
+                                data: history.map(d => d.new),
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16,185,129,0.1)',
+                                borderWidth: 2,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    afterBody: (items) => {
+                                        const idx = items[0]?.dataIndex;
+                                        if (idx === undefined) return;
+                                        const d = history[idx];
+                                        return [`Retentie: ${d.retentie_pct}%`, `Churn: ${d.churn_pct}%`];
+                                    }
                                 }
                             }
-                        }
-                    });
-                }
+                        },
+                        scales: { y: { beginAtZero: false } }
+                    }
+                });
+
             } catch (error) {
                 console.error('Error loading churn forecast:', error);
                 showError('churnForecastChart', error.message);
@@ -2657,11 +2706,12 @@
         }
 
         // ============================================
-        // Update applyFilters to also load Eclub data
+        // Update applyFilters to also load Eclub data en grafiek
         const originalApplyFilters = applyFilters;
         applyFilters = function() {
             originalApplyFilters();
             loadEclubData();
+            loadChurnForecast();
         };
     </script>
 </body>

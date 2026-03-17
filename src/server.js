@@ -3192,6 +3192,25 @@ app.get('/api/eclub/test-auth', async (req, res) => {
   }
 });
 
+// GET /api/eclub/history/:practiceCode - 12 maanden historische ledendata voor grafiek
+app.get('/api/eclub/history/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const maanden = req.query.maanden ? parseInt(req.query.maanden) : 11;
+
+    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+
+    const history = await eclubService.getHistoricalData(practiceCode, maanden);
+    res.json({ success: true, data: history });
+
+  } catch (error) {
+    console.error('eClub history error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/eclub/clear-cache - Cache leegmaken (admin only)
 app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
   try {

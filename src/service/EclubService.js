@@ -368,4 +368,64 @@ export default class EclubService {
     this.authService.clearAllCaches();
     console.log(`🗑️ [ECLUB] Cache leeggemaakt`);
   }
+
+  async getHistoricalData(practiceCode, aantalMaanden = 12) {
+    console.log(`📈 [ECLUB] Historische data ophalen voor ${practiceCode} (${aantalMaanden} maanden)...`);
+
+    if (!this.hasCredentials()) throw new Error('Eclub credentials niet geconfigureerd');
+
+    const branchId = await this._getBranchId(practiceCode);
+    if (!branchId) throw new Error(`Geen eClub branchId voor ${practiceCode}`);
+
+    const huidig = this._huidigeMaand();
+    let startJaar  = huidig.jaar;
+    let startMaand = huidig.maand - aantalMaanden;
+    while (startMaand <= 0) { startMaand += 12; startJaar--; }
+
+    const from = this._maandStartUtc(startJaar, startMaand);
+    const take = Math.min(aantalMaanden + 1, 12);
+
+    console.log(`📅 [ECLUB] Historisch from=${from} take=${take} branchId=${branchId}`);
+
+    const data = await this.apiClient.get({
+      url: `/api/memberships/${branchId}/status`,
+      params: { from, period: 3, take },
+      businessId: this.businessId
+    });
+
+    const rows = Array.isArray(data) ? data : (data?.value || []);
+    const resultaat = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const vorig  = rows[i - 1];
+      const huidigRow = rows[i];
+
+      const subscribed_begin = parseInt(vorig.subscribed)     || 0;
+      const subscribed_einde = parseInt(huidigRow.subscribed) || 0;
+      const nieuw            = parseInt(huidigRow.new)        || 0;
+      const terugkerend      = parseInt(huidigRow.returning)  || 0;
+      const verlopen         = parseInt(huidigRow.expiring)   || 0;
+      const gepauzeerd       = parseInt(huidigRow.paused)     || 0;
+
+      const retentie = subscribed_begin > 0
+        ? Math.round(((subscribed_einde - nieuw - terugkerend) / subscribed_begin) * 10000) / 100 : 0;
+      const churn = subscribed_begin > 0
+        ? Math.round((verlopen / subscribed_begin) * 10000) / 100 : 0;
+
+      const periodeLabel = huidigRow.from
+        ? new Date(huidigRow.from).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric', timeZone: 'Europe/Amsterdam' })
+        : `Maand ${i}`;
+
+      resultaat.push({ periode: periodeLabel, from: huidigRow.from,
+        subscribed: subscribed_einde, expiring: verlopen,
+        new: nieuw, returning: terugkerend, paused: gepauzeerd,
+        retentie_pct: retentie, churn_pct: churn });
+    }
+
+    console.log(`✅ [ECLUB] ${resultaat.length} maanden historische data opgehaald`);
+    return resultaat;
+  }
 }
+
+// Patch: voeg getHistoricalData toe als losse export helper
+// (wordt geïnjecteerd via monkey-patch na class definitie)
