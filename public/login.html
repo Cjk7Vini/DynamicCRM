@@ -325,7 +325,7 @@
       destination = dest;
       document.getElementById('optDashboard').classList.toggle('active-item', dest === 'dashboard');
       document.getElementById('optNazorg').classList.toggle('active-item', dest === 'nazorg');
-      loginBtn.textContent = dest === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
+      loginBtn.textContent = dest === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
       document.getElementById('destLabel').innerHTML =
         dest === 'nazorg'
           ? 'Bestemming: <span>Nazorgportaal</span>'
@@ -368,12 +368,12 @@
         } else {
           showError(data.error || 'Login mislukt');
           loginBtn.disabled = false;
-          loginBtn.textContent = destination === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
+          loginBtn.textContent = destination === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
         }
       } catch (err) {
         showError('Netwerkfout. Probeer opnieuw.');
         loginBtn.disabled = false;
-        loginBtn.textContent = destination === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
+        loginBtn.textContent = destination === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
       }
     }
 
