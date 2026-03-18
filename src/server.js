@@ -21,6 +21,7 @@ import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
 import MetaService from './service/MetaService.js';
 import EclubService from './service/EclubService.js';
+import cron from 'node-cron';
 
 const app = express();
 
