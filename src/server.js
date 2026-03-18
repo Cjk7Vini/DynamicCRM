@@ -3510,6 +3510,13 @@ app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
               [user.practice_code]
             );
           });
+        } else if (action === 'stop') {
+          await withWriteConnection(async (client) => {
+            await client.query(
+              `UPDATE public.praktijken SET actief = FALSE WHERE code = $1`,
+              [user.practice_code]
+            );
+          });
         } else if (licenseType === 'unlimited') {
           await withWriteConnection(async (client) => {
             await client.query(

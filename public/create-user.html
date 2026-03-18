@@ -718,6 +718,7 @@
                   <div class="action-item" onclick="userAction(${u.id}, 'extend_24m')">Verlengen 24 maanden</div>
                   <div class="action-item" onclick="userAction(${u.id}, 'unlimited')">Onbeperkt instellen</div>
                   <div class="action-item" onclick="userAction(${u.id}, 'reactivate')">Heractiveren</div>
+                  <div class="action-item danger" onclick="userAction(${u.id}, 'stop')">Stopzetten</div>
                   <div class="action-divider"></div>
                 ` : ''}
                 <div class="action-section-label">Account</div>
@@ -740,7 +741,11 @@
     async function userAction(userId, action) {
       closeAllMenus();
 
-      const confirmActions = { delete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?', ban: 'Weet je zeker dat je deze gebruiker wilt verbannen?' };
+      const confirmActions = { 
+        delete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?', 
+        ban: 'Weet je zeker dat je deze gebruiker wilt verbannen?',
+        stop: 'Weet je zeker dat je de licentie wilt stopzetten? De gebruiker verliest direct toegang.'
+      };
       if (confirmActions[action] && !confirm(confirmActions[action])) return;
 
       try {
@@ -751,6 +756,7 @@
           const body = {};
           if (action === 'ban')    body.banned = true;
           if (action === 'unban')  body.banned = false;
+          if (action === 'stop')   body.action = 'stop';
           if (action === 'extend_12m') body.action = 'extend_12m';
           if (action === 'extend_24m') body.action = 'extend_24m';
           if (action === 'unlimited')  body.licenseType = 'unlimited';
