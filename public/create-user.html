@@ -548,7 +548,8 @@
 
     function licenseStatus(user) {
       if (!user.practice_code) return null;
-      if (user.license_type === 'unlimited') return { label: 'Onbeperkt', cls: 'badge-blue' };
+      if (user.license_type === 'unlimited' && user.license_active !== false) return { label: 'Onbeperkt', cls: 'badge-blue' };
+      if (user.license_active === false) return { label: 'Stopgezet', cls: 'badge-red' };
       if (!user.license_end_date) return { label: 'Geen licentie', cls: 'badge-gray' };
       const end = new Date(user.license_end_date);
       const now = new Date();
@@ -689,11 +690,14 @@
       users.forEach(u => {
         const status = licenseStatus(u);
         const isBanned = u.banned;
+        const isStopped = u.license_active === false && u.practice_code;
         const statusBadge = isBanned
           ? '<span class="badge badge-red">Verbannen</span>'
-          : status
-            ? `<span class="badge ${status.cls}">${status.label}</span>`
-            : '<span class="badge badge-blue">Admin</span>';
+          : isStopped
+            ? '<span class="badge badge-red">Stopgezet</span>'
+            : status
+              ? `<span class="badge ${status.cls}">${status.label}</span>`
+              : '<span class="badge badge-blue">Admin</span>';
 
         const licenseInfo = u.practice_code && u.license_type
           ? `<div class="license-info">${licenseLabel(u.license_type)}${u.license_end_date ? ` · tot ${formatDate(u.license_end_date)}` : ''}</div>`

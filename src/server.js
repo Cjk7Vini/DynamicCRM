@@ -2596,6 +2596,35 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'Onjuiste inloggegevens' });
     }
+
+    // Check of gebruiker verbannen is
+    if (user.banned) {
+      return res.status(403).json({ error: 'Je account is geblokkeerd. Neem contact op met Dynamic Health Consultancy.' });
+    }
+
+    // Check of praktijk actief is (alleen voor practice users)
+    if (user.role === 'practice' && user.practice_code) {
+      const praktijk = await withReadConnection(async (client) => {
+        const result = await client.query(
+          'SELECT actief, license_end_date FROM public.praktijken WHERE code = $1',
+          [user.practice_code]
+        );
+        return result.rows[0];
+      });
+
+      if (praktijk && praktijk.actief === false) {
+        return res.status(403).json({ error: 'Je licentie is stopgezet. Neem contact op met Dynamic Health Consultancy voor meer informatie.' });
+      }
+
+      // Check verlopen licentie
+      if (praktijk && praktijk.license_end_date) {
+        const now = new Date();
+        const end = new Date(praktijk.license_end_date);
+        if (end < now) {
+          return res.status(403).json({ error: 'Je licentie is verlopen. Neem contact op met Dynamic Health Consultancy voor verlenging.' });
+        }
+      }
+    }
     
     const validPassword = await bcrypt.compare(password, user.password_hash);
     
