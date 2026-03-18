@@ -652,7 +652,9 @@
       const container = document.getElementById('usersContainer');
       container.innerHTML = '<div class="loading">Laden...</div>';
       try {
-        const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
+        const url = search 
+          ? `/api/admin/users?search=${encodeURIComponent(search)}&_=${Date.now()}` 
+          : `/api/admin/users?_=${Date.now()}`;
         const res  = await fetch(url, { credentials: 'include' });
         const data = await res.json();
         if (!data.success) { container.innerHTML = '<div class="empty-state">Kon gebruikers niet laden.</div>'; return; }
