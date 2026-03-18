@@ -450,6 +450,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 10px;
             padding: 0 14px;
             color: white;
             font-weight: 600;
@@ -1224,10 +1225,11 @@
                 </table>
             </div>
         </div>
+    </div><!-- end charts-row -->
     <span id="avgTime" style="display:none;"></span>
 
     <!-- Meta Marketing -->
-    <div class="card" id="metaMarketingSection" style="display:none; margin-bottom:24px;">
+    <div class="card" id="metaMarketingSection" style="display:none; margin-bottom:16px;">
         <div class="card-header">
             <div>
                 <div class="card-title">Meta Marketing Performance</div>
@@ -1575,6 +1577,7 @@
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Naam</th>';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Email</th>';
                 html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Telefoon</th>';
+                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Binnenkomst</th>';
                 
                 if (stage === 'intent') {
                     html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
@@ -1591,6 +1594,10 @@
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
                     html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
+                    
+                    // Timestamp binnenkomst
+                    const ts = lead.aangemaakt_op ? new Date(lead.aangemaakt_op).toLocaleString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+                    html += `<td style="padding: 12px; font-size: 13px; color: #86868b;">${ts}</td>`;
                     
                     if (stage === 'intent') {
                         const appointmentDate = lead.appointment_date || lead.afspraak_datum;
@@ -2933,14 +2940,14 @@
         async function exportMetaData() {
             try {
                 const practice = document.getElementById('practiceFilter')?.value || '';
-                const dateFrom = document.getElementById('dateFrom')?.value || '';
-                const dateTo   = document.getElementById('dateTo')?.value || '';
-                let url = `/api/meta/summary/${practice}`;
-                if (dateFrom || dateTo) url += `?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+                if (!practice) { alert('Selecteer eerst een praktijk'); return; }
+                const dateFrom = document.getElementById('dateFrom')?.value || '2025-01-01';
+                const dateTo   = document.getElementById('dateTo')?.value || new Date().toISOString().slice(0,10);
+                let url = `/api/meta/summary/${practice}?dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
                 const res  = await fetch(url, { credentials: 'include' });
                 const data = await res.json();
-                if (!data.success) { alert('Geen Meta data beschikbaar'); return; }
+                if (!data.success || !data.data) { alert('Geen Meta data beschikbaar voor deze praktijk'); return; }
 
                 const d = data.data || {};
                 const ws = XLSX.utils.aoa_to_sheet([
