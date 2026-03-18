@@ -21,6 +21,7 @@ import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
 import MetaService from './service/MetaService.js';
 import EclubService from './service/EclubService.js';
+import cron from 'node-cron';
 
 const app = express();
 
@@ -3224,6 +3225,397 @@ app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatDateNL(date) {
+  return new Date(date).toLocaleDateString('nl-NL', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+}
+
+function licenseLabel(type) {
+  if (type === '12m') return '12 maanden';
+  if (type === '24m') return '24 maanden';
+  if (type === 'unlimited') return 'Onbeperkt';
+  return type || 'Onbekend';
+}
+
+async function sendWelcomeEmail({ email, praktijkNaam, password, licenseType, licenseEndDate }) {
+  const eindDatum = licenseType === 'unlimited' ? null : formatDateNL(licenseEndDate);
+  const licenseText = licenseType === 'unlimited'
+    ? 'Je licentie is onbeperkt geldig.'
+    : `Je licentie loopt tot en met ${eindDatum}. Je ontvangt 14 dagen van tevoren een herinnering.`;
+
+  const html = `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1A1D21;padding:32px 40px;">
+          <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:40px;width:auto;">
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
+          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je account voor het Dynamic Health dashboard is aangemaakt. Hieronder vind je je inloggegevens.</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
+            <tr><td style="padding:24px;">
+              <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Inloggegevens</p>
+              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> <a href="https://dynamic-health-consultancy.nl/login.html" style="color:#2BB8A3;text-decoration:none;">dynamic-health-consultancy.nl/login.html</a></p>
+              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Gebruikersnaam:</strong> ${email}</p>
+              <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijdelijk wachtwoord:</strong> <span style="font-family:monospace;background:#e8e8ed;padding:2px 8px;border-radius:4px;">${password}</span></p>
+            </td></tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
+            <tr><td style="padding:24px;">
+              <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Licentie</p>
+              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Type:</strong> ${licenseLabel(licenseType)}</p>
+              <p style="margin:0;font-size:15px;color:#3A3D40;">${licenseText}</p>
+            </td></tr>
+          </table>
+
+          <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">We raden je aan je wachtwoord na de eerste inlog te wijzigen via de accountinstellingen.</p>
+          <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;line-height:1.6;">Bij vragen kun je ons bereiken via <a href="mailto:info@dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">info@dynamic-health-consultancy.nl</a>.</p>
+          <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+        </td></tr>
+        <tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
+          <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; <a href="https://dynamic-health-consultancy.nl" style="color:#9090a8;">dynamic-health-consultancy.nl</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return sendMailResilient({
+    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+    to: email,
+    subject: 'Welkom bij Dynamic Health — je account is aangemaakt',
+    html,
+    text: `Beste ${praktijkNaam},\n\nJe account is aangemaakt.\n\nDashboard: https://dynamic-health-consultancy.nl/login.html\nGebruikersnaam: ${email}\nTijdelijk wachtwoord: ${password}\n\nLicentie: ${licenseLabel(licenseType)}\n${licenseType !== 'unlimited' ? `Geldig tot: ${formatDateNL(licenseEndDate)}` : ''}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
+  });
+}
+
+async function sendExpiryWarningEmail({ email, praktijkNaam, licenseEndDate }) {
+  const eindDatum = formatDateNL(licenseEndDate);
+
+  const html = `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background:#1A1D21;padding:32px 40px;">
+          <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:40px;width:auto;">
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
+          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">We willen je er graag op attenderen dat je licentie voor het Dynamic Health dashboard binnenkort afloopt.</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8ed;border:1px solid #fcd34d;border-radius:6px;margin:0 0 28px;">
+            <tr><td style="padding:24px;">
+              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Verloopdatum:</strong> ${eindDatum}</p>
+              <p style="margin:0;font-size:15px;color:#3A3D40;">Na deze datum wordt de toegang tot het dashboard automatisch geblokkeerd.</p>
+            </td></tr>
+          </table>
+
+          <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Wil je je licentie verlengen of heb je vragen? Neem dan contact met ons op via <a href="mailto:info@dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">info@dynamic-health-consultancy.nl</a>.</p>
+          <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+        </td></tr>
+        <tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
+          <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; <a href="https://dynamic-health-consultancy.nl" style="color:#9090a8;">dynamic-health-consultancy.nl</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return sendMailResilient({
+    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+    to: email,
+    subject: 'Je licentie verloopt over 14 dagen',
+    html,
+    text: `Beste ${praktijkNaam},\n\nJe licentie voor het Dynamic Health dashboard verloopt op ${eindDatum}.\n\nNa deze datum wordt de toegang automatisch geblokkeerd. Neem contact op via info@dynamic-health-consultancy.nl voor verlenging.\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LICENTIE BEHEER ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/admin/create-user — uitgebreid met licentie + welkomstmail
+app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+
+    const { email, password, role, practiceCode, licenseType, praktijkNaam } = req.body;
+
+    if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
+    if (!['admin', 'practice'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
+    if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return res.status(400).json({ error: 'Wachtwoord voldoet niet aan de eisen' });
+    }
+
+    // Check duplicate
+    const existing = await withReadConnection(async (client) => {
+      const r = await client.query('SELECT id FROM public.users WHERE email = $1', [email.toLowerCase().trim()]);
+      return r.rows[0];
+    });
+    if (existing) return res.status(400).json({ error: 'Dit e-mailadres bestaat al' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Bereken licentiedatum
+    let licenseStart = null, licenseEnd = null, finalLicenseType = null;
+    if (role === 'practice') {
+      finalLicenseType = licenseType || '12m';
+      licenseStart = new Date();
+      if (finalLicenseType !== 'unlimited') {
+        licenseEnd = new Date();
+        const months = finalLicenseType === '12m' ? 12 : 24;
+        licenseEnd.setMonth(licenseEnd.getMonth() + months);
+      }
+    }
+
+    const newUser = await withWriteConnection(async (client) => {
+      const r = await client.query(
+        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
+         VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email, role, practice_code`,
+        [email.toLowerCase().trim(), passwordHash, role, role === 'practice' ? practiceCode.toUpperCase().trim() : null]
+      );
+      return r.rows[0];
+    });
+
+    // Licentie opslaan in praktijken tabel
+    if (role === 'practice' && practiceCode) {
+      await withWriteConnection(async (client) => {
+        await client.query(
+          `UPDATE public.praktijken SET
+            license_type = $1,
+            license_start_date = $2,
+            license_end_date = $3,
+            expiry_warning_sent = FALSE
+           WHERE code = $4`,
+          [finalLicenseType, licenseStart, licenseEnd, practiceCode.toUpperCase().trim()]
+        );
+      });
+    }
+
+    // Stuur welkomstmail
+    try {
+      const naam = praktijkNaam || practiceCode || email;
+      await sendWelcomeEmail({
+        email,
+        praktijkNaam: naam,
+        password,
+        licenseType: finalLicenseType || 'unlimited',
+        licenseEndDate: licenseEnd
+      });
+      console.log(`✅ Welkomstmail verstuurd naar ${email}`);
+    } catch (mailErr) {
+      console.warn('Welkomstmail mislukt:', mailErr.message);
+    }
+
+    res.json({
+      success: true,
+      user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code },
+      license: { type: finalLicenseType, start: licenseStart, end: licenseEnd }
+    });
+
+  } catch (error) {
+    console.error('Create user licensed error:', error);
+    res.status(500).json({ error: 'Fout bij aanmaken gebruiker' });
+  }
+});
+
+// GET /api/admin/users — alle gebruikers ophalen
+app.get('/api/admin/users', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+
+    const { search } = req.query;
+
+    const users = await withReadConnection(async (client) => {
+      let q = `
+        SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
+               p.naam as praktijk_naam, p.license_type, p.license_start_date,
+               p.license_end_date, p.actief as license_active
+        FROM public.users u
+        LEFT JOIN public.praktijken p ON u.practice_code = p.code
+        WHERE u.role != 'admin'
+      `;
+      const params = [];
+      if (search) {
+        params.push(`%${search}%`);
+        q += ` AND (u.email ILIKE $1 OR u.practice_code ILIKE $1 OR p.naam ILIKE $1)`;
+      }
+      q += ' ORDER BY u.created_at DESC';
+      const r = await client.query(q, params);
+      return r.rows;
+    });
+
+    res.json({ success: true, users });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Fout bij ophalen gebruikers' });
+  }
+});
+
+// PATCH /api/admin/users/:id — gebruiker aanpassen (ban, licentie wijzigen)
+app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+
+    const { id } = req.params;
+    const { banned, licenseType, action } = req.body;
+
+    // Ban/unban
+    if (typeof banned === 'boolean') {
+      await withWriteConnection(async (client) => {
+        await client.query('UPDATE public.users SET banned = $1 WHERE id = $2', [banned, id]);
+      });
+    }
+
+    // Licentie aanpassen
+    if (licenseType || action) {
+      const user = await withReadConnection(async (client) => {
+        const r = await client.query('SELECT practice_code FROM public.users WHERE id = $1', [id]);
+        return r.rows[0];
+      });
+
+      if (user?.practice_code) {
+        let licenseEnd = null;
+        let newType = licenseType;
+
+        if (action === 'extend_12m') { newType = '12m'; licenseEnd = new Date(); licenseEnd.setMonth(licenseEnd.getMonth() + 12); }
+        else if (action === 'extend_24m') { newType = '24m'; licenseEnd = new Date(); licenseEnd.setMonth(licenseEnd.getMonth() + 24); }
+        else if (action === 'reactivate') {
+          await withWriteConnection(async (client) => {
+            await client.query(
+              `UPDATE public.praktijken SET actief = TRUE, expiry_warning_sent = FALSE WHERE code = $1`,
+              [user.practice_code]
+            );
+          });
+        } else if (licenseType === 'unlimited') {
+          await withWriteConnection(async (client) => {
+            await client.query(
+              `UPDATE public.praktijken SET license_type = 'unlimited', license_end_date = NULL,
+               actief = TRUE, expiry_warning_sent = FALSE WHERE code = $1`,
+              [user.practice_code]
+            );
+          });
+        }
+
+        if (licenseEnd) {
+          await withWriteConnection(async (client) => {
+            await client.query(
+              `UPDATE public.praktijken SET license_type = $1, license_end_date = $2,
+               license_start_date = NOW(), actief = TRUE, expiry_warning_sent = FALSE WHERE code = $3`,
+              [newType, licenseEnd, user.practice_code]
+            );
+          });
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Fout bij bijwerken gebruiker' });
+  }
+});
+
+// DELETE /api/admin/users/:id — gebruiker verwijderen
+app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { id } = req.params;
+    await withWriteConnection(async (client) => {
+      await client.query('DELETE FROM public.users WHERE id = $1 AND role != \'admin\'', [id]);
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Fout bij verwijderen gebruiker' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRON JOB — dagelijks om 08:00
+// ─────────────────────────────────────────────────────────────────────────────
+
+cron.schedule('0 8 * * *', async () => {
+  console.log('🔄 [CRON] Licentie check gestart...');
+
+  try {
+    // 1. Stuur waarschuwingsmail 14 dagen voor verlopen
+    const expiringSoon = await withReadConnection(async (client) => {
+      const r = await client.query(`
+        SELECT p.code, p.naam, p.license_end_date,
+               u.email
+        FROM public.praktijken p
+        JOIN public.users u ON u.practice_code = p.code
+        WHERE p.license_type != 'unlimited'
+          AND p.license_end_date IS NOT NULL
+          AND p.license_end_date::date = (NOW() + INTERVAL '14 days')::date
+          AND (p.expiry_warning_sent = FALSE OR p.expiry_warning_sent IS NULL)
+          AND p.actief = TRUE
+          AND u.role = 'practice'
+      `);
+      return r.rows;
+    });
+
+    for (const p of expiringSoon) {
+      try {
+        await sendExpiryWarningEmail({
+          email: p.email,
+          praktijkNaam: p.naam,
+          licenseEndDate: p.license_end_date
+        });
+        await withWriteConnection(async (client) => {
+          await client.query(
+            'UPDATE public.praktijken SET expiry_warning_sent = TRUE WHERE code = $1',
+            [p.code]
+          );
+        });
+        console.log(`✅ [CRON] Waarschuwingsmail verstuurd: ${p.naam} (${p.email})`);
+      } catch (e) {
+        console.error(`❌ [CRON] Mail mislukt voor ${p.naam}:`, e.message);
+      }
+    }
+
+    // 2. Deactiveer verlopen licenties
+    const deactivated = await withWriteConnection(async (client) => {
+      const r = await client.query(`
+        UPDATE public.praktijken
+        SET actief = FALSE
+        WHERE license_type != 'unlimited'
+          AND license_end_date IS NOT NULL
+          AND license_end_date::date < NOW()::date
+          AND actief = TRUE
+        RETURNING code, naam
+      `);
+      return r.rows;
+    });
+
+    if (deactivated.length > 0) {
+      console.log(`✅ [CRON] Gedeactiveerd: ${deactivated.map(p => p.naam).join(', ')}`);
+    }
+
+    console.log(`✅ [CRON] Licentie check klaar. Warnings: ${expiringSoon.length}, Deactivaties: ${deactivated.length}`);
+  } catch (error) {
+    console.error('❌ [CRON] Licentie check mislukt:', error);
+  }
+}, { timezone: 'Europe/Amsterdam' });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);

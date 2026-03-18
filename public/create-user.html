@@ -1,409 +1,798 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nieuwe Gebruiker - Dynamic Health</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gebruikersbeheer — Dynamic Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #f4f4f6;
+      --surface:  #ffffff;
+      --border:   #e4e4e8;
+      --text-1:   #0f0f12;
+      --text-2:   #5a5a72;
+      --text-3:   #9090a8;
+      --accent:   #2BB8A3;
+      --accent-d: #1a9985;
+      --danger:   #e5334a;
+      --warn:     #f59e0b;
+      --green:    #16a34a;
+      --radius:   10px;
+      --shadow:   0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #333399 0%, #3399CC 50%, #99CC33 100%);
-            min-height: 100vh;
-            padding: 40px 20px;
-        }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-        }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      font-size: 14px;
+      min-height: 100vh;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
+    /* ── TOPBAR ── */
+    .topbar {
+      background: #1A1D21;
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
 
-        .header h1 {
-            font-size: 24px;
-            color: #1d1d1f;
-            margin-bottom: 8px;
-        }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-        .form-group {
-            margin-bottom: 24px;
-        }
+    .topbar-brand img { height: 32px; width: auto; }
 
-        label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 8px;
-        }
+    .topbar-brand-name {
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
 
-        input, select {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #d2d2d7;
-            border-radius: 8px;
-            font-size: 15px;
-            font-family: inherit;
-        }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
 
-        input:focus, select:focus {
-            outline: none;
-            border-color: #06c;
-            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
-        }
+    .btn-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: transparent;
+      color: rgba(255,255,255,.7);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all .15s;
+    }
 
-        .help-text {
-            font-size: 12px;
-            color: #86868b;
-            margin-top: 6px;
-        }
+    .btn-back:hover { background: rgba(255,255,255,.1); color: white; }
 
-        .btn {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #333399 0%, #3399CC 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+    /* ── LAYOUT ── */
+    .layout {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
 
-        .btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(51, 153, 204, 0.3);
-        }
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
+    .card-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+    }
 
-        .btn-secondary {
-            background: #f5f5f7;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-1);
+    }
 
-        .btn-secondary:hover {
-            background: #e8e8ed;
-            box-shadow: none;
-            transform: none;
-        }
+    .card-subtitle {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 2px;
+    }
 
-        .message {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 24px;
-            font-weight: 500;
-        }
+    .card-body { padding: 24px; }
 
-        .success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 2px solid #10b981;
-        }
+    /* ── FORM ── */
+    .form-group { margin-bottom: 18px; }
 
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 2px solid #ef4444;
-        }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
 
-        .credentials-box {
-            background: #fffbeb;
-            border: 3px solid #fbbf24;
-            border-radius: 12px;
-            padding: 24px;
-            margin: 24px 0;
-        }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text-1);
+      background: white;
+      transition: border-color .15s, box-shadow .15s;
+    }
 
-        .credentials-box h3 {
-            font-size: 18px;
-            color: #1d1d1f;
-            margin-bottom: 16px;
-        }
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(43,184,163,.12);
+    }
 
-        .credential-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #fbbf24;
-        }
+    .form-help {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 4px;
+    }
 
-        .credential-row:last-child {
-            border-bottom: none;
-        }
+    .password-row {
+      display: flex;
+      gap: 8px;
+    }
 
-        .credential-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: #78350f;
-        }
+    .password-row input { flex: 1; }
 
-        .credential-value {
-            font-size: 16px;
-            font-weight: 700;
-            color: #1d1d1f;
-            font-family: 'Courier New', monospace;
-            background: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-        }
+    .btn-gen {
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--text-2);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
+    }
 
-        .warning-box {
-            background: #fef3c7;
-            border: 2px solid #fbbf24;
-            padding: 16px;
-            border-radius: 8px;
-            margin-top: 16px;
-            font-size: 14px;
-            color: #78350f;
-            font-weight: 600;
-        }
+    .btn-gen:hover { background: var(--accent); color: white; border-color: var(--accent); }
 
-        .password-display {
-            display: flex;
-            gap: 8px;
-            align-items: stretch;
-        }
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .15s;
+      border: none;
+      white-space: nowrap;
+    }
 
-        .password-display input {
-            flex: 1;
-        }
+    .btn-primary { background: var(--accent); color: white; width: 100%; justify-content: center; }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
-        .generate-btn {
-            padding: 14px 20px;
-            background: #10b981;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-        }
+    .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+    .btn-danger:hover { background: #fde8eb; }
 
-        .generate-btn:hover {
-            background: #059669;
-        }
+    .btn-warn { background: transparent; border: 1px solid var(--warn); color: var(--warn); }
+    .btn-warn:hover { background: #fffbeb; }
 
-        .generate-feedback {
-            background: #d1fae5;
-            color: #065f46;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            margin-top: 8px;
-            display: none;
-        }
-    </style>
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    /* ── ALERT ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .alert-success { background: #e6f6ec; border: 1px solid #86efac; color: #166534; }
+    .alert-error   { background: #fde8eb; border: 1px solid #fca5a5; color: #991b1b; }
+
+    /* ── CREDENTIALS BOX ── */
+    .cred-box {
+      background: #f9f9fb;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+
+    .cred-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .cred-row:last-child { border-bottom: none; }
+    .cred-label { color: var(--text-2); font-weight: 500; }
+    .cred-value { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-1); font-weight: 500; }
+
+    .cred-warn {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #92400e;
+      font-weight: 500;
+    }
+
+    /* ── SEARCH ── */
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .search-row input {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .search-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .search-row button {
+      padding: 9px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 7px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* ── USER TABLE ── */
+    .user-table { width: 100%; border-collapse: collapse; }
+
+    .user-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .user-table td {
+      padding: 12px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .user-table tr:last-child td { border-bottom: none; }
+    .user-table tr:hover td { background: var(--bg); }
+
+    /* ── BADGE ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-green  { background: #e6f6ec; color: #166534; }
+    .badge-red    { background: #fde8eb; color: #991b1b; }
+    .badge-amber  { background: #fffbeb; color: #92400e; }
+    .badge-gray   { background: #f4f4f6; color: var(--text-2); }
+    .badge-blue   { background: #e8f0fe; color: #1a56db; }
+
+    /* ── LICENSE BADGE ── */
+    .license-info { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+
+    /* ── ACTIONS DROPDOWN ── */
+    .action-wrap { position: relative; display: inline-block; }
+
+    .action-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      min-width: 200px;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .action-menu.open { display: block; }
+
+    .action-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      font-size: 13px;
+      color: var(--text-1);
+      cursor: pointer;
+      transition: background .1s;
+    }
+
+    .action-item:hover { background: var(--bg); }
+    .action-item.danger { color: var(--danger); }
+    .action-item.danger:hover { background: #fde8eb; }
+    .action-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+    .action-section-label {
+      padding: 6px 14px 2px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-3);
+      font-size: 13px;
+    }
+
+    /* ── LOADING ── */
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: var(--text-3);
+      font-size: 13px;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>➕ Nieuwe Gebruiker Aanmaken</h1>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
+      <span class="topbar-brand-name">Dynamic Health</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/churn-dashboard.html" class="btn-back">
+        ← Terug naar dashboard
+      </a>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- Linker kolom: gebruiker aanmaken -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Gebruiker aanmaken</div>
+          <div class="card-subtitle">Nieuw account met licentie</div>
         </div>
+        <div class="card-body">
+          <div id="createAlert"></div>
 
-        <div id="messageBox"></div>
-
-        <div id="formContainer">
-            <form id="createForm" onsubmit="createUser(event)">
-                <div class="form-group">
-                    <label for="email">Email Adres *</label>
-                    <input type="email" id="email" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="role">Rol *</label>
-                    <select id="role" required onchange="togglePractice()">
-                        <option value="">Selecteer...</option>
-                        <option value="admin">Admin</option>
-                        <option value="practice">Practice</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="practiceGroup" style="display: none;">
-                    <label for="practiceCode">Practice Code *</label>
-                    <input type="text" id="practiceCode" maxlength="10" style="text-transform: uppercase;">
-                    <div class="help-text">Bijv: S7F2MW</div>
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Wachtwoord *</label>
-                    <div class="password-display">
-                        <input type="text" id="password" required minlength="8" value="Dynamic2026!">
-                        <button type="button" class="generate-btn" onclick="generatePassword()">🔄 Genereer</button>
-                    </div>
-                    <div id="generateFeedback" class="generate-feedback">✅ Nieuw wachtwoord gegenereerd!</div>
-                    <div class="help-text">Min 8 tekens, hoofdletter, kleine letter, cijfer</div>
-                </div>
-
-                <button type="submit" class="btn" id="submitBtn">Gebruiker Aanmaken</button>
-            </form>
-
-            <button class="btn btn-secondary" onclick="window.location.href='/churn-dashboard.html'">
-                ← Terug naar Dashboard
-            </button>
-        </div>
-
-        <div id="successBox" style="display: none;">
-            <div class="credentials-box">
-                <h3>✅ Gebruiker Succesvol Aangemaakt!</h3>
-                
-                <div class="credential-row">
-                    <span class="credential-label">Email:</span>
-                    <span class="credential-value" id="displayEmail"></span>
-                </div>
-                
-                <div class="credential-row">
-                    <span class="credential-label">Wachtwoord:</span>
-                    <span class="credential-value" id="displayPassword"></span>
-                </div>
-                
-                <div class="credential-row">
-                    <span class="credential-label">Rol:</span>
-                    <span class="credential-value" id="displayRole"></span>
-                </div>
-
-                <div class="warning-box">
-                    ⚠️ Kopieer deze gegevens nu! Stuur naar de gebruiker.
-                </div>
+          <div id="createForm">
+            <div class="form-group">
+              <label>E-mailadres</label>
+              <input type="email" id="email" placeholder="naam@praktijk.nl">
             </div>
 
-            <button class="btn" onclick="location.reload()">
-                ➕ Nog Een Gebruiker Aanmaken
+            <div class="form-group">
+              <label>Praktijknaam</label>
+              <input type="text" id="praktijkNaam" placeholder="Bijv. Fysio Soestdijk">
+            </div>
+
+            <div class="form-group">
+              <label>Rol</label>
+              <select id="role" onchange="onRoleChange()">
+                <option value="practice">Practice</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="practiceCodeGroup">
+              <label>Praktijkcode</label>
+              <input type="text" id="practiceCode" placeholder="Bijv. S7F2MW" maxlength="10" style="text-transform:uppercase;">
+              <div class="form-help">Maximaal 10 tekens, hoofdletters</div>
+            </div>
+
+            <div class="form-group" id="licenseGroup">
+              <label>Licentie</label>
+              <select id="licenseType">
+                <option value="12m">12 maanden</option>
+                <option value="24m">24 maanden</option>
+                <option value="unlimited">Onbeperkt</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Tijdelijk wachtwoord</label>
+              <div class="password-row">
+                <input type="text" id="password" value="Dynamic2026!">
+                <button type="button" class="btn-gen" onclick="generatePassword()">Genereer</button>
+              </div>
+              <div class="form-help">Min. 8 tekens, hoofdletter, kleine letter, cijfer</div>
+            </div>
+
+            <button class="btn btn-primary" onclick="createUser()" id="createBtn">
+              Account aanmaken
             </button>
+          </div>
+
+          <!-- Succes weergave -->
+          <div id="createSuccess" style="display:none;">
+            <div class="alert alert-success">Account aangemaakt. Welkomstmail is verstuurd.</div>
+            <div class="cred-box">
+              <div class="cred-row">
+                <span class="cred-label">E-mail</span>
+                <span class="cred-value" id="dispEmail">—</span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">Wachtwoord</span>
+                <span class="cred-value" id="dispPwd">—</span>
+              </div>
+              <div class="cred-row">
+                <span class="cred-label">Licentie</span>
+                <span class="cred-value" id="dispLicense">—</span>
+              </div>
+              <div class="cred-row" id="dispEndRow">
+                <span class="cred-label">Geldig tot</span>
+                <span class="cred-value" id="dispEnd">—</span>
+              </div>
+              <div class="cred-warn">Kopieer deze gegevens nu. Het wachtwoord is hierna niet meer zichtbaar.</div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:16px;" onclick="resetForm()">
+              Nieuw account aanmaken
+            </button>
+          </div>
         </div>
+      </div>
     </div>
 
-    <script>
-        // Check admin
-        async function checkAdmin() {
-            try {
-                const res = await fetch('/api/auth/me', { credentials: 'include' });
-                if (!res.ok) {
-                    window.location.href = '/login.html';
-                    return;
-                }
-                const data = await res.json();
-                if (data.user.role !== 'admin') {
-                    alert('Alleen admins!');
-                    window.location.href = '/churn-dashboard.html';
-                }
-            } catch {
-                window.location.href = '/login.html';
-            }
-        }
-        checkAdmin();
+    <!-- Rechter kolom: gebruikersbeheer -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Gebruikersbeheer</div>
+          <div class="card-subtitle">Zoeken, licentie aanpassen, verbannen</div>
+        </div>
+        <div class="card-body">
+          <div class="search-row">
+            <input type="text" id="searchInput" placeholder="Zoek op e-mail, praktijkcode of naam..." onkeydown="if(event.key==='Enter') searchUsers()">
+            <button onclick="searchUsers()">Zoeken</button>
+          </div>
 
-        function togglePractice() {
-            const role = document.getElementById('role').value;
-            const group = document.getElementById('practiceGroup');
-            const field = document.getElementById('practiceCode');
-            
-            if (role === 'practice') {
-                group.style.display = 'block';
-                field.required = true;
-            } else {
-                group.style.display = 'none';
-                field.required = false;
-                field.value = '';
-            }
-        }
+          <div id="usersContainer">
+            <div class="loading">Gebruikers worden geladen...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        function generatePassword() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-            let pwd = '';
-            
-            // Ensure requirements
-            pwd += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-            pwd += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-            pwd += '0123456789'[Math.floor(Math.random() * 10)];
-            pwd += '!@#$%^&*'[Math.floor(Math.random() * 8)];
-            
-            // Fill rest
-            for (let i = 4; i < 14; i++) {
-                pwd += chars[Math.floor(Math.random() * chars.length)];
-            }
-            
-            // Shuffle
-            pwd = pwd.split('').sort(() => Math.random() - 0.5).join('');
-            
-            document.getElementById('password').value = pwd;
-            
-            // Show feedback
-            const feedback = document.getElementById('generateFeedback');
-            feedback.style.display = 'block';
-            setTimeout(() => {
-                feedback.style.display = 'none';
-            }, 2000);
-        }
+  <!-- Action menu backdrop -->
+  <div id="backdrop" style="display:none;position:fixed;inset:0;z-index:90;" onclick="closeAllMenus()"></div>
 
-        async function createUser(event) {
-            event.preventDefault();
-            
-            const email = document.getElementById('email').value.trim();
-            const role = document.getElementById('role').value;
-            const practiceCode = document.getElementById('practiceCode').value.trim() || null;
-            const password = document.getElementById('password').value;
-            
-            const msgBox = document.getElementById('messageBox');
-            const submitBtn = document.getElementById('submitBtn');
-            
-            msgBox.innerHTML = '';
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Bezig...';
-            
-            try {
-                const res = await fetch('/api/admin/create-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ email, password, role, practiceCode })
-                });
-                
-                const data = await res.json();
-                
-                if (res.ok) {
-                    // Success!
-                    document.getElementById('displayEmail').textContent = email;
-                    document.getElementById('displayPassword').textContent = password;
-                    document.getElementById('displayRole').textContent = role;
-                    
-                    document.getElementById('formContainer').style.display = 'none';
-                    document.getElementById('successBox').style.display = 'block';
-                    
-                    msgBox.innerHTML = '<div class="message success">✅ Gebruiker succesvol aangemaakt!</div>';
-                } else {
-                    msgBox.innerHTML = `<div class="message error">❌ ${data.error || 'Fout'}</div>`;
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Gebruiker Aanmaken';
+  <script>
+    // ── Auth check ──────────────────────────────────────────────────────────
+    async function checkAdmin() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!res.ok) { window.location.href = '/login.html'; return; }
+        const data = await res.json();
+        if (data.user?.role !== 'admin') {
+          alert('Alleen admins hebben toegang tot deze pagina.');
+          window.location.href = '/churn-dashboard.html';
+        }
+      } catch { window.location.href = '/login.html'; }
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function licenseLabel(type) {
+      if (type === '12m') return '12 maanden';
+      if (type === '24m') return '24 maanden';
+      if (type === 'unlimited') return 'Onbeperkt';
+      return type || '—';
+    }
+
+    function formatDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function licenseStatus(user) {
+      if (!user.practice_code) return null;
+      if (user.license_type === 'unlimited') return { label: 'Onbeperkt', cls: 'badge-blue' };
+      if (!user.license_end_date) return { label: 'Geen licentie', cls: 'badge-gray' };
+      const end = new Date(user.license_end_date);
+      const now = new Date();
+      const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      if (days < 0) return { label: 'Verlopen', cls: 'badge-red' };
+      if (days <= 14) return { label: `Verloopt over ${days}d`, cls: 'badge-amber' };
+      return { label: `Actief (${days}d)`, cls: 'badge-green' };
+    }
+
+    function generatePassword() {
+      const up = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lo = 'abcdefghijklmnopqrstuvwxyz';
+      const nu = '0123456789';
+      const sp = '!@#$%^&*';
+      const all = up + lo + nu + sp;
+      let pwd = up[Math.floor(Math.random()*26)] + lo[Math.floor(Math.random()*26)] +
+                nu[Math.floor(Math.random()*10)] + sp[Math.floor(Math.random()*8)];
+      for (let i = 4; i < 14; i++) pwd += all[Math.floor(Math.random()*all.length)];
+      document.getElementById('password').value = pwd.split('').sort(() => Math.random() - .5).join('');
+    }
+
+    function onRoleChange() {
+      const role = document.getElementById('role').value;
+      document.getElementById('practiceCodeGroup').style.display = role === 'practice' ? 'block' : 'none';
+      document.getElementById('licenseGroup').style.display = role === 'practice' ? 'block' : 'none';
+    }
+
+    function showAlert(id, type, msg) {
+      document.getElementById(id).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+    }
+
+    function resetForm() {
+      document.getElementById('createForm').style.display = 'block';
+      document.getElementById('createSuccess').style.display = 'none';
+      document.getElementById('createAlert').innerHTML = '';
+      document.getElementById('email').value = '';
+      document.getElementById('praktijkNaam').value = '';
+      document.getElementById('practiceCode').value = '';
+      document.getElementById('password').value = 'Dynamic2026!';
+      document.getElementById('createBtn').disabled = false;
+    }
+
+    // ── Gebruiker aanmaken ──────────────────────────────────────────────────
+    async function createUser() {
+      const email        = document.getElementById('email').value.trim();
+      const praktijkNaam = document.getElementById('praktijkNaam').value.trim();
+      const role         = document.getElementById('role').value;
+      const practiceCode = document.getElementById('practiceCode').value.trim();
+      const licenseType  = document.getElementById('licenseType').value;
+      const password     = document.getElementById('password').value;
+
+      if (!email || !password) { showAlert('createAlert', 'error', 'Vul alle verplichte velden in.'); return; }
+      if (role === 'practice' && !practiceCode) { showAlert('createAlert', 'error', 'Praktijkcode is verplicht.'); return; }
+
+      const btn = document.getElementById('createBtn');
+      btn.disabled = true;
+      btn.textContent = 'Bezig...';
+      document.getElementById('createAlert').innerHTML = '';
+
+      try {
+        const res = await fetch('/api/admin/create-user-licensed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password, role, practiceCode: practiceCode || null, licenseType, praktijkNaam })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          document.getElementById('dispEmail').textContent   = email;
+          document.getElementById('dispPwd').textContent     = password;
+          document.getElementById('dispLicense').textContent = licenseLabel(data.license?.type);
+
+          const endRow = document.getElementById('dispEndRow');
+          if (data.license?.end) {
+            document.getElementById('dispEnd').textContent = formatDate(data.license.end);
+            endRow.style.display = 'flex';
+          } else {
+            endRow.style.display = 'none';
+          }
+
+          document.getElementById('createForm').style.display = 'none';
+          document.getElementById('createSuccess').style.display = 'block';
+          loadUsers();
+        } else {
+          showAlert('createAlert', 'error', data.error || 'Er is een fout opgetreden.');
+          btn.disabled = false;
+          btn.textContent = 'Account aanmaken';
+        }
+      } catch (e) {
+        showAlert('createAlert', 'error', 'Netwerkfout. Probeer opnieuw.');
+        btn.disabled = false;
+        btn.textContent = 'Account aanmaken';
+      }
+    }
+
+    // ── Gebruikers laden / zoeken ───────────────────────────────────────────
+    let allUsers = [];
+
+    async function loadUsers(search = '') {
+      const container = document.getElementById('usersContainer');
+      container.innerHTML = '<div class="loading">Laden...</div>';
+      try {
+        const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
+        const res  = await fetch(url, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.success) { container.innerHTML = '<div class="empty-state">Kon gebruikers niet laden.</div>'; return; }
+        allUsers = data.users;
+        renderUsers(allUsers);
+      } catch {
+        container.innerHTML = '<div class="empty-state">Fout bij laden.</div>';
+      }
+    }
+
+    function searchUsers() {
+      const q = document.getElementById('searchInput').value.trim();
+      loadUsers(q);
+    }
+
+    function renderUsers(users) {
+      const container = document.getElementById('usersContainer');
+      if (!users.length) {
+        container.innerHTML = '<div class="empty-state">Geen gebruikers gevonden.</div>';
+        return;
+      }
+
+      let html = `<table class="user-table">
+        <thead><tr>
+          <th>Gebruiker</th>
+          <th>Licentie</th>
+          <th>Status</th>
+          <th>Acties</th>
+        </tr></thead>
+        <tbody>`;
+
+      users.forEach(u => {
+        const status = licenseStatus(u);
+        const isBanned = u.banned;
+        const statusBadge = isBanned
+          ? '<span class="badge badge-red">Verbannen</span>'
+          : status
+            ? `<span class="badge ${status.cls}">${status.label}</span>`
+            : '<span class="badge badge-blue">Admin</span>';
+
+        const licenseInfo = u.practice_code && u.license_type
+          ? `<div class="license-info">${licenseLabel(u.license_type)}${u.license_end_date ? ` · tot ${formatDate(u.license_end_date)}` : ''}</div>`
+          : '';
+
+        html += `<tr>
+          <td>
+            <div style="font-weight:500;">${u.email}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${u.praktijk_naam || u.practice_code || 'Admin'}</div>
+          </td>
+          <td>
+            ${u.practice_code ? `<div style="font-size:13px;font-weight:500;">${licenseLabel(u.license_type) || '—'}</div>${licenseInfo}` : '—'}
+          </td>
+          <td>${statusBadge}</td>
+          <td>
+            <div class="action-wrap">
+              <button class="btn btn-sm" style="border:1px solid var(--border);background:white;" onclick="toggleMenu('menu-${u.id}', event)">
+                Acties ↓
+              </button>
+              <div class="action-menu" id="menu-${u.id}">
+                ${u.practice_code ? `
+                  <div class="action-section-label">Licentie</div>
+                  <div class="action-item" onclick="userAction(${u.id}, 'extend_12m')">Verlengen 12 maanden</div>
+                  <div class="action-item" onclick="userAction(${u.id}, 'extend_24m')">Verlengen 24 maanden</div>
+                  <div class="action-item" onclick="userAction(${u.id}, 'unlimited')">Onbeperkt instellen</div>
+                  <div class="action-item" onclick="userAction(${u.id}, 'reactivate')">Heractiveren</div>
+                  <div class="action-divider"></div>
+                ` : ''}
+                <div class="action-section-label">Account</div>
+                ${isBanned
+                  ? `<div class="action-item" onclick="userAction(${u.id}, 'unban')">Verbanning opheffen</div>`
+                  : `<div class="action-item danger" onclick="userAction(${u.id}, 'ban')">Verbannen</div>`
                 }
-            } catch (error) {
-                console.error(error);
-                msgBox.innerHTML = '<div class="message error">❌ Netwerkfout</div>';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Gebruiker Aanmaken';
-            }
+                <div class="action-item danger" onclick="userAction(${u.id}, 'delete')">Verwijderen</div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // ── Acties ──────────────────────────────────────────────────────────────
+    async function userAction(userId, action) {
+      closeAllMenus();
+
+      const confirmActions = { delete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?', ban: 'Weet je zeker dat je deze gebruiker wilt verbannen?' };
+      if (confirmActions[action] && !confirm(confirmActions[action])) return;
+
+      try {
+        let res;
+        if (action === 'delete') {
+          res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE', credentials: 'include' });
+        } else {
+          const body = {};
+          if (action === 'ban')    body.banned = true;
+          if (action === 'unban')  body.banned = false;
+          if (action === 'extend_12m') body.action = 'extend_12m';
+          if (action === 'extend_24m') body.action = 'extend_24m';
+          if (action === 'unlimited')  body.licenseType = 'unlimited';
+          if (action === 'reactivate') body.action = 'reactivate';
+
+          res = await fetch(`/api/admin/users/${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+          });
         }
-    </script>
+
+        const data = await res.json();
+        if (data.success) {
+          loadUsers(document.getElementById('searchInput').value.trim());
+        } else {
+          alert('Er is een fout opgetreden: ' + (data.error || 'onbekend'));
+        }
+      } catch { alert('Netwerkfout. Probeer opnieuw.'); }
+    }
+
+    // ── Dropdown menu ───────────────────────────────────────────────────────
+    function toggleMenu(id, event) {
+      event.stopPropagation();
+      const menu = document.getElementById(id);
+      const isOpen = menu.classList.contains('open');
+      closeAllMenus();
+      if (!isOpen) {
+        menu.classList.add('open');
+        document.getElementById('backdrop').style.display = 'block';
+      }
+    }
+
+    function closeAllMenus() {
+      document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+      document.getElementById('backdrop').style.display = 'none';
+    }
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    checkAdmin();
+    loadUsers();
+  </script>
 </body>
 </html>
