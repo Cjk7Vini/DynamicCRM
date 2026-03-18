@@ -155,6 +155,89 @@
       color: #666;
       font-size: 12px;
     }
+
+    /* Split button */
+    .btn-split-wrap {
+      position: relative;
+      display: flex;
+      gap: 2px;
+      margin-bottom: 2px;
+    }
+
+    .btn-main {
+      flex: 1;
+      border-radius: 8px 0 0 8px;
+      padding: 14px 20px;
+    }
+
+    .btn-arrow {
+      width: 48px;
+      flex-shrink: 0;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 0;
+      font-size: 12px;
+      background: linear-gradient(135deg, #2a2a80 0%, #2a88b0 100%);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .btn-arrow:hover { background: linear-gradient(135deg, #222270 0%, #2278a0 100%); }
+
+    .btn-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      overflow: hidden;
+      z-index: 100;
+    }
+
+    .btn-dropdown.open { display: block; }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      cursor: pointer;
+      transition: background .12s;
+    }
+
+    .dropdown-item:hover { background: #f5f5f7; }
+    .dropdown-item:first-child { border-bottom: 1px solid #f0f0f0; }
+
+    .item-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ddd;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+
+    .active-item .item-dot { background: #2BB8A3; }
+
+    .dest-label {
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+      margin-top: 8px;
+    }
+
+    .dest-label span {
+      color: #333399;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -191,9 +274,24 @@
         >
       </div>
 
-      <button type="submit" class="btn" id="loginBtn">
-        Inloggen
-      </button>
+      <div class="btn-split-wrap">
+        <button type="button" class="btn btn-main" id="loginBtn" onclick="doLogin()">
+          Inloggen
+        </button>
+        <button type="button" class="btn btn-arrow" id="arrowBtn" onclick="toggleDropdown(event)">
+          &#9660;
+        </button>
+        <div class="btn-dropdown" id="btnDropdown">
+          <div class="dropdown-item active-item" id="optDashboard" onclick="selectDest('dashboard')">
+            <span class="item-dot"></span>
+            Dashboard
+          </div>
+          <div class="dropdown-item" id="optNazorg" onclick="selectDest('nazorg')">
+            <span class="item-dot"></span>
+            Nazorgportaal
+          </div>
+        </div>
+      </div>
     </form>
 
     <div style="text-align: center; margin-top: 16px;">
@@ -206,32 +304,51 @@
   </div>
 
   <script>
-    const form = document.getElementById('loginForm');
     const errorDiv = document.getElementById('error');
     const loginBtn = document.getElementById('loginBtn');
+    let destination = 'dashboard';
 
-    // Check if already logged in
     checkSession();
 
     async function checkSession() {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (res.ok) {
-          // Already logged in, redirect to dashboard
-          window.location.href = '/churn-dashboard.html';
+          window.location.href = destination === 'nazorg'
+            ? '/nazorg-portaal.html'
+            : '/churn-dashboard.html';
         }
-      } catch (err) {
-        // Not logged in, stay on login page
-      }
+      } catch (err) {}
     }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+    function selectDest(dest) {
+      destination = dest;
+      document.getElementById('optDashboard').classList.toggle('active-item', dest === 'dashboard');
+      document.getElementById('optNazorg').classList.toggle('active-item', dest === 'nazorg');
+      loginBtn.textContent = dest === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
+      document.getElementById('destLabel').innerHTML =
+        dest === 'nazorg'
+          ? 'Bestemming: <span>Nazorgportaal</span>'
+          : 'Bestemming: <span>Dashboard</span>';
+      closeDropdown();
+    }
 
-      // Show loading
+    function toggleDropdown(e) {
+      e.stopPropagation();
+      document.getElementById('btnDropdown').classList.toggle('open');
+    }
+
+    function closeDropdown() {
+      document.getElementById('btnDropdown').classList.remove('open');
+    }
+
+    document.addEventListener('click', closeDropdown);
+
+    async function doLogin() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { showError('Vul e-mail en wachtwoord in.'); return; }
+
       loginBtn.disabled = true;
       loginBtn.innerHTML = '<span class="loading"></span> Inloggen...';
       errorDiv.classList.remove('show');
@@ -243,24 +360,22 @@
           credentials: 'include',
           body: JSON.stringify({ email, password })
         });
-
         const data = await res.json();
-
         if (res.ok) {
-          // Success! Redirect to dashboard
-          window.location.href = '/churn-dashboard.html';
+          window.location.href = destination === 'nazorg'
+            ? '/nazorg-portaal.html'
+            : '/churn-dashboard.html';
         } else {
-          // Show error
           showError(data.error || 'Login mislukt');
           loginBtn.disabled = false;
-          loginBtn.innerHTML = 'Inloggen';
+          loginBtn.textContent = destination === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
         }
       } catch (err) {
         showError('Netwerkfout. Probeer opnieuw.');
         loginBtn.disabled = false;
-        loginBtn.innerHTML = 'Inloggen';
+        loginBtn.textContent = destination === 'nazorg' ? 'Inloggen — Nazorgportaal' : 'Inloggen';
       }
-    });
+    }
 
     function showError(message) {
       errorDiv.textContent = message;
@@ -268,11 +383,8 @@
       setTimeout(() => errorDiv.classList.remove('show'), 5000);
     }
 
-    // Enter key support
     document.getElementById('password').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        form.dispatchEvent(new Event('submit'));
-      }
+      if (e.key === 'Enter') doLogin();
     });
   </script>
 </body>
