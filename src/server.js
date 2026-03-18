@@ -3412,17 +3412,21 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
 
     // Stuur welkomstmail
     try {
-      const naam = praktijkNaam || practiceCode || email;
-      await sendWelcomeEmail({
-        email,
-        praktijkNaam: naam,
-        password,
-        licenseType: finalLicenseType || 'unlimited',
-        licenseEndDate: licenseEnd
-      });
-      console.log(`✅ Welkomstmail verstuurd naar ${email}`);
+      if (!SMTP.host || !SMTP.user || !SMTP.pass) {
+        console.warn(`⚠️ Welkomstmail NIET verstuurd naar ${email}: SMTP niet geconfigureerd (SMTP_HOST/SMTP_USER/SMTP_PASS ontbreken in Render environment variables)`);
+      } else {
+        const naam = praktijkNaam || practiceCode || email;
+        await sendWelcomeEmail({
+          email,
+          praktijkNaam: naam,
+          password,
+          licenseType: finalLicenseType || 'unlimited',
+          licenseEndDate: licenseEnd
+        });
+        console.log(`✅ Welkomstmail verstuurd naar ${email}`);
+      }
     } catch (mailErr) {
-      console.warn('Welkomstmail mislukt:', mailErr.message);
+      console.error(`❌ Welkomstmail mislukt voor ${email}:`, mailErr.message);
     }
 
     res.json({
@@ -3437,7 +3441,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/admin/users — alle gebruikers ophalen
+// GET /api/admin/users — alle gebruikers ophalen (inclusief admins)
 app.get('/api/admin/users', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
@@ -3445,20 +3449,21 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
     const { search } = req.query;
 
     const users = await withReadConnection(async (client) => {
+      // Huidige admin uitsluiten zodat je jezelf niet per ongeluk kunt verwijderen
       let q = `
         SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active
         FROM public.users u
         LEFT JOIN public.praktijken p ON u.practice_code = p.code
-        WHERE u.role != 'admin'
+        WHERE u.id != $1
       `;
-      const params = [];
+      const params = [req.session.userId];
       if (search) {
         params.push(`%${search}%`);
-        q += ` AND (u.email ILIKE $1 OR u.practice_code ILIKE $1 OR p.naam ILIKE $1)`;
+        q += ` AND (u.email ILIKE $${params.length} OR u.practice_code ILIKE $${params.length} OR p.naam ILIKE $${params.length})`;
       }
-      q += ' ORDER BY u.created_at DESC';
+      q += ' ORDER BY u.role ASC, u.created_at DESC';
       const r = await client.query(q, params);
       return r.rows;
     });
