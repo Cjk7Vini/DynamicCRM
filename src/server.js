@@ -21,7 +21,6 @@ import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
 import MetaService from './service/MetaService.js';
 import EclubService from './service/EclubService.js';
-import cron from 'node-cron';
 
 const app = express();
 
@@ -2596,35 +2595,6 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'Onjuiste inloggegevens' });
     }
-
-    // Check of gebruiker verbannen is
-    if (user.banned) {
-      return res.status(403).json({ error: 'Je account is geblokkeerd. Neem contact op met Dynamic Health Consultancy.' });
-    }
-
-    // Check of praktijk actief is (alleen voor practice users)
-    if (user.role === 'practice' && user.practice_code) {
-      const praktijk = await withReadConnection(async (client) => {
-        const result = await client.query(
-          'SELECT actief, license_end_date FROM public.praktijken WHERE code = $1',
-          [user.practice_code]
-        );
-        return result.rows[0];
-      });
-
-      if (praktijk && praktijk.actief === false) {
-        return res.status(403).json({ error: 'Je licentie is stopgezet. Neem contact op met Dynamic Health Consultancy voor meer informatie.' });
-      }
-
-      // Check verlopen licentie
-      if (praktijk && praktijk.license_end_date) {
-        const now = new Date();
-        const end = new Date(praktijk.license_end_date);
-        if (end < now) {
-          return res.status(403).json({ error: 'Je licentie is verlopen. Neem contact op met Dynamic Health Consultancy voor verlenging.' });
-        }
-      }
-    }
     
     const validPassword = await bcrypt.compare(password, user.password_hash);
     
@@ -3255,408 +3225,380 @@ app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────────────────────────────────────
-// EMAIL TEMPLATES
+// NAZORG FLOW
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formatDateNL(date) {
-  return new Date(date).toLocaleDateString('nl-NL', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  });
-}
+function nazorgEmailHtml({ clientNaam, praktijkNaam, mailNummer, reactieUrl, terugbelUrl, isLast }) {
+  const intro = mailNummer === 1
+    ? 'Het is alweer twee weken geleden dat je bij ons bent geweest voor je laatste behandeling. We hopen dat je herstel goed verloopt en dat je je goed voelt.'
+    : mailNummer === 2
+    ? 'Het is inmiddels een aantal weken geleden dat je behandeltraject bij ons is afgerond. We denken graag aan je terug en zijn benieuwd hoe het nu met je gaat.'
+    : 'Je behandeltraject bij ons is nu afgerond. We nemen voor de laatste keer contact met je op om te vragen hoe het met je gaat.';
 
-function licenseLabel(type) {
-  if (type === '12m') return '12 maanden';
-  if (type === '24m') return '24 maanden';
-  if (type === 'unlimited') return 'Onbeperkt';
-  return type || 'Onbekend';
-}
+  const outro = isLast
+    ? 'Dit is het laatste bericht dat je van ons ontvangt in het kader van je nazorg. Mochten er in de toekomst nieuwe klachten ontstaan, dan staan we uiteraard voor je klaar.'
+    : 'Mochten er vragen of klachten zijn, dan kun je altijd contact met ons opnemen.';
 
-async function sendWelcomeEmail({ email, praktijkNaam, password, licenseType, licenseEndDate }) {
-  const eindDatum = licenseType === 'unlimited' ? null : formatDateNL(licenseEndDate);
-  const licenseText = licenseType === 'unlimited'
-    ? 'Je licentie is onbeperkt geldig.'
-    : `Je licentie loopt tot en met ${eindDatum}. Je ontvangt 14 dagen van tevoren een herinnering.`;
-
-  const html = `<!DOCTYPE html>
-<html lang="nl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <tr><td style="background:#1A1D21;padding:32px 40px;">
-          <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:40px;width:auto;">
-        </td></tr>
-        <tr><td style="padding:40px;">
-          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
-          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je account voor het Dynamic Health dashboard is aangemaakt. Hieronder vind je je inloggegevens.</p>
-
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
-            <tr><td style="padding:24px;">
-              <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Inloggegevens</p>
-              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> <a href="https://dynamic-health-consultancy.nl/login.html" style="color:#2BB8A3;text-decoration:none;">dynamic-health-consultancy.nl/login.html</a></p>
-              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Gebruikersnaam:</strong> ${email}</p>
-              <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijdelijk wachtwoord:</strong> <span style="font-family:monospace;background:#e8e8ed;padding:2px 8px;border-radius:4px;">${password}</span></p>
-            </td></tr>
-          </table>
-
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
-            <tr><td style="padding:24px;">
-              <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Licentie</p>
-              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Type:</strong> ${licenseLabel(licenseType)}</p>
-              <p style="margin:0;font-size:15px;color:#3A3D40;">${licenseText}</p>
-            </td></tr>
-          </table>
-
-          <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">We raden je aan je wachtwoord na de eerste inlog te wijzigen via de accountinstellingen.</p>
-          <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;line-height:1.6;">Bij vragen kun je ons bereiken via <a href="mailto:info@dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">info@dynamic-health-consultancy.nl</a>.</p>
-          <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
-        </td></tr>
-        <tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
-          <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; <a href="https://dynamic-health-consultancy.nl" style="color:#9090a8;">dynamic-health-consultancy.nl</a></p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
-  return sendMailResilient({
-    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
-    to: email,
-    subject: 'Welkom bij Dynamic Health — je account is aangemaakt',
-    html,
-    text: `Beste ${praktijkNaam},\n\nJe account is aangemaakt.\n\nDashboard: https://dynamic-health-consultancy.nl/login.html\nGebruikersnaam: ${email}\nTijdelijk wachtwoord: ${password}\n\nLicentie: ${licenseLabel(licenseType)}\n${licenseType !== 'unlimited' ? `Geldig tot: ${formatDateNL(licenseEndDate)}` : ''}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
-  });
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#1A1D21;padding:32px 40px;">
+<img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;">
+</td></tr>
+<tr><td style="padding:40px;">
+<p style="margin:0 0 20px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${clientNaam},</p>
+<p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.7;">${intro}</p>
+<p style="margin:0 0 16px;font-size:15px;color:#3A3D40;font-weight:600;">We stellen het op prijs als je even twee vragen wilt beantwoorden:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:8px;margin:0 0 28px;">
+<tr><td style="padding:24px;">
+<p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f0f12;">Hoe zou je je herstel omschrijven op een schaal van 1 tot 10?</p>
+<p style="margin:0 0 16px;font-size:13px;color:#9090a8;">1 = helemaal niet hersteld, 10 = volledig hersteld</p>
+<p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f0f12;">Hoe hoog schat je je pijnklachten in op dit moment?</p>
+<p style="margin:0;font-size:13px;color:#9090a8;">0 = geen pijn, 10 = ernstige pijn</p>
+</td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+<tr><td align="center">
+<a href="${reactieUrl}" style="display:inline-block;padding:14px 32px;background:#2BB8A3;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:700;">Vul de vragen in</a>
+</td></tr></table>
+<p style="margin:0 0 16px;font-size:15px;color:#3A3D40;line-height:1.7;">Heb je op dit moment klachten of wil je liever even bellen? Laat het ons weten via de knop hieronder.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+<tr><td align="center">
+<a href="${terugbelUrl}" style="display:inline-block;padding:12px 28px;background:#ffffff;color:#2BB8A3;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;border:2px solid #2BB8A3;">Stuur een terugbelverzoek</a>
+</td></tr></table>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;line-height:1.7;">${outro}</p>
+<p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>${praktijkNaam}</strong></p>
+</td></tr>
+<tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+<p style="margin:0;font-size:11px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; nazorgflow</p>
+</td></tr>
+</table></td></tr></table>
+</body></html>`;
 }
 
-async function sendExpiryWarningEmail({ email, praktijkNaam, licenseEndDate }) {
-  const eindDatum = formatDateNL(licenseEndDate);
-
-  const html = `<!DOCTYPE html>
-<html lang="nl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+function nazorgPraktijkNotificatieHtml({ clientNaam, mailNummer, herstelCijfer, pijnScore, opmerking }) {
+  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <tr><td style="background:#1A1D21;padding:32px 40px;">
-          <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:40px;width:auto;">
-        </td></tr>
-        <tr><td style="padding:40px;">
-          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
-          <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">We willen je er graag op attenderen dat je licentie voor het Dynamic Health dashboard binnenkort afloopt.</p>
-
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8ed;border:1px solid #fcd34d;border-radius:6px;margin:0 0 28px;">
-            <tr><td style="padding:24px;">
-              <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Verloopdatum:</strong> ${eindDatum}</p>
-              <p style="margin:0;font-size:15px;color:#3A3D40;">Na deze datum wordt de toegang tot het dashboard automatisch geblokkeerd.</p>
-            </td></tr>
-          </table>
-
-          <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Wil je je licentie verlengen of heb je vragen? Neem dan contact met ons op via <a href="mailto:info@dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">info@dynamic-health-consultancy.nl</a>.</p>
-          <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
-        </td></tr>
-        <tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
-          <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; <a href="https://dynamic-health-consultancy.nl" style="color:#9090a8;">dynamic-health-consultancy.nl</a></p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
-  return sendMailResilient({
-    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
-    to: email,
-    subject: 'Je licentie verloopt over 14 dagen',
-    html,
-    text: `Beste ${praktijkNaam},\n\nJe licentie voor het Dynamic Health dashboard verloopt op ${eindDatum}.\n\nNa deze datum wordt de toegang automatisch geblokkeerd. Neem contact op via info@dynamic-health-consultancy.nl voor verlenging.\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
-  });
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#1A1D21;padding:28px 40px;">
+<img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:32px;width:auto;">
+</td></tr>
+<tr><td style="padding:36px 40px;">
+<p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Er is een reactie ontvangen op nazorg mail ${mailNummer} van <strong>${clientNaam}</strong>.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:8px;margin:0 0 24px;">
+<tr><td style="padding:20px 24px;">
+<p style="margin:0 0 10px;font-size:14px;color:#3A3D40;"><strong>Herstelcijfer:</strong> ${herstelCijfer}/10</p>
+<p style="margin:0 0 10px;font-size:14px;color:#3A3D40;"><strong>Pijnscore:</strong> ${pijnScore}/10</p>
+${opmerking ? `<p style="margin:0;font-size:14px;color:#3A3D40;"><strong>Opmerking:</strong> ${opmerking}</p>` : ''}
+</td></tr></table>
+<a href="https://dynamic-health-consultancy.nl/nazorg-portaal.html" style="display:inline-block;padding:12px 24px;background:#2BB8A3;color:white;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Open nazorgportaal</a>
+</td></tr>
+</table></td></tr></table>
+</body></html>`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LICENTIE BEHEER ENDPOINTS
-// ─────────────────────────────────────────────────────────────────────────────
-
-// POST /api/admin/create-user — uitgebreid met licentie + welkomstmail
-app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
+// POST /api/nazorg/start
+app.post('/api/nazorg/start', requireAuth, async (req, res) => {
   try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-
-    const { email, password, role, practiceCode, licenseType, praktijkNaam } = req.body;
-
-    if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
-    if (!['admin', 'practice'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
-    if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
-    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      return res.status(400).json({ error: 'Wachtwoord voldoet niet aan de eisen' });
+    const { naam, email, telefoon, behandelaar, laatste_behandeling, praktijk_code: bodyCode } = req.body;
+    const praktijkCode = req.session.role === 'admin' ? (bodyCode || req.session.practiceCode) : req.session.practiceCode;
+    if (!naam || !email || !laatste_behandeling || !praktijkCode) {
+      return res.status(400).json({ error: 'Naam, e-mail, praktijkcode en datum zijn verplicht' });
     }
+    const start = new Date(laatste_behandeling);
+    const m1 = new Date(start); m1.setDate(m1.getDate() + 14);
+    const m2 = new Date(m1);   m2.setDate(m2.getDate() + 42);
+    const m3 = new Date(start); m3.setDate(m3.getDate() + 90);
 
-    // Check duplicate
-    const existing = await withReadConnection(async (client) => {
-      const r = await client.query('SELECT id FROM public.users WHERE email = $1', [email.toLowerCase().trim()]);
-      return r.rows[0];
-    });
-    if (existing) return res.status(400).json({ error: 'Dit e-mailadres bestaat al' });
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Bereken licentiedatum
-    let licenseStart = null, licenseEnd = null, finalLicenseType = null;
-    if (role === 'practice') {
-      finalLicenseType = licenseType || '12m';
-      licenseStart = new Date();
-      if (finalLicenseType !== 'unlimited') {
-        licenseEnd = new Date();
-        const months = finalLicenseType === '12m' ? 12 : 24;
-        licenseEnd.setMonth(licenseEnd.getMonth() + months);
+    const clientId = await withWriteConnection(async (db) => {
+      const r = await db.query(
+        `INSERT INTO nazorg_clienten (praktijk_code,naam,email,telefoon,behandelaar,laatste_behandeling,gestart_door)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [praktijkCode, naam, email, telefoon||null, behandelaar||null, laatste_behandeling, req.session.email]
+      );
+      const id = r.rows[0].id;
+      for (const [nr, datum] of [[1,m1],[2,m2],[3,m3]]) {
+        const token = crypto.randomBytes(32).toString('hex');
+        await db.query('INSERT INTO nazorg_reacties (client_id,mail_nummer,token) VALUES ($1,$2,$3)', [id,nr,token]);
+        await db.query('INSERT INTO nazorg_emails (client_id,mail_nummer,gepland_op) VALUES ($1,$2,$3)',
+          [id, nr, datum.toISOString().split('T')[0]]);
       }
-    }
+      return id;
+    });
+    console.log(`[NAZORG] Klantenreis gestart: ${naam} (${email}) - praktijk ${praktijkCode}`);
+    res.json({ success: true, clientId });
+  } catch (error) {
+    console.error('Nazorg start error:', error);
+    res.status(500).json({ error: 'Fout bij starten klantenreis' });
+  }
+});
 
-    const newUser = await withWriteConnection(async (client) => {
-      const r = await client.query(
-        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
-         VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email, role, practice_code`,
-        [email.toLowerCase().trim(), passwordHash, role, role === 'practice' ? practiceCode.toUpperCase().trim() : null]
+// GET /api/nazorg/clienten
+app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
+  try {
+    const praktijkCode = req.session.role === 'admin' ? (req.query.praktijk||null) : req.session.practiceCode;
+    const clienten = await withReadConnection(async (db) => {
+      let q = `SELECT c.*,
+        (SELECT COUNT(*) FROM nazorg_emails e WHERE e.client_id=c.id AND e.verstuurd=TRUE) as mails_verstuurd,
+        (SELECT COUNT(*) FROM nazorg_reacties r WHERE r.client_id=c.id AND r.herstel_cijfer IS NOT NULL) as reacties,
+        (SELECT COUNT(*) FROM nazorg_taken t WHERE t.client_id=c.id AND t.status='open') as open_taken
+        FROM nazorg_clienten c WHERE c.status != 'verwijderd'`;
+      const params = [];
+      if (praktijkCode) { params.push(praktijkCode); q += ` AND c.praktijk_code=$${params.length}`; }
+      q += ' ORDER BY c.aangemaakt_op DESC';
+      return (await db.query(q, params)).rows;
+    });
+    res.json({ success: true, clienten });
+  } catch (error) { res.status(500).json({ error: 'Fout bij ophalen clienten' }); }
+});
+
+// GET /api/nazorg/client/:id
+app.get('/api/nazorg/client/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await withReadConnection(async (db) => {
+      const c = await db.query('SELECT * FROM nazorg_clienten WHERE id=$1', [id]);
+      const e = await db.query('SELECT * FROM nazorg_emails WHERE client_id=$1 ORDER BY mail_nummer', [id]);
+      const r = await db.query('SELECT * FROM nazorg_reacties WHERE client_id=$1 ORDER BY mail_nummer', [id]);
+      const t = await db.query('SELECT * FROM nazorg_taken WHERE client_id=$1 ORDER BY aangemaakt_op DESC', [id]);
+      return { client: c.rows[0], emails: e.rows, reacties: r.rows, taken: t.rows };
+    });
+    res.json({ success: true, ...data });
+  } catch (error) { res.status(500).json({ error: 'Fout bij ophalen client' }); }
+});
+
+// GET /api/nazorg/taken
+app.get('/api/nazorg/taken', requireAuth, async (req, res) => {
+  try {
+    const praktijkCode = req.session.role === 'admin' ? (req.query.praktijk||null) : req.session.practiceCode;
+    const taken = await withReadConnection(async (db) => {
+      let q = `SELECT t.*, c.naam as client_naam, c.email as client_email, c.telefoon as client_telefoon
+        FROM nazorg_taken t JOIN nazorg_clienten c ON t.client_id=c.id WHERE t.status='open'`;
+      const params = [];
+      if (praktijkCode) { params.push(praktijkCode); q += ` AND t.praktijk_code=$${params.length}`; }
+      q += ' ORDER BY t.aangemaakt_op ASC';
+      return (await db.query(q, params)).rows;
+    });
+    res.json({ success: true, taken });
+  } catch (error) { res.status(500).json({ error: 'Fout bij ophalen taken' }); }
+});
+
+// PATCH /api/nazorg/taak/:id
+app.patch('/api/nazorg/taak/:id', requireAuth, async (req, res) => {
+  try {
+    await withWriteConnection(async (db) => {
+      await db.query(`UPDATE nazorg_taken SET status='afgehandeld', afgehandeld_op=NOW() WHERE id=$1`, [req.params.id]);
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Fout bij afhandelen taak' }); }
+});
+
+// DELETE /api/nazorg/client/:id
+app.delete('/api/nazorg/client/:id', requireAuth, async (req, res) => {
+  try {
+    await withWriteConnection(async (db) => {
+      await db.query(`UPDATE nazorg_clienten SET status='verwijderd' WHERE id=$1`, [req.params.id]);
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Fout bij verwijderen client' }); }
+});
+
+// GET /nazorg/reactie/:token — publieke reactiepagina
+app.get('/nazorg/reactie/:token', async (req, res) => {
+  try {
+    const data = await withReadConnection(async (db) => {
+      const r = await db.query(
+        `SELECT nr.*, nc.naam FROM nazorg_reacties nr
+         JOIN nazorg_clienten nc ON nr.client_id=nc.id WHERE nr.token=$1`,
+        [req.params.token]
       );
       return r.rows[0];
     });
+    if (!data) return res.status(404).send('<p>Link niet gevonden.</p>');
+    if (data.herstel_cijfer !== null) return res.send('<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Bedankt!</h2><p>Je hebt deze vragen al eerder ingevuld.</p></body></html>');
 
-    // Licentie opslaan in praktijken tabel
-    if (role === 'practice' && practiceCode) {
-      await withWriteConnection(async (client) => {
-        await client.query(
-          `UPDATE public.praktijken SET
-            license_type = $1,
-            license_start_date = $2,
-            license_end_date = $3,
-            expiry_warning_sent = FALSE
-           WHERE code = $4`,
-          [finalLicenseType, licenseStart, licenseEnd, practiceCode.toUpperCase().trim()]
-        );
-      });
-    }
-
-    // Stuur welkomstmail
-    try {
-      if (!SMTP.host || !SMTP.user || !SMTP.pass) {
-        console.warn(`⚠️ Welkomstmail NIET verstuurd naar ${email}: SMTP niet geconfigureerd (SMTP_HOST/SMTP_USER/SMTP_PASS ontbreken in Render environment variables)`);
-      } else {
-        const naam = praktijkNaam || practiceCode || email;
-        await sendWelcomeEmail({
-          email,
-          praktijkNaam: naam,
-          password,
-          licenseType: finalLicenseType || 'unlimited',
-          licenseEndDate: licenseEnd
-        });
-        console.log(`✅ Welkomstmail verstuurd naar ${email}`);
-      }
-    } catch (mailErr) {
-      console.error(`❌ Welkomstmail mislukt voor ${email}:`, mailErr.message);
-    }
-
-    res.json({
-      success: true,
-      user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code },
-      license: { type: finalLicenseType, start: licenseStart, end: licenseEnd }
-    });
-
-  } catch (error) {
-    console.error('Create user licensed error:', error);
-    res.status(500).json({ error: 'Fout bij aanmaken gebruiker' });
-  }
+    const token = req.params.token;
+    res.send(`<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nazorg vragenlijst</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'DM Sans',sans-serif;background:#f4f4f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:white;border-radius:16px;padding:40px;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+    h1{font-size:20px;font-weight:700;color:#0f0f12;margin-bottom:8px}
+    .sub{font-size:14px;color:#9090a8;margin-bottom:32px;line-height:1.6}
+    .q{margin-bottom:28px}
+    .q label{display:block;font-size:14px;font-weight:600;color:#0f0f12;margin-bottom:8px}
+    .hint{font-size:12px;color:#9090a8;margin-bottom:10px}
+    .scale{display:flex;gap:5px;flex-wrap:wrap}
+    .scale button{flex:1;min-width:34px;padding:10px 4px;border:1.5px solid #e4e4e8;border-radius:8px;background:white;font-size:13px;font-weight:600;color:#5a5a72;cursor:pointer;transition:all .15s}
+    .scale button.sel{background:#2BB8A3;border-color:#2BB8A3;color:white}
+    textarea{width:100%;padding:12px;border:1.5px solid #e4e4e8;border-radius:8px;font-family:inherit;font-size:14px;resize:vertical;min-height:80px}
+    textarea:focus{outline:none;border-color:#2BB8A3}
+    .btn{width:100%;padding:14px;background:#2BB8A3;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .done{text-align:center;padding:40px 0;display:none}
+    .done h2{font-size:22px;margin-bottom:12px}
+    .done p{color:#5a5a72;font-size:14px;line-height:1.7}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div id="formDiv">
+    <h1>Hoe gaat het met je?</h1>
+    <p class="sub">Beste ${data.naam}, we zijn benieuwd hoe je herstel verloopt. Vul hieronder twee korte vragen in.</p>
+    <div class="q">
+      <label>Hoe zou je je herstel omschrijven?</label>
+      <div class="hint">1 = helemaal niet hersteld &nbsp;&mdash;&nbsp; 10 = volledig hersteld</div>
+      <div class="scale" id="hScale">
+        ${Array.from({length:10},(_,i)=>`<button onclick="sel('h',${i+1})" id="h${i+1}">${i+1}</button>`).join('')}
+      </div>
+    </div>
+    <div class="q">
+      <label>Hoe hoog zijn je pijnklachten op dit moment?</label>
+      <div class="hint">0 = geen pijn &nbsp;&mdash;&nbsp; 10 = ernstige pijn</div>
+      <div class="scale" id="pScale">
+        ${Array.from({length:11},(_,i)=>`<button onclick="sel('p',${i})" id="p${i}">${i}</button>`).join('')}
+      </div>
+    </div>
+    <div class="q">
+      <label>Heb je nog een opmerking? (optioneel)</label>
+      <textarea id="opm" placeholder="Eventuele toelichting..."></textarea>
+    </div>
+    <button class="btn" id="sendBtn" onclick="send()" disabled>Versturen</button>
+  </div>
+  <div class="done" id="doneDiv">
+    <div style="font-size:48px;margin-bottom:16px">&#10003;</div>
+    <h2>Bedankt voor je reactie!</h2>
+    <p>We hebben je antwoorden ontvangen. Mocht je vragen hebben, neem dan gerust contact op met de praktijk.</p>
+  </div>
+</div>
+<script>
+const sc={h:null,p:null};
+function sel(t,v){sc[t]=v;const p=t==='h'?'h':'p';const mx=t==='h'?10:10;for(let i=0;i<=mx;i++){const b=document.getElementById(p+i);if(b)b.className=i===v?'sel':'';}document.getElementById('sendBtn').disabled=sc.h===null||sc.p===null;}
+async function send(){const btn=document.getElementById('sendBtn');btn.disabled=true;btn.textContent='Bezig...';
+const res=await fetch('/nazorg/reactie/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({herstel_cijfer:sc.h,pijn_score:sc.p,opmerking:document.getElementById('opm').value.trim()})});
+if(res.ok){document.getElementById('formDiv').style.display='none';document.getElementById('doneDiv').style.display='block';}
+else{btn.disabled=false;btn.textContent='Versturen';alert('Er is iets misgegaan. Probeer het opnieuw.');}}
+</script>
+</body></html>`);
+  } catch (e) { res.status(500).send('Er is een fout opgetreden.'); }
 });
 
-// GET /api/admin/users — alle gebruikers ophalen (inclusief admins)
-app.get('/api/admin/users', requireAuth, async (req, res) => {
+// POST /nazorg/reactie/:token
+app.post('/nazorg/reactie/:token', async (req, res) => {
   try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { token } = req.params;
+    const { herstel_cijfer, pijn_score, opmerking } = req.body;
+    const reactie = await withReadConnection(async (db) => {
+      const r = await db.query(
+        `SELECT nr.*, nc.naam, nc.praktijk_code, p.naam as praktijk_naam, p.email_to as praktijk_email
+         FROM nazorg_reacties nr JOIN nazorg_clienten nc ON nr.client_id=nc.id
+         LEFT JOIN praktijken p ON nc.praktijk_code=p.code
+         WHERE nr.token=$1 AND nr.herstel_cijfer IS NULL`, [token]);
+      return r.rows[0];
+    });
+    if (!reactie) return res.status(400).json({ error: 'Token ongeldig of al gebruikt' });
 
-    const { search } = req.query;
-
-    const users = await withReadConnection(async (client) => {
-      // Huidige admin uitsluiten zodat je jezelf niet per ongeluk kunt verwijderen
-      let q = `
-        SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
-               p.naam as praktijk_naam, p.license_type, p.license_start_date,
-               p.license_end_date, p.actief as license_active
-        FROM public.users u
-        LEFT JOIN public.praktijken p ON u.practice_code = p.code
-        WHERE u.id != $1
-      `;
-      const params = [req.session.userId];
-      if (search) {
-        params.push(`%${search}%`);
-        q += ` AND (u.email ILIKE $${params.length} OR u.practice_code ILIKE $${params.length} OR p.naam ILIKE $${params.length})`;
-      }
-      q += ' ORDER BY u.role ASC, u.created_at DESC';
-      const r = await client.query(q, params);
-      return r.rows;
+    await withWriteConnection(async (db) => {
+      await db.query(
+        'UPDATE nazorg_reacties SET herstel_cijfer=$1,pijn_score=$2,opmerking=$3,ingevuld_op=NOW() WHERE token=$4',
+        [herstel_cijfer, pijn_score, opmerking||null, token]
+      );
     });
 
-    res.json({ success: true, users });
-  } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({ error: 'Fout bij ophalen gebruikers' });
-  }
-});
-
-// PATCH /api/admin/users/:id — gebruiker aanpassen (ban, licentie wijzigen)
-app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-
-    const { id } = req.params;
-    const { banned, licenseType, action } = req.body;
-
-    // Ban/unban
-    if (typeof banned === 'boolean') {
-      await withWriteConnection(async (client) => {
-        await client.query('UPDATE public.users SET banned = $1 WHERE id = $2', [banned, id]);
-      });
-    }
-
-    // Licentie aanpassen
-    if (licenseType || action) {
-      const user = await withReadConnection(async (client) => {
-        const r = await client.query('SELECT practice_code FROM public.users WHERE id = $1', [id]);
-        return r.rows[0];
-      });
-
-      if (user?.practice_code) {
-        let licenseEnd = null;
-        let newType = licenseType;
-
-        if (action === 'extend_12m') { newType = '12m'; licenseEnd = new Date(); licenseEnd.setMonth(licenseEnd.getMonth() + 12); }
-        else if (action === 'extend_24m') { newType = '24m'; licenseEnd = new Date(); licenseEnd.setMonth(licenseEnd.getMonth() + 24); }
-        else if (action === 'reactivate') {
-          await withWriteConnection(async (client) => {
-            await client.query(
-              `UPDATE public.praktijken SET actief = TRUE, expiry_warning_sent = FALSE WHERE code = $1`,
-              [user.practice_code]
-            );
-          });
-        } else if (action === 'stop') {
-          await withWriteConnection(async (client) => {
-            await client.query(
-              `UPDATE public.praktijken SET actief = FALSE WHERE code = $1`,
-              [user.practice_code]
-            );
-          });
-        } else if (licenseType === 'unlimited') {
-          await withWriteConnection(async (client) => {
-            await client.query(
-              `UPDATE public.praktijken SET license_type = 'unlimited', license_end_date = NULL,
-               actief = TRUE, expiry_warning_sent = FALSE WHERE code = $1`,
-              [user.practice_code]
-            );
-          });
-        }
-
-        if (licenseEnd) {
-          await withWriteConnection(async (client) => {
-            await client.query(
-              `UPDATE public.praktijken SET license_type = $1, license_end_date = $2,
-               license_start_date = NOW(), actief = TRUE, expiry_warning_sent = FALSE WHERE code = $3`,
-              [newType, licenseEnd, user.practice_code]
-            );
-          });
-        }
-      }
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ error: 'Fout bij bijwerken gebruiker' });
-  }
-});
-
-// DELETE /api/admin/users/:id — gebruiker verwijderen
-app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-    const { id } = req.params;
-    await withWriteConnection(async (client) => {
-      await client.query('DELETE FROM public.users WHERE id = $1 AND role != \'admin\'', [id]);
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({ error: 'Fout bij verwijderen gebruiker' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CRON JOB — dagelijks om 08:00
-// ─────────────────────────────────────────────────────────────────────────────
-
-cron.schedule('0 8 * * *', async () => {
-  console.log('🔄 [CRON] Licentie check gestart...');
-
-  try {
-    // 1. Stuur waarschuwingsmail 14 dagen voor verlopen
-    const expiringSoon = await withReadConnection(async (client) => {
-      const r = await client.query(`
-        SELECT p.code, p.naam, p.license_end_date,
-               u.email
-        FROM public.praktijken p
-        JOIN public.users u ON u.practice_code = p.code
-        WHERE p.license_type != 'unlimited'
-          AND p.license_end_date IS NOT NULL
-          AND p.license_end_date::date = (NOW() + INTERVAL '14 days')::date
-          AND (p.expiry_warning_sent = FALSE OR p.expiry_warning_sent IS NULL)
-          AND p.actief = TRUE
-          AND u.role = 'practice'
-      `);
-      return r.rows;
-    });
-
-    for (const p of expiringSoon) {
+    if (reactie.praktijk_email && SMTP.host) {
       try {
-        await sendExpiryWarningEmail({
-          email: p.email,
-          praktijkNaam: p.naam,
-          licenseEndDate: p.license_end_date
+        await sendMailResilient({
+          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          to: reactie.praktijk_email,
+          subject: `Nazorg reactie ontvangen van ${reactie.naam}`,
+          html: nazorgPraktijkNotificatieHtml({ clientNaam: reactie.naam, mailNummer: reactie.mail_nummer, herstelCijfer: herstel_cijfer, pijnScore: pijn_score, opmerking }),
+          text: `Reactie van ${reactie.naam}. Herstelcijfer: ${herstel_cijfer}/10, pijnscore: ${pijn_score}/10.`
         });
-        await withWriteConnection(async (client) => {
-          await client.query(
-            'UPDATE public.praktijken SET expiry_warning_sent = TRUE WHERE code = $1',
-            [p.code]
-          );
-        });
-        console.log(`✅ [CRON] Waarschuwingsmail verstuurd: ${p.naam} (${p.email})`);
-      } catch (e) {
-        console.error(`❌ [CRON] Mail mislukt voor ${p.naam}:`, e.message);
-      }
+      } catch (e) { console.warn('Nazorg notificatie mislukt:', e.message); }
     }
+    res.json({ success: true });
+  } catch (e) { console.error('Nazorg reactie error:', e); res.status(500).json({ error: 'Fout bij opslaan' }); }
+});
 
-    // 2. Deactiveer verlopen licenties
-    const deactivated = await withWriteConnection(async (client) => {
-      const r = await client.query(`
-        UPDATE public.praktijken
-        SET actief = FALSE
-        WHERE license_type != 'unlimited'
-          AND license_end_date IS NOT NULL
-          AND license_end_date::date < NOW()::date
-          AND actief = TRUE
-        RETURNING code, naam
-      `);
+// GET /nazorg/terugbel/:token
+app.get('/nazorg/terugbel/:token', async (req, res) => {
+  try {
+    const reactie = await withReadConnection(async (db) => {
+      const r = await db.query(
+        `SELECT nr.client_id, nr.mail_nummer, nc.naam, nc.praktijk_code
+         FROM nazorg_reacties nr JOIN nazorg_clienten nc ON nr.client_id=nc.id WHERE nr.token=$1`,
+        [req.params.token]);
+      return r.rows[0];
+    });
+    if (!reactie) return res.status(404).send('<p>Link niet gevonden.</p>');
+
+    await withWriteConnection(async (db) => {
+      await db.query(
+        `INSERT INTO nazorg_taken (client_id,praktijk_code,omschrijving) VALUES ($1,$2,$3)`,
+        [reactie.client_id, reactie.praktijk_code, `Terugbelverzoek via nazorg mail ${reactie.mail_nummer} van ${reactie.naam}`]
+      );
+    });
+
+    res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;background:#f4f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}.card{background:white;border-radius:16px;padding:40px;max-width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}</style></head>
+<body><div class="card"><div style="font-size:40px;margin-bottom:16px">&#128222;</div><h2 style="margin-bottom:12px">Terugbelverzoek ontvangen</h2><p style="color:#5a5a72;font-size:14px;line-height:1.7">Je verzoek is doorgestuurd. We nemen zo snel mogelijk contact met je op.</p></div></body></html>`);
+  } catch (e) { res.status(500).send('Fout opgetreden.'); }
+});
+
+// NAZORG CRON: dagelijks 09:00
+cron.schedule('0 9 * * *', async () => {
+  console.log('[NAZORG CRON] E-mailcheck gestart...');
+  try {
+    const vandaag = new Date().toISOString().split('T')[0];
+    const teVersturen = await withReadConnection(async (db) => {
+      const r = await db.query(
+        `SELECT e.id as eid, e.mail_nummer, e.client_id, nc.naam, nc.email, nc.praktijk_code, p.naam as praktijk_naam
+         FROM nazorg_emails e JOIN nazorg_clienten nc ON e.client_id=nc.id
+         LEFT JOIN praktijken p ON nc.praktijk_code=p.code
+         WHERE e.verstuurd=FALSE AND e.gepland_op<=$1 AND nc.status='actief'`, [vandaag]);
       return r.rows;
     });
 
-    if (deactivated.length > 0) {
-      console.log(`✅ [CRON] Gedeactiveerd: ${deactivated.map(p => p.naam).join(', ')}`);
+    for (const mail of teVersturen) {
+      try {
+        const tokenRow = await withReadConnection(async (db) => {
+          const r = await db.query('SELECT token FROM nazorg_reacties WHERE client_id=$1 AND mail_nummer=$2', [mail.client_id, mail.mail_nummer]);
+          return r.rows[0];
+        });
+        if (!tokenRow) continue;
+        const base = process.env.APP_URL || 'https://dynamic-health-consultancy.nl';
+        const isLast = mail.mail_nummer === 3;
+        await sendMailResilient({
+          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          to: mail.email,
+          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : mail.mail_nummer === 2 ? `We denken aan je — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : `Een laatste update over je herstel — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
+          html: nazorgEmailHtml({ clientNaam: mail.naam, praktijkNaam: mail.praktijk_naam || mail.praktijk_code,
+            mailNummer: mail.mail_nummer, reactieUrl: `${base}/nazorg/reactie/${tokenRow.token}`,
+            terugbelUrl: `${base}/nazorg/terugbel/${tokenRow.token}`, isLast }),
+          text: `Beste ${mail.naam}, vul je herstelcijfer in via: ${base}/nazorg/reactie/${tokenRow.token}`
+        });
+        await withWriteConnection(async (db) => {
+          await db.query('UPDATE nazorg_emails SET verstuurd=TRUE,verstuurd_op=NOW() WHERE id=$1', [mail.eid]);
+          if (isLast) await db.query(`UPDATE nazorg_clienten SET status='voltooid',flow_voltooid=TRUE WHERE id=$1`, [mail.client_id]);
+        });
+        console.log(`[NAZORG CRON] Mail ${mail.mail_nummer} verstuurd naar ${mail.email}`);
+      } catch (e) { console.error(`[NAZORG CRON] Mislukt voor ${mail.email}:`, e.message); }
     }
-
-    console.log(`✅ [CRON] Licentie check klaar. Warnings: ${expiringSoon.length}, Deactivaties: ${deactivated.length}`);
-  } catch (error) {
-    console.error('❌ [CRON] Licentie check mislukt:', error);
-  }
+    console.log('[NAZORG CRON] Klaar');
+  } catch (e) { console.error('[NAZORG CRON] Fout:', e); }
 }, { timezone: 'Europe/Amsterdam' });
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);

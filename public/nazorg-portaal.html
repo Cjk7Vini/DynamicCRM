@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nazorgportaal — Dynamic Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #f4f4f6;
+      --surface: #ffffff;
+      --border:  #e4e4e8;
+      --text-1:  #0f0f12;
+      --text-2:  #5a5a72;
+      --text-3:  #9090a8;
+      --accent:  #2BB8A3;
+      --accent-d:#1a9985;
+      --red:     #e5334a;
+      --amber:   #f59e0b;
+      --green:   #16a34a;
+      --radius:  10px;
+      --shadow:  0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',system-ui,sans-serif; background:var(--bg); color:var(--text-1); font-size:14px; min-height:100vh; }
+
+    /* Topbar */
+    .topbar { background:#1A1D21; height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 32px; }
+    .topbar-brand { display:flex; align-items:center; gap:12px; }
+    .topbar-brand img { height:30px; }
+    .topbar-brand-name { color:white; font-size:15px; font-weight:600; }
+    .topbar-right { display:flex; align-items:center; gap:10px; }
+    .btn-back { display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:6px; border:1px solid rgba(255,255,255,.2); background:transparent; color:rgba(255,255,255,.7); font-size:13px; font-family:inherit; cursor:pointer; text-decoration:none; transition:all .15s; }
+    .btn-back:hover { background:rgba(255,255,255,.1); color:white; }
+
+    /* Layout */
+    .main { max-width:1200px; margin:28px auto; padding:0 24px; }
+
+    /* Tabs */
+    .tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:4px; width:fit-content; }
+    .tab { padding:8px 20px; border-radius:7px; font-size:13px; font-weight:500; cursor:pointer; border:none; background:transparent; color:var(--text-2); font-family:inherit; transition:all .15s; }
+    .tab.active { background:var(--accent); color:white; font-weight:600; }
+
+    /* Cards */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+    .card-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:1px solid var(--border); }
+    .card-title { font-size:14px; font-weight:600; }
+    .card-body { padding:20px; }
+
+    /* KPI row */
+    .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
+    .kpi-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px; }
+    .kpi-value { font-size:26px; font-weight:700; color:var(--text-1); }
+
+    /* Form */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .form-group { margin-bottom:0; }
+    .form-group.full { grid-column:1/-1; }
+    label { display:block; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; color:var(--text-2); margin-bottom:5px; }
+    input, select { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:7px; font-size:14px; font-family:inherit; color:var(--text-1); background:white; }
+    input:focus, select:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,184,163,.1); }
+    .btn { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; border-radius:7px; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .15s; border:none; }
+    .btn-primary { background:var(--accent); color:white; }
+    .btn-primary:hover { background:var(--accent-d); }
+    .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--text-2); }
+    .btn-ghost:hover { background:var(--bg); }
+    .btn-sm { padding:5px 10px; font-size:12px; }
+
+    /* Alert */
+    .alert { padding:10px 14px; border-radius:7px; font-size:13px; font-weight:500; margin-bottom:14px; }
+    .alert-success { background:#e6f6ec; border:1px solid #86efac; color:#166534; }
+    .alert-error { background:#fde8eb; border:1px solid #fca5a5; color:#991b1b; }
+
+    /* Table */
+    .table { width:100%; border-collapse:collapse; }
+    .table th { text-align:left; padding:8px 12px; font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--text-3); border-bottom:1px solid var(--border); }
+    .table td { padding:11px 12px; font-size:13px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .table tr:last-child td { border-bottom:none; }
+    .table tr:hover td { background:var(--bg); }
+
+    /* Badge */
+    .badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+    .badge-green  { background:#e6f6ec; color:#166534; }
+    .badge-red    { background:#fde8eb; color:#991b1b; }
+    .badge-amber  { background:#fffbeb; color:#92400e; }
+    .badge-blue   { background:#e8f0fe; color:#1a56db; }
+    .badge-gray   { background:#f4f4f6; color:var(--text-2); }
+
+    /* Mail steps */
+    .mail-steps { display:flex; gap:8px; align-items:center; }
+    .mail-dot { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--text-3); flex-shrink:0; }
+    .mail-dot.sent { background:var(--accent); border-color:var(--accent); color:white; }
+    .mail-dot.reacted { background:var(--green); border-color:var(--green); color:white; }
+
+    /* Search */
+    .search-row { display:flex; gap:8px; margin-bottom:16px; }
+    .search-row input { flex:1; }
+
+    /* Empty */
+    .empty { text-align:center; padding:40px; color:var(--text-3); font-size:13px; }
+
+    /* Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; backdrop-filter:blur(2px); justify-content:center; align-items:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:white; border-radius:14px; padding:28px; max-width:560px; width:90%; max-height:80vh; overflow-y:auto; }
+    .modal h3 { font-size:16px; font-weight:700; margin-bottom:16px; }
+    .modal-close { float:right; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-3); margin-top:-4px; }
+
+    /* Score display */
+    .score-pill { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; font-size:13px; font-weight:700; }
+    .score-good { background:#e6f6ec; color:#166534; }
+    .score-mid  { background:#fffbeb; color:#92400e; }
+    .score-bad  { background:#fde8eb; color:#991b1b; }
+
+    @media(max-width:768px) {
+      .kpi-row { grid-template-columns:repeat(2,1fr); }
+      .form-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-brand">
+      <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
+      <span class="topbar-brand-name">Nazorgportaal</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/churn-dashboard.html" class="btn-back">← Dashboard</a>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi"><div class="kpi-label">Actieve cliënten</div><div class="kpi-value" id="kpiActief">—</div></div>
+      <div class="kpi"><div class="kpi-label">Voltooide flows</div><div class="kpi-value" id="kpiVoltooid">—</div></div>
+      <div class="kpi"><div class="kpi-label">Open taken</div><div class="kpi-value" id="kpiTaken">—</div></div>
+      <div class="kpi"><div class="kpi-label">Reacties ontvangen</div><div class="kpi-value" id="kpiReacties">—</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('clienten')">Cliënten</button>
+      <button class="tab" onclick="showTab('nieuw')">Nieuwe cliënt</button>
+      <button class="tab" onclick="showTab('taken')">Openstaande taken</button>
+    </div>
+
+    <!-- Tab: Cliënten -->
+    <div id="tab-clienten">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Overzicht cliënten</div>
+        </div>
+        <div class="card-body">
+          <div class="search-row">
+            <input type="text" id="searchInput" placeholder="Zoek op naam of e-mail..." oninput="filterClienten()">
+          </div>
+          <div id="clientenTable"><div class="empty">Laden...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Nieuwe cliënt -->
+    <div id="tab-nieuw" style="display:none;">
+      <div class="card" style="max-width:600px;">
+        <div class="card-header">
+          <div class="card-title">Klantenreis starten</div>
+        </div>
+        <div class="card-body">
+          <div id="startAlert"></div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Naam cliënt *</label>
+              <input type="text" id="fNaam" placeholder="Voor- en achternaam">
+            </div>
+            <div class="form-group">
+              <label>E-mailadres *</label>
+              <input type="email" id="fEmail" placeholder="email@voorbeeld.nl">
+            </div>
+            <div class="form-group">
+              <label>Telefoonnummer</label>
+              <input type="tel" id="fTel" placeholder="06-12345678">
+            </div>
+            <div class="form-group">
+              <label>Behandelaar</label>
+              <input type="text" id="fBehandelaar" placeholder="Naam behandelaar">
+            </div>
+            <div class="form-group full">
+              <label>Datum laatste behandeling *</label>
+              <input type="date" id="fDatum">
+            </div>
+            <div class="form-group full" id="praktijkGroep" style="display:none;">
+              <label>Praktijkcode</label>
+              <input type="text" id="fPraktijk" placeholder="Bijv. T6PV9A">
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <div style="background:#f9f9fb;border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;font-size:13px;color:var(--text-2);line-height:1.6;">
+              <strong style="color:var(--text-1);">Planning na starten:</strong><br>
+              Mail 1 — 14 dagen na laatste behandeling<br>
+              Mail 2 — 8 weken na laatste behandeling<br>
+              Mail 3 — 3 maanden na laatste behandeling (afsluitend)
+            </div>
+            <button class="btn btn-primary" id="startBtn" onclick="startKlantenreis()">
+              Start klantenreis
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Taken -->
+    <div id="tab-taken" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Openstaande terugbelverzoeken</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadTaken()">↻ Vernieuwen</button>
+        </div>
+        <div class="card-body">
+          <div id="takenTable"><div class="empty">Laden...</div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Cliënt detail modal -->
+  <div class="modal-overlay" id="clientModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h3 id="modalNaam">Cliënt detail</h3>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let allClienten = [];
+
+    // ── Auth ─────────────────────────────────────────────────────────────
+    async function init() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials:'include' });
+        if (!res.ok) { window.location.href = '/login.html'; return; }
+        const data = await res.json();
+        currentUser = data.user;
+        if (currentUser.role === 'admin') {
+          document.getElementById('praktijkGroep').style.display = 'block';
+        }
+        loadClienten();
+        loadTaken();
+      } catch { window.location.href = '/login.html'; }
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────────────────
+    function showTab(name) {
+      ['clienten','nieuw','taken'].forEach(t => {
+        document.getElementById('tab-'+t).style.display = t===name ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab').forEach((btn,i) => {
+        btn.classList.toggle('active', ['clienten','nieuw','taken'][i] === name);
+      });
+      if (name === 'taken') loadTaken();
+    }
+
+    // ── KPIs ─────────────────────────────────────────────────────────────
+    function updateKPIs(clienten, taken) {
+      const actief    = clienten.filter(c => c.status === 'actief').length;
+      const voltooid  = clienten.filter(c => c.status === 'voltooid').length;
+      const takenOpen = taken.length;
+      const reacties  = clienten.reduce((s,c) => s + parseInt(c.reacties||0), 0);
+      document.getElementById('kpiActief').textContent   = actief;
+      document.getElementById('kpiVoltooid').textContent = voltooid;
+      document.getElementById('kpiTaken').textContent    = takenOpen;
+      document.getElementById('kpiReacties').textContent = reacties;
+    }
+
+    // ── Cliënten laden ────────────────────────────────────────────────────
+    async function loadClienten() {
+      try {
+        const res = await fetch('/api/nazorg/clienten', { credentials:'include' });
+        const data = await res.json();
+        if (!data.success) return;
+        allClienten = data.clienten;
+        renderClienten(allClienten);
+        const takenRes = await fetch('/api/nazorg/taken', { credentials:'include' });
+        const takenData = await takenRes.json();
+        updateKPIs(allClienten, takenData.taken || []);
+      } catch (e) { console.error(e); }
+    }
+
+    function filterClienten() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allClienten.filter(c =>
+        c.naam.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+      );
+      renderClienten(filtered);
+    }
+
+    function renderClienten(clienten) {
+      const el = document.getElementById('clientenTable');
+      if (!clienten.length) { el.innerHTML = '<div class="empty">Geen cliënten gevonden.</div>'; return; }
+
+      let html = `<table class="table"><thead><tr>
+        <th>Naam</th><th>E-mail</th><th>Behandeling</th><th>Mails</th><th>Reacties</th><th>Status</th><th></th>
+      </tr></thead><tbody>`;
+
+      clienten.forEach(c => {
+        const mails = parseInt(c.mails_verstuurd||0);
+        const reacties = parseInt(c.reacties||0);
+        const openTaken = parseInt(c.open_taken||0);
+        const statusBadge = c.status === 'actief'
+          ? '<span class="badge badge-green">Actief</span>'
+          : c.status === 'voltooid'
+          ? '<span class="badge badge-blue">Voltooid</span>'
+          : '<span class="badge badge-gray">Gestopt</span>';
+
+        const mailDots = [1,2,3].map(n => {
+          const cls = n <= reacties ? 'reacted' : n <= mails ? 'sent' : '';
+          return `<div class="mail-dot ${cls}" title="Mail ${n}">${n}</div>`;
+        }).join('');
+
+        html += `<tr>
+          <td><div style="font-weight:500;">${c.naam}</div>
+            ${openTaken > 0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;">⚡ ${openTaken} open taak</div>` : ''}
+          </td>
+          <td style="color:var(--text-2);">${c.email}</td>
+          <td style="color:var(--text-2);">${formatDate(c.laatste_behandeling)}</td>
+          <td><div class="mail-steps">${mailDots}</div></td>
+          <td><span class="badge ${reacties > 0 ? 'badge-green' : 'badge-gray'}">${reacties}/3</span></td>
+          <td>${statusBadge}</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="openDetail(${c.id})">Detail</button></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    // ── Taken laden ───────────────────────────────────────────────────────
+    async function loadTaken() {
+      try {
+        const res = await fetch('/api/nazorg/taken', { credentials:'include' });
+        const data = await res.json();
+        const el = document.getElementById('takenTable');
+        if (!data.success || !data.taken.length) {
+          el.innerHTML = '<div class="empty">Geen openstaande taken.</div>'; return;
+        }
+        let html = `<table class="table"><thead><tr>
+          <th>Cliënt</th><th>Contact</th><th>Omschrijving</th><th>Aangemaakt</th><th></th>
+        </tr></thead><tbody>`;
+        data.taken.forEach(t => {
+          html += `<tr>
+            <td><div style="font-weight:500;">${t.client_naam}</div></td>
+            <td><div>${t.client_email}</div><div style="color:var(--text-3);font-size:12px;">${t.client_telefoon||'—'}</div></td>
+            <td style="color:var(--text-2);">${t.omschrijving}</td>
+            <td style="color:var(--text-3);">${formatDate(t.aangemaakt_op)}</td>
+            <td><button class="btn btn-primary btn-sm" onclick="afhandelTaak(${t.id})">Afgehandeld</button></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+        document.getElementById('kpiTaken').textContent = data.taken.length;
+      } catch (e) { console.error(e); }
+    }
+
+    async function afhandelTaak(id) {
+      try {
+        const res = await fetch(`/api/nazorg/taak/${id}`, { method:'PATCH', credentials:'include' });
+        const data = await res.json();
+        if (data.success) { loadTaken(); loadClienten(); }
+      } catch (e) { alert('Fout bij afhandelen.'); }
+    }
+
+    // ── Klantenreis starten ───────────────────────────────────────────────
+    async function startKlantenreis() {
+      const naam      = document.getElementById('fNaam').value.trim();
+      const email     = document.getElementById('fEmail').value.trim();
+      const tel       = document.getElementById('fTel').value.trim();
+      const behandelaar = document.getElementById('fBehandelaar').value.trim();
+      const datum     = document.getElementById('fDatum').value;
+      const praktijk  = document.getElementById('fPraktijk')?.value.trim();
+      const alertEl   = document.getElementById('startAlert');
+
+      alertEl.innerHTML = '';
+      if (!naam || !email || !datum) {
+        alertEl.innerHTML = '<div class="alert alert-error">Vul naam, e-mail en datum in.</div>'; return;
+      }
+
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true; btn.textContent = 'Bezig...';
+
+      try {
+        const body = { naam, email, telefoon: tel||null, behandelaar: behandelaar||null,
+          laatste_behandeling: datum, praktijk_code: praktijk||null };
+        const res = await fetch('/api/nazorg/start', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          credentials:'include', body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alertEl.innerHTML = '<div class="alert alert-success">Klantenreis gestart. De eerste e-mail wordt verstuurd 14 dagen na de behandeldatum.</div>';
+          document.getElementById('fNaam').value = '';
+          document.getElementById('fEmail').value = '';
+          document.getElementById('fTel').value = '';
+          document.getElementById('fBehandelaar').value = '';
+          document.getElementById('fDatum').value = '';
+          loadClienten();
+        } else {
+          alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Fout bij starten.'}</div>`;
+        }
+      } catch (e) {
+        alertEl.innerHTML = '<div class="alert alert-error">Netwerkfout. Probeer opnieuw.</div>';
+      }
+      btn.disabled = false; btn.textContent = 'Start klantenreis';
+    }
+
+    // ── Detail modal ──────────────────────────────────────────────────────
+    async function openDetail(id) {
+      document.getElementById('clientModal').classList.add('open');
+      document.getElementById('modalContent').innerHTML = '<div class="empty">Laden...</div>';
+      try {
+        const res = await fetch(`/api/nazorg/client/${id}`, { credentials:'include' });
+        const data = await res.json();
+        if (!data.success) return;
+        const c = data.client;
+        document.getElementById('modalNaam').textContent = c.naam;
+
+        let html = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;font-size:13px;">
+            <div><span style="color:var(--text-3);">E-mail:</span> ${c.email}</div>
+            <div><span style="color:var(--text-3);">Telefoon:</span> ${c.telefoon||'—'}</div>
+            <div><span style="color:var(--text-3);">Behandelaar:</span> ${c.behandelaar||'—'}</div>
+            <div><span style="color:var(--text-3);">Laatste behandeling:</span> ${formatDate(c.laatste_behandeling)}</div>
+          </div>`;
+
+        html += '<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--text-3);margin-bottom:10px;">E-mails & reacties</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">';
+
+        for (let nr = 1; nr <= 3; nr++) {
+          const email_row = data.emails.find(e => e.mail_nummer === nr);
+          const reactie = data.reacties.find(r => r.mail_nummer === nr);
+          const verstuurd = email_row?.verstuurd;
+          const gepland = email_row?.gepland_op;
+
+          let scoreHtml = '';
+          if (reactie?.herstel_cijfer !== null && reactie?.herstel_cijfer !== undefined) {
+            const hcls = reactie.herstel_cijfer >= 7 ? 'score-good' : reactie.herstel_cijfer >= 4 ? 'score-mid' : 'score-bad';
+            const pcls = reactie.pijn_score <= 3 ? 'score-good' : reactie.pijn_score <= 6 ? 'score-mid' : 'score-bad';
+            scoreHtml = `<div style="display:flex;align-items:center;gap:12px;margin-top:8px;font-size:12px;">
+              Herstel: <span class="score-pill ${hcls}">${reactie.herstel_cijfer}</span>
+              Pijn: <span class="score-pill ${pcls}">${reactie.pijn_score}</span>
+              ${reactie.opmerking ? `<span style="color:var(--text-2);font-style:italic;">"${reactie.opmerking}"</span>` : ''}
+            </div>`;
+          }
+
+          html += `<div style="background:var(--bg);border-radius:8px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:600;font-size:13px;">Mail ${nr}</span>
+              <span class="badge ${verstuurd ? (reactie?.herstel_cijfer !== null ? 'badge-green' : 'badge-blue') : 'badge-gray'}">
+                ${verstuurd ? (reactie?.herstel_cijfer !== null ? 'Gereageerd' : 'Verstuurd') : `Gepland: ${formatDate(gepland)}`}
+              </span>
+            </div>
+            ${scoreHtml}
+          </div>`;
+        }
+        html += '</div>';
+
+        if (data.taken.length) {
+          html += '<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--text-3);margin-bottom:10px;">Terugbelverzoeken</div>';
+          html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+          data.taken.forEach(t => {
+            html += `<div style="background:var(--bg);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+              <span>${t.omschrijving}</span>
+              <span class="badge ${t.status==='open' ? 'badge-amber' : 'badge-green'}">${t.status}</span>
+            </div>`;
+          });
+          html += '</div>';
+        }
+
+        html += `<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="verwijderClient(${id})">Cliënt verwijderen</button>
+        </div>`;
+
+        document.getElementById('modalContent').innerHTML = html;
+      } catch (e) { document.getElementById('modalContent').innerHTML = '<div class="empty">Fout bij laden.</div>'; }
+    }
+
+    async function verwijderClient(id) {
+      if (!confirm('Weet je zeker dat je deze cliënt wilt verwijderen uit de nazorgflow?')) return;
+      try {
+        await fetch(`/api/nazorg/client/${id}`, { method:'DELETE', credentials:'include' });
+        closeModal(); loadClienten();
+      } catch (e) { alert('Fout bij verwijderen.'); }
+    }
+
+    function closeModal() { document.getElementById('clientModal').classList.remove('open'); }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function formatDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' });
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>
