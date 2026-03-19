@@ -3274,7 +3274,7 @@ function nazorgEmailHtml({ clientNaam, praktijkNaam, mailNummer, reactieUrl, ter
 <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>${praktijkNaam}</strong></p>
 </td></tr>
 <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
-<p style="margin:0;font-size:11px;color:#9090a8;text-align:center;">Dynamic Health Consultancy &mdash; nazorgflow</p>
+<p style="margin:0;font-size:11px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
 </td></tr>
 </table></td></tr></table>
 </body></html>`;
