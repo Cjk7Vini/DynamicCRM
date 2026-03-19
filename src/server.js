@@ -3366,9 +3366,9 @@ app.get('/api/nazorg/check', async (req, res) => {
         await sendMailResilient({
           from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
           to: mail.email,
-          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
-            : mail.mail_nummer === 2 ? `We denken aan je — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
-            : `Een laatste update over je herstel — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
+          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : mail.mail_nummer === 2 ? `We denken aan je | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : `Een laatste update over je herstel | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
           html: nazorgEmailHtml({ clientNaam: mail.naam, praktijkNaam: mail.praktijk_naam || mail.praktijk_code,
             mailNummer: mail.mail_nummer, reactieUrl: `${base}/nazorg/reactie/${tokenRow.token}`,
             terugbelUrl: `${base}/nazorg/terugbel/${tokenRow.token}`, isLast }),
@@ -3488,8 +3488,8 @@ app.get('/nazorg/reactie/:token', async (req, res) => {
     .q{margin-bottom:28px}
     .q label{display:block;font-size:14px;font-weight:600;color:#0f0f12;margin-bottom:8px}
     .hint{font-size:12px;color:#9090a8;margin-bottom:10px}
-    .scale{display:flex;gap:5px;flex-wrap:wrap}
-    .scale button{flex:1;min-width:34px;padding:10px 4px;border:1.5px solid #e4e4e8;border-radius:8px;background:white;font-size:13px;font-weight:600;color:#5a5a72;cursor:pointer;transition:all .15s}
+    .scale{display:flex;gap:5px;flex-wrap:nowrap}
+    .scale button{flex:1;min-width:0;padding:10px 2px;border:1.5px solid #e4e4e8;border-radius:8px;background:white;font-size:12px;font-weight:600;color:#5a5a72;cursor:pointer;transition:all .15s}
     .scale button.sel{background:#2BB8A3;border-color:#2BB8A3;color:white}
     textarea{width:100%;padding:12px;border:1.5px solid #e4e4e8;border-radius:8px;font-family:inherit;font-size:14px;resize:vertical;min-height:80px}
     textarea:focus{outline:none;border-color:#2BB8A3}
@@ -3533,7 +3533,7 @@ app.get('/nazorg/reactie/:token', async (req, res) => {
 </div>
 <script>
 const sc={h:null,p:null};
-function sel(t,v){sc[t]=v;const p=t==='h'?'h':'p';const mx=t==='h'?10:10;for(let i=0;i<=mx;i++){const b=document.getElementById(p+i);if(b)b.className=i===v?'sel':'';}document.getElementById('sendBtn').disabled=sc.h===null||sc.p===null;}
+function sel(t,v){sc[t]=v;const ids=t==='h'?Array.from({length:10},(_,i)=>i+1):Array.from({length:11},(_,i)=>i);ids.forEach(i=>{const b=document.getElementById((t==='h'?'h':'p')+i);if(b)b.className=i===v?'sel':''});document.getElementById('sendBtn').disabled=sc.h===null||sc.p===null;}
 async function send(){const btn=document.getElementById('sendBtn');btn.disabled=true;btn.textContent='Bezig...';
 const res=await fetch('/nazorg/reactie/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({herstel_cijfer:sc.h,pijn_score:sc.p,opmerking:document.getElementById('opm').value.trim()})});
 if(res.ok){document.getElementById('formDiv').style.display='none';document.getElementById('doneDiv').style.display='block';}
@@ -3630,9 +3630,9 @@ cron.schedule('0 9 * * *', async () => {
         await sendMailResilient({
           from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
           to: mail.email,
-          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
-            : mail.mail_nummer === 2 ? `We denken aan je — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
-            : `Een laatste update over je herstel — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
+          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : mail.mail_nummer === 2 ? `We denken aan je | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : `Een laatste update over je herstel | ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
           html: nazorgEmailHtml({ clientNaam: mail.naam, praktijkNaam: mail.praktijk_naam || mail.praktijk_code,
             mailNummer: mail.mail_nummer, reactieUrl: `${base}/nazorg/reactie/${tokenRow.token}`,
             terugbelUrl: `${base}/nazorg/terugbel/${tokenRow.token}`, isLast }),
