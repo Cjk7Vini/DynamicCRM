@@ -3339,7 +3339,56 @@ app.post('/api/nazorg/start', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/nazorg/clienten
+// GET /api/nazorg/check — trigger via EasyCron (zelfde schema als check-reminders)
+app.get('/api/nazorg/check', async (req, res) => {
+  try {
+    const vandaag = new Date().toISOString().split('T')[0];
+
+    const teVersturen = await withReadConnection(async (db) => {
+      const r = await db.query(
+        `SELECT e.id as eid, e.mail_nummer, e.client_id, nc.naam, nc.email, nc.praktijk_code, p.naam as praktijk_naam
+         FROM nazorg_emails e JOIN nazorg_clienten nc ON e.client_id=nc.id
+         LEFT JOIN praktijken p ON nc.praktijk_code=p.code
+         WHERE e.verstuurd=FALSE AND e.gepland_op<=$1 AND nc.status='actief'`, [vandaag]);
+      return r.rows;
+    });
+
+    let verstuurd = 0;
+    for (const mail of teVersturen) {
+      try {
+        const tokenRow = await withReadConnection(async (db) => {
+          const r = await db.query('SELECT token FROM nazorg_reacties WHERE client_id=$1 AND mail_nummer=$2', [mail.client_id, mail.mail_nummer]);
+          return r.rows[0];
+        });
+        if (!tokenRow) continue;
+        const base = process.env.APP_URL || 'https://dynamic-health-consultancy.nl';
+        const isLast = mail.mail_nummer === 3;
+        await sendMailResilient({
+          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          to: mail.email,
+          subject: mail.mail_nummer === 1 ? `Hoe gaat het met je herstel? — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : mail.mail_nummer === 2 ? `We denken aan je — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`
+            : `Een laatste update over je herstel — ${mail.praktijk_naam || 'Uw fysiotherapeut'}`,
+          html: nazorgEmailHtml({ clientNaam: mail.naam, praktijkNaam: mail.praktijk_naam || mail.praktijk_code,
+            mailNummer: mail.mail_nummer, reactieUrl: `${base}/nazorg/reactie/${tokenRow.token}`,
+            terugbelUrl: `${base}/nazorg/terugbel/${tokenRow.token}`, isLast }),
+          text: `Beste ${mail.naam}, vul je herstelcijfer in via: ${base}/nazorg/reactie/${tokenRow.token}`
+        });
+        await withWriteConnection(async (db) => {
+          await db.query('UPDATE nazorg_emails SET verstuurd=TRUE,verstuurd_op=NOW() WHERE id=$1', [mail.eid]);
+          if (isLast) await db.query(`UPDATE nazorg_clienten SET status='voltooid',flow_voltooid=TRUE WHERE id=$1`, [mail.client_id]);
+        });
+        verstuurd++;
+        console.log(`[NAZORG] Mail ${mail.mail_nummer} verstuurd naar ${mail.email}`);
+      } catch (e) { console.error(`[NAZORG] Mislukt voor ${mail.email}:`, e.message); }
+    }
+
+    res.json({ success: true, nazorg_mails_verstuurd: verstuurd });
+  } catch (error) {
+    console.error('[NAZORG CHECK] Fout:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
   try {
     const praktijkCode = req.session.role === 'admin' ? (req.query.praktijk||null) : req.session.practiceCode;
