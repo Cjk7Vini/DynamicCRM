@@ -1195,13 +1195,50 @@
 
     <!-- Practice performance + hot leads -->
     <div class="charts-row">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Praktijk prestaties</div>
+        <div class="card" id="performanceCard">
+            <!-- Admin view -->
+            <div id="adminPerformanceView">
+                <div class="card-header">
+                    <div class="card-title">Praktijk prestaties</div>
+                </div>
+                <div class="card-body" id="practicePerformanceContainer">
+                    <div class="chart-wrap" style="height:200px;">
+                        <canvas id="practiceChart"></canvas>
+                    </div>
+                </div>
             </div>
-            <div class="card-body" id="practicePerformanceContainer">
-                <div class="chart-wrap" style="height:200px;">
-                    <canvas id="practiceChart"></canvas>
+            <!-- Practice user view -->
+            <div id="practiceOwnView" style="display:none;">
+                <div class="card-header">
+                    <div class="card-title" id="practiceOwnTitle">Mijn praktijk</div>
+                </div>
+                <div class="card-body" id="practiceOwnContainer">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Leads deze maand</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownLeadsMonth">-</div>
+                        </div>
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Totaal leads</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownLeadsTotal">-</div>
+                        </div>
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Afspraken gepland</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownAfspraken">-</div>
+                        </div>
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Actieve leden (eClub)</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownEclubLeden">-</div>
+                        </div>
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Churn % (eClub)</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownChurnPct">-</div>
+                        </div>
+                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Retentie % (eClub)</div>
+                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownRetentiePct">-</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1445,9 +1482,57 @@
             const practiceSearchGroup = document.getElementById('practiceSearchGroup');
             if (practiceSearchGroup) practiceSearchGroup.style.display = 'none';
 
-            // Verberg praktijk performance chart
-            const practicePerformanceContainer = document.getElementById('practicePerformanceContainer');
-            if (practicePerformanceContainer) practicePerformanceContainer.style.display = 'none';
+            // Wissel admin performance view naar eigen praktijk view
+            const adminView = document.getElementById('adminPerformanceView');
+            if (adminView) adminView.style.display = 'none';
+            const ownView = document.getElementById('practiceOwnView');
+            if (ownView) ownView.style.display = 'block';
+
+            // Laad eigen prestaties
+            loadOwnPracticeStats();
+        }
+
+        async function loadOwnPracticeStats() {
+            try {
+                const practiceCode = currentUser.practiceCode || currentUser.practice_code;
+                if (!practiceCode) return;
+
+                // Titel instellen
+                const titleEl = document.getElementById('practiceOwnTitle');
+                if (titleEl && currentUser.praktijkNaam) titleEl.textContent = currentUser.praktijkNaam;
+
+                // Leads ophalen
+                const leadsRes = await fetch('/api/funnel', { credentials: 'include' });
+                const leadsData = await leadsRes.json();
+
+                if (leadsData && leadsData.stages) {
+                    const total = leadsData.stages.reduce((s, st) => s + (parseInt(st.count) || 0), 0);
+                    const intent = leadsData.stages.find(s => s.stage === 'intent');
+                    document.getElementById('ownLeadsTotal').textContent = total || 0;
+                    document.getElementById('ownAfspraken').textContent = intent ? parseInt(intent.count) || 0 : 0;
+                }
+
+                // Leads deze maand
+                const now = new Date();
+                const dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const dateTo = now.toISOString().split('T')[0];
+                const monthRes = await fetch(\`/api/leads-by-stage?stage=awareness&practice=\${practiceCode}&dateFrom=\${dateFrom}&dateTo=\${dateTo}\`, { credentials: 'include' });
+                const monthData = await monthRes.json();
+                document.getElementById('ownLeadsMonth').textContent = monthData && monthData.leads ? monthData.leads.length : 0;
+
+                // eClub data
+                const eclubRes = await fetch(\`/api/eclub/kpis/\${practiceCode}?jaar=\${now.getFullYear()}&maand=\${now.getMonth() + 1}\`, { credentials: 'include' });
+                const eclubData = await eclubRes.json();
+
+                if (eclubData && eclubData.success && eclubData.data) {
+                    const d = eclubData.data;
+                    document.getElementById('ownEclubLeden').textContent = d.leden_actief || '-';
+                    document.getElementById('ownChurnPct').textContent = d.churn_pct > 0 ? d.churn_pct + '%' : '-';
+                    document.getElementById('ownRetentiePct').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
+                }
+            } catch (error) {
+                console.error('Own practice stats error:', error);
+            }
         }
 
         // Logout function
