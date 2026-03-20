@@ -1502,7 +1502,7 @@
                 if (titleEl && currentUser.praktijkNaam) titleEl.textContent = currentUser.praktijkNaam;
 
                 // Leads ophalen
-                const leadsRes = await fetch('/api/funnel', { credentials: 'include' });
+                const leadsRes = await fetch(`/api/funnel?practice=${practiceCode}`, { credentials: 'include' });
                 const leadsData = await leadsRes.json();
 
                 if (leadsData && leadsData.stages) {
