@@ -163,6 +163,13 @@
             }
         }
     </style>
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=1177365577340703&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
 </head>
 <body>
     <div class="container">
@@ -261,6 +268,9 @@
                 });
 
                 if (response.ok) {
+                    if (typeof fbq !== 'undefined') {
+                        fbq('track', 'Lead');
+                    }
                     window.location.href = 'thankyou.html';
                 } else {
                     const errorData = await response.json();
