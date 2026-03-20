@@ -40,7 +40,8 @@ class MetaService {
               'actions',
               'ctr',
               'cpc',
-              'cost_per_action_type'
+              'cost_per_action_type',
+              'landing_page_views'
             ].join(','),
             level: 'campaign',
             time_range: JSON.stringify({
@@ -200,8 +201,9 @@ class MetaService {
                 ctr,
                 cpc,
                 cost_per_conversion,
+                landing_page_views,
                 synced_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
               ON CONFLICT (code, campaign_id, date)
               DO UPDATE SET
                 campaign_name = EXCLUDED.campaign_name,
@@ -212,6 +214,7 @@ class MetaService {
                 ctr = EXCLUDED.ctr,
                 cpc = EXCLUDED.cpc,
                 cost_per_conversion = EXCLUDED.cost_per_conversion,
+                landing_page_views = EXCLUDED.landing_page_views,
                 synced_at = NOW()
             `, [
               practiceCode,
@@ -225,7 +228,8 @@ class MetaService {
               conversions,
               parseFloat(campaign.ctr || 0),
               parseFloat(campaign.cpc || 0),
-              costPerConversion
+              costPerConversion,
+              parseInt(campaign.landing_page_views || 0)
             ]);
           });
 
@@ -329,7 +333,8 @@ class MetaService {
             ELSE 0 
           END as avg_cost_per_lead,
           ROUND(AVG(ctr), 2) as avg_ctr,
-          ROUND(AVG(cpc), 2) as avg_cpc
+          ROUND(AVG(cpc), 2) as avg_cpc,
+          COALESCE(SUM(landing_page_views), 0) as total_page_views
         FROM meta_ad_performance
         WHERE code = $1
           AND date BETWEEN $2 AND $3
@@ -344,7 +349,8 @@ class MetaService {
       total_conversions: 0,
       avg_cost_per_lead: 0,
       avg_ctr: 0,
-      avg_cpc: 0
+      avg_cpc: 0,
+      total_page_views: 0
     };
   }
 
