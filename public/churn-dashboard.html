@@ -982,7 +982,7 @@
             Laatste sync: <span id="lastSyncTime">—</span><br>
             Leden: <span id="eclubMemberCount">—</span>
         </div>
-        <button id="btnEclubSync" class="btn btn-ghost" style="width:100%; background:rgba(255,255,255,.1); color:white; border-color:rgba(255,255,255,.2);" onclick="syncEclubData()">
+        <button id="btnEclubSync" class="btn btn-ghost" style="width:100%; background:rgba(255,255,255,.1); color:white; border-color:rgba(255,255,255,.2);" onclick="syncEclub()">
             <span id="syncButtonText">Sync leden</span>
         </button>
         <div id="syncStatus" style="margin-top:8px; font-size:12px; display:none;"></div>
@@ -1767,7 +1767,9 @@
         // Load Churn Forecast Chart - eClub historische data
         async function loadChurnForecast() {
             try {
-                const practice = document.getElementById('practiceFilter')?.value;
+                const practice = document.getElementById('practiceFilter')?.value
+                    || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
+                    || null;
 
                 // Zonder praktijk: lege grafiek tonen
                 if (!practice) {
@@ -2379,7 +2381,9 @@
 
         async function loadEclubData() {
             try {
-                const practice = document.getElementById('practiceFilter').value;
+                const practice = document.getElementById('practiceFilter').value
+                    || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
+                    || null;
                 if (!practice) return;
 
                 const { jaar, maandVan, maandTot } = getEclubPeriode();
@@ -2425,7 +2429,9 @@
         }
 
         async function syncEclub() {
-            const practice = document.getElementById('practiceFilter').value;
+            const practice = document.getElementById('practiceFilter').value
+                || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
+                || null;
             if (!practice) {
                 alert('Selecteer eerst een praktijk');
                 return;
