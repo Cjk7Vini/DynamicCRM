@@ -1494,7 +1494,7 @@
 
         async function loadOwnPracticeStats() {
             try {
-                const practiceCode = currentUser.practiceCode || currentUser.practice_code;
+                const practiceCode = getPracticeCode();
                 if (!practiceCode) return;
 
                 // Titel instellen
@@ -1516,12 +1516,12 @@
                 const now = new Date();
                 const dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
                 const dateTo = now.toISOString().split('T')[0];
-                const monthRes = await fetch(\`/api/leads-by-stage?stage=awareness&practice=\${practiceCode}&dateFrom=\${dateFrom}&dateTo=\${dateTo}\`, { credentials: 'include' });
+                const monthRes = await fetch(`/api/leads-by-stage?stage=awareness&practice=${practiceCode}&dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' });
                 const monthData = await monthRes.json();
                 document.getElementById('ownLeadsMonth').textContent = monthData && monthData.leads ? monthData.leads.length : 0;
 
                 // eClub data
-                const eclubRes = await fetch(\`/api/eclub/kpis/\${practiceCode}?jaar=\${now.getFullYear()}&maand=\${now.getMonth() + 1}\`, { credentials: 'include' });
+                const eclubRes = await fetch(`/api/eclub/kpis/${practiceCode}?jaar=${now.getFullYear()}&maand=${now.getMonth() + 1}`, { credentials: 'include' });
                 const eclubData = await eclubRes.json();
 
                 if (eclubData && eclubData.success && eclubData.data) {
@@ -1749,6 +1749,21 @@
 
         async function loadPractices() {
             try {
+                // Practice users: set their own code directly, skip full list
+                if (currentUser && currentUser.role === 'practice') {
+                    const code = getPracticeCode();
+                    if (code) {
+                        const select = document.getElementById('practiceFilter');
+                        select.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.value = code;
+                        opt.textContent = code;
+                        opt.selected = true;
+                        select.appendChild(opt);
+                    }
+                    return;
+                }
+
                 const res = await fetch('/api/churn/practices');
                 const data = await res.json();
                 
@@ -1853,8 +1868,7 @@
         async function loadChurnForecast() {
             try {
                 const practice = document.getElementById('practiceFilter')?.value
-                    || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
-                    || null;
+                    || (currentUser && getPracticeCode()) || null;
 
                 // Zonder praktijk: lege grafiek tonen
                 if (!practice) {
@@ -2100,12 +2114,17 @@
         }
 
         // Build query string from filters
+        function getPracticeCode() {
+            if (!currentUser) return null;
+            return currentUser.practiceCode || currentUser.practice_code || null; // normalize camelCase vs underscore
+        }
+
         function buildQueryString() {
             const params = new URLSearchParams();
             
             // If practice user, force their practice code
-            if (currentUser && currentUser.role === 'practice' && currentUser.practice_code) {
-                params.append('practice', currentUser.practice_code);
+            if (currentUser && currentUser.role === 'practice' && getPracticeCode()) {
+                params.append('practice', getPracticeCode());
             } else if (currentUser && currentUser.role === 'admin') {
                 // Admin can filter by practice - only if explicitly selected
                 const practiceFilter = document.getElementById('practiceFilter');
@@ -2182,9 +2201,9 @@
                     // For practice users, get their practice name from the dropdown or API
                     const practiceFilter = document.getElementById('practiceFilter');
                     const selectedOption = Array.from(practiceFilter.options).find(
-                        opt => opt.value === currentUser.practice_code
+                        opt => opt.value === getPracticeCode()
                     );
-                    practiceName = selectedOption ? selectedOption.text : currentUser.practice_code;
+                    practiceName = selectedOption ? selectedOption.text : getPracticeCode();
                 } else {
                     // For admin, use selected filter
                     practiceName = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
@@ -2467,8 +2486,7 @@
         async function loadEclubData() {
             try {
                 const practice = document.getElementById('practiceFilter').value
-                    || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
-                    || null;
+                    || (currentUser && getPracticeCode()) || null;
                 if (!practice) return;
 
                 const { jaar, maandVan, maandTot } = getEclubPeriode();
@@ -2515,7 +2533,7 @@
 
         async function syncEclub() {
             const practice = document.getElementById('practiceFilter').value
-                || (currentUser && (currentUser.practiceCode || currentUser.practice_code))
+                || (currentUser && getPracticeCode())
                 || null;
             if (!practice) {
                 alert('Selecteer eerst een praktijk');
@@ -2670,7 +2688,7 @@
         async function loadMetaMarketing() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
-                : currentUser.practiceCode;
+                : getPracticeCode();
                 
             if (!practiceCode) {
                 document.getElementById('metaMarketingSection').style.display = 'none';
@@ -2948,7 +2966,7 @@
         async function syncMetaData() {
             const practiceCode = currentUser.role === 'admin' 
                 ? document.getElementById('practiceFilter').value 
-                : currentUser.practiceCode;
+                : getPracticeCode();
                 
             if (!practiceCode) {
                 alert('Selecteer eerst een praktijk');
