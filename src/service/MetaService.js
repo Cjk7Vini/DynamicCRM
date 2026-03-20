@@ -40,8 +40,7 @@ class MetaService {
               'actions',
               'ctr',
               'cpc',
-              'cost_per_action_type',
-              'landing_page_views'
+              'cost_per_action_type'
             ].join(','),
             level: 'campaign',
             time_range: JSON.stringify({
@@ -116,6 +115,13 @@ class MetaService {
     return totalConversions;
   }
 
+  // Parse landing page views from actions array
+  parsePageViews(actions) {
+    if (!actions || !Array.isArray(actions)) return 0;
+    const pageViewAction = actions.find(a => a.action_type === 'landing_page_view');
+    return parseInt(pageViewAction?.value || 0);
+  }
+
   // Parse cost per conversion (including custom conversions)
   parseCostPerConversion(costPerActionType) {
     if (!costPerActionType || !Array.isArray(costPerActionType)) return 0;
@@ -185,6 +191,7 @@ class MetaService {
         try {
           const conversions = this.parseConversions(campaign.actions);
           const costPerConversion = this.parseCostPerConversion(campaign.cost_per_action_type);
+          const pageViews = this.parsePageViews(campaign.actions);
 
           await this.writeConn(async (client) => {
             await client.query(`
@@ -229,7 +236,7 @@ class MetaService {
               parseFloat(campaign.ctr || 0),
               parseFloat(campaign.cpc || 0),
               costPerConversion,
-              parseInt(campaign.landing_page_views || 0)
+              pageViews
             ]);
           });
 
