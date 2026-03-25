@@ -97,22 +97,21 @@ class MetaService {
   }
 
   // Parse conversions from Meta's actions array
+  // Only count offsite_conversion.fb_pixel_lead — the Lead pixel event
+  // fired by our forms on submit. We exclude offsite_conversion.custom.*,
+  // onsite_conversion.*, and fb_pixel_custom because those are too broad
+  // and count PageViews, clicks, and other non-lead events.
   parseConversions(actions) {
     if (!actions || !Array.isArray(actions)) return 0;
-    
-    const conversionActions = actions.filter(a => 
-      a.action_type === 'lead' || 
+
+    const conversionActions = actions.filter(a =>
       a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      a.action_type === 'onsite_conversion.lead_grouped' ||
-      a.action_type.includes('offsite_conversion.custom') ||
-      a.action_type.includes('offsite_conversion.fb_pixel_custom')
+      a.action_type === 'lead'
     );
-    
-    const totalConversions = conversionActions.reduce((sum, action) => {
+
+    return conversionActions.reduce((sum, action) => {
       return sum + (parseInt(action.value) || 0);
     }, 0);
-    
-    return totalConversions;
   }
 
   // Parse landing page views from actions array
@@ -122,18 +121,15 @@ class MetaService {
     return parseInt(pageViewAction?.value || 0);
   }
 
-  // Parse cost per conversion (including custom conversions)
+  // Parse cost per conversion — matches parseConversions filter exactly
   parseCostPerConversion(costPerActionType) {
     if (!costPerActionType || !Array.isArray(costPerActionType)) return 0;
-    
-    const conversionCosts = costPerActionType.filter(c => 
-      c.action_type === 'lead' ||
+
+    const conversionCosts = costPerActionType.filter(c =>
       c.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      c.action_type === 'onsite_conversion.lead_grouped' ||
-      c.action_type.includes('offsite_conversion.custom') ||
-      c.action_type.includes('offsite_conversion.fb_pixel_custom')
+      c.action_type === 'lead'
     );
-    
+
     return conversionCosts.length > 0 ? parseFloat(conversionCosts[0].value) || 0 : 0;
   }
 
