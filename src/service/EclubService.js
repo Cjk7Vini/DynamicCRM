@@ -90,7 +90,7 @@ export default class EclubService {
    * Haal MembershipStatus op voor één maand.
    * Retourneert de eerste entity uit de array.
    */
-  async getMembershipStatus(branchId, jaar, maand) {
+  async getMembershipStatus(branchId, jaar, maand, orgId = null) {
     const from  = this._maandStartUtc(jaar, maand);
     const neem  = 1;  // 1 periode van een maand
 
@@ -99,7 +99,7 @@ export default class EclubService {
     const data = await this.apiClient.get({
       url: `/api/memberships/${branchId}/status`,
       params: { from, period: 3, take: neem },
-      businessId: this.businessId
+      businessId: orgId || this.businessId
     });
 
     // API retourneert een array van MembershipStatus entities
@@ -112,7 +112,7 @@ export default class EclubService {
    * Nodig voor Retentie en Churn berekening.
    * Retourneert [vorigeMaand, huidigeMaand].
    */
-  async getMembershipStatusTweeMananden(branchId, jaar, maand) {
+  async getMembershipStatusTweeMananden(branchId, jaar, maand, orgId = null) {
     // from = begin van vorige maand, take=2
     let vorigMaand = maand - 1;
     let vorigJaar  = jaar;
@@ -125,7 +125,7 @@ export default class EclubService {
     const data = await this.apiClient.get({
       url: `/api/memberships/${branchId}/status`,
       params: { from, period: 3, take: 2 },
-      businessId: this.businessId
+      businessId: orgId || this.businessId
     });
 
     const rows = Array.isArray(data) ? data : (data?.value || []);
@@ -140,7 +140,7 @@ export default class EclubService {
    * Haal totaal aantal bezoeken op voor een maand.
    * accesspointid=0 = alle toegangspunten.
    */
-  async getMemberVisits(branchId, jaar, maand) {
+  async getMemberVisits(branchId, jaar, maand, orgId = null) {
     const from  = this._maandStartUtc(jaar, maand);
     const until = this._maandEindUtc(jaar, maand);
 
@@ -149,7 +149,7 @@ export default class EclubService {
     const data = await this.apiClient.get({
       url: `/api/membervisits/${branchId}`,
       params: { from, until, period: 3, accesspointid: 0 },
-      businessId: this.businessId
+      businessId: orgId || this.businessId
     });
 
     const rows = Array.isArray(data) ? data : (data?.value || []);
@@ -167,7 +167,7 @@ export default class EclubService {
    * Haal omzet op voor een maand.
    * Revenue gebruikt LOKALE datums (geen UTC), format: YYYY-MM-DD
    */
-  async getRevenue(branchId, jaar, maand) {
+  async getRevenue(branchId, jaar, maand, orgId = null) {
     const from  = `${jaar}-${String(maand).padStart(2, '0')}-01`;
     let volgendJaar = jaar;
     let volgendeMaand = maand + 1;
@@ -179,7 +179,7 @@ export default class EclubService {
     const data = await this.apiClient.get({
       url: `/api/revenue/${branchId}`,
       params: { from, until },
-      businessId: this.businessId
+      businessId: orgId || this.businessId
     });
 
     const rows = Array.isArray(data) ? data : (data?.value || []);
@@ -208,8 +208,8 @@ export default class EclubService {
       throw new Error('Eclub credentials niet geconfigureerd');
     }
 
-    // Haal branchId op uit database
-    const branchId = await this._getBranchId(practiceCode);
+    // Haal branchId en orgId op uit database
+    const { branchId, orgId } = await this._getEclubConfig(practiceCode);
     if (!branchId) {
       throw new Error(`Geen eClub branchId gevonden voor praktijk ${practiceCode}`);
     }
@@ -219,17 +219,17 @@ export default class EclubService {
     const j = jaar  || huidig.jaar;
     const m = maand || huidig.maand;
 
-    console.log(`📅 [ECLUB] Periode: ${j}-${String(m).padStart(2, '0')} | branchId: ${branchId}`);
+    console.log(`📅 [ECLUB] Periode: ${j}-${String(m).padStart(2, '0')} | branchId: ${branchId} | orgId: ${orgId}`);
 
     // Alle API calls parallel uitvoeren voor snelheid
     // MemberVisits is optioneel — 404 = geen toegangspunten geconfigureerd
     const [statusRijen, totalVisits, revenue] = await Promise.all([
-      this.getMembershipStatusTweeMananden(branchId, j, m),
-      this.getMemberVisits(branchId, j, m).catch(err => {
+      this.getMembershipStatusTweeMananden(branchId, j, m, orgId),
+      this.getMemberVisits(branchId, j, m, orgId).catch(err => {
         console.warn(`⚠️ [ECLUB] MemberVisits niet beschikbaar voor branchId ${branchId}: ${err.message}`);
         return 0;
       }),
-      this.getRevenue(branchId, j, m).catch(err => {
+      this.getRevenue(branchId, j, m, orgId).catch(err => {
         console.warn(`⚠️ [ECLUB] Revenue niet beschikbaar voor branchId ${branchId}: ${err.message}`);
         return { excl: 0, incl: 0, rows: [] };
       })
@@ -337,7 +337,7 @@ export default class EclubService {
       return {
         success:      true,
         message:      'Authenticatie geslaagd',
-        businessId:   this.businessId,
+        businessId:   orgId || this.businessId,
         tokenInfo,
         cookieLength: cookie ? cookie.length : 0
       };
@@ -350,14 +350,23 @@ export default class EclubService {
   // DATABASE HULP: branchId opzoeken
   // ─────────────────────────────────────────────────────────────────────────
 
-  async _getBranchId(practiceCode) {
+  async _getEclubConfig(practiceCode) {
     const result = await this.withReadConnection(async (client) => {
       return client.query(
-        `SELECT eclub_branch_id FROM praktijken WHERE code = $1`,
+        `SELECT eclub_branch_id, eclub_org_id FROM praktijken WHERE code = $1`,
         [practiceCode]
       );
     });
-    return result.rows[0]?.eclub_branch_id || null;
+    const row = result.rows[0];
+    return {
+      branchId: row?.eclub_branch_id || null,
+      orgId: row?.eclub_org_id || this.businessId  // fallback to global for Vitaal
+    };
+  }
+
+  async _getBranchId(practiceCode) {
+    const config = await this._getEclubConfig(practiceCode);
+    return config.branchId;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -374,7 +383,7 @@ export default class EclubService {
 
     if (!this.hasCredentials()) throw new Error('Eclub credentials niet geconfigureerd');
 
-    const branchId = await this._getBranchId(practiceCode);
+    const { branchId, orgId } = await this._getEclubConfig(practiceCode);
     if (!branchId) throw new Error(`Geen eClub branchId voor ${practiceCode}`);
 
     const huidig = this._huidigeMaand();
@@ -390,7 +399,7 @@ export default class EclubService {
     const data = await this.apiClient.get({
       url: `/api/memberships/${branchId}/status`,
       params: { from, period: 3, take },
-      businessId: this.businessId
+      businessId: orgId || this.businessId
     });
 
     const rows = Array.isArray(data) ? data : (data?.value || []);
