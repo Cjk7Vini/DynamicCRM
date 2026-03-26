@@ -511,140 +511,36 @@ app.post('/leads', async (req, res) => {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
-          <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:20px 0">
-              <tr>
-                <td align="center">
-                  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-                    <!-- Header met gradient -->
-                    <tr>
-                      <td style="background:linear-gradient(135deg, #2563eb 0%, #10b981 100%);border-radius:16px 16px 0 0;padding:30px 20px;text-align:center">
-                        <div style="background:#f97316;display:inline-block;padding:8px 16px;border-radius:20px;margin-bottom:16px">
-                          <span style="color:#fff;font-weight:700;font-size:14px">🔔 NIEUWE LEAD</span>
-                        </div>
-                        <h1 style="color:#fff;font-size:24px;margin:0;font-weight:700">Er is een nieuwe lead binnengekomen!</h1>
-                      </td>
-                    </tr>
-                    <!-- Witte card met lead info -->
-                    <tr>
-                      <td style="background:#fff;padding:30px;border-radius:0 0 16px 16px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
-                        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:20px">
-                          <tr>
-                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">👤</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Naam:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${volledige_naam}</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">📧</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Email:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${emailadres || '-'}</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">📱</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Telefoon:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${telefoon || '-'}</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">🎯</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Doel/Klacht:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${doel || 'Vet loss'}</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">💡</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Bron:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${bron || '-'}</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding:10px 0">
-                              <table width="100%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td width="30" valign="top">
-                                    <span style="color:#2563eb;font-size:18px">🏢</span>
-                                  </td>
-                                  <td>
-                                    <span style="color:#6b7280;font-size:14px;font-weight:600">Praktijk:</span>
-                                    <div style="color:#111827;font-size:15px;font-weight:600;margin-top:2px">${practice.naam} (${practice.code})</div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                        
-                        <!-- Gele actie box -->
-                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;background:#fef3c7;border:2px solid #fbbf24;border-radius:12px;padding:20px">
-                          <tr>
-                            <td align="center">
-                              <div style="color:#92400e;font-size:18px;font-weight:700;margin-bottom:12px">⚡ Actie Vereist</div>
-                              <p style="color:#78350f;font-size:14px;margin:0 0 16px 0;line-height:1.5">Neem binnen 1 werkdag contact op met deze lead!</p>
-                              <a href="${baseUrl}/${practice.code === '458D05' ? 'appointment-form-kerngezond.html' : 'appointment-form.html'}?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}" 
-                                 style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:700;font-size:15px">
-                                📅 Plan Afspraak
-                              </a>
-                              <p style="color:#92400e;font-size:12px;margin:16px 0 0 0">💡 Tip: Klik op deze button om een datum en tijd in te plannen. De klant ontvangt automatisch een bevestiging.</p>
-                            </td>
-                          </tr>
-                        </table>
-                        
-                        <p style="color:#6b7280;font-size:12px;text-align:center;margin-top:20px;padding-top:20px;border-top:1px solid #e5e7eb">
-                          Lead ontvangen op ${formatAms(inserted.aangemaakt_op)}
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
+          <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;"><tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <tr><td style="background:#1A1D21;padding:24px 40px;">
+              <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;"><span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
+            </td></tr>
+            <tr><td style="padding:36px 40px;">
+              <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Er is een nieuwe lead binnengekomen voor <strong>${practice.naam}</strong>.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 24px;">
+                <tr><td style="padding:20px 24px;">
+                  <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Leadgegevens</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${volledige_naam}</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Telefoonnummer:</strong> ${telefoon || 'Niet opgegeven'}</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Email:</strong> ${emailadres || 'Niet opgegeven'}</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Doel:</strong> ${doel || 'Niet opgegeven'}</p>
+                  <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Bron:</strong> ${bron || 'Niet opgegeven'}</p>
+                </td></tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td align="center">
+                <a href="${baseUrl}/${practice.code === '458D05' ? 'appointment-form-kerngezond.html' : 'appointment-form.html'}?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
+                   style="display:inline-block;background:#166534;color:#e6f6ec;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Afspraak inplannen</a>
+              </td></tr></table>
+              <p style="margin:0;font-size:13px;color:#9090a8;">Ontvangen op ${formatAms(inserted.aangemaakt_op)}</p>
+            </td></tr>
+            <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+              <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+            </td></tr>
+          </table>
+          </td></tr></table>
           </body>
           </html>`;
 
@@ -1057,46 +953,44 @@ app.post('/api/confirm-appointment', async (req, res) => {
         try {
           const practiceHtml = `
             <!DOCTYPE html>
-            <html>
-            <head><meta charset="utf-8"></head>
-            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
-              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
-                <tr>
-                  <td>
-                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak bevestiging</h1>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
-                      Beste,
-                    </p>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
-                      Uw afspraak met <strong>${updated.lead.volledige_naam}</strong> is nu bevestigd op de volgende datum:
-                    </p>
-                    
-                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${updated.lead.volledige_naam}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${updated.lead.telefoon || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${updated.lead.emailadres || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Datum:</strong> ${formattedDate}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Type:</strong> ${appointmentTypeDisplay}</p>
-                      ${updated.notes ? `<p style="color:#374151;font-size:14px;margin:8px 0"><strong>Opmerkingen:</strong> ${updated.notes}</p>` : ''}
-                    </div>
-
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
-                      Met vriendelijke groet,<br/>
-                      <strong>Marketingteam Dynamic Health Consultancy</strong>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </body>
-            </html>`;
+            <html lang="nl">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;"><tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <tr><td style="background:#1A1D21;padding:24px 40px;">
+                <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;"><span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
+              </td></tr>
+              <tr><td style="padding:36px 40px;">
+                <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+                <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">De afspraak met <strong>${updated.lead.volledige_naam}</strong> is bevestigd.</p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Afspraakgegevens</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${updated.lead.volledige_naam}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Telefoonnummer:</strong> ${updated.lead.telefoon || 'Niet opgegeven'}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Email:</strong> ${updated.lead.emailadres || 'Niet opgegeven'}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Datum:</strong> ${formattedDate}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Tijd:</strong> ${formattedTime}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Type:</strong> ${appointmentTypeDisplay}</p>
+                    ${updated.notes ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Opmerkingen:</strong> ${updated.notes}</p>` : ''}
+                  </td></tr>
+                </table>
+                <p style="margin:0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+              </td></tr>
+              <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+                <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+              </td></tr>
+            </table>
+            </td></tr></table>
+            </body></html>`;
 
           await sendMailResilient({
             from: SMTP.from,
             to: updated.lead.praktijk_email,
             subject: `Nieuwe afspraak bevestigd - ${updated.lead.volledige_naam} op ${formattedDate}`,
             html: practiceHtml,
-            text: `Beste,\n\nUw afspraak met ${updated.lead.volledige_naam} is nu bevestigd.\n\nNaam: ${updated.lead.volledige_naam}\nTelefoonnummer: ${updated.lead.telefoon || 'Niet opgegeven'}\nEmail: ${updated.lead.emailadres || 'Niet opgegeven'}\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nType: ${appointmentTypeDisplay}\n${updated.notes ? 'Opmerkingen: ' + updated.notes : ''}\n\nMet vriendelijke groet,\nMarketingteam Dynamic Health Consultancy`
+            text: `Beste,\n\nUw afspraak met ${updated.lead.volledige_naam} is nu bevestigd.\n\nNaam: ${updated.lead.volledige_naam}\nTelefoonnummer: ${updated.lead.telefoon || 'Niet opgegeven'}\nEmail: ${updated.lead.emailadres || 'Niet opgegeven'}\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nType: ${appointmentTypeDisplay}\n${updated.notes ? 'Opmerkingen: ' + updated.notes : ''}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
           });
           console.log('PRAKTIJK BEVESTIGING verstuurd naar:', updated.lead.praktijk_email);
         } catch (mailErr) {
@@ -2026,7 +1920,7 @@ app.get('/api/rebook', async (req, res) => {
         <tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
           <tr><td style="background:#1A1D21;padding:24px 40px;">
-            <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:block;">
+            <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;"><span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
           </td></tr>
           <tr><td style="padding:36px 40px;">
             <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>

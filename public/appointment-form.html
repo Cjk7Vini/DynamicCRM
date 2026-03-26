@@ -3,206 +3,126 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Afspraak Plannen</title>
+  <title>Afspraak Plannen | Dynamic Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --primary: #2563eb;
-      --success: #10b981;
-      --bg-gradient: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-      --card: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
-      --border: #e5e7eb;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg-gradient);
+      font-family: "DM Sans", -apple-system, sans-serif;
+      background: #f4f5f7;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
-    }
-    .container {
-      max-width: 500px;
-      width: 100%;
+      padding: 24px;
     }
     .card {
-      background: var(--card);
-      border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(17, 24, 39, 0.15);
-      padding: 40px 30px;
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .icon {
-      width: 64px;
-      height: 64px;
-      background: var(--primary);
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 16px;
-      font-size: 32px;
-    }
-    h1 {
-      font-size: 24px;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .subtitle {
-      color: var(--muted);
-      font-size: 14px;
-    }
-    .lead-info {
-      background: #f9fafb;
+      background: white;
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
     }
-    .lead-info-row {
+    .card-header {
+      background: #1A1D21;
+      padding: 20px 28px;
       display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      font-size: 14px;
+      align-items: center;
+      gap: 12px;
     }
-    .lead-info-label {
-      color: var(--muted);
-      font-weight: 500;
-    }
-    .lead-info-value {
-      color: var(--text);
-      font-weight: 600;
-    }
-    .form-group {
-      margin-bottom: 20px;
-    }
-    label {
-      display: block;
-      color: var(--text);
-      font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-    input[type="date"],
-    input[type="time"],
-    textarea {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid var(--border);
-      border-radius: 10px;
-      font-size: 16px;
-      transition: border 0.2s;
-    }
-    input:focus,
-    textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-    }
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-      font-family: inherit;
-    }
-    button {
-      width: 100%;
-      background: var(--success);
-      color: white;
-      border: none;
-      padding: 14px 20px;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    button:hover {
-      filter: brightness(0.9);
-      transform: translateY(-1px);
-    }
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .message {
-      margin-top: 16px;
-      padding: 12px;
+    .card-header img { height: 32px; width: auto; }
+    .card-header span { color: white; font-size: 14px; font-weight: 500; }
+    .card-body { padding: 28px; }
+    .page-title { font-size: 18px; font-weight: 600; color: #111827; margin-bottom: 4px; }
+    .page-sub { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+
+    .lead-box {
+      background: #f9f9fb;
       border-radius: 8px;
-      font-size: 14px;
-      text-align: center;
-      display: none;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      border: 1px solid #e8e8ed;
     }
-    .message.error {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-      display: block;
+    .lead-box-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .5px; color: #9090a8; margin-bottom: 12px;
     }
-    .message.success {
-      background: #dcfce7;
-      color: #166534;
-      border: 1px solid #86efac;
-      display: block;
+    .lead-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+    .lead-row:not(:last-child) { border-bottom: 1px solid #f0f1f4; }
+    .lead-label { color: #6b7280; }
+    .lead-value { font-weight: 500; color: #111827; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #6b7280; margin-bottom: 5px; }
+    input, select, textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #e2e4e9;
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      color: #111827; background: white; transition: border-color .15s; outline: none;
     }
+    input:focus, select:focus, textarea:focus { border-color: #333399; box-shadow: 0 0 0 3px rgba(51,51,153,.08); }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn {
+      width: 100%; padding: 12px; background: #333399; color: white;
+      border: none; border-radius: 8px; font-size: 15px; font-family: inherit;
+      font-weight: 600; cursor: pointer; transition: opacity .15s; margin-top: 4px;
+    }
+    .btn:hover { opacity: .9; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .msg { padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-top: 14px; display: none; }
+    .msg.error { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; display: block; }
+    .msg.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; display: block; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <div class="header">
-        <div class="icon">📅</div>
-        <h1>Afspraak Plannen</h1>
-        <p class="subtitle">Plan de afspraak met je lead</p>
+  <div class="card">
+    <div class="card-header">
+      <img src="images/dynamic-logo-2.png" alt="Dynamic Health" onerror="this.style.display='none'">
+      <span>Dynamic Health Consultancy</span>
+    </div>
+    <div class="card-body">
+      <div class="page-title">Afspraak plannen</div>
+      <div class="page-sub">Plan de afspraak met de lead hieronder</div>
+
+      <div class="lead-box" id="leadBox">
+        <div class="lead-box-title">Leadgegevens</div>
+        <div class="lead-row"><span class="lead-label">Naam</span><span class="lead-value" id="leadName">—</span></div>
+        <div class="lead-row"><span class="lead-label">Email</span><span class="lead-value" id="leadEmail">—</span></div>
+        <div class="lead-row"><span class="lead-label">Telefoon</span><span class="lead-value" id="leadPhone">—</span></div>
       </div>
 
-      <div class="lead-info" id="leadInfo">
-        <div class="lead-info-row">
-          <span class="lead-info-label">Naam:</span>
-          <span class="lead-info-value" id="leadName">-</span>
-        </div>
-        <div class="lead-info-row">
-          <span class="lead-info-label">Email:</span>
-          <span class="lead-info-value" id="leadEmail">-</span>
-        </div>
-        <div class="lead-info-row">
-          <span class="lead-info-label">Telefoon:</span>
-          <span class="lead-info-value" id="leadPhone">-</span>
-        </div>
-      </div>
-
-      <form id="appointmentForm">
-        <div class="form-group">
-          <label for="date">Afspraak Datum *</label>
-          <input type="date" id="date" name="date" required />
+      <div id="appointmentForm">
+        <div class="form-row">
+          <div>
+            <label>Datum *</label>
+            <input type="date" id="date" required>
+          </div>
+          <div>
+            <label>Tijd *</label>
+            <input type="time" id="time" required>
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="time">Afspraak Tijd *</label>
-          <input type="time" id="time" name="time" required />
-        </div>
-
-        <div class="form-group">
-          <label for="type">Type Afspraak *</label>
-          <select id="type" name="type" required style="width:100%;padding:12px;border:2px solid var(--border);border-radius:10px;font-size:16px;background:white;cursor:pointer;">
-            <option value="">-- Kies type afspraak --</option>
+          <label>Type afspraak *</label>
+          <select id="type" required>
+            <option value="">Kies een type...</option>
             <option value="vitaliteitscheck">Vitaliteitscheck (gratis) – Ontdek in 60 minuten waar jouw verbeterpunten liggen</option>
-            <option value="rondleiding">Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)</option>
+            <option value="rondleiding">Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (30 minuten)</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label for="notes">Opmerkingen (optioneel)</label>
-          <textarea id="notes" name="notes" placeholder="Bijv. kom 10 minuten eerder, neem sportkleding mee..."></textarea>
+          <label>Opmerkingen (optioneel)</label>
+          <textarea id="notes" placeholder="Bijv. kom 10 minuten eerder, neem sportkleding mee..."></textarea>
         </div>
 
-        <button type="submit" id="submitBtn">Afspraak Bevestigen</button>
-        <div id="message" class="message"></div>
-      </form>
+        <button class="btn" id="submitBtn" onclick="submitForm()">Afspraak bevestigen</button>
+        <div id="message" class="msg"></div>
+      </div>
     </div>
   </div>
 
@@ -213,80 +133,61 @@
     const token = params.get('token');
 
     if (!leadId || !practiceCode || !token) {
-      document.getElementById('message').textContent = 'Ongeldige link - ontbrekende parameters';
-      document.getElementById('message').className = 'message error';
+      document.getElementById('message').textContent = 'Ongeldige link.';
+      document.getElementById('message').className = 'msg error';
       document.getElementById('appointmentForm').style.display = 'none';
     }
 
-    // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('date').min = today;
+    document.getElementById('date').min = new Date().toISOString().split('T')[0];
 
-    // Fetch lead info
-    async function loadLeadInfo() {
+    async function loadLead() {
       try {
-        const response = await fetch(`/api/lead-info?lead_id=${leadId}&practice_code=${practiceCode}&token=${token}`);
-        if (!response.ok) throw new Error('Kon lead info niet ophalen');
-        
-        const data = await response.json();
-        document.getElementById('leadName').textContent = data.volledige_naam || '-';
-        document.getElementById('leadEmail').textContent = data.emailadres || '-';
-        document.getElementById('leadPhone').textContent = data.telefoon || '-';
-      } catch (err) {
-        console.error(err);
-        document.getElementById('leadInfo').innerHTML = '<p style="color:#b91c1c;text-align:center">Kon lead gegevens niet laden</p>';
+        const res = await fetch(`/api/lead-info?lead_id=${leadId}&practice_code=${practiceCode}&token=${token}`);
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        document.getElementById('leadName').textContent = d.volledige_naam || '—';
+        document.getElementById('leadEmail').textContent = d.emailadres || '—';
+        document.getElementById('leadPhone').textContent = d.telefoon || '—';
+      } catch {
+        document.getElementById('leadBox').innerHTML = '<p style="color:#b91c1c;font-size:13px;">Kon leadgegevens niet laden.</p>';
       }
     }
 
-    loadLeadInfo();
-
-    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const submitBtn = document.getElementById('submitBtn');
-      const message = document.getElementById('message');
-      
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Bezig met opslaan...';
-      message.style.display = 'none';
-
-      const formData = {
-        lead_id: leadId,
-        practice_code: practiceCode,
-        token: token,
-        date: document.getElementById('date').value,
-        time: document.getElementById('time').value,
-        type: document.getElementById('type').value,
-        notes: document.getElementById('notes').value
-      };
+    async function submitForm() {
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('message');
+      msg.className = 'msg';
+      btn.disabled = true;
+      btn.textContent = 'Bezig...';
 
       try {
-        const response = await fetch('/api/confirm-appointment', {
+        const res = await fetch('/api/confirm-appointment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            lead_id: leadId, practice_code: practiceCode, token,
+            date: document.getElementById('date').value,
+            time: document.getElementById('time').value,
+            type: document.getElementById('type').value,
+            notes: document.getElementById('notes').value
+          })
         });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Er ging iets mis');
-        }
-
-        message.textContent = '✅ Afspraak bevestigd! De klant ontvangt een bevestigingsmail.';
-        message.className = 'message success';
-        
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Er ging iets mis');
+        msg.textContent = 'Afspraak bevestigd. De lead ontvangt een bevestigingsmail.';
+        msg.className = 'msg success';
         setTimeout(() => {
           window.location.href = `/success.html?name=${encodeURIComponent(result.lead_name)}&lead_id=${leadId}&practice_code=${practiceCode}&practice_name=${encodeURIComponent(result.practice_name)}`;
         }, 2000);
-
-      } catch (err) {
-        message.textContent = '❌ ' + err.message;
-        message.className = 'message error';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Afspraak Bevestigen';
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.className = 'msg error';
+        btn.disabled = false;
+        btn.textContent = 'Afspraak bevestigen';
       }
-    });
+    }
+
+    loadLead();
   </script>
 </body>
 </html>
