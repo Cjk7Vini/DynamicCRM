@@ -1590,63 +1590,111 @@ app.get('/api/check-reminders', async (req, res) => {
           const reminderHtml = `
             <!DOCTYPE html>
             <html>
-            <head><meta charset="utf-8"></head>
-            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
-              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif">
+
+              <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td>
-                    <div style="background:#fef3c7;border-radius:12px;padding:16px;margin-bottom:20px;border-left:4px solid #f59e0b">
-                      <p style="color:#92400e;font-size:16px;margin:0;font-weight:600">⏰ Afspraak over 1 uur!</p>
-                    </div>
-                    
-                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak herinnering</h1>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
-                      Beste,
-                    </p>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
-                      Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
-                      U kunt nu uw afspraak voorbereiden voor de lead.
-                    </p>
-                    
-                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${appt.volledige_naam}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${appt.telefoon || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${appt.emailadres || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
-                    </div>
-
-                    <div style="margin:30px 0">
-                      <p style="color:#111827;font-size:15px;font-weight:600;margin-bottom:16px">Na de afspraak:</p>
-                      
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td style="padding:0 10px 10px 0" width="50%">
-                            <a href="${attendedUrl}" style="display:block;background:#10b981;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
-                              ✓ Lead is langsgeweest
-                            </a>
-                          </td>
-                          <td style="padding:0 0 10px 10px" width="50%">
-                            <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
-                              ✗ Afspraak gemist
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:16px">
-                        Als de lead is langsgeweest, kunt u dat bevestigen door de button in te klikken.<br/>
-                        Indien de lead niet is komen opdagen, klik dan op de button "Afspraak gemist".<br/>
-                        Wij zullen namens Dynamic Health Consultancy een email naar de lead sturen dat zij de afspraak hebben gemist.
-                      </p>
-                    </div>
-
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
-                      Met vriendelijke groet,<br/>
-                      <strong>Dynamic Health Consultancy</strong>
-                    </p>
+                  <td style="background:#111827;padding:18px 24px;text-align:center">
+                    <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:0.2px">${appt.praktijk_naam}</span>
                   </td>
                 </tr>
               </table>
+
+              <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 16px">
+                <tr>
+                  <td>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+
+                      <tr>
+                        <td style="background:#fef9c3;border-left:4px solid #eab308;padding:14px 24px">
+                          <span style="color:#713f12;font-size:15px;font-weight:600">&#9200; Afspraak over 1 uur!</span>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding:28px 28px 24px">
+
+                          <h1 style="color:#111827;font-size:20px;font-weight:700;margin:0 0 18px 0">Afspraak herinnering</h1>
+
+                          <p style="color:#374151;font-size:15px;line-height:1.65;margin:0 0 6px 0">Beste,</p>
+                          <p style="color:#374151;font-size:15px;line-height:1.65;margin:0 0 22px 0">
+                            Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
+                            U kunt nu uw afspraak voorbereiden voor de lead.
+                          </p>
+
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:12px;margin-bottom:24px">
+                            <tr>
+                              <td style="padding:4px 20px">
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                  <tr>
+                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
+                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Naam</div>
+                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.volledige_naam}</div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
+                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Telefoonnummer</div>
+                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.telefoon || 'Niet opgegeven'}</div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
+                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Email</div>
+                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.emailadres || 'Niet opgegeven'}</div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding:10px 0">
+                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tijd</div>
+                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${formattedTime}</div>
+                                    </td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+
+                          <p style="color:#374151;font-size:14px;line-height:1.65;margin:0 0 18px 0">
+                            Na afloop van de afspraak kunt u hieronder aangeven wat het resultaat was:
+                          </p>
+
+                          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
+                            <tr>
+                              <td style="padding:0 6px 0 0" width="50%">
+                                <a href="${attendedUrl}" style="display:block;background:#111827;color:#ffffff;text-align:center;padding:14px 10px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600">
+                                  Lead is langsgeweest
+                                </a>
+                              </td>
+                              <td style="padding:0 0 0 6px" width="50%">
+                                <a href="${missedUrl}" style="display:block;background:#ef4444;color:#ffffff;text-align:center;padding:14px 10px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600">
+                                  Afspraak gemist
+                                </a>
+                              </td>
+                            </tr>
+                          </table>
+
+                          <p style="color:#6b7280;font-size:12px;line-height:1.6;margin:0">
+                            Als de lead is langsgeweest kunt u dat bevestigen door op de button te klikken.
+                            Indien de lead niet is komen opdagen, klik dan op Afspraak gemist.
+                            Wij sturen namens Dynamic Health Consultancy een e-mail naar de lead.
+                          </p>
+
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="background:#f9fafb;padding:14px 28px;border-top:1px solid #e5e7eb;text-align:center">
+                          <span style="color:#9ca3af;font-size:12px">Copyright &copy; Dynamic Health Consultancy</span>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
             </body>
             </html>`;
 
