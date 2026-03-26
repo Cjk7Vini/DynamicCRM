@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Health | Analytics</title>
+    <title>Dynamic Health — Analytics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -935,6 +935,7 @@
                 <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Leads</div>
                 <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
                 <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('lost','Geen interesse')">Geen interesse</div>
             </div>
         </div>
 
@@ -1312,10 +1313,6 @@
                 <div class="metric-card">
                     <div class="metric-label">CPC</div>
                     <div class="metric-value" id="metaCPC">€0,00</div>
-                </div>
-                <div class="metric-card highlight">
-                    <div class="metric-label">Page Views</div>
-                    <div class="metric-value" id="metaPageViews">0</div>
                 </div>
             </div>
             <div class="meta-campaigns-table">
@@ -2313,7 +2310,8 @@
                 const expectedStages = [
                     { stage: 'awareness', stage_name: 'Leads', count: 0 },
                     { stage: 'intent', stage_name: 'Benaderd', count: 0 },
-                    { stage: 'won', stage_name: 'Lid', count: 0 }
+                    { stage: 'won', stage_name: 'Lid', count: 0 },
+                    { stage: 'lost', stage_name: 'Geen interesse', count: 0 }
                 ];
 
                 // Merge with actual data
@@ -2808,10 +2806,6 @@
             document.getElementById('metaCPC').textContent = 
                 `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
             
-            // Page Views
-            document.getElementById('metaPageViews').textContent =
-                formatNumber(data.total_page_views || data.landing_page_views || 0);
-
             // ROAS (estimated)
             const estimatedLeadValue = 150; // Average patient lifetime value
             const totalSpend = parseFloat(data.total_spend || 0);
