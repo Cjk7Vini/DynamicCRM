@@ -130,6 +130,20 @@
     .action-divider { height: 1px; background: var(--border-light); margin: 4px 0; }
     #backdrop { display: none; position: fixed; inset: 0; z-index: 90; }
 
+
+    .profile-panel { background: #f9f9fb; border-top: 1px solid var(--border-light); }
+    .profile-inner { padding: 16px 20px; }
+    .profile-title { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .profile-close { margin-left: auto; background: none; border: none; font-size: 18px; color: var(--text-3); cursor: pointer; line-height: 1; padding: 0; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .pf-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); margin-bottom: 4px; }
+    .pf-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--text-1); background: white; font-family: inherit; }
+    .pf-input:focus { outline: none; border-color: var(--accent); }
+    .profile-lic { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
+    .profile-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-save { padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; }
+    .btn-cancel-sm { padding: 7px 14px; border: 1px solid var(--border); background: white; color: var(--text-2); border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .user-row { cursor: pointer; }
     /* States */
     .state-msg { padding: 32px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
   </style>
@@ -268,9 +282,33 @@ async function checkAdmin() {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
     if (!res.ok) { window.location.href = '/login.html'; return; }
     const data = await res.json();
-    if (data.user?.role !== 'admin') { alert('Alleen admins hebben toegang.'); window.location.href = '/churn-dashboard.html'; }
+    if (!data.user) { window.location.href = '/login.html'; return; }
+    if (data.user.role !== 'admin') { alert('Alleen admins hebben toegang.'); window.location.href = '/churn-dashboard.html'; return; }
+    const email = data.user.email || '';
+    const initials = email.slice(0,2).toUpperCase();
+    document.getElementById('userInitials').textContent = initials;
+    document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
+    document.getElementById('ddName').textContent = 'Admin';
+    document.getElementById('ddEmail').textContent = email;
   } catch { window.location.href = '/login.html'; }
 }
+
+function toggleUserMenu() {
+  document.getElementById('userDropdown').classList.toggle('open');
+}
+
+async function doLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch {}
+  window.location.href = '/login.html';
+}
+
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('userMenuWrap')?.contains(e.target)) {
+    document.getElementById('userDropdown')?.classList.remove('open');
+  }
+});
 
 function licenseLabel(type) {
   return type === '12m' ? '12 maanden' : type === '24m' ? '24 maanden' : type === 'unlimited' ? 'Onbeperkt' : '—';
@@ -421,20 +459,50 @@ async function loadUsers(search = '') {
 
 function searchUsers() { loadUsers(document.getElementById('searchInput').value.trim()); }
 
+let openProfileId = null;
+
 function renderUsers(users) {
   const c = document.getElementById('usersContainer');
-  if (!users.length) { c.innerHTML = '<div class="state-msg">Geen gebruikers gevonden.</div>'; return; }
-  c.innerHTML = users.map(u => {
+  // Filter: only show users with a license or that are admins
+  const filtered = users.filter(u =>
+    u.role === 'admin' ||
+    (u.practice_code && (u.license_type || u.banned || u.license_active === false))
+  );
+  if (!filtered.length) { c.innerHTML = '<div class="state-msg">Geen gebruikers met licentie gevonden.</div>'; return; }
+  c.innerHTML = filtered.map(u => {
     const initials = (u.email||'?').slice(0,2).toUpperCase();
     const [bgColor, fgColor] = avatarColors(u.email||'a');
     const dbBadge = dashboardBadge(u);
     const nzBadge = nazorgBadge(u);
     const isBanned = u.banned;
+    const profileHtml = `
+    <div class="profile-panel" id="profile-${u.id}" style="display:none;">
+      <div class="profile-inner">
+        <div class="profile-title">
+          Profiel — ${u.email}
+          <button class="profile-close" onclick="closeProfile(${u.id})">×</button>
+        </div>
+        <div class="profile-lic">
+          ${u.license_type ? `<span class="badge badge-${u.license_active !== false ? 'green' : 'red'}">${licenseLabel(u.license_type)}${u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : ''}</span>` : ''}
+          ${u.nazorg_enabled ? `<span class="badge badge-purple">Nazorg${u.nazorg_license_end_date ? ' · tot ' + formatDate(u.nazorg_license_end_date) : ''}</span>` : ''}
+        </div>
+        <div class="profile-grid">
+          <div><div class="pf-label">Naam contactpersoon</div><input class="pf-input" id="pf-naam-${u.id}" value="${u.contact_naam||''}"></div>
+          <div><div class="pf-label">Telefoonnummer</div><input class="pf-input" id="pf-tel-${u.id}" value="${u.contact_telefoon||''}"></div>
+          <div><div class="pf-label">Praktijkcode</div><input class="pf-input" value="${u.practice_code||''}" disabled style="opacity:.6;"></div>
+          <div><div class="pf-label">Locatie</div><input class="pf-input" id="pf-loc-${u.id}" value="${u.locatie||''}" placeholder="Adres praktijk..."></div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn-cancel-sm" onclick="closeProfile(${u.id})">Annuleren</button>
+          <button class="btn-save" onclick="saveProfile(${u.id})">Opslaan</button>
+        </div>
+      </div>
+    </div>`;
     return `
-    <div class="user-row">
+    <div class="user-row" id="row-${u.id}" onclick="openProfile(${u.id}, event)">
       <div class="user-avatar" style="background:${bgColor};color:${fgColor};">${initials}</div>
       <div class="user-info">
-        <div class="user-email">${u.email}</div>
+        <div class="user-email" style="color:var(--accent);text-decoration:underline;text-underline-offset:2px;">${u.email}</div>
         <div class="user-name">${u.praktijk_naam || u.practice_code || 'Admin'}</div>
       </div>
       <div class="user-badges">
@@ -467,8 +535,43 @@ function renderUsers(users) {
           <div class="action-item danger" onclick="userAction(${u.id},'delete')">Verwijderen</div>
         </div>
       </div>
-    </div>`;
+    </div>
+    ${profileHtml}`;
   }).join('');
+}
+
+function openProfile(id, e) {
+  if (e.target.closest('.action-wrap')) return;
+  if (openProfileId === id) { closeProfile(id); return; }
+  if (openProfileId !== null) closeProfile(openProfileId);
+  openProfileId = id;
+  document.getElementById('profile-' + id).style.display = 'block';
+  document.getElementById('row-' + id).style.background = 'var(--accent-light)';
+}
+
+function closeProfile(id) {
+  const p = document.getElementById('profile-' + id);
+  if (p) p.style.display = 'none';
+  const r = document.getElementById('row-' + id);
+  if (r) r.style.background = '';
+  if (openProfileId === id) openProfileId = null;
+}
+
+async function saveProfile(id) {
+  const naam = document.getElementById('pf-naam-' + id)?.value.trim() || '';
+  const tel = document.getElementById('pf-tel-' + id)?.value.trim() || '';
+  const loc = document.getElementById('pf-loc-' + id)?.value.trim() || '';
+  try {
+    const res = await fetch('/api/admin/users/' + id + '/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ contact_naam: naam, contact_telefoon: tel, locatie: loc })
+    });
+    const d = await res.json();
+    if (d.success) { closeProfile(id); loadUsers(document.getElementById('searchInput').value.trim()); }
+    else alert('Fout: ' + (d.error || 'onbekend'));
+  } catch { alert('Netwerkfout.'); }
 }
 
 async function userAction(userId, action) {

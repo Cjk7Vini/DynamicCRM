@@ -2894,7 +2894,8 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
       let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active,
-               p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date
+               p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
+               p.contact_naam, p.contact_telefoon, p.locatie
         FROM public.users u LEFT JOIN public.praktijken p ON u.practice_code = p.code
         WHERE u.id != $1`;
       const params = [req.session.userId];
@@ -3298,6 +3299,28 @@ app.get('/nazorg-portaal.html', requireAuth, async (req, res, next) => {
     console.error('Nazorg portaal auth error:', err);
     res.redirect('/login.html');
   }
+});
+
+
+// PATCH /api/admin/users/:id/profile
+app.patch('/api/admin/users/:id/profile', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { id } = req.params;
+    const { contact_naam, contact_telefoon, locatie } = req.body;
+    const user = await withReadConnection(async (client) => {
+      const r = await client.query('SELECT practice_code FROM public.users WHERE id=$1', [id]);
+      return r.rows[0];
+    });
+    if (!user?.practice_code) return res.status(400).json({ error: 'Geen praktijkcode voor deze gebruiker' });
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `UPDATE public.praktijken SET contact_naam=$1, contact_telefoon=$2, locatie=$3 WHERE code=$4`,
+        [contact_naam || null, contact_telefoon || null, locatie || null, user.practice_code]
+      );
+    });
+    res.json({ success: true });
+  } catch (e) { console.error('Profile update error:', e); res.status(500).json({ error: 'Fout bij opslaan profiel' }); }
 });
 
 app.listen(PORT, () => {
