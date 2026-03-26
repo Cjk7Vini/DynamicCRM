@@ -32,8 +32,23 @@
     .topbar-brand { display: flex; align-items: center; gap: 10px; }
     .topbar-brand img { height: 28px; width: auto; }
     .topbar-brand-name { color: white; font-size: 14px; font-weight: 500; }
-    .btn-back { color: #9ca3af; font-size: 13px; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: color .15s; }
-    .btn-back:hover { color: white; }
+    .user-dropdown-wrap { position: relative; }
+    .user-dropdown-btn { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; background: transparent; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; cursor: pointer; font-family: inherit; color: white; transition: all .15s; }
+    .user-dropdown-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.3); }
+    .user-avatar-sm { width: 32px; height: 32px; border-radius: 50%; background: #333399; display: flex; align-items: center; justify-content: center; font-size: 13px; color: white; font-weight: 600; flex-shrink: 0; }
+    .user-details { display: flex; flex-direction: column; align-items: flex-start; }
+    .user-email-txt { font-size: 13px; font-weight: 500; color: white; line-height: 1.3; }
+    .user-role-txt { font-size: 11px; color: #9ca3af; line-height: 1.2; }
+    .user-dropdown-menu { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 240px; background: white; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.10); z-index: 300; overflow: hidden; }
+    .user-dropdown-menu.open { display: block; animation: ddFade .15s ease; }
+    @keyframes ddFade { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+    .dd-section { padding: 8px 14px 4px; font-size: 10px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-3); }
+    .dd-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; font-size: 13px; color: var(--text-1); cursor: pointer; transition: background .12s; text-decoration: none; }
+    .dd-item:hover { background: var(--gray-bg); }
+    .dd-item.danger { color: var(--red); }
+    .dd-item.danger:hover { background: var(--red-bg); }
+    .dd-sep { height: 1px; background: var(--border-light); margin: 4px 0; }
+    .dd-chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform .2s; color: #9ca3af; }
 
     /* Layout */
     .layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 24px; max-width: 1400px; }
@@ -155,20 +170,27 @@
     <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
     <span class="topbar-brand-name">Dynamic Health</span>
   </div>
-  <div class="user-menu" id="userMenuWrap">
-    <button class="user-btn" id="userMenuBtn" onclick="toggleUserMenu()">
+  <div class="user-dropdown-wrap" id="userMenuWrap">
+    <button class="user-dropdown-btn" onclick="toggleUserMenu()" id="userMenuBtn">
       <div class="user-avatar-sm" id="userInitials">A</div>
-      <span id="userEmailDisplay">admin</span>
-      <span class="user-chevron">▾</span>
-    </button>
-    <div class="user-dropdown" id="userDropdown">
-      <div class="dd-header">
-        <div class="dd-name" id="ddName">Admin</div>
-        <div class="dd-email" id="ddEmail">—</div>
+      <div class="user-details">
+        <span class="user-email-txt" id="userEmailDisplay">admin</span>
+        <span class="user-role-txt" id="userRoleTxt">Administrator</span>
       </div>
-      <a href="/churn-dashboard.html" class="dd-item">← Dashboard</a>
+      <svg class="dd-chevron" id="ddChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="user-dropdown-menu" id="userDropdown">
+      <div class="dd-section">Navigatie</div>
+      <a href="/churn-dashboard.html" class="dd-item">
+        <svg style="width:15px;height:15px;flex-shrink:0;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
       <div class="dd-sep"></div>
-      <div class="dd-item danger" onclick="doLogout()">Uitloggen</div>
+      <div class="dd-section">Account</div>
+      <div class="dd-item danger" onclick="doLogout()">
+        <svg style="width:15px;height:15px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Uitloggen
+      </div>
     </div>
   </div>
 </header>
@@ -303,13 +325,15 @@ async function checkAdmin() {
     const initials = email.slice(0,2).toUpperCase();
     document.getElementById('userInitials').textContent = initials;
     document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
-    document.getElementById('ddName').textContent = 'Admin';
-    document.getElementById('ddEmail').textContent = email;
+    document.getElementById('userRoleTxt').textContent = 'Administrator';
   } catch { window.location.href = '/login.html'; }
 }
 
 function toggleUserMenu() {
-  document.getElementById('userDropdown').classList.toggle('open');
+  const menu = document.getElementById('userDropdown');
+  const chevron = document.getElementById('ddChevron');
+  menu.classList.toggle('open');
+  chevron.style.transform = menu.classList.contains('open') ? 'rotate(180deg)' : '';
 }
 
 async function doLogout() {
@@ -322,6 +346,8 @@ async function doLogout() {
 document.addEventListener('click', function(e) {
   if (!document.getElementById('userMenuWrap')?.contains(e.target)) {
     document.getElementById('userDropdown')?.classList.remove('open');
+    const chevron = document.getElementById('ddChevron');
+    if (chevron) chevron.style.transform = '';
   }
 });
 
@@ -481,7 +507,8 @@ function renderUsers(users) {
   // Filter: only show users with a license or that are admins
   const filtered = users.filter(u =>
     u.role === 'admin' ||
-    (u.practice_code && (u.license_type || u.banned || u.license_active === false))
+    u.banned ||
+    (u.practice_code && (u.license_type || u.license_active === false))
   );
   if (!filtered.length) { c.innerHTML = '<div class="state-msg">Geen gebruikers met licentie gevonden.</div>'; return; }
   c.innerHTML = filtered.map(u => {
