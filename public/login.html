@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Dynamic Health Consultancy</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: linear-gradient(135deg, #333399 0%, #3399CC 50%, #99CC33 100%);
@@ -20,8 +15,7 @@
       justify-content: center;
       padding: 20px;
     }
-
-    .login-container {
+    .card {
       background: white;
       border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
@@ -29,329 +23,141 @@
       max-width: 420px;
       padding: 40px;
     }
-
-    .logo {
-      text-align: center;
-      margin-bottom: 32px;
+    .logo { text-align: center; margin-bottom: 32px; }
+    .logo img { max-width: 180px; height: auto; margin-bottom: 12px; }
+    .logo p { color: #666; font-size: 14px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 6px; color: #333; font-weight: 500; font-size: 14px; }
+    input, select {
+      width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 15px; transition: border-color .2s;
+      font-family: inherit; color: #1a1a1a; background: white;
     }
+    input:focus, select:focus { outline: none; border-color: #3399CC; box-shadow: 0 0 0 3px rgba(51,153,204,.1); }
 
-    .logo img {
-      max-width: 200px;
-      height: auto;
-      margin-bottom: 16px;
+    /* Destination toggle */
+    .dest-group { margin-bottom: 20px; }
+    .dest-label { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 10px; display: block; }
+    .dest-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .dest-btn {
+      padding: 11px 12px; border: 2px solid #e0e0e0; border-radius: 8px;
+      font-size: 13px; font-family: inherit; font-weight: 500; color: #555;
+      background: white; cursor: pointer; text-align: center; transition: all .15s;
     }
-
-    .logo h1 {
-      font-size: 28px;
-      color: #1a1a1a;
-      margin-bottom: 8px;
-    }
-
-    .logo p {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .form-group {
-      margin-bottom: 24px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      color: #333;
-      font-weight: 500;
-      font-size: 14px;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 15px;
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    input:focus {
-      outline: none;
-      border-color: #3399CC;
-      box-shadow: 0 0 0 3px rgba(51, 153, 204, 0.1);
-    }
-
-    input::placeholder {
-      color: #999;
-    }
+    .dest-btn:hover { border-color: #3399CC; color: #3399CC; }
+    .dest-btn.active { border-color: #333399; background: #eeeef8; color: #333399; }
+    .dest-btn.disabled { opacity: .45; cursor: not-allowed; }
+    .dest-locked { font-size: 11px; color: #999; text-align: center; margin-top: 6px; display: none; }
 
     .btn {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #333399 0%, #3399CC 100%);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      width: 100%; padding: 13px; background: linear-gradient(135deg, #333399, #3399CC);
+      color: white; border: none; border-radius: 8px; font-size: 15px;
+      font-family: inherit; font-weight: 600; cursor: pointer; transition: opacity .15s;
     }
+    .btn:hover { opacity: .9; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(51, 51, 153, 0.4);
-    }
-
-    .btn:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .error {
-      background: #fee;
-      border: 1px solid #fcc;
-      color: #c33;
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .error.show {
-      display: block;
-      animation: shake 0.3s;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-10px); }
-      75% { transform: translateX(10px); }
-    }
-
-    .loading {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      margin-right: 8px;
-      vertical-align: middle;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .footer {
-      text-align: center;
-      margin-top: 24px;
-      color: #666;
-      font-size: 12px;
-    }
-
-    /* Split button */
-    .btn-split-wrap {
-      position: relative;
-      display: flex;
-      gap: 2px;
-      margin-bottom: 2px;
-    }
-
-    .btn-main {
-      flex: 1;
-      border-radius: 8px 0 0 8px;
-      padding: 14px 20px;
-    }
-
-    .btn-arrow {
-      width: 48px;
-      flex-shrink: 0;
-      border-radius: 0 8px 8px 0;
-      padding: 14px 0;
-      font-size: 12px;
-      background: linear-gradient(135deg, #2a2a80 0%, #2a88b0 100%);
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: all .2s;
-    }
-
-    .btn-arrow:hover { background: linear-gradient(135deg, #222270 0%, #2278a0 100%); }
-
-    .btn-dropdown {
-      display: none;
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      right: 0;
-      background: white;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.12);
-      overflow: hidden;
-      z-index: 100;
-    }
-
-    .btn-dropdown.open { display: block; }
-
-    .dropdown-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 13px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #333;
-      cursor: pointer;
-      transition: background .12s;
-    }
-
-    .dropdown-item:hover { background: #f5f5f7; }
-    .dropdown-item:first-child { border-bottom: 1px solid #f0f0f0; }
-
-    .item-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ddd;
-      flex-shrink: 0;
-      transition: background .15s;
-    }
-
-    .active-item .item-dot { background: #2BB8A3; }
-
-    .dest-label {
-      text-align: center;
-      font-size: 12px;
-      color: #999;
-      margin-top: 8px;
-    }
-
-    .dest-label span {
-      color: #333399;
-      font-weight: 600;
-    }
+    .error { background: #fee2e2; color: #7f1d1d; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; display: none; }
+    .error.show { display: block; }
+    .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .footer { text-align: center; margin-top: 24px; color: #999; font-size: 12px; }
+    .forgot { text-align: center; margin-top: 14px; }
+    .forgot a { color: #3399CC; font-size: 14px; text-decoration: none; font-weight: 500; }
   </style>
 </head>
 <body>
-  <div class="login-container">
+  <div class="card">
     <div class="logo">
-      <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy">
-      <p>Churn Analytics Dashboard</p>
+      <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" onerror="this.style.display='none'">
+      <p>Inlogportaal</p>
     </div>
 
-    <div id="error" class="error"></div>
+    <div id="errorDiv" class="error"></div>
 
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input 
-          type="email" 
-          id="email" 
-          name="email" 
-          placeholder="jouw@email.nl"
-          required
-          autocomplete="email"
-        >
-      </div>
-
-      <div class="form-group">
-        <label for="password">Wachtwoord</label>
-        <input 
-          type="password" 
-          id="password" 
-          name="password" 
-          placeholder="••••••••"
-          required
-          autocomplete="current-password"
-        >
-      </div>
-
-      <div class="btn-split-wrap">
-        <button type="button" class="btn btn-main" id="loginBtn" onclick="doLogin()">
-          Inloggen
-        </button>
-        <button type="button" class="btn btn-arrow" id="arrowBtn" onclick="toggleDropdown(event)">
-          &#9660;
-        </button>
-        <div class="btn-dropdown" id="btnDropdown">
-          <div class="dropdown-item active-item" id="optDashboard" onclick="selectDest('dashboard')">
-            <span class="item-dot"></span>
-            Dashboard
-          </div>
-          <div class="dropdown-item" id="optNazorg" onclick="selectDest('nazorg')">
-            <span class="item-dot"></span>
-            Nazorgportaal
-          </div>
-        </div>
-      </div>
-    </form>
-
-    <div style="text-align: center; margin-top: 16px;">
-      <a href="/forgot-password.html" style="color: #3399CC; text-decoration: none; font-size: 14px; font-weight: 500;">Wachtwoord vergeten?</a>
+    <div class="form-group">
+      <label for="email">E-mailadres</label>
+      <input type="email" id="email" placeholder="naam@praktijk.nl" autocomplete="email" required>
     </div>
 
-    <div class="footer">
-      © 2025 Dynamic Health Consultancy
+    <div class="form-group">
+      <label for="password">Wachtwoord</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
     </div>
+
+    <div class="dest-group">
+      <span class="dest-label">Ik wil naar:</span>
+      <div class="dest-options">
+        <button class="dest-btn active" id="destDashboard" onclick="setDest('dashboard')">Dashboard</button>
+        <button class="dest-btn" id="destNazorg" onclick="setDest('nazorg')">Nazorg portaal</button>
+      </div>
+      <div class="dest-locked" id="nazorgLocked">Geen nazorg licentie op dit account</div>
+    </div>
+
+    <button class="btn" id="loginBtn" onclick="doLogin()">Inloggen</button>
+
+    <div class="forgot">
+      <a href="/forgot-password.html">Wachtwoord vergeten?</a>
+    </div>
+
+    <div class="footer">© Dynamic Health Consultancy</div>
   </div>
 
   <script>
-    const errorDiv = document.getElementById('error');
-    const loginBtn = document.getElementById('loginBtn');
     let destination = 'dashboard';
+    let nazorgAllowed = null;
 
-    checkSession();
+    function setDest(dest) {
+      destination = dest;
+      document.getElementById('destDashboard').classList.toggle('active', dest === 'dashboard');
+      document.getElementById('destNazorg').classList.toggle('active', dest === 'nazorg');
+    }
 
     async function checkSession() {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.ok) {
-          window.location.href = destination === 'nazorg'
-            ? '/nazorg-portaal.html'
-            : '/churn-dashboard.html';
+        if (!res.ok) return;
+        // Already logged in - check nazorg and redirect
+        const data = await res.json();
+        if (data.user) {
+          const nzRes = await fetch('/api/auth/nazorg-check', { credentials: 'include' });
+          const nz = await nzRes.json();
+          nazorgAllowed = nz.allowed;
+          updateNazorgButton();
+          // Redirect to previously chosen destination or default
+          const saved = sessionStorage.getItem('loginDest');
+          if (saved === 'nazorg' && nazorgAllowed) window.location.href = '/nazorg-portaal.html';
+          else window.location.href = '/churn-dashboard.html';
         }
-      } catch (err) {}
+      } catch {}
     }
 
-    function selectDest(dest) {
-      destination = dest;
-      document.getElementById('optDashboard').classList.toggle('active-item', dest === 'dashboard');
-      document.getElementById('optNazorg').classList.toggle('active-item', dest === 'nazorg');
-      loginBtn.textContent = dest === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
-      document.getElementById('destLabel').innerHTML =
-        dest === 'nazorg'
-          ? 'Bestemming: <span>Nazorgportaal</span>'
-          : 'Bestemming: <span>Dashboard</span>';
-      closeDropdown();
+    function updateNazorgButton() {
+      const btn = document.getElementById('destNazorg');
+      const locked = document.getElementById('nazorgLocked');
+      if (nazorgAllowed === false) {
+        btn.classList.add('disabled');
+        btn.onclick = null;
+        locked.style.display = 'block';
+        if (destination === 'nazorg') setDest('dashboard');
+      } else {
+        btn.classList.remove('disabled');
+        btn.onclick = () => setDest('nazorg');
+        locked.style.display = 'none';
+      }
     }
-
-    function toggleDropdown(e) {
-      e.stopPropagation();
-      document.getElementById('btnDropdown').classList.toggle('open');
-    }
-
-    function closeDropdown() {
-      document.getElementById('btnDropdown').classList.remove('open');
-    }
-
-    document.addEventListener('click', closeDropdown);
 
     async function doLogin() {
-      const email    = document.getElementById('email').value.trim();
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
-      if (!email || !password) { showError('Vul e-mail en wachtwoord in.'); return; }
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errorDiv');
 
-      loginBtn.disabled = true;
-      loginBtn.innerHTML = '<span class="loading"></span> Inloggen...';
-      errorDiv.classList.remove('show');
+      if (!email || !password) { showError('Vul e-mailadres en wachtwoord in.'); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span> Inloggen...';
+      err.classList.remove('show');
 
       try {
         const res = await fetch('/api/auth/login', {
@@ -361,31 +167,45 @@
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-        if (res.ok) {
-          window.location.href = destination === 'nazorg'
-            ? '/nazorg-portaal.html'
-            : '/churn-dashboard.html';
-        } else {
-          showError(data.error || 'Login mislukt');
-          loginBtn.disabled = false;
-          loginBtn.textContent = destination === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
+
+        if (!res.ok) {
+          showError(data.error || 'Inloggen mislukt. Controleer je gegevens.');
+          btn.disabled = false;
+          btn.innerHTML = 'Inloggen';
+          return;
         }
-      } catch (err) {
+
+        // Check nazorg licentie na succesvol inloggen
+        if (destination === 'nazorg') {
+          const nzRes = await fetch('/api/auth/nazorg-check', { credentials: 'include' });
+          const nz = await nzRes.json();
+          if (!nz.allowed) {
+            showError('Je hebt geen toegang tot het nazorg portaal. Neem contact op met Dynamic Health Consultancy.');
+            btn.disabled = false;
+            btn.innerHTML = 'Inloggen';
+            return;
+          }
+          sessionStorage.setItem('loginDest', 'nazorg');
+          window.location.href = '/nazorg-portaal.html';
+        } else {
+          sessionStorage.setItem('loginDest', 'dashboard');
+          window.location.href = '/churn-dashboard.html';
+        }
+      } catch {
         showError('Netwerkfout. Probeer opnieuw.');
-        loginBtn.disabled = false;
-        loginBtn.textContent = destination === 'nazorg' ? 'Inloggen › Nazorgportaal' : 'Inloggen';
+        btn.disabled = false;
+        btn.innerHTML = 'Inloggen';
       }
     }
 
-    function showError(message) {
-      errorDiv.textContent = message;
-      errorDiv.classList.add('show');
-      setTimeout(() => errorDiv.classList.remove('show'), 5000);
+    function showError(msg) {
+      const err = document.getElementById('errorDiv');
+      err.textContent = msg;
+      err.classList.add('show');
     }
 
-    document.getElementById('password').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') doLogin();
-    });
+    document.addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+    checkSession();
   </script>
 </body>
 </html>

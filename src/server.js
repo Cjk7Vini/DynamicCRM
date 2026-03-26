@@ -2860,92 +2860,220 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // Admin: Create new user
-app.post('/api/admin/create-user', requireAuth, async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// LICENTIE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatDateNL(date) {
+  return new Date(date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function licenseLabel(type) {
+  if (type === '12m') return '12 maanden';
+  if (type === '24m') return '24 maanden';
+  if (type === 'unlimited') return 'Onbeperkt';
+  return type || 'Onbekend';
+}
+
+async function sendWelcomeEmail({ email, praktijkNaam, password, licenseType, licenseEndDate, nazorgEnabled }) {
+  const eindDatum = licenseType === 'unlimited' ? null : formatDateNL(licenseEndDate);
+  const licenseText = licenseType === 'unlimited'
+    ? 'Je licentie is onbeperkt geldig.'
+    : `Je licentie loopt tot en met ${eindDatum}. Je ontvangt 14 dagen van tevoren een herinnering.`;
+  const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#1A1D21;padding:24px 40px;"><span style="color:white;font-size:15px;font-weight:600;">Dynamic Health Consultancy</span></td></tr>
+<tr><td style="padding:40px;">
+<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
+<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je account voor het Dynamic Health dashboard is aangemaakt. Hieronder vind je je inloggegevens.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;"><tr><td style="padding:24px;">
+<p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Inloggegevens</p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> <a href="https://dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">dynamic-health-consultancy.nl</a></p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Gebruikersnaam:</strong> ${email}</p>
+<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijdelijk wachtwoord:</strong> <span style="font-family:monospace;background:#e8e8ed;padding:2px 8px;border-radius:4px;">${password}</span></p>
+</td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;"><tr><td style="padding:24px;">
+<p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Licentie</p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> ${licenseLabel(licenseType)}</p>
+${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Nazorg portaal:</strong> Inbegrepen</p>` : ''}
+<p style="margin:8px 0 0;font-size:14px;color:#9090a8;">${licenseText}</p>
+</td></tr></table>
+<p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">We raden je aan je wachtwoord na de eerste inlog te wijzigen via de accountinstellingen.</p>
+<p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+</td></tr>
+<tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
+<p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+</td></tr></table></td></tr></table></body></html>`;
+  return sendMailResilient({
+    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+    to: email,
+    subject: 'Welkom bij Dynamic Health | je account is aangemaakt',
+    html,
+    text: `Beste ${praktijkNaam},\n\nJe account is aangemaakt.\n\nDashboard: https://dynamic-health-consultancy.nl\nGebruikersnaam: ${email}\nTijdelijk wachtwoord: ${password}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
+  });
+}
+
+// POST /api/admin/create-user-licensed
+app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
   try {
-    // Check admin access
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin toegang vereist' });
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType } = req.body;
+    if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
+    if (!['admin', 'practice'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
+    if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return res.status(400).json({ error: 'Wachtwoord voldoet niet aan de eisen' });
     }
-
-    const { email, password, role, practiceCode } = req.body;
-
-    // Validate input
-    if (!email || !password || !role) {
-      return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
+    const existing = await withReadConnection(async (client) => {
+      const r = await client.query('SELECT id FROM public.users WHERE email = $1', [email.toLowerCase().trim()]);
+      return r.rows[0];
+    });
+    if (existing) return res.status(400).json({ error: 'Dit e-mailadres bestaat al' });
+    const passwordHash = await bcrypt.hash(password, 10);
+    let licenseStart = null, licenseEnd = null, finalLicenseType = null;
+    if (role === 'practice') {
+      finalLicenseType = licenseType || '12m';
+      licenseStart = new Date();
+      if (finalLicenseType !== 'unlimited') {
+        licenseEnd = new Date();
+        licenseEnd.setMonth(licenseEnd.getMonth() + (finalLicenseType === '12m' ? 12 : 24));
+      }
     }
-
-    if (!['admin', 'practice'].includes(role)) {
-      return res.status(400).json({ error: 'Ongeldige rol' });
-    }
-
-    if (role === 'practice' && !practiceCode) {
-      return res.status(400).json({ error: 'Practice code is verplicht voor practice users' });
-    }
-
-    // Validate password strength
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Wachtwoord moet minimaal 8 tekens zijn' });
-    }
-
-    const hasUpper = /[A-Z]/.test(password);
-    const hasLower = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-
-    if (!hasUpper || !hasLower || !hasNumber) {
-      return res.status(400).json({
-        error: 'Wachtwoord moet hoofdletter, kleine letter en cijfer bevatten'
+    const newUser = await withWriteConnection(async (client) => {
+      const r = await client.query(
+        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
+         VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email, role, practice_code`,
+        [email.toLowerCase().trim(), passwordHash, role, role === 'practice' ? practiceCode.toUpperCase().trim() : null]
+      );
+      return r.rows[0];
+    });
+    if (role === 'practice' && practiceCode) {
+      let nazorgEnd = null, finalNazorgType = null;
+      if (nazorgEnabled && nazorgLicenseType) {
+        finalNazorgType = nazorgLicenseType;
+        if (finalNazorgType !== 'unlimited') {
+          nazorgEnd = new Date();
+          nazorgEnd.setMonth(nazorgEnd.getMonth() + (finalNazorgType === '12m' ? 12 : 24));
+        }
+      }
+      await withWriteConnection(async (client) => {
+        await client.query(
+          `UPDATE public.praktijken SET license_type=$1, license_start_date=$2, license_end_date=$3, expiry_warning_sent=FALSE,
+           nazorg_enabled=$4, nazorg_license_type=$5, nazorg_license_end_date=$6 WHERE code=$7`,
+          [finalLicenseType, licenseStart, licenseEnd, !!nazorgEnabled, finalNazorgType, nazorgEnd, practiceCode.toUpperCase().trim()]
+        );
       });
     }
+    try {
+      await sendWelcomeEmail({ email, praktijkNaam: praktijkNaam || practiceCode || email, password, licenseType: finalLicenseType || 'unlimited', licenseEndDate: licenseEnd, nazorgEnabled: !!nazorgEnabled });
+    } catch (mailErr) { console.warn('Welkomstmail mislukt:', mailErr.message); }
+    res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code }, license: { type: finalLicenseType, start: licenseStart, end: licenseEnd } });
+  } catch (error) { console.error('Create user licensed error:', error); res.status(500).json({ error: 'Fout bij aanmaken gebruiker' }); }
+});
 
-    // Check if email already exists
-    const existingUser = await withReadConnection(async (client) => {
-      const result = await client.query(
-        'SELECT id FROM public.users WHERE email = $1',
-        [email.toLowerCase().trim()]
-      );
-      return result.rows[0];
+// Keep old endpoint for backward compat
+app.post('/api/admin/create-user', requireAuth, async (req, res) => {
+  req.body.licenseType = req.body.licenseType || '12m';
+  req.body.nazorgEnabled = false;
+  const handler = await import('./server.js').catch(() => null);
+  // Forward to licensed endpoint logic inline
+  const { email, password, role, practiceCode } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email en wachtwoord verplicht' });
+  const passwordHash = await bcrypt.hash(password, 10);
+  try {
+    const r = await withWriteConnection(async (client) => {
+      return (await client.query(`INSERT INTO public.users (email, password_hash, role, practice_code, created_at) VALUES ($1,$2,$3,$4,NOW()) RETURNING id,email,role,practice_code`,
+        [email.toLowerCase().trim(), passwordHash, role, role==='practice'?practiceCode?.toUpperCase().trim():null])).rows[0];
     });
+    res.json({ success: true, user: r });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email adres bestaat al' });
+// GET /api/admin/users
+app.get('/api/admin/users', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { search } = req.query;
+    const users = await withReadConnection(async (client) => {
+      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
+               p.naam as praktijk_naam, p.license_type, p.license_start_date,
+               p.license_end_date, p.actief as license_active,
+               p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date
+        FROM public.users u LEFT JOIN public.praktijken p ON u.practice_code = p.code
+        WHERE u.id != $1`;
+      const params = [req.session.userId];
+      if (search) { params.push(`%${search}%`); q += ` AND (u.email ILIKE $${params.length} OR u.practice_code ILIKE $${params.length} OR p.naam ILIKE $${params.length})`; }
+      q += ' ORDER BY u.role ASC, u.created_at DESC';
+      return (await client.query(q, params)).rows;
+    });
+    res.json({ success: true, users });
+  } catch (error) { console.error('Get users error:', error); res.status(500).json({ error: 'Fout bij ophalen gebruikers' }); }
+});
+
+// PATCH /api/admin/users/:id
+app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { id } = req.params;
+    const { banned, licenseType, action } = req.body;
+    if (typeof banned === 'boolean') {
+      await withWriteConnection(async (client) => { await client.query('UPDATE public.users SET banned=$1 WHERE id=$2', [banned, id]); });
     }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const newUser = await withWriteConnection(async (client) => {
-      const result = await client.query(
-        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         RETURNING id, email, role, practice_code`,
-        [
-          email.toLowerCase().trim(),
-          passwordHash,
-          role,
-          role === 'practice' ? practiceCode.toUpperCase().trim() : null
-        ]
-      );
-      return result.rows[0];
-    });
-
-    console.log(`✅ Admin ${req.session.userEmail} created new user: ${newUser.email} (${newUser.role})`);
-
-    res.json({
-      success: true,
-      message: 'Gebruiker succesvol aangemaakt',
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        role: newUser.role,
-        practice_code: newUser.practice_code
+    if (licenseType || action) {
+      const user = await withReadConnection(async (client) => { const r = await client.query('SELECT practice_code FROM public.users WHERE id=$1', [id]); return r.rows[0]; });
+      if (user?.practice_code) {
+        if (action === 'reactivate') {
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET actief=TRUE, expiry_warning_sent=FALSE WHERE code=$1`, [user.practice_code]); });
+        } else if (action === 'stop') {
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET actief=FALSE WHERE code=$1`, [user.practice_code]); });
+        } else if (licenseType === 'unlimited') {
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET license_type='unlimited', license_end_date=NULL, actief=TRUE, expiry_warning_sent=FALSE WHERE code=$1`, [user.practice_code]); });
+        } else if (action === 'extend_12m' || action === 'extend_24m') {
+          const newType = action === 'extend_12m' ? '12m' : '24m';
+          const licenseEnd = new Date(); licenseEnd.setMonth(licenseEnd.getMonth() + (action === 'extend_12m' ? 12 : 24));
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET license_type=$1, license_end_date=$2, license_start_date=NOW(), actief=TRUE, expiry_warning_sent=FALSE WHERE code=$3`, [newType, licenseEnd, user.practice_code]); });
+        } else if (action === 'nazorg_enable') {
+          const nEnd = new Date(); nEnd.setMonth(nEnd.getMonth() + 12);
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='12m', nazorg_license_end_date=$1 WHERE code=$2`, [nEnd, user.practice_code]); });
+        } else if (action === 'nazorg_enable_24m') {
+          const nEnd = new Date(); nEnd.setMonth(nEnd.getMonth() + 24);
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='24m', nazorg_license_end_date=$1 WHERE code=$2`, [nEnd, user.practice_code]); });
+        } else if (action === 'nazorg_unlimited') {
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='unlimited', nazorg_license_end_date=NULL WHERE code=$1`, [user.practice_code]); });
+        } else if (action === 'nazorg_disable') {
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=FALSE WHERE code=$1`, [user.practice_code]); });
+        }
       }
-    });
+    }
+    res.json({ success: true });
+  } catch (error) { console.error('Update user error:', error); res.status(500).json({ error: 'Fout bij bijwerken gebruiker' }); }
+});
 
-  } catch (error) {
-    console.error('Create user error:', error);
-    res.status(500).json({ error: 'Fout bij aanmaken gebruiker' });
-  }
+// DELETE /api/admin/users/:id
+app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    await withWriteConnection(async (client) => { await client.query("DELETE FROM public.users WHERE id=$1 AND role!='admin'", [req.params.id]); });
+    res.json({ success: true });
+  } catch (error) { console.error('Delete user error:', error); res.status(500).json({ error: 'Fout bij verwijderen gebruiker' }); }
+});
+
+// GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
+app.get('/api/auth/nazorg-check', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role === 'admin') return res.json({ allowed: true });
+    const praktijk = await withReadConnection(async (client) => {
+      const r = await client.query(`SELECT nazorg_enabled, nazorg_license_end_date FROM public.praktijken WHERE code=$1`, [req.session.practiceCode]);
+      return r.rows[0];
+    });
+    if (!praktijk?.nazorg_enabled) return res.json({ allowed: false, reason: 'Geen nazorg licentie' });
+    if (praktijk.nazorg_license_end_date && new Date(praktijk.nazorg_license_end_date) < new Date()) {
+      return res.json({ allowed: false, reason: 'Nazorg licentie verlopen' });
+    }
+    res.json({ allowed: true });
+  } catch (e) { res.status(500).json({ allowed: false }); }
 });
 
 // Get current user
@@ -3233,6 +3361,48 @@ app.get('/api/no-interest', async (req, res) => {
   } catch (error) {
     console.error('No-interest error:', error);
     res.status(500).send('Er is een fout opgetreden.');
+  }
+});
+
+
+// Serve nazorg-portaal.html with license check
+app.get('/nazorg-portaal.html', requireAuth, async (req, res, next) => {
+  try {
+    // Admins always allowed
+    if (req.session.role === 'admin') return next();
+    
+    const praktijk = await withReadConnection(async (client) => {
+      const r = await client.query(
+        'SELECT nazorg_enabled, nazorg_license_end_date FROM public.praktijken WHERE code=$1',
+        [req.session.practiceCode]
+      );
+      return r.rows[0];
+    });
+
+    if (!praktijk?.nazorg_enabled) {
+      return res.status(403).send(`<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>Geen toegang</title>
+      <style>body{font-family:sans-serif;background:#f4f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{background:white;padding:40px;border-radius:12px;text-align:center;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,.08);}
+      h2{color:#1a1a1a;margin-bottom:12px;}p{color:#555;font-size:14px;line-height:1.7;margin-bottom:20px;}
+      a{display:inline-block;padding:10px 20px;background:#333399;color:white;border-radius:8px;text-decoration:none;font-size:14px;}</style></head>
+      <body><div class="card"><h2>Geen toegang</h2><p>Uw account heeft geen actieve nazorg portaal licentie. Neem contact op met Dynamic Health Consultancy voor meer informatie.</p>
+      <a href="/churn-dashboard.html">Terug naar dashboard</a></div></body></html>`);
+    }
+
+    if (praktijk.nazorg_license_end_date && new Date(praktijk.nazorg_license_end_date) < new Date()) {
+      return res.status(403).send(`<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>Licentie verlopen</title>
+      <style>body{font-family:sans-serif;background:#f4f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{background:white;padding:40px;border-radius:12px;text-align:center;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,.08);}
+      h2{color:#1a1a1a;margin-bottom:12px;}p{color:#555;font-size:14px;line-height:1.7;margin-bottom:20px;}
+      a{display:inline-block;padding:10px 20px;background:#333399;color:white;border-radius:8px;text-decoration:none;font-size:14px;}</style></head>
+      <body><div class="card"><h2>Licentie verlopen</h2><p>Uw nazorg portaal licentie is verlopen. Neem contact op met Dynamic Health Consultancy voor verlenging.</p>
+      <a href="/churn-dashboard.html">Terug naar dashboard</a></div></body></html>`);
+    }
+
+    next();
+  } catch (err) {
+    console.error('Nazorg portaal auth error:', err);
+    res.redirect('/login.html');
   }
 });
 

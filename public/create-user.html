@@ -3,808 +3,511 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gebruikersbeheer — Dynamic Health</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>Gebruikersbeheer | Dynamic Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:       #f4f4f6;
-      --surface:  #ffffff;
-      --border:   #e4e4e8;
-      --text-1:   #0f0f12;
-      --text-2:   #5a5a72;
-      --text-3:   #9090a8;
-      --accent:   #2BB8A3;
-      --accent-d: #1a9985;
-      --danger:   #e5334a;
-      --warn:     #f59e0b;
-      --green:    #16a34a;
-      --radius:   10px;
-      --shadow:   0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --border: #e2e4e9;
+      --border-light: #f0f1f4;
+      --text-1: #111827;
+      --text-2: #4b5563;
+      --text-3: #9ca3af;
+      --accent: #333399;
+      --accent-light: #eeeef8;
+      --green: #166534; --green-bg: #dcfce7; --green-text: #166534;
+      --red: #A32D2D; --red-bg: #fee2e2; --red-text: #7f1d1d;
+      --amber-bg: #fef3c7; --amber-text: #92400e;
+      --blue-bg: #dbeafe; --blue-text: #1e40af;
+      --purple-bg: #ede9fe; --purple-text: #5b21b6;
+      --gray-bg: #f3f4f6; --gray-text: #6b7280;
+      --radius: 10px;
     }
+    body { font-family: "DM Sans", sans-serif; background: var(--bg); color: var(--text-1); font-size: 14px; line-height: 1.5; }
 
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Topbar */
+    .topbar { background: #1A1D21; padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-brand img { height: 28px; width: auto; }
+    .topbar-brand-name { color: white; font-size: 14px; font-weight: 500; }
+    .btn-back { color: #9ca3af; font-size: 13px; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: color .15s; }
+    .btn-back:hover { color: white; }
 
-    body {
-      font-family: 'DM Sans', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text-1);
-      font-size: 14px;
-      min-height: 100vh;
-    }
+    /* Layout */
+    .layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 24px; max-width: 1400px; }
 
-    /* ── TOPBAR ── */
-    .topbar {
-      background: #1A1D21;
-      padding: 0 32px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    /* Card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
+    .card-title { font-size: 15px; font-weight: 600; color: var(--text-1); }
+    .card-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .card-body { padding: 20px; }
 
-    .topbar-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .topbar-brand img { height: 32px; width: auto; }
-
-    .topbar-brand-name {
-      color: white;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.2px;
-    }
-
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-
-    .btn-back {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: transparent;
-      color: rgba(255,255,255,.7);
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all .15s;
-    }
-
-    .btn-back:hover { background: rgba(255,255,255,.1); color: white; }
-
-    /* ── LAYOUT ── */
-    .layout {
-      max-width: 1200px;
-      margin: 32px auto;
-      padding: 0 24px;
-      display: grid;
-      grid-template-columns: 400px 1fr;
-      gap: 24px;
-      align-items: start;
-    }
-
-    /* ── CARD ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-    }
-
-    .card-header {
-      padding: 20px 24px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-1);
-    }
-
-    .card-subtitle {
-      font-size: 12px;
-      color: var(--text-3);
-      margin-top: 2px;
-    }
-
-    .card-body { padding: 24px; }
-
-    /* ── FORM ── */
-    .form-group { margin-bottom: 18px; }
-
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      color: var(--text-2);
-      margin-bottom: 6px;
-    }
-
-    .form-group input,
-    .form-group select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      font-size: 14px;
-      font-family: inherit;
-      color: var(--text-1);
-      background: white;
-      transition: border-color .15s, box-shadow .15s;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(43,184,163,.12);
-    }
-
-    .form-help {
-      font-size: 11px;
-      color: var(--text-3);
-      margin-top: 4px;
-    }
-
-    .password-row {
-      display: flex;
-      gap: 8px;
-    }
-
+    /* Form */
+    .form-group { margin-bottom: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); margin-bottom: 5px; }
+    input, select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; font-family: inherit; color: var(--text-1); background: var(--surface); transition: border-color .15s; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); }
+    .form-help { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+    .password-row { display: flex; gap: 8px; }
     .password-row input { flex: 1; }
+    .btn-gen { padding: 9px 13px; border: 1px solid var(--border); border-radius: 7px; background: var(--gray-bg); color: var(--text-2); font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap; transition: background .15s; }
+    .btn-gen:hover { background: var(--border); }
 
-    .btn-gen {
-      padding: 10px 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: inherit;
-      color: var(--text-2);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all .15s;
-    }
+    /* License section */
+    .license-section { margin-top: 18px; }
+    .license-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border-light); }
+    .lic-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--gray-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-light); }
+    .lic-left { display: flex; align-items: center; gap: 10px; }
+    .lic-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background .2s; }
+    .lic-dot.on { background: #16a34a; }
+    .lic-dot.off { background: #d1d5db; }
+    .lic-label { font-size: 13px; font-weight: 500; }
+    .lic-right { display: flex; align-items: center; gap: 8px; }
+    .lic-right select { width: auto; padding: 5px 9px; font-size: 12px; margin: 0; }
+    .lic-right select:disabled { opacity: .4; }
+    .toggle { width: 34px; height: 19px; border-radius: 10px; background: #d1d5db; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+    .toggle.on { background: #16a34a; }
+    .toggle::after { content:''; position:absolute; width:15px; height:15px; background:white; border-radius:50%; top:2px; left:2px; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .toggle.on::after { left:17px; }
 
-    .btn-gen:hover { background: var(--accent); color: white; border-color: var(--accent); }
-
-    /* ── BUTTONS ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 18px;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all .15s;
-      border: none;
-      white-space: nowrap;
-    }
-
-    .btn-primary { background: var(--accent); color: white; width: 100%; justify-content: center; }
-    .btn-primary:hover { background: var(--accent-d); }
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 7px; font-size: 14px; font-family: inherit; font-weight: 500; cursor: pointer; border: none; transition: opacity .15s; }
+    .btn-primary { background: var(--accent); color: white; width: 100%; margin-top: 6px; }
+    .btn-primary:hover { opacity: .9; }
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
-    .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
-    .btn-danger:hover { background: #fde8eb; }
+    /* Alert */
+    .alert { padding: 10px 14px; border-radius: 7px; font-size: 13px; margin-bottom: 14px; }
+    .alert-success { background: var(--green-bg); color: var(--green-text); }
+    .alert-error { background: var(--red-bg); color: var(--red-text); }
 
-    .btn-warn { background: transparent; border: 1px solid var(--warn); color: var(--warn); }
-    .btn-warn:hover { background: #fffbeb; }
+    /* Cred box */
+    .cred-box { background: var(--gray-bg); border-radius: 8px; padding: 16px; border: 1px solid var(--border-light); }
+    .cred-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border-light); }
+    .cred-row:last-of-type { border-bottom: none; }
+    .cred-label { font-size: 12px; color: var(--text-3); }
+    .cred-value { font-size: 13px; font-weight: 500; color: var(--text-1); }
+    .cred-warn { margin-top: 12px; font-size: 12px; color: var(--amber-text); background: var(--amber-bg); padding: 8px 10px; border-radius: 6px; }
 
-    .btn-sm {
-      padding: 5px 10px;
-      font-size: 12px;
-    }
+    /* Search */
+    .search-bar { display: flex; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border-light); }
+    .search-bar input { flex: 1; }
+    .btn-search { padding: 9px 16px; background: var(--accent); color: white; border: none; border-radius: 7px; font-size: 13px; font-family: inherit; font-weight: 500; cursor: pointer; }
 
-    /* ── ALERT ── */
-    .alert {
-      padding: 12px 16px;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 16px;
-    }
+    /* User list */
+    .user-list { }
+    .user-row { display: flex; align-items: center; padding: 13px 20px; border-bottom: 1px solid var(--border-light); gap: 12px; transition: background .1s; }
+    .user-row:last-child { border-bottom: none; }
+    .user-row:hover { background: var(--gray-bg); }
+    .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--blue-bg); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--blue-text); flex-shrink: 0; }
+    .user-info { flex: 1; min-width: 0; }
+    .user-email { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-name { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+    .user-badges { display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
+    .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+    .badge-green { background: var(--green-bg); color: var(--green-text); }
+    .badge-red { background: var(--red-bg); color: var(--red-text); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+    .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+    .badge-purple { background: var(--purple-bg); color: var(--purple-text); }
+    .badge-gray { background: var(--gray-bg); color: var(--gray-text); border: 1px solid var(--border); }
 
-    .alert-success { background: #e6f6ec; border: 1px solid #86efac; color: #166534; }
-    .alert-error   { background: #fde8eb; border: 1px solid #fca5a5; color: #991b1b; }
-
-    /* ── CREDENTIALS BOX ── */
-    .cred-box {
-      background: #f9f9fb;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 20px;
-      margin-top: 16px;
-    }
-
-    .cred-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-    }
-
-    .cred-row:last-child { border-bottom: none; }
-    .cred-label { color: var(--text-2); font-weight: 500; }
-    .cred-value { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-1); font-weight: 500; }
-
-    .cred-warn {
-      margin-top: 12px;
-      padding: 10px 14px;
-      background: #fffbeb;
-      border: 1px solid #fcd34d;
-      border-radius: 6px;
-      font-size: 12px;
-      color: #92400e;
-      font-weight: 500;
-    }
-
-    /* ── SEARCH ── */
-    .search-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .search-row input {
-      flex: 1;
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    .search-row input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .search-row button {
-      padding: 9px 16px;
-      background: var(--accent);
-      border: none;
-      border-radius: 7px;
-      color: white;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-    }
-
-    /* ── USER TABLE ── */
-    .user-table { width: 100%; border-collapse: collapse; }
-
-    .user-table th {
-      text-align: left;
-      padding: 8px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      color: var(--text-3);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .user-table td {
-      padding: 12px;
-      font-size: 13px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-    }
-
-    .user-table tr:last-child td { border-bottom: none; }
-    .user-table tr:hover td { background: var(--bg); }
-
-    /* ── BADGE ── */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .badge-green  { background: #e6f6ec; color: #166534; }
-    .badge-red    { background: #fde8eb; color: #991b1b; }
-    .badge-amber  { background: #fffbeb; color: #92400e; }
-    .badge-gray   { background: #f4f4f6; color: var(--text-2); }
-    .badge-blue   { background: #e8f0fe; color: #1a56db; }
-
-    /* ── LICENSE BADGE ── */
-    .license-info { font-size: 12px; color: var(--text-2); margin-top: 2px; }
-
-    /* ── ACTIONS DROPDOWN ── */
-    .action-wrap { position: relative; display: inline-block; }
-
-    .action-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: calc(100% + 4px);
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0,0,0,.1);
-      min-width: 200px;
-      z-index: 100;
-      overflow: hidden;
-    }
-
+    /* Action menu */
+    .action-wrap { position: relative; }
+    .btn-acties { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .btn-acties:hover { background: var(--gray-bg); }
+    .action-menu { display: none; position: absolute; right: 0; top: calc(100% + 4px); background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.1); min-width: 210px; z-index: 100; overflow: hidden; }
     .action-menu.open { display: block; }
+    .action-section { padding: 8px 14px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); }
+    .action-item { padding: 9px 14px; font-size: 13px; color: var(--text-1); cursor: pointer; transition: background .1s; }
+    .action-item:hover { background: var(--gray-bg); }
+    .action-item.danger { color: var(--red); }
+    .action-item.danger:hover { background: var(--red-bg); }
+    .action-divider { height: 1px; background: var(--border-light); margin: 4px 0; }
+    #backdrop { display: none; position: fixed; inset: 0; z-index: 90; }
 
-    .action-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 14px;
-      font-size: 13px;
-      color: var(--text-1);
-      cursor: pointer;
-      transition: background .1s;
-    }
-
-    .action-item:hover { background: var(--bg); }
-    .action-item.danger { color: var(--danger); }
-    .action-item.danger:hover { background: #fde8eb; }
-    .action-divider { height: 1px; background: var(--border); margin: 4px 0; }
-
-    .action-section-label {
-      padding: 6px 14px 2px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--text-3);
-    }
-
-    /* ── EMPTY STATE ── */
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: var(--text-3);
-      font-size: 13px;
-    }
-
-    /* ── LOADING ── */
-    .loading {
-      text-align: center;
-      padding: 32px;
-      color: var(--text-3);
-      font-size: 13px;
-    }
+    /* States */
+    .state-msg { padding: 32px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
   </style>
 </head>
 <body>
 
-  <!-- Topbar -->
-  <header class="topbar">
-    <div class="topbar-brand">
-      <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
-      <span class="topbar-brand-name">Dynamic Health</span>
-    </div>
-    <div class="topbar-right">
-      <a href="/churn-dashboard.html" class="btn-back">
-        ← Terug naar dashboard
-      </a>
-    </div>
-  </header>
+<header class="topbar">
+  <div class="topbar-brand">
+    <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
+    <span class="topbar-brand-name">Dynamic Health</span>
+  </div>
+  <a href="/churn-dashboard.html" class="btn-back">← Terug naar dashboard</a>
+</header>
 
-  <div class="layout">
+<div class="layout">
 
-    <!-- Linker kolom: gebruiker aanmaken -->
-    <div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Gebruiker aanmaken</div>
-          <div class="card-subtitle">Nieuw account met licentie</div>
-        </div>
-        <div class="card-body">
-          <div id="createAlert"></div>
+  <!-- LINKER KOLOM: Gebruiker aanmaken -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Gebruiker aanmaken</div>
+        <div class="card-subtitle">Nieuw account met licentie(s)</div>
+      </div>
+      <div class="card-body">
+        <div id="createAlert"></div>
 
-          <div id="createForm">
-            <div class="form-group">
-              <label>E-mailadres</label>
-              <input type="email" id="email" placeholder="naam@praktijk.nl">
-            </div>
-
-            <div class="form-group">
-              <label>Praktijknaam</label>
-              <input type="text" id="praktijkNaam" placeholder="Bijv. Fysio Soestdijk">
-            </div>
-
-            <div class="form-group">
+        <div id="createForm">
+          <div class="form-group">
+            <label>E-mailadres</label>
+            <input type="email" id="email" placeholder="naam@praktijk.nl">
+          </div>
+          <div class="form-group">
+            <label>Praktijknaam</label>
+            <input type="text" id="praktijkNaam" placeholder="Bijv. Fysio Soestdijk">
+          </div>
+          <div class="form-row">
+            <div>
               <label>Rol</label>
               <select id="role" onchange="onRoleChange()">
                 <option value="practice">Practice</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
-
-            <div class="form-group" id="practiceCodeGroup">
+            <div id="practiceCodeGroup">
               <label>Praktijkcode</label>
-              <input type="text" id="practiceCode" placeholder="Bijv. S7F2MW" maxlength="10" style="text-transform:uppercase;">
-              <div class="form-help">Maximaal 10 tekens, hoofdletters</div>
+              <input type="text" id="practiceCode" placeholder="S7F2MW" maxlength="10" style="text-transform:uppercase;">
             </div>
-
-            <div class="form-group" id="licenseGroup">
-              <label>Licentie</label>
-              <select id="licenseType">
-                <option value="12m">12 maanden</option>
-                <option value="24m">24 maanden</option>
-                <option value="unlimited">Onbeperkt</option>
-              </select>
+          </div>
+          <div class="form-group">
+            <label>Tijdelijk wachtwoord</label>
+            <div class="password-row">
+              <input type="text" id="password" value="Dynamic2026!">
+              <button class="btn-gen" onclick="generatePassword()">Genereer</button>
             </div>
-
-            <div class="form-group">
-              <label>Tijdelijk wachtwoord</label>
-              <div class="password-row">
-                <input type="text" id="password" value="Dynamic2026!">
-                <button type="button" class="btn-gen" onclick="generatePassword()">Genereer</button>
-              </div>
-              <div class="form-help">Min. 8 tekens, hoofdletter, kleine letter, cijfer</div>
-            </div>
-
-            <button class="btn btn-primary" onclick="createUser()" id="createBtn">
-              Account aanmaken
-            </button>
+            <div class="form-help">Min. 8 tekens, hoofdletter, kleine letter, cijfer</div>
           </div>
 
-          <!-- Succes weergave -->
-          <div id="createSuccess" style="display:none;">
-            <div class="alert alert-success">Account aangemaakt. Welkomstmail is verstuurd.</div>
-            <div class="cred-box">
-              <div class="cred-row">
-                <span class="cred-label">E-mail</span>
-                <span class="cred-value" id="dispEmail">—</span>
+          <div class="license-section" id="licenseSection">
+            <div class="license-section-title">Licenties</div>
+
+            <!-- Dashboard licentie -->
+            <div class="lic-row">
+              <div class="lic-left">
+                <div class="lic-dot on"></div>
+                <div class="lic-label">Dashboard</div>
               </div>
-              <div class="cred-row">
-                <span class="cred-label">Wachtwoord</span>
-                <span class="cred-value" id="dispPwd">—</span>
+              <div class="lic-right">
+                <select id="licenseType">
+                  <option value="12m">12 maanden</option>
+                  <option value="24m">24 maanden</option>
+                  <option value="unlimited">Onbeperkt</option>
+                </select>
               </div>
-              <div class="cred-row">
-                <span class="cred-label">Licentie</span>
-                <span class="cred-value" id="dispLicense">—</span>
-              </div>
-              <div class="cred-row" id="dispEndRow">
-                <span class="cred-label">Geldig tot</span>
-                <span class="cred-value" id="dispEnd">—</span>
-              </div>
-              <div class="cred-warn">Kopieer deze gegevens nu. Het wachtwoord is hierna niet meer zichtbaar.</div>
             </div>
-            <button class="btn btn-primary" style="margin-top:16px;" onclick="resetForm()">
-              Nieuw account aanmaken
-            </button>
+
+            <!-- Nazorg licentie -->
+            <div class="lic-row">
+              <div class="lic-left">
+                <div class="lic-dot off" id="nazorgDot"></div>
+                <div class="lic-label" id="nazorgLabel" style="color:var(--text-3)">Nazorg portaal</div>
+              </div>
+              <div class="lic-right">
+                <select id="nazorgLicenseType" disabled>
+                  <option value="12m">12 maanden</option>
+                  <option value="24m">24 maanden</option>
+                  <option value="unlimited">Onbeperkt</option>
+                </select>
+                <div class="toggle" id="nazorgToggle" onclick="toggleNazorg()"></div>
+              </div>
+            </div>
           </div>
+
+          <button class="btn btn-primary" onclick="createUser()" id="createBtn">Account aanmaken</button>
         </div>
-      </div>
-    </div>
 
-    <!-- Rechter kolom: gebruikersbeheer -->
-    <div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Gebruikersbeheer</div>
-          <div class="card-subtitle">Zoeken, licentie aanpassen, verbannen</div>
-        </div>
-        <div class="card-body">
-          <div class="search-row">
-            <input type="text" id="searchInput" placeholder="Zoek op e-mail, praktijkcode of naam..." onkeydown="if(event.key==='Enter') searchUsers()">
-            <button onclick="searchUsers()">Zoeken</button>
+        <!-- Success state -->
+        <div id="createSuccess" style="display:none;">
+          <div class="alert alert-success">Account aangemaakt. Welkomstmail is verstuurd.</div>
+          <div class="cred-box">
+            <div class="cred-row"><span class="cred-label">E-mail</span><span class="cred-value" id="dispEmail">—</span></div>
+            <div class="cred-row"><span class="cred-label">Wachtwoord</span><span class="cred-value" id="dispPwd">—</span></div>
+            <div class="cred-row"><span class="cred-label">Dashboard licentie</span><span class="cred-value" id="dispLicense">—</span></div>
+            <div class="cred-row" id="dispEndRow"><span class="cred-label">Geldig tot</span><span class="cred-value" id="dispEnd">—</span></div>
+            <div class="cred-row" id="dispNazorgRow" style="display:none;"><span class="cred-label">Nazorg portaal</span><span class="cred-value" id="dispNazorg">—</span></div>
+            <div class="cred-warn">Kopieer deze gegevens nu. Het wachtwoord is hierna niet meer zichtbaar.</div>
           </div>
-
-          <div id="usersContainer">
-            <div class="loading">Gebruikers worden geladen...</div>
-          </div>
+          <button class="btn btn-primary" style="margin-top:14px;" onclick="resetForm()">Nieuw account aanmaken</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Action menu backdrop -->
-  <div id="backdrop" style="display:none;position:fixed;inset:0;z-index:90;" onclick="closeAllMenus()"></div>
+  <!-- RECHTER KOLOM: Gebruikersbeheer -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Gebruikersbeheer</div>
+        <div class="card-subtitle">Zoeken, licenties aanpassen, verbannen</div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Zoek op e-mail, praktijkcode of naam..." onkeydown="if(event.key==='Enter') searchUsers()">
+        <button class="btn-search" onclick="searchUsers()">Zoeken</button>
+      </div>
+      <div class="user-list" id="usersContainer">
+        <div class="state-msg">Gebruikers worden geladen...</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-  <script>
-    // ── Auth check ──────────────────────────────────────────────────────────
-    async function checkAdmin() {
-      try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (!res.ok) { window.location.href = '/login.html'; return; }
-        const data = await res.json();
-        if (data.user?.role !== 'admin') {
-          alert('Alleen admins hebben toegang tot deze pagina.');
-          window.location.href = '/churn-dashboard.html';
-        }
-      } catch { window.location.href = '/login.html'; }
+<div id="backdrop" onclick="closeAllMenus()"></div>
+
+<script>
+async function checkAdmin() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!res.ok) { window.location.href = '/login.html'; return; }
+    const data = await res.json();
+    if (data.user?.role !== 'admin') { alert('Alleen admins hebben toegang.'); window.location.href = '/churn-dashboard.html'; }
+  } catch { window.location.href = '/login.html'; }
+}
+
+function licenseLabel(type) {
+  return type === '12m' ? '12 maanden' : type === '24m' ? '24 maanden' : type === 'unlimited' ? 'Onbeperkt' : '—';
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
+}
+
+function dashboardBadge(u) {
+  if (!u.practice_code) return '<span class="badge badge-blue">Admin</span>';
+  if (u.banned) return '<span class="badge badge-red">Verbannen</span>';
+  if (u.license_active === false) return '<span class="badge badge-red">Stopgezet</span>';
+  if (!u.license_type) return '<span class="badge badge-gray">Geen licentie</span>';
+  if (u.license_type === 'unlimited') return '<span class="badge badge-green">Dashboard onbeperkt</span>';
+  const days = daysLeft(u.license_end_date);
+  if (days === null || days < 0) return '<span class="badge badge-red">Dashboard verlopen</span>';
+  if (days <= 14) return `<span class="badge badge-amber">Dashboard: ${days}d</span>`;
+  return `<span class="badge badge-green">Dashboard actief (${days}d)</span>`;
+}
+
+function nazorgBadge(u) {
+  if (!u.practice_code) return '';
+  if (!u.nazorg_enabled) return '<span class="badge badge-gray">Geen nazorg</span>';
+  if (u.nazorg_license_type === 'unlimited') return '<span class="badge badge-purple">Nazorg onbeperkt</span>';
+  const days = daysLeft(u.nazorg_license_end_date);
+  if (days === null || days < 0) return '<span class="badge badge-red">Nazorg verlopen</span>';
+  if (days <= 14) return `<span class="badge badge-amber">Nazorg: ${days}d</span>`;
+  return `<span class="badge badge-purple">Nazorg actief (${days}d)</span>`;
+}
+
+function avatarColors(email) {
+  const colors = [
+    ['#dbeafe','#1e40af'],['#ede9fe','#5b21b6'],['#dcfce7','#166534'],
+    ['#fef3c7','#92400e'],['#fee2e2','#7f1d1d'],['#f0fdf4','#15803d']
+  ];
+  const i = email.charCodeAt(0) % colors.length;
+  return colors[i];
+}
+
+function generatePassword() {
+  const up='ABCDEFGHIJKLMNOPQRSTUVWXYZ', lo='abcdefghijklmnopqrstuvwxyz', nu='0123456789', sp='!@#$%';
+  const all=up+lo+nu+sp;
+  let p=up[~~(Math.random()*26)]+lo[~~(Math.random()*26)]+nu[~~(Math.random()*10)]+sp[~~(Math.random()*5)];
+  for(let i=4;i<14;i++) p+=all[~~(Math.random()*all.length)];
+  document.getElementById('password').value=p.split('').sort(()=>Math.random()-.5).join('');
+}
+
+function onRoleChange() {
+  const isP = document.getElementById('role').value === 'practice';
+  document.getElementById('practiceCodeGroup').style.visibility = isP ? 'visible' : 'hidden';
+  document.getElementById('licenseSection').style.display = isP ? 'block' : 'none';
+}
+
+let nazorgOn = false;
+function toggleNazorg() {
+  nazorgOn = !nazorgOn;
+  document.getElementById('nazorgToggle').classList.toggle('on', nazorgOn);
+  document.getElementById('nazorgDot').className = 'lic-dot ' + (nazorgOn ? 'on' : 'off');
+  document.getElementById('nazorgLabel').style.color = nazorgOn ? 'var(--text-1)' : 'var(--text-3)';
+  document.getElementById('nazorgLicenseType').disabled = !nazorgOn;
+}
+
+function showAlert(id, type, msg) {
+  document.getElementById(id).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+function resetForm() {
+  document.getElementById('createForm').style.display = 'block';
+  document.getElementById('createSuccess').style.display = 'none';
+  document.getElementById('createAlert').innerHTML = '';
+  ['email','praktijkNaam','practiceCode'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('password').value = 'Dynamic2026!';
+  document.getElementById('createBtn').disabled = false;
+  nazorgOn = false;
+  document.getElementById('nazorgToggle').classList.remove('on');
+  document.getElementById('nazorgDot').className = 'lic-dot off';
+  document.getElementById('nazorgLabel').style.color = 'var(--text-3)';
+  document.getElementById('nazorgLicenseType').disabled = true;
+}
+
+async function createUser() {
+  const email = document.getElementById('email').value.trim();
+  const praktijkNaam = document.getElementById('praktijkNaam').value.trim();
+  const role = document.getElementById('role').value;
+  const practiceCode = document.getElementById('practiceCode').value.trim();
+  const licenseType = document.getElementById('licenseType').value;
+  const nazorgLicenseType = document.getElementById('nazorgLicenseType').value;
+  const password = document.getElementById('password').value;
+
+  if (!email || !password) { showAlert('createAlert', 'error', 'Vul alle verplichte velden in.'); return; }
+  if (role === 'practice' && !practiceCode) { showAlert('createAlert', 'error', 'Praktijkcode is verplicht.'); return; }
+
+  const btn = document.getElementById('createBtn');
+  btn.disabled = true; btn.textContent = 'Bezig...';
+  document.getElementById('createAlert').innerHTML = '';
+
+  try {
+    const res = await fetch('/api/admin/create-user-licensed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      document.getElementById('dispEmail').textContent = email;
+      document.getElementById('dispPwd').textContent = password;
+      document.getElementById('dispLicense').textContent = licenseLabel(data.license?.type);
+      const endRow = document.getElementById('dispEndRow');
+      if (data.license?.end) { document.getElementById('dispEnd').textContent = formatDate(data.license.end); endRow.style.display = 'flex'; }
+      else { endRow.style.display = 'none'; }
+      const nazorgRow = document.getElementById('dispNazorgRow');
+      if (nazorgOn) { document.getElementById('dispNazorg').textContent = licenseLabel(nazorgLicenseType); nazorgRow.style.display = 'flex'; }
+      else { nazorgRow.style.display = 'none'; }
+      document.getElementById('createForm').style.display = 'none';
+      document.getElementById('createSuccess').style.display = 'block';
+      loadUsers();
+    } else {
+      showAlert('createAlert', 'error', data.error || 'Er is een fout opgetreden.');
+      btn.disabled = false; btn.textContent = 'Account aanmaken';
     }
+  } catch(e) {
+    showAlert('createAlert', 'error', 'Netwerkfout. Probeer opnieuw.');
+    btn.disabled = false; btn.textContent = 'Account aanmaken';
+  }
+}
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    function licenseLabel(type) {
-      if (type === '12m') return '12 maanden';
-      if (type === '24m') return '24 maanden';
-      if (type === 'unlimited') return 'Onbeperkt';
-      return type || '—';
-    }
+let allUsers = [];
+async function loadUsers(search = '') {
+  const c = document.getElementById('usersContainer');
+  c.innerHTML = '<div class="state-msg">Laden...</div>';
+  try {
+    const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}&_=${Date.now()}` : `/api/admin/users?_=${Date.now()}`;
+    const res = await fetch(url, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.success) { c.innerHTML = '<div class="state-msg">Kon gebruikers niet laden.</div>'; return; }
+    allUsers = data.users;
+    renderUsers(allUsers);
+  } catch { c.innerHTML = '<div class="state-msg">Fout bij laden.</div>'; }
+}
 
-    function formatDate(d) {
-      if (!d) return '—';
-      return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
-    }
+function searchUsers() { loadUsers(document.getElementById('searchInput').value.trim()); }
 
-    function licenseStatus(user) {
-      if (!user.practice_code) return null;
-      if (user.license_type === 'unlimited' && user.license_active !== false) return { label: 'Onbeperkt', cls: 'badge-blue' };
-      if (user.license_active === false) return { label: 'Stopgezet', cls: 'badge-red' };
-      if (!user.license_end_date) return { label: 'Geen licentie', cls: 'badge-gray' };
-      const end = new Date(user.license_end_date);
-      const now = new Date();
-      const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-      if (days < 0) return { label: 'Verlopen', cls: 'badge-red' };
-      if (days <= 14) return { label: `Verloopt over ${days}d`, cls: 'badge-amber' };
-      return { label: `Actief (${days}d)`, cls: 'badge-green' };
-    }
-
-    function generatePassword() {
-      const up = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const lo = 'abcdefghijklmnopqrstuvwxyz';
-      const nu = '0123456789';
-      const sp = '!@#$%^&*';
-      const all = up + lo + nu + sp;
-      let pwd = up[Math.floor(Math.random()*26)] + lo[Math.floor(Math.random()*26)] +
-                nu[Math.floor(Math.random()*10)] + sp[Math.floor(Math.random()*8)];
-      for (let i = 4; i < 14; i++) pwd += all[Math.floor(Math.random()*all.length)];
-      document.getElementById('password').value = pwd.split('').sort(() => Math.random() - .5).join('');
-    }
-
-    function onRoleChange() {
-      const role = document.getElementById('role').value;
-      document.getElementById('practiceCodeGroup').style.display = role === 'practice' ? 'block' : 'none';
-      document.getElementById('licenseGroup').style.display = role === 'practice' ? 'block' : 'none';
-    }
-
-    function showAlert(id, type, msg) {
-      document.getElementById(id).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
-    }
-
-    function resetForm() {
-      document.getElementById('createForm').style.display = 'block';
-      document.getElementById('createSuccess').style.display = 'none';
-      document.getElementById('createAlert').innerHTML = '';
-      document.getElementById('email').value = '';
-      document.getElementById('praktijkNaam').value = '';
-      document.getElementById('practiceCode').value = '';
-      document.getElementById('password').value = 'Dynamic2026!';
-      document.getElementById('createBtn').disabled = false;
-    }
-
-    // ── Gebruiker aanmaken ──────────────────────────────────────────────────
-    async function createUser() {
-      const email        = document.getElementById('email').value.trim();
-      const praktijkNaam = document.getElementById('praktijkNaam').value.trim();
-      const role         = document.getElementById('role').value;
-      const practiceCode = document.getElementById('practiceCode').value.trim();
-      const licenseType  = document.getElementById('licenseType').value;
-      const password     = document.getElementById('password').value;
-
-      if (!email || !password) { showAlert('createAlert', 'error', 'Vul alle verplichte velden in.'); return; }
-      if (role === 'practice' && !practiceCode) { showAlert('createAlert', 'error', 'Praktijkcode is verplicht.'); return; }
-
-      const btn = document.getElementById('createBtn');
-      btn.disabled = true;
-      btn.textContent = 'Bezig...';
-      document.getElementById('createAlert').innerHTML = '';
-
-      try {
-        const res = await fetch('/api/admin/create-user-licensed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ email, password, role, practiceCode: practiceCode || null, licenseType, praktijkNaam })
-        });
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-          document.getElementById('dispEmail').textContent   = email;
-          document.getElementById('dispPwd').textContent     = password;
-          document.getElementById('dispLicense').textContent = licenseLabel(data.license?.type);
-
-          const endRow = document.getElementById('dispEndRow');
-          if (data.license?.end) {
-            document.getElementById('dispEnd').textContent = formatDate(data.license.end);
-            endRow.style.display = 'flex';
-          } else {
-            endRow.style.display = 'none';
+function renderUsers(users) {
+  const c = document.getElementById('usersContainer');
+  if (!users.length) { c.innerHTML = '<div class="state-msg">Geen gebruikers gevonden.</div>'; return; }
+  c.innerHTML = users.map(u => {
+    const initials = (u.email||'?').slice(0,2).toUpperCase();
+    const [bgColor, fgColor] = avatarColors(u.email||'a');
+    const dbBadge = dashboardBadge(u);
+    const nzBadge = nazorgBadge(u);
+    const isBanned = u.banned;
+    return `
+    <div class="user-row">
+      <div class="user-avatar" style="background:${bgColor};color:${fgColor};">${initials}</div>
+      <div class="user-info">
+        <div class="user-email">${u.email}</div>
+        <div class="user-name">${u.praktijk_naam || u.practice_code || 'Admin'}</div>
+      </div>
+      <div class="user-badges">
+        ${dbBadge}
+        ${nzBadge}
+      </div>
+      <div class="action-wrap">
+        <button class="btn-acties" onclick="toggleMenu('menu-${u.id}', event)">Acties ↓</button>
+        <div class="action-menu" id="menu-${u.id}">
+          ${u.practice_code ? `
+            <div class="action-section">Dashboard licentie</div>
+            <div class="action-item" onclick="userAction(${u.id},'extend_12m')">Verlengen 12 maanden</div>
+            <div class="action-item" onclick="userAction(${u.id},'extend_24m')">Verlengen 24 maanden</div>
+            <div class="action-item" onclick="userAction(${u.id},'unlimited')">Onbeperkt instellen</div>
+            <div class="action-item" onclick="userAction(${u.id},'reactivate')">Heractiveren</div>
+            <div class="action-item danger" onclick="userAction(${u.id},'stop')">Stopzetten</div>
+            <div class="action-divider"></div>
+            <div class="action-section">Nazorg portaal</div>
+            <div class="action-item" onclick="userAction(${u.id},'nazorg_enable')">Activeren 12 maanden</div>
+            <div class="action-item" onclick="userAction(${u.id},'nazorg_enable_24m')">Activeren 24 maanden</div>
+            <div class="action-item" onclick="userAction(${u.id},'nazorg_unlimited')">Onbeperkt instellen</div>
+            <div class="action-item danger" onclick="userAction(${u.id},'nazorg_disable')">Deactiveren</div>
+            <div class="action-divider"></div>
+          ` : ''}
+          <div class="action-section">Account</div>
+          ${isBanned
+            ? `<div class="action-item" onclick="userAction(${u.id},'unban')">Verbanning opheffen</div>`
+            : `<div class="action-item danger" onclick="userAction(${u.id},'ban')">Verbannen</div>`
           }
+          <div class="action-item danger" onclick="userAction(${u.id},'delete')">Verwijderen</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-          document.getElementById('createForm').style.display = 'none';
-          document.getElementById('createSuccess').style.display = 'block';
-          loadUsers();
-        } else {
-          showAlert('createAlert', 'error', data.error || 'Er is een fout opgetreden.');
-          btn.disabled = false;
-          btn.textContent = 'Account aanmaken';
-        }
-      } catch (e) {
-        showAlert('createAlert', 'error', 'Netwerkfout. Probeer opnieuw.');
-        btn.disabled = false;
-        btn.textContent = 'Account aanmaken';
-      }
+async function userAction(userId, action) {
+  closeAllMenus();
+  const confirms = { delete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?', ban: 'Verbannen?', stop: 'Licentie stopzetten? De gebruiker verliest direct toegang.', nazorg_disable: 'Nazorg portaal deactiveren?' };
+  if (confirms[action] && !confirm(confirms[action])) return;
+  try {
+    let res;
+    if (action === 'delete') {
+      res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE', credentials: 'include' });
+    } else {
+      const body = {};
+      if (action === 'ban') body.banned = true;
+      else if (action === 'unban') body.banned = false;
+      else body.action = action;
+      if (action === 'unlimited') { body.action = undefined; body.licenseType = 'unlimited'; }
+      res = await fetch(`/api/admin/users/${userId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
     }
+    const data = await res.json();
+    if (data.success) loadUsers(document.getElementById('searchInput').value.trim());
+    else alert('Fout: ' + (data.error || 'onbekend'));
+  } catch { alert('Netwerkfout.'); }
+}
 
-    // ── Gebruikers laden / zoeken ───────────────────────────────────────────
-    let allUsers = [];
+function toggleMenu(id, event) {
+  event.stopPropagation();
+  const m = document.getElementById(id);
+  const isOpen = m.classList.contains('open');
+  closeAllMenus();
+  if (!isOpen) { m.classList.add('open'); document.getElementById('backdrop').style.display = 'block'; }
+}
 
-    async function loadUsers(search = '') {
-      const container = document.getElementById('usersContainer');
-      container.innerHTML = '<div class="loading">Laden...</div>';
-      try {
-        const url = search 
-          ? `/api/admin/users?search=${encodeURIComponent(search)}&_=${Date.now()}` 
-          : `/api/admin/users?_=${Date.now()}`;
-        const res  = await fetch(url, { credentials: 'include' });
-        const data = await res.json();
-        if (!data.success) { container.innerHTML = '<div class="empty-state">Kon gebruikers niet laden.</div>'; return; }
-        allUsers = data.users;
-        renderUsers(allUsers);
-      } catch {
-        container.innerHTML = '<div class="empty-state">Fout bij laden.</div>';
-      }
-    }
+function closeAllMenus() {
+  document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+  document.getElementById('backdrop').style.display = 'none';
+}
 
-    function searchUsers() {
-      const q = document.getElementById('searchInput').value.trim();
-      loadUsers(q);
-    }
-
-    function renderUsers(users) {
-      const container = document.getElementById('usersContainer');
-      if (!users.length) {
-        container.innerHTML = '<div class="empty-state">Geen gebruikers gevonden.</div>';
-        return;
-      }
-
-      let html = `<table class="user-table">
-        <thead><tr>
-          <th>Gebruiker</th>
-          <th>Licentie</th>
-          <th>Status</th>
-          <th>Acties</th>
-        </tr></thead>
-        <tbody>`;
-
-      users.forEach(u => {
-        const status = licenseStatus(u);
-        const isBanned = u.banned;
-        const isStopped = u.license_active === false && u.practice_code;
-        const statusBadge = isBanned
-          ? '<span class="badge badge-red">Verbannen</span>'
-          : isStopped
-            ? '<span class="badge badge-red">Stopgezet</span>'
-            : status
-              ? `<span class="badge ${status.cls}">${status.label}</span>`
-              : '<span class="badge badge-blue">Admin</span>';
-
-        const licenseInfo = u.practice_code && u.license_type
-          ? `<div class="license-info">${licenseLabel(u.license_type)}${u.license_end_date ? ` · tot ${formatDate(u.license_end_date)}` : ''}</div>`
-          : '';
-
-        html += `<tr>
-          <td>
-            <div style="font-weight:500;">${u.email}</div>
-            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${u.praktijk_naam || u.practice_code || 'Admin'}</div>
-          </td>
-          <td>
-            ${u.practice_code ? `<div style="font-size:13px;font-weight:500;">${licenseLabel(u.license_type) || '—'}</div>${licenseInfo}` : '—'}
-          </td>
-          <td>${statusBadge}</td>
-          <td>
-            <div class="action-wrap">
-              <button class="btn btn-sm" style="border:1px solid var(--border);background:white;" onclick="toggleMenu('menu-${u.id}', event)">
-                Acties ↓
-              </button>
-              <div class="action-menu" id="menu-${u.id}">
-                ${u.practice_code ? `
-                  <div class="action-section-label">Licentie</div>
-                  <div class="action-item" onclick="userAction(${u.id}, 'extend_12m')">Verlengen 12 maanden</div>
-                  <div class="action-item" onclick="userAction(${u.id}, 'extend_24m')">Verlengen 24 maanden</div>
-                  <div class="action-item" onclick="userAction(${u.id}, 'unlimited')">Onbeperkt instellen</div>
-                  <div class="action-item" onclick="userAction(${u.id}, 'reactivate')">Heractiveren</div>
-                  <div class="action-item danger" onclick="userAction(${u.id}, 'stop')">Stopzetten</div>
-                  <div class="action-divider"></div>
-                ` : ''}
-                <div class="action-section-label">Account</div>
-                ${isBanned
-                  ? `<div class="action-item" onclick="userAction(${u.id}, 'unban')">Verbanning opheffen</div>`
-                  : `<div class="action-item danger" onclick="userAction(${u.id}, 'ban')">Verbannen</div>`
-                }
-                <div class="action-item danger" onclick="userAction(${u.id}, 'delete')">Verwijderen</div>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-      });
-
-      html += '</tbody></table>';
-      container.innerHTML = html;
-    }
-
-    // ── Acties ──────────────────────────────────────────────────────────────
-    async function userAction(userId, action) {
-      closeAllMenus();
-
-      const confirmActions = { 
-        delete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?', 
-        ban: 'Weet je zeker dat je deze gebruiker wilt verbannen?',
-        stop: 'Weet je zeker dat je de licentie wilt stopzetten? De gebruiker verliest direct toegang.'
-      };
-      if (confirmActions[action] && !confirm(confirmActions[action])) return;
-
-      try {
-        let res;
-        if (action === 'delete') {
-          res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE', credentials: 'include' });
-        } else {
-          const body = {};
-          if (action === 'ban')    body.banned = true;
-          if (action === 'unban')  body.banned = false;
-          if (action === 'stop')   body.action = 'stop';
-          if (action === 'extend_12m') body.action = 'extend_12m';
-          if (action === 'extend_24m') body.action = 'extend_24m';
-          if (action === 'unlimited')  body.licenseType = 'unlimited';
-          if (action === 'reactivate') body.action = 'reactivate';
-
-          res = await fetch(`/api/admin/users/${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(body)
-          });
-        }
-
-        const data = await res.json();
-        if (data.success) {
-          loadUsers(document.getElementById('searchInput').value.trim());
-        } else {
-          alert('Er is een fout opgetreden: ' + (data.error || 'onbekend'));
-        }
-      } catch { alert('Netwerkfout. Probeer opnieuw.'); }
-    }
-
-    // ── Dropdown menu ───────────────────────────────────────────────────────
-    function toggleMenu(id, event) {
-      event.stopPropagation();
-      const menu = document.getElementById(id);
-      const isOpen = menu.classList.contains('open');
-      closeAllMenus();
-      if (!isOpen) {
-        menu.classList.add('open');
-        document.getElementById('backdrop').style.display = 'block';
-      }
-    }
-
-    function closeAllMenus() {
-      document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
-      document.getElementById('backdrop').style.display = 'none';
-    }
-
-    // ── Init ────────────────────────────────────────────────────────────────
-    checkAdmin();
-    loadUsers();
-  </script>
+checkAdmin();
+loadUsers();
+</script>
 </body>
 </html>
