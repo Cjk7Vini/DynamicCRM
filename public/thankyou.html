@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bedankt voor je aanmelding</title>
-  
+
   <!-- Meta Pixel -->
   <script src="/js/meta-pixel.js"></script>
   <noscript>
@@ -12,351 +12,200 @@
          src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
   </noscript>
   <!-- End Meta Pixel -->
-  
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
-    :root {
-      --primary: #2563eb;
-      --success: #10b981;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --bg: #f9fafb;
-    }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+      font-family: 'Poppins', system-ui, sans-serif;
+      background: #f3f4f6;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 20px;
     }
-    
-    .container {
-      max-width: 600px;
+
+    .page-header {
       width: 100%;
-    }
-    
-    .card {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      padding: 50px 40px;
+      background: #111827;
+      padding: 18px 24px;
       text-align: center;
-      animation: slideUp 0.5s ease-out;
     }
-    
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .checkmark {
-      width: 100px;
-      height: 100px;
-      background: var(--success);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 30px;
-      animation: scaleIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    
-    @keyframes scaleIn {
-      0% {
-        transform: scale(0);
-        opacity: 0;
-      }
-      50% {
-        transform: scale(1.1);
-      }
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-    
-    .checkmark svg {
-      width: 55px;
-      height: 55px;
-      stroke: white;
-      stroke-width: 4;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      fill: none;
-      animation: drawCheck 0.5s ease-out 0.3s forwards;
-      stroke-dasharray: 100;
-      stroke-dashoffset: 100;
-    }
-    
-    @keyframes drawCheck {
-      to {
-        stroke-dashoffset: 0;
-      }
-    }
-    
-    h1 {
-      font-size: 32px;
-      color: var(--text);
-      margin-bottom: 16px;
+    .practice-header-name {
+      color: #ffffff;
+      font-size: 17px;
       font-weight: 700;
+      letter-spacing: 0.2px;
     }
-    
-    .practice-name {
-      font-size: 20px;
-      color: var(--primary);
-      font-weight: 600;
-      margin-bottom: 24px;
+
+    .main {
+      width: 100%;
+      max-width: 600px;
+      padding: 36px 20px 60px;
     }
-    
-    .message {
-      font-size: 16px;
-      color: var(--muted);
-      line-height: 1.6;
-      margin-bottom: 32px;
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      overflow: hidden;
+      animation: slideUp 0.4s ease-out;
     }
-    
-    .info-box {
-      background: var(--bg);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 32px;
-      text-align: left;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    
-    .info-item {
-      display: flex;
-      align-items: center;
-      padding: 10px 0;
-    }
-    
-    .info-item svg {
-      width: 24px;
-      height: 24px;
-      margin-right: 12px;
-      stroke: var(--success);
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      fill: none;
-      flex-shrink: 0;
-    }
-    
-    .info-text {
-      font-size: 15px;
-      color: var(--text);
-    }
-    
-    .next-steps {
-      text-align: left;
-      margin-bottom: 32px;
-    }
-    
-    .next-steps h2 {
-      font-size: 18px;
-      color: var(--text);
-      margin-bottom: 16px;
-      font-weight: 600;
-    }
-    
-    .step {
-      display: flex;
-      align-items: flex-start;
-      margin-bottom: 12px;
-    }
-    
-    .step-number {
-      background: var(--primary);
-      color: white;
-      width: 28px;
-      height: 28px;
+
+    .card-body { padding: 36px 28px; text-align: center; }
+
+    .checkmark {
+      width: 72px; height: 72px;
+      background: #10b981;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 600;
-      margin-right: 12px;
-      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    
-    .step-text {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.6;
-      padding-top: 4px;
+    @keyframes scaleIn {
+      0%  { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.1); }
+      100%{ transform: scale(1); opacity: 1; }
     }
-    
-    .close-notice {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #e5e7eb;
+    .checkmark svg {
+      width: 38px; height: 38px;
+      stroke: white; stroke-width: 3.5;
+      stroke-linecap: round; stroke-linejoin: round; fill: none;
+      stroke-dasharray: 100; stroke-dashoffset: 100;
+      animation: drawCheck 0.4s ease-out 0.25s forwards;
     }
-    
-    @media (max-width: 640px) {
-      .card {
-        padding: 40px 24px;
-      }
-      
-      h1 {
-        font-size: 26px;
-      }
-      
-      .checkmark {
-        width: 80px;
-        height: 80px;
-      }
-      
-      .checkmark svg {
-        width: 45px;
-        height: 45px;
-      }
+    @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+    h1 { font-size: 24px; font-weight: 700; color: #111827; margin-bottom: 12px; line-height: 1.3; }
+    .message { font-size: 14px; color: #6b7280; line-height: 1.65; margin-bottom: 28px; }
+
+    .info-box { background: #f9fafb; border-radius: 12px; padding: 4px 16px; margin-bottom: 28px; text-align: left; }
+    .info-item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #f3f4f6; }
+    .info-item:last-child { border-bottom: none; }
+    .info-icon { width: 32px; height: 32px; background: #ecfdf5; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .info-icon svg { width: 16px; height: 16px; stroke: #10b981; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .info-text { font-size: 14px; color: #374151; font-weight: 500; }
+
+    .steps-title { font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 14px; text-align: left; }
+    .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .step-num { width: 26px; height: 26px; background: #111827; color: white; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-text { font-size: 13px; color: #6b7280; line-height: 1.6; padding-top: 3px; }
+
+    .countdown { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #9ca3af; text-align: center; }
+
+    .page-footer { margin-top: auto; padding: 20px; font-size: 12px; color: #9ca3af; text-align: center; }
+
+    @media (max-width: 480px) {
+      .card-body { padding: 28px 20px; }
+      h1 { font-size: 20px; }
+      .checkmark { width: 60px; height: 60px; }
+      .checkmark svg { width: 32px; height: 32px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <header class="page-header">
+    <span class="practice-header-name" id="headerPracticeName"></span>
+  </header>
+
+  <main class="main">
     <div class="card">
-      <div class="checkmark">
-        <svg viewBox="0 0 24 24">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </div>
-      
-      <h1>Gegevens succesvol verstuurd!</h1>
-      
-      <p class="practice-name" id="practiceName">Dynamic Health Consultancy</p>
-      
-      <p class="message">
-        Je aanmelding is bij ons binnen! We nemen zo spoedig mogelijk contact met je op voor een afspraak.
-      </p>
-      
-      <div class="info-box">
-        <div class="info-item">
-          <svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <span class="info-text">We nemen telefonisch contact met je op</span>
+      <div class="card-body">
+
+        <div class="checkmark">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </div>
-        
-        <div class="info-item">
-          <svg viewBox="0 0 24 24">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span class="info-text">Check je email voor bevestiging</span>
-        </div>
-      </div>
-      
-      <div class="next-steps">
-        <h2>Wat gebeurt er nu?</h2>
-        
-        <div class="step">
-          <div class="step-number">1</div>
-          <div class="step-text">
-            We ontvangen je aanmelding en bekijken je gegevens
+
+        <h1>Gegevens succesvol verstuurd!</h1>
+
+        <p class="message">
+          Je aanmelding is bij ons binnen. We nemen zo spoedig mogelijk telefonisch contact met je op voor een afspraak.
+        </p>
+
+        <div class="info-box">
+          <div class="info-item">
+            <div class="info-icon">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <span class="info-text">We nemen telefonisch contact met je op</span>
+          </div>
+          <div class="info-item">
+            <div class="info-icon">
+              <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <span class="info-text">Check je e-mail voor bevestiging</span>
           </div>
         </div>
-        
+
+        <p class="steps-title">Wat gebeurt er nu?</p>
+
         <div class="step">
-          <div class="step-number">2</div>
-          <div class="step-text">
-            Een van onze medewerkers neemt telefonisch contact met je op
-          </div>
+          <div class="step-num">1</div>
+          <div class="step-text">We ontvangen je aanmelding en bekijken je gegevens</div>
         </div>
-        
         <div class="step">
-          <div class="step-number">3</div>
-          <div class="step-text">
-            We plannen samen een afspraak die bij jou past
-          </div>
+          <div class="step-num">2</div>
+          <div class="step-text">Een van onze medewerkers neemt telefonisch contact met je op</div>
         </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">We plannen samen een afspraak die bij jou past</div>
+        </div>
+
+        <div class="countdown">
+          Dit venster sluit automatisch over <strong id="countdown">10</strong> seconden
+        </div>
+
       </div>
-      
-      <p class="close-notice">
-        Dit venster sluit automatisch over <span id="countdown">10</span> seconden
-      </p>
     </div>
-  </div>
+  </main>
+
+  <footer class="page-footer">Copyright &copy; Dynamic Health Consultancy</footer>
 
   <script>
-    // Get practice code from URL
-    const params = new URLSearchParams(window.location.search);
-    const practiceCode = params.get('s') || params.get('practice') || '';
-    
-    // Load practice name from API
+    var params = new URLSearchParams(window.location.search);
+    var practiceCode = params.get('s') || params.get('practice') || '';
+
     async function loadPracticeName() {
-      if (!practiceCode) {
-        document.getElementById('practiceName').textContent = 'Dynamic Health Consultancy';
-        return;
-      }
-      
+      var el = document.getElementById('headerPracticeName');
+      if (!practiceCode) return;
       try {
-        const response = await fetch(`/api/practice/${practiceCode}`);
-        const data = await response.json();
-        
+        var res = await fetch('/api/practice/' + practiceCode);
+        var data = await res.json();
         if (data.success && data.practice) {
-          document.getElementById('practiceName').textContent = data.practice.naam;
-          document.title = `Bedankt - ${data.practice.naam}`;
+          el.textContent = data.practice.naam;
+          document.title = 'Bedankt - ' + data.practice.naam;
         }
-      } catch (error) {
-        console.error('Could not load practice name:', error);
-      }
+      } catch(e) {}
     }
-    
-    // Load practice name on page load
     loadPracticeName();
-    
-    // Auto-close countdown
-    let seconds = 10;
-    const countdownEl = document.getElementById('countdown');
-    
-    const interval = setInterval(() => {
-      seconds--;
-      countdownEl.textContent = seconds;
-      
-      if (seconds <= 0) {
-        clearInterval(interval);
-        // Redirect to Dynamic Health homepage
+
+    var s = 10;
+    var cd = document.getElementById('countdown');
+    var iv = setInterval(function() {
+      s--;
+      cd.textContent = s;
+      if (s <= 0) {
+        clearInterval(iv);
         window.location.href = 'https://dynamic-health-consultancy.nl/index.html';
       }
     }, 1000);
-    
-    // Log conversion event for analytics
+
     if (practiceCode) {
       try {
-        const payload = {
-          lead_id: null,
-          practice_code: practiceCode,
-          event_type: 'thankyou_page_viewed',
-          metadata: { 
-            timestamp: Date.now(),
-            referrer: document.referrer 
-          }
-        };
-        
+        var payload = { lead_id: null, practice_code: practiceCode, event_type: 'thankyou_page_viewed', metadata: { timestamp: Date.now(), referrer: document.referrer } };
         if (navigator.sendBeacon) {
-          const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-          navigator.sendBeacon('/events', blob);
+          navigator.sendBeacon('/events', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
         }
-      } catch (error) {
-        console.error('Could not log conversion event:', error);
-      }
+      } catch(e) {}
     }
   </script>
 </body>

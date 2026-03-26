@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <title>Actie Succesvol Geregistreerd</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Poppins', system-ui, sans-serif;
+      background: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* DARK HEADER WITH REAL DHC LOGO */
+    .page-header {
+      width: 100%;
+      background: #111827;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .header-logo {
+      height: 38px;
+      width: auto;
+    }
+    .header-divider {
+      width: 1px;
+      height: 28px;
+      background: rgba(255,255,255,0.2);
+    }
+    .header-label {
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .main {
+      width: 100%;
+      max-width: 560px;
+      padding: 36px 20px 60px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      overflow: hidden;
+      animation: slideUp 0.4s ease-out;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* GREEN TOP BAND */
+    .card-accent {
+      background: #10b981;
+      padding: 24px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .check-circle {
+      width: 50px; height: 50px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes scaleIn {
+      0%  { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.1); }
+      100%{ transform: scale(1); opacity: 1; }
+    }
+    .check-circle svg {
+      width: 26px; height: 26px;
+      stroke: white; stroke-width: 3;
+      stroke-linecap: round; stroke-linejoin: round; fill: none;
+    }
+    .accent-text h1 { color: white; font-size: 18px; font-weight: 700; margin-bottom: 3px; }
+    .accent-text p { color: rgba(255,255,255,0.85); font-size: 13px; }
+
+    /* CARD BODY */
+    .card-body { padding: 26px 28px; }
+
+    .lead-name { font-size: 20px; font-weight: 700; color: #111827; text-align: center; margin-bottom: 18px; }
+
+    .details { background: #f9fafb; border-radius: 12px; padding: 4px 18px; margin-bottom: 20px; }
+    .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e7eb; gap: 12px; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: #6b7280; font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .detail-value { color: #111827; font-size: 14px; font-weight: 600; text-align: right; }
+
+    .badge {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
+      padding: 12px 18px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; margin-bottom: 18px;
+    }
+    .badge svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+    .message { font-size: 13px; color: #6b7280; line-height: 1.65; text-align: center; }
+
+    .timestamp {
+      color: #9ca3af; font-size: 12px;
+      margin-top: 18px; padding-top: 18px;
+      border-top: 1px solid #e5e7eb; text-align: center;
+    }
+
+    .page-footer { margin-top: auto; padding: 20px; font-size: 12px; color: #9ca3af; text-align: center; }
+
+    @media (max-width: 480px) {
+      .card-accent { padding: 20px; }
+      .card-body { padding: 22px 20px; }
+      .accent-text h1 { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <img class="header-logo"
+         src="/images/dynamic-logo-2.png"
+         onerror="this.style.display='none'"
+         alt="Dynamic Health Consultancy" />
+    <div class="header-divider"></div>
+    <span class="header-label">CRM Systeem</span>
+  </header>
+
+  <main class="main">
+    <div class="card">
+
+      <div class="card-accent">
+        <div class="check-circle">
+          <svg fill="none" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="accent-text">
+          <h1>Actie Succesvol Geregistreerd</h1>
+          <p>De lead is verwerkt in het systeem</p>
+        </div>
+      </div>
+
+      <div class="card-body">
+
+        <div class="lead-name" id="leadName">-</div>
+
+        <div class="details">
+          <div class="detail-row">
+            <span class="detail-label">Lead</span>
+            <span class="detail-value" id="leadIdDisplay">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Status</span>
+            <span class="detail-value">Afspraak gemaakt</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Praktijk</span>
+            <span class="detail-value" id="practiceDisplay">-</span>
+          </div>
+        </div>
+
+        <div class="badge">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Gebeld &amp; Afspraak is gemaakt
+        </div>
+
+        <p class="message">
+          De lead heeft het vertrouwen gewonnen en de afspraak is succesvol ingepland. Vergeet niet de lead verder op te volgen via je CRM-systeem.
+        </p>
+
+        <p class="timestamp" id="timestamp">-</p>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">Copyright &copy; Dynamic Health Consultancy</footer>
+
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var leadName     = params.get('name')          || 'Naam onbekend';
+    var leadId       = params.get('lead_id')       || '-';
+    var practiceCode = params.get('practice_code') || '-';
+    var practiceName = params.get('practice_name') || practiceCode;
+
+    document.getElementById('leadName').textContent       = leadName;
+    document.getElementById('leadIdDisplay').textContent  = '#' + leadId;
+    document.getElementById('practiceDisplay').textContent = practiceName;
+
+    var now = new Date();
+    document.getElementById('timestamp').textContent = 'Geregistreerd op ' +
+      new Intl.DateTimeFormat('nl-NL', {
+        timeZone: 'Europe/Amsterdam',
+        dateStyle: 'full',
+        timeStyle: 'short'
+      }).format(now);
+  </script>
+</body>
+</html>
