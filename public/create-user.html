@@ -155,7 +155,22 @@
     <img src="images/dynamic-logo-2.png" alt="Dynamic Health">
     <span class="topbar-brand-name">Dynamic Health</span>
   </div>
-  <a href="/churn-dashboard.html" class="btn-back">← Terug naar dashboard</a>
+  <div class="user-menu" id="userMenuWrap">
+    <button class="user-btn" id="userMenuBtn" onclick="toggleUserMenu()">
+      <div class="user-avatar-sm" id="userInitials">A</div>
+      <span id="userEmailDisplay">admin</span>
+      <span class="user-chevron">▾</span>
+    </button>
+    <div class="user-dropdown" id="userDropdown">
+      <div class="dd-header">
+        <div class="dd-name" id="ddName">Admin</div>
+        <div class="dd-email" id="ddEmail">—</div>
+      </div>
+      <a href="/churn-dashboard.html" class="dd-item">← Dashboard</a>
+      <div class="dd-sep"></div>
+      <div class="dd-item danger" onclick="doLogout()">Uitloggen</div>
+    </div>
+  </div>
 </header>
 
 <div class="layout">
