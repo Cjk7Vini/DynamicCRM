@@ -1590,111 +1590,63 @@ app.get('/api/check-reminders', async (req, res) => {
           const reminderHtml = `
             <!DOCTYPE html>
             <html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-            <body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif">
-
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background:#111827;padding:18px 24px;text-align:center">
-                    <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:0.2px">${appt.praktijk_naam}</span>
-                  </td>
-                </tr>
-              </table>
-
-              <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 16px">
+            <head><meta charset="utf-8"></head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
+              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
                 <tr>
                   <td>
-                    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+                    <div style="background:#fef3c7;border-radius:12px;padding:16px;margin-bottom:20px;border-left:4px solid #f59e0b">
+                      <p style="color:#92400e;font-size:16px;margin:0;font-weight:600">⏰ Afspraak over 1 uur!</p>
+                    </div>
+                    
+                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak herinnering</h1>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
+                      Beste,
+                    </p>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
+                      Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
+                      U kunt nu uw afspraak voorbereiden voor de lead.
+                    </p>
+                    
+                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${appt.volledige_naam}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${appt.telefoon || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${appt.emailadres || 'Niet opgegeven'}</p>
+                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
+                    </div>
 
-                      <tr>
-                        <td style="background:#fef9c3;border-left:4px solid #eab308;padding:14px 24px">
-                          <span style="color:#713f12;font-size:15px;font-weight:600">&#9200; Afspraak over 1 uur!</span>
-                        </td>
-                      </tr>
+                    <div style="margin:30px 0">
+                      <p style="color:#111827;font-size:15px;font-weight:600;margin-bottom:16px">Na de afspraak:</p>
+                      
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding:0 10px 10px 0" width="50%">
+                            <a href="${attendedUrl}" style="display:block;background:#10b981;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                              ✓ Lead is langsgeweest
+                            </a>
+                          </td>
+                          <td style="padding:0 0 10px 10px" width="50%">
+                            <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                              ✗ Afspraak gemist
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
 
-                      <tr>
-                        <td style="padding:28px 28px 24px">
+                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:16px">
+                        Als de lead is langsgeweest, kunt u dat bevestigen door de button in te klikken.<br/>
+                        Indien de lead niet is komen opdagen, klik dan op de button "Afspraak gemist".<br/>
+                        Wij zullen namens Dynamic Health Consultancy een email naar de lead sturen dat zij de afspraak hebben gemist.
+                      </p>
+                    </div>
 
-                          <h1 style="color:#111827;font-size:20px;font-weight:700;margin:0 0 18px 0">Afspraak herinnering</h1>
-
-                          <p style="color:#374151;font-size:15px;line-height:1.65;margin:0 0 6px 0">Beste,</p>
-                          <p style="color:#374151;font-size:15px;line-height:1.65;margin:0 0 22px 0">
-                            Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
-                            U kunt nu uw afspraak voorbereiden voor de lead.
-                          </p>
-
-                          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:12px;margin-bottom:24px">
-                            <tr>
-                              <td style="padding:4px 20px">
-                                <table width="100%" cellpadding="0" cellspacing="0">
-                                  <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
-                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Naam</div>
-                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.volledige_naam}</div>
-                                    </td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
-                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Telefoonnummer</div>
-                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.telefoon || 'Niet opgegeven'}</div>
-                                    </td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb">
-                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Email</div>
-                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${appt.emailadres || 'Niet opgegeven'}</div>
-                                    </td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding:10px 0">
-                                      <div style="color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tijd</div>
-                                      <div style="color:#111827;font-size:15px;font-weight:600;margin-top:3px">${formattedTime}</div>
-                                    </td>
-                                  </tr>
-                                </table>
-                              </td>
-                            </tr>
-                          </table>
-
-                          <p style="color:#374151;font-size:14px;line-height:1.65;margin:0 0 18px 0">
-                            Na afloop van de afspraak kunt u hieronder aangeven wat het resultaat was:
-                          </p>
-
-                          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
-                            <tr>
-                              <td style="padding:0 6px 0 0" width="50%">
-                                <a href="${attendedUrl}" style="display:block;background:#111827;color:#ffffff;text-align:center;padding:14px 10px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600">
-                                  Lead is langsgeweest
-                                </a>
-                              </td>
-                              <td style="padding:0 0 0 6px" width="50%">
-                                <a href="${missedUrl}" style="display:block;background:#ef4444;color:#ffffff;text-align:center;padding:14px 10px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600">
-                                  Afspraak gemist
-                                </a>
-                              </td>
-                            </tr>
-                          </table>
-
-                          <p style="color:#6b7280;font-size:12px;line-height:1.6;margin:0">
-                            Als de lead is langsgeweest kunt u dat bevestigen door op de button te klikken.
-                            Indien de lead niet is komen opdagen, klik dan op Afspraak gemist.
-                            Wij sturen namens Dynamic Health Consultancy een e-mail naar de lead.
-                          </p>
-
-                        </td>
-                      </tr>
-
-                      <tr>
-                        <td style="background:#f9fafb;padding:14px 28px;border-top:1px solid #e5e7eb;text-align:center">
-                          <span style="color:#9ca3af;font-size:12px">Copyright &copy; Dynamic Health Consultancy</span>
-                        </td>
-                      </tr>
-
-                    </table>
+                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
+                      Met vriendelijke groet,<br/>
+                      <strong>Dynamic Health Consultancy</strong>
+                    </p>
                   </td>
                 </tr>
               </table>
-
             </body>
             </html>`;
 
@@ -3369,6 +3321,268 @@ app.patch('/api/admin/users/:id/profile', requireAuth, async (req, res) => {
     });
     res.json({ success: true });
   } catch (e) { console.error('Profile update error:', e); res.status(500).json({ error: 'Fout bij opslaan profiel' }); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// BEZETTINGSGRAAD CALCULATOR
+// POST /api/bezetting/opslaan  → opslaan + Excel genereren + mailen
+// GET  /api/bezetting/lijst    → alle opgeslagen rapporten
+// ─────────────────────────────────────────────────────────────
+
+// Helperfunctie: genereer Excel buffer met ExcelJS (commonjs-compatibel via dynamic import)
+async function genereerBezettingExcel(data) {
+  const ExcelJS = (await import('exceljs')).default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Werkblad 1');
+
+  const { maand, jaar, praktijkCode, matenNummers, totalen, aantalMedewerkers, agendaUrenTotaal } = data;
+
+  const SALARIS_TOTAAL = Math.round(3950 * 1.30); // 5135
+
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+  const totaalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  const boldFont   = { bold: true };
+  const centerAlign = { horizontal: 'center' };
+  const rightAlign  = { horizontal: 'right' };
+
+  const n = aantalMedewerkers || 1;
+
+  // Totaalcijfers (ingevoerd door praktijk)
+  const totOmzet   = Number(totalen.omzet)   || 0;
+  const totPtUren  = Number(totalen.pturen)  || 0;
+  const totNieuw   = Number(totalen.nieuw)   || 0;
+  const totOverig  = Number(totalen.overig)  || 0;
+  const totVerlof  = Number(totalen.verlof)  || 0;
+  const totZiekte  = Number(totalen.ziekte)  || 0;
+  const totAgenda  = Number(agendaUrenTotaal) || 0;
+  const totBeh     = Math.round(totPtUren * 2);
+
+  // Gemiddelde per medewerker
+  const gemOmzet   = Math.round(totOmzet / n * 100) / 100;
+  const gemPtUren  = Math.round(totPtUren / n * 100) / 100;
+  const gemNieuw   = Math.round(totNieuw / n * 100) / 100;
+  const gemOverig  = Math.round(totOverig / n * 100) / 100;
+  const gemVerlof  = Math.round(totVerlof / n * 100) / 100;
+  const gemZiekte  = Math.round(totZiekte / n * 100) / 100;
+  const gemAgenda  = Math.round(totAgenda / n * 100) / 100;
+  const gemBeh     = Math.round(totBeh / n);
+
+  // Rij 1: leeg
+  ws.addRow([]);
+
+  // Rij 2: maand/jaar
+  const rij2 = ws.addRow([`${maand} ${jaar}`]);
+  rij2.getCell(1).font = boldFont;
+
+  // Rij 3: headers
+  const headers = [
+    'Personeel', 'Omzet', 'Salaris incl. alle kosten',
+    'Effectieve vulling 85%', 'Aantal nieuwe pt\'s', 'Percentage nieuwe',
+    'Aantal behandelingen', 'Totaal agenda uren', 'Aantal uren Pt\'s',
+    'Sportgroep/overleg/overig', 'Verlof', 'Ziekte'
+  ];
+  const rij3 = ws.addRow(headers);
+  rij3.eachCell(cell => {
+    cell.font = boldFont;
+    cell.fill = headerFill;
+    cell.alignment = centerAlign;
+  });
+
+  // Rijen 4 t/m 4+n-1: één rij per medewerker met gemiddelde waarden
+  for (let i = 0; i < n; i++) {
+    const vulling  = gemAgenda > 0 ? Math.round(((gemPtUren + gemVerlof + gemZiekte) / gemAgenda) * 10000) / 100 : 0;
+    const pctNieuw = gemBeh > 0    ? Math.round((gemNieuw / gemBeh) * 10000) / 100 : 0;
+
+    const rij = ws.addRow([
+      `${i + 1}.`,
+      gemOmzet,
+      SALARIS_TOTAAL,
+      vulling,
+      gemNieuw,
+      pctNieuw,
+      gemBeh,
+      gemAgenda,
+      gemPtUren,
+      gemOverig,
+      gemVerlof,
+      gemZiekte
+    ]);
+    rij.getCell(4).numFmt = '0.00';
+    rij.getCell(6).numFmt = '0.00';
+  }
+
+  // Lege rij na medewerkers
+  ws.addRow([]);
+
+  // Percentages totaal
+  const pctNieuwTotaal = totBeh > 0    ? Math.round((totNieuw / totBeh) * 10000) / 100 : 0;
+  const pctVerlof      = totAgenda > 0 ? Math.round((totVerlof / totAgenda) * 10000) / 100 : 0;
+  const pctZiek        = totAgenda > 0 ? Math.round((totZiekte / totAgenda) * 10000) / 100 : 0;
+  const vullingMet     = totAgenda > 0 ? Math.round(((totPtUren + totZiekte + totVerlof) / totAgenda) * 10000) / 100 : 0;
+  const vullingZonder  = totAgenda > 0 ? Math.round(((totPtUren + totVerlof) / totAgenda) * 10000) / 100 : 0;
+
+  // Maten: percentage van totaal omzet op basis van hun aantal
+  const matenNrs = (matenNummers || '').split(',').map(s => parseInt(s.trim())).filter(x => !isNaN(x) && x >= 1 && x <= n);
+  const matenAandeel = n > 0 && matenNrs.length > 0 ? matenNrs.length / n : 0;
+  const pctMaten = Math.round(matenAandeel * 10000) / 100;
+
+  // Totaalblok kolom M(13) en N(14)
+  const totaalRijNr = 4 + n + 2; // 2 lege rijen buffer
+  const totaalRijen = [
+    [totaalRijNr,     'Totaal', null],
+    [totaalRijNr + 2, 'Totaal omzet:', totOmzet],
+    [totaalRijNr + 3, 'Totaal behandelingen:', totBeh],
+    [totaalRijNr + 4, 'Totaal aantal nieuwe pt\'s:', totNieuw],
+    [totaalRijNr + 5, 'Totaal agenda uren:', totAgenda],
+    [totaalRijNr + 6, 'Totaal verlof uren:', totVerlof],
+    [totaalRijNr + 7, 'Totaal ziekte uren:', totZiekte],
+    [totaalRijNr + 9, 'Percentages', null],
+    [totaalRijNr + 11, 'Percentage nieuwe totaal:', pctNieuwTotaal],
+    [totaalRijNr + 12, 'Percentage verlof:', pctVerlof],
+    [totaalRijNr + 13, 'Percentage ziek:', pctZiek],
+    [totaalRijNr + 14, 'Effectieve agenda vulling (met ziekte):', vullingMet],
+    [totaalRijNr + 15, 'Effectieve agenda vulling (zonder ziekte):', vullingZonder],
+    [totaalRijNr + 16, 'Percentage Maten van de omzet:', pctMaten],
+  ];
+
+  const maxRij = totaalRijNr + 17;
+  while (ws.rowCount < maxRij) ws.addRow([]);
+
+  totaalRijen.forEach(([rowNum, label, value]) => {
+    const row = ws.getRow(rowNum);
+    if (label) {
+      row.getCell(13).value = label;
+      row.getCell(13).font = boldFont;
+      row.getCell(13).fill = totaalFill;
+    }
+    if (value !== null && value !== undefined) {
+      row.getCell(14).value = value;
+      row.getCell(14).fill = totaalFill;
+      row.getCell(14).alignment = rightAlign;
+    }
+    row.commit();
+  });
+
+  // Kolombreedte
+  ws.getColumn(1).width  = 12;
+  ws.getColumn(2).width  = 12;
+  ws.getColumn(3).width  = 26;
+  ws.getColumn(4).width  = 20;
+  ws.getColumn(5).width  = 18;
+  ws.getColumn(6).width  = 18;
+  ws.getColumn(7).width  = 20;
+  ws.getColumn(8).width  = 18;
+  ws.getColumn(9).width  = 16;
+  ws.getColumn(10).width = 28;
+  ws.getColumn(11).width = 10;
+  ws.getColumn(12).width = 10;
+  ws.getColumn(13).width = 44;
+  ws.getColumn(14).width = 14;
+
+  return await wb.xlsx.writeBuffer();
+}
+
+// POST /api/bezetting/opslaan
+app.post('/api/bezetting/opslaan', async (req, res) => {
+  try {
+    const { maand, jaar, praktijkCode, matenNummers, aantalFt, aantalPt, ptUrenPerMaand, totalen } = req.body;
+
+    if (!maand || !jaar || !totalen) {
+      return res.status(400).json({ error: 'Maand, jaar en totaalcijfers zijn verplicht' });
+    }
+
+    const aantalFtN   = Number(aantalFt)        || 0;
+    const aantalPtN   = Number(aantalPt)         || 0;
+    const ptUrenN     = Number(ptUrenPerMaand)   || 72;
+    const aantalMedewerkers = aantalFtN + aantalPtN || 1;
+    const agendaUrenTotaal  = (aantalFtN * 144) + (aantalPtN * ptUrenN);
+
+    // Sla op in database
+    const opgeslagen = await withWriteConnection(async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS bezettingsgraad_rapporten (
+          id SERIAL PRIMARY KEY,
+          maand VARCHAR(20) NOT NULL,
+          jaar INT NOT NULL,
+          praktijk_code VARCHAR(20),
+          maten_nummers VARCHAR(100),
+          medewerkers_data JSONB NOT NULL,
+          aangemaakt_op TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+
+      const result = await client.query(
+        `INSERT INTO bezettingsgraad_rapporten
+           (maand, jaar, praktijk_code, maten_nummers, medewerkers_data)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [maand, jaar, praktijkCode || null, matenNummers || null,
+         JSON.stringify({ aantalMedewerkers, agendaUrenTotaal, totalen })]
+      );
+      return result.rows[0];
+    });
+
+    // Genereer Excel
+    const excelBuffer = await genereerBezettingExcel({
+      maand, jaar, praktijkCode, matenNummers,
+      aantalMedewerkers, agendaUrenTotaal, totalen
+    });
+
+    // Mail naar Lars
+    const bestandsnaam = `Bezettingsgraad_${praktijkCode || 'praktijk'}_${maand}_${jaar}.xlsx`;
+    await sendMailResilient({
+      from: SMTP.from,
+      to: 'lars@dynamic-health-consultancy.nl',
+      subject: `Bezettingsgraad rapport ${maand} ${jaar}${praktijkCode ? ' - ' + praktijkCode : ''}`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;background:#f3f4f6;padding:20px">
+          <div style="background:#111827;padding:18px 24px;border-radius:12px 12px 0 0;text-align:center">
+            <span style="color:#fff;font-size:17px;font-weight:700">Dynamic Health Consultancy</span>
+          </div>
+          <div style="background:#fff;padding:28px;border-radius:0 0 12px 12px">
+            <h2 style="color:#111827;margin:0 0 16px">Nieuw bezettingsgraad rapport ontvangen</h2>
+            <table style="width:100%;font-size:14px;border-collapse:collapse">
+              <tr><td style="color:#6b7280;padding:6px 0;width:140px">Maand/jaar</td><td style="color:#111827;font-weight:600">${maand} ${jaar}</td></tr>
+              <tr><td style="color:#6b7280;padding:6px 0">Praktijkcode</td><td style="color:#111827;font-weight:600">${praktijkCode || 'Niet opgegeven'}</td></tr>
+              <tr><td style="color:#6b7280;padding:6px 0">Medewerkers</td><td style="color:#111827;font-weight:600">${aantalMedewerkers} (${aantalFtN} FT / ${aantalPtN} PT)</td></tr>
+              <tr><td style="color:#6b7280;padding:6px 0">Rapport ID</td><td style="color:#111827;font-weight:600">#${opgeslagen.id}</td></tr>
+            </table>
+            <p style="color:#6b7280;font-size:13px;margin-top:20px">Het Excel rapport is bijgevoegd als bijlage.</p>
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: bestandsnaam,
+        content: Buffer.from(excelBuffer),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }]
+    });
+
+    res.json({ success: true, id: opgeslagen.id, bericht: `Rapport opgeslagen en verstuurd naar lars@dynamic-health-consultancy.nl` });
+
+  } catch (err) {
+    console.error('Bezetting opslaan error:', err);
+    res.status(500).json({ error: 'Fout bij opslaan of versturen: ' + err.message });
+  }
+});
+
+// GET /api/bezetting/lijst
+app.get('/api/bezetting/lijst', async (req, res) => {
+  try {
+    const rows = await withReadConnection(async (client) => {
+      const result = await client.query(
+        `SELECT id, maand, jaar, praktijk_code, maten_nummers, aangemaakt_op
+         FROM bezettingsgraad_rapporten
+         ORDER BY aangemaakt_op DESC
+         LIMIT 100`
+      );
+      return result.rows;
+    });
+    res.json({ success: true, rapporten: rows });
+  } catch (err) {
+    console.error('Bezetting lijst error:', err);
+    res.status(500).json({ error: 'Fout bij ophalen rapporten' });
+  }
 });
 
 app.listen(PORT, () => {

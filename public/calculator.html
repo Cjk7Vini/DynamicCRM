@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bezettingsgraad Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', system-ui, sans-serif; background: #f3f4f6; min-height: 100vh; }
+
+    .page-header { background: #111827; padding: 15px 32px; display: flex; align-items: center; gap: 14px; }
+    .header-logo { height: 34px; width: auto; }
+    .header-div { width: 1px; height: 24px; background: rgba(255,255,255,0.2); }
+    .header-title { color: #fff; font-size: 14px; font-weight: 600; }
+
+    .main { max-width: 860px; margin: 0 auto; padding: 28px 20px 80px; }
+
+    .sec { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
+    .sec-head { background: #111827; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
+    .sec-head h2 { color: #fff; font-size: 14px; font-weight: 600; }
+    .sec-badge { font-size: 11px; background: rgba(255,255,255,0.15); color: #fff; padding: 2px 10px; border-radius: 20px; }
+    .sec-body { padding: 22px; }
+
+    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .fld label { display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    .fld input, .fld select { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 9px; font-size: 14px; font-family: 'Poppins', sans-serif; color: #111827; background: #f9fafb; outline: none; transition: border-color 0.15s, background 0.15s; }
+    .fld input:focus, .fld select:focus { border-color: #111827; background: #fff; }
+
+    .agenda-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 16px; }
+    .al { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+    .as { font-size: 11px; color: #9ca3af; font-weight: 400; }
+    .arow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .arow input { width: 62px; padding: 8px 10px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
+    .arow input:focus { border-color: #111827; }
+    .al2 { font-size: 12px; color: #6b7280; }
+    .ac { font-size: 12px; font-weight: 600; color: #059669; }
+    .agenda-note { font-size: 12px; color: #6b7280; margin-top: 12px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px; }
+
+    .invoer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .inv-card { border: 1.5px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+    .inv-card-head { background: #f3f4f6; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }
+    .inv-card-body { padding: 12px 14px; }
+    .inv-card input { width: 100%; padding: 10px 12px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 16px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; margin-bottom: 6px; }
+    .inv-card input:focus { border-color: #111827; }
+    .inv-card .sub { font-size: 11px; color: #9ca3af; }
+
+    .resultaat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .r-blok h3 { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6; }
+    .r-rij { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f9fafb; }
+    .r-rij:last-child { border-bottom: none; }
+    .r-lbl { font-size: 13px; color: #6b7280; }
+    .r-val { font-size: 14px; font-weight: 600; color: #111827; }
+    .r-val.g { color: #059669; }
+    .r-val.o { color: #d97706; }
+
+    .opslaan-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .opslaan-info { font-size: 13px; color: #6b7280; line-height: 1.6; }
+    .opslaan-info strong { color: #111827; }
+
+    .btn-opslaan { background: #111827; color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; }
+    .btn-opslaan:hover { background: #1f2937; }
+    .btn-opslaan:active { transform: scale(0.98); }
+    .btn-opslaan:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+
+    .feedback { display: none; margin-top: 16px; padding: 13px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; }
+    .feedback.ok  { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+    .feedback.err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+    @media (max-width: 640px) {
+      .grid4 { grid-template-columns: 1fr 1fr; }
+      .invoer-grid { grid-template-columns: 1fr 1fr; }
+      .resultaat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <img class="header-logo" src="/images/dynamic-logo-2.png" onerror="this.style.display='none'" alt="DHC">
+  <div class="header-div"></div>
+  <span class="header-title">Bezettingsgraad Calculator</span>
+</header>
+
+<main class="main">
+
+  <div class="sec">
+    <div class="sec-head"><h2>Rapportage gegevens</h2></div>
+    <div class="sec-body">
+      <div class="grid4">
+        <div class="fld">
+          <label>Maand</label>
+          <select id="maand">
+            <option>Januari</option><option>Februari</option><option>Maart</option>
+            <option>April</option><option>Mei</option><option>Juni</option>
+            <option>Juli</option><option>Augustus</option><option>September</option>
+            <option>Oktober</option><option>November</option><option>December</option>
+          </select>
+        </div>
+        <div class="fld"><label>Jaar</label><input type="number" id="jaar" value="2026" min="2020" max="2040"></div>
+        <div class="fld"><label>Praktijkcode</label><input id="code" placeholder="bv. K9X3QY" maxlength="20"></div>
+        <div class="fld"><label>Maten (nummers)</label><input id="maten" placeholder="bv. 1, 3, 5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><h2>Agenda-uren</h2></div>
+    <div class="sec-body">
+      <div class="grid2">
+        <div class="agenda-box">
+          <div class="al">Fulltimers <span class="as">144 uur/maand</span></div>
+          <div class="arow">
+            <input type="number" id="ft" value="0" min="0" max="20" oninput="herbereken()">
+            <span class="al2">medewerkers</span>
+            <span class="ac" id="ft-res">= 0 uur</span>
+          </div>
+        </div>
+        <div class="agenda-box">
+          <div class="al">Parttimers <span class="as">gemiddeld uur/maand</span></div>
+          <div class="arow">
+            <input type="number" id="pt" value="0" min="0" max="20" oninput="herbereken()">
+            <span class="al2">mw x</span>
+            <input type="number" id="pt-uur" value="72" min="1" max="144" oninput="herbereken()">
+            <span class="al2">uur/mnd</span>
+            <span class="ac" id="pt-res">= 0 uur</span>
+          </div>
+        </div>
+      </div>
+      <div class="agenda-note" id="agenda-note">Vul het aantal medewerkers in om te beginnen.</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head">
+      <h2>Invoer</h2>
+      <span class="sec-badge" id="inv-badge">Totaalcijfers hele praktijk</span>
+    </div>
+    <div class="sec-body">
+      <div class="invoer-grid">
+        <div class="inv-card">
+          <div class="inv-card-head">Totaal omzet (€)</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-omzet" placeholder="0" min="0" oninput="herbereken()">
+            <div class="sub">Totale praktijkomzet deze maand</div>
+          </div>
+        </div>
+        <div class="inv-card">
+          <div class="inv-card-head">Uren patiënten</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-pturen" placeholder="0" min="0" step="0.5" oninput="herbereken()">
+            <div class="sub">Alle gedeclareerde behandeluren</div>
+          </div>
+        </div>
+        <div class="inv-card">
+          <div class="inv-card-head">Nieuwe patiënten</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-nieuw" placeholder="0" min="0" oninput="herbereken()">
+            <div class="sub">Nieuwe intakes deze maand</div>
+          </div>
+        </div>
+        <div class="inv-card">
+          <div class="inv-card-head">Overige uren</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-overig" placeholder="0" min="0" step="0.5" oninput="herbereken()">
+            <div class="sub">Vergadering, overleg, reistijd</div>
+          </div>
+        </div>
+        <div class="inv-card">
+          <div class="inv-card-head">Verlofuren</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-verlof" placeholder="0" min="0" step="0.5" oninput="herbereken()">
+            <div class="sub">Opgenomen verlof heel team</div>
+          </div>
+        </div>
+        <div class="inv-card">
+          <div class="inv-card-head">Ziekteuren</div>
+          <div class="inv-card-body">
+            <input type="number" id="i-ziekte" placeholder="0" min="0" step="0.5" oninput="herbereken()">
+            <div class="sub">Ziekteverzuim heel team</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><h2>Resultaat</h2><span class="sec-badge">Automatisch berekend</span></div>
+    <div class="sec-body">
+      <div class="resultaat-grid">
+        <div class="r-blok">
+          <h3>Totalen</h3>
+          <div class="r-rij"><span class="r-lbl">Totaal omzet</span><span class="r-val" id="r-omzet">€ 0</span></div>
+          <div class="r-rij"><span class="r-lbl">Totaal behandelingen</span><span class="r-val" id="r-beh">0</span></div>
+          <div class="r-rij"><span class="r-lbl">Totaal nieuwe patiënten</span><span class="r-val" id="r-nieuw">0</span></div>
+          <div class="r-rij"><span class="r-lbl">Totaal agenda-uren</span><span class="r-val" id="r-agenda">0</span></div>
+          <div class="r-rij"><span class="r-lbl">Totaal verlofuren</span><span class="r-val" id="r-verlof">0</span></div>
+          <div class="r-rij"><span class="r-lbl">Totaal ziekteuren</span><span class="r-val" id="r-ziekte">0</span></div>
+        </div>
+        <div class="r-blok">
+          <h3>Percentages</h3>
+          <div class="r-rij"><span class="r-lbl">Percentage nieuwe patiënten</span><span class="r-val g" id="r-pn">0%</span></div>
+          <div class="r-rij"><span class="r-lbl">Percentage verlof</span><span class="r-val o" id="r-pv">0%</span></div>
+          <div class="r-rij"><span class="r-lbl">Percentage ziekte</span><span class="r-val o" id="r-pz">0%</span></div>
+          <div class="r-rij"><span class="r-lbl">Effectieve vulling met ziekte</span><span class="r-val g" id="r-vm">0%</span></div>
+          <div class="r-rij"><span class="r-lbl">Effectieve vulling zonder ziekte</span><span class="r-val g" id="r-vz">0%</span></div>
+          <div class="r-rij"><span class="r-lbl">Maten aandeel van omzet</span><span class="r-val" id="r-maten">0%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><h2>Opslaan en versturen</h2></div>
+    <div class="sec-body">
+      <div class="opslaan-bar">
+        <div class="opslaan-info">
+          Rapport wordt opgeslagen en als Excel verstuurd naar<br>
+          <strong>lars@dynamic-health-consultancy.nl</strong>
+        </div>
+        <button class="btn-opslaan" id="btn-opslaan" onclick="opslaan()">
+          Rapport opslaan en versturen
+        </button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  const nu = new Date();
+  document.getElementById('maand').value = MAANDEN[nu.getMonth()];
+  document.getElementById('jaar').value  = nu.getFullYear();
+
+  function n(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+  function el(id) { return document.getElementById(id); }
+  function set(id, val) { var e = el(id); if (e) e.textContent = val; }
+
+  function herbereken() {
+    var ft    = n('ft');
+    var pt    = n('pt');
+    var ptUur = n('pt-uur') || 72;
+    var totMW = ft + pt;
+
+    var ftUren    = ft * 144;
+    var ptUren    = pt * ptUur;
+    var totAgenda = ftUren + ptUren;
+    var gemAgenda = totMW > 0 ? Math.round(totAgenda / totMW * 10) / 10 : 0;
+
+    el('ft-res').textContent = '= ' + ftUren.toLocaleString('nl-NL') + ' uur';
+    el('pt-res').textContent = '= ' + Math.round(ptUren) + ' uur';
+    el('inv-badge').textContent = totMW > 0 ? 'Totaalcijfers voor ' + totMW + ' medewerkers' : 'Totaalcijfers hele praktijk';
+    el('agenda-note').textContent = totMW > 0
+      ? totMW + ' medewerkers \u2014 gemiddeld ' + gemAgenda + ' agenda-uren per medewerker per maand'
+      : 'Vul het aantal medewerkers in om te beginnen.';
+
+    var omzet  = n('i-omzet');
+    var pturen = n('i-pturen');
+    var nieuw  = n('i-nieuw');
+    var verlof = n('i-verlof');
+    var ziekte = n('i-ziekte');
+    var beh    = Math.round(pturen * 2);
+
+    set('r-omzet',  '\u20ac ' + Math.round(omzet).toLocaleString('nl-NL'));
+    set('r-beh',    beh.toLocaleString('nl-NL'));
+    set('r-nieuw',  Math.round(nieuw).toLocaleString('nl-NL'));
+    set('r-agenda', Math.round(totAgenda * 10) / 10);
+    set('r-verlof', Math.round(verlof * 10) / 10);
+    set('r-ziekte', Math.round(ziekte * 10) / 10);
+
+    var pn = beh > 0       ? Math.round(nieuw  / beh       * 1000) / 10 : 0;
+    var pv = totAgenda > 0 ? Math.round(verlof / totAgenda * 1000) / 10 : 0;
+    var pz = totAgenda > 0 ? Math.round(ziekte / totAgenda * 1000) / 10 : 0;
+    var vm = totAgenda > 0 ? Math.round((pturen + ziekte + verlof) / totAgenda * 1000) / 10 : 0;
+    var vz = totAgenda > 0 ? Math.round((pturen + verlof)          / totAgenda * 1000) / 10 : 0;
+
+    set('r-pn', pn + '%');
+    set('r-pv', pv + '%');
+    set('r-pz', pz + '%');
+    set('r-vm', vm + '%');
+    set('r-vz', vz + '%');
+
+    var matenStr = el('maten')?.value || '';
+    var matenNrs = matenStr.split(',').map(function(s) { return parseInt(s.trim()); }).filter(function(x) { return !isNaN(x) && x >= 1; });
+    var pctMaten = totMW > 0 && matenNrs.length > 0 ? Math.round(matenNrs.length / totMW * 1000) / 10 : 0;
+    set('r-maten', pctMaten + '%');
+  }
+
+  async function opslaan() {
+    var btn  = el('btn-opslaan');
+    var fb   = el('feedback');
+    var code = el('code')?.value.trim();
+
+    if (!code) {
+      fb.className = 'feedback err';
+      fb.style.display = 'block';
+      fb.textContent = 'Vul een praktijkcode in voordat je het rapport verstuurt.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Bezig met versturen...';
+    fb.style.display = 'none';
+
+    try {
+      var res = await fetch('/api/bezetting/opslaan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maand:          el('maand').value,
+          jaar:           parseInt(el('jaar').value),
+          praktijkCode:   code,
+          matenNummers:   el('maten')?.value.trim() || '',
+          aantalFt:       n('ft'),
+          aantalPt:       n('pt'),
+          ptUrenPerMaand: n('pt-uur') || 72,
+          totalen: {
+            omzet:  n('i-omzet'),
+            pturen: n('i-pturen'),
+            nieuw:  n('i-nieuw'),
+            overig: n('i-overig'),
+            verlof: n('i-verlof'),
+            ziekte: n('i-ziekte')
+          }
+        })
+      });
+
+      var data = await res.json();
+
+      if (data.success) {
+        fb.className = 'feedback ok';
+        fb.textContent = 'Rapport #' + data.id + ' opgeslagen en verstuurd naar lars@dynamic-health-consultancy.nl';
+      } else {
+        fb.className = 'feedback err';
+        fb.textContent = data.error || 'Er is iets misgegaan.';
+      }
+    } catch (e) {
+      fb.className = 'feedback err';
+      fb.textContent = 'Netwerkfout: ' + e.message;
+    }
+
+    fb.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Rapport opslaan en versturen';
+  }
+
+  el('maten').addEventListener('input', herbereken);
+  herbereken();
+</script>
+</body>
+</html>
