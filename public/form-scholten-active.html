@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aanmelden - Scholten Active</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@700;800&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --dark-green:  #002F2C;
+            --light-green: #005C48;
+            --bright-green: #9DC134;
+            --beige:       #D6CABC;
+            --dark-beige:  #917F76;
+            --background:  #f5f0ea;
+            --text-dark:   #1a1a1a;
+            --text-mid:    #4a4a4a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 580px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 44px 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 40px rgba(0,47,44,0.10);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .logo img {
+            max-width: 160px;
+            height: auto;
+        }
+
+        /* Afgerond beige blok — kenmerkend stijlelement brandbook */
+        .hero-block {
+            background: var(--beige);
+            border-radius: 16px;
+            padding: 24px 28px;
+            margin-bottom: 28px;
+        }
+
+        h1 {
+            font-family: 'Barlow', sans-serif;
+            font-weight: 800;
+            color: var(--dark-green);
+            font-size: 24px;
+            line-height: 1.2;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .tagline {
+            font-size: 13px;
+            color: var(--dark-beige);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .benefits {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: var(--text-mid);
+        }
+
+        .benefit-icon {
+            width: 20px;
+            height: 20px;
+            background: var(--light-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .benefit-icon svg {
+            width: 11px;
+            height: 11px;
+            stroke: #fff;
+            stroke-width: 2.5;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--dark-green);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .required { color: var(--bright-green); }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0dbd5;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-dark);
+            background: #faf8f5;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--light-green);
+            background: #fff;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 3px;
+            accent-color: var(--light-green);
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: var(--text-mid);
+            line-height: 1.6;
+        }
+
+        .checkbox-label a {
+            color: var(--light-green);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--dark-green);
+            color: #fff;
+            padding: 15px;
+            border: none;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.25s;
+            box-shadow: 0 4px 18px rgba(0,47,44,0.25);
+        }
+
+        .submit-btn:hover {
+            background: var(--light-green);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0,92,72,0.3);
+        }
+
+        .submit-btn:disabled {
+            background: var(--beige);
+            color: var(--dark-beige);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            text-align: center;
+            font-size: 12px;
+            color: var(--dark-beige);
+            margin-top: 14px;
+        }
+
+        #msg {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+        #msg.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+        #msg.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; display: block; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,47,44,0.55);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .success-modal {
+            background: #fff;
+            border-radius: 20px;
+            padding: 48px 36px;
+            max-width: 460px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,47,44,0.25);
+            animation: slideUp 0.35s ease;
+        }
+
+        .success-icon {
+            width: 72px; height: 72px;
+            background: var(--light-green);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 24px rgba(0,92,72,0.3);
+        }
+
+        .success-icon svg {
+            width: 36px; height: 36px;
+            stroke: #fff; stroke-width: 3;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+
+        .success-modal h2 {
+            font-family: 'Barlow', sans-serif;
+            font-weight: 800;
+            color: var(--dark-green);
+            font-size: 24px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .success-modal p {
+            color: var(--text-mid);
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .practice-name-highlight {
+            color: var(--light-green);
+            font-weight: 700;
+        }
+
+        .close-button {
+            background: var(--dark-green);
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            font-family: 'Poppins', sans-serif;
+            transition: background 0.2s;
+        }
+
+        .close-button:hover { background: var(--light-green); }
+
+        .auto-close-note {
+            color: var(--dark-beige);
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(32px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 640px) {
+            .container { padding: 30px 22px; }
+            h1 { font-size: 20px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=1177365577340703&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+
+<div class="container">
+
+    <div class="logo">
+        <img src="/images/7. Scholten_Active_Logo_BEIGE-CMYK.jpg" alt="Scholten Active">
+    </div>
+
+    <div class="hero-block">
+        <h1>Actief bewegen,<br>persoonlijk presteren</h1>
+        <p class="tagline">Scholten Active</p>
+        <div class="benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <span>Persoonlijk beweegplan op maat</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <span>Gratis adviesgesprek</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <span>Informatie over tijden en tarieven</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="msg"></div>
+
+    <form id="leadForm">
+        <input type="hidden" id="praktijk_code" name="praktijk_code" value="FF42F5">
+
+        <div class="form-group">
+            <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+            <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+        </div>
+
+        <div class="form-group">
+            <label for="emailadres">E-mailadres <span class="required">*</span></label>
+            <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
+        </div>
+
+        <div class="form-group">
+            <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+            <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+        </div>
+
+        <div class="form-group">
+            <label for="doel">Wat is je doel?</label>
+            <select id="doel" name="doel">
+                <option value="">Selecteer...</option>
+                <option value="Afvallen">Afvallen</option>
+                <option value="Fitter worden">Fitter worden</option>
+                <option value="Spieren vergroten">Spieren vergroten</option>
+                <option value="Klachten voorkomen">Klachten voorkomen</option>
+                <option value="Sportprestaties verbeteren">Sportprestaties verbeteren</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="bron">Hoe heb je ons gevonden?</label>
+            <select id="bron" name="bron">
+                <option value="">Selecteer...</option>
+                <option value="Facebook/Instagram">Facebook/Instagram</option>
+                <option value="Google">Google</option>
+                <option value="Vrienden/Familie">Vrienden/Familie</option>
+                <option value="Anders">Anders</option>
+            </select>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+            <label for="toestemming" class="checkbox-label">
+                Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen. <span class="required">*</span>
+            </label>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">
+            Verstuur mijn aanmelding
+        </button>
+
+        <p class="security-note">Je gegevens worden veilig verwerkt en nooit gedeeld met derden</p>
+    </form>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+    <div class="success-modal">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52"><polyline points="14 27 22 35 38 19"/></svg>
+        </div>
+        <h2>Aanmelding verstuurd!</h2>
+        <p>Je aanmelding is verstuurd naar</p>
+        <p class="practice-name-highlight">Scholten Active</p>
+        <p style="margin-top:14px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
+        <button class="close-button" onclick="sluitModal()">Sluiten</button>
+        <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+    </div>
+</div>
+
+<footer style="text-align:center;padding:16px;font-size:12px;color:var(--dark-beige);margin-top:8px;">
+    Copyright &copy; Dynamic Health Consultancy
+</footer>
+
+<script>
+    var PRACTICE_CODE = 'FF42F5';
+    var API_URL = 'https://dynamiccrm.onrender.com';
+    var countdownTimer;
+
+    document.getElementById('praktijk_code').value = PRACTICE_CODE;
+
+    document.getElementById('leadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('msg');
+        var origText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Bezig met verzenden...';
+        msg.style.display = 'none';
+
+        var email = document.getElementById('emailadres').value.trim();
+        var phone = document.getElementById('telefoon').value.trim();
+
+        if (!email || !email.includes('@') || !email.includes('.')) {
+            msg.textContent = 'Vul een geldig e-mailadres in.';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        var phoneDigits = phone.replace(/\D/g, '');
+        if (!phone || phoneDigits.length < 10) {
+            msg.textContent = 'Vul een geldig telefoonnummer in (minimaal 10 cijfers).';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        var formData = {
+            praktijk_code: PRACTICE_CODE,
+            volledige_naam: document.getElementById('volledige_naam').value.trim(),
+            emailadres: email,
+            telefoon: phoneDigits,
+            bron: document.getElementById('bron').value || null,
+            doel: document.getElementById('doel').value || null,
+            toestemming: document.getElementById('toestemming').checked
+        };
+
+        try {
+            var response = await fetch(API_URL + '/leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                if (typeof fbq !== 'undefined') { fbq('track', 'Lead'); }
+                toonModal();
+            } else {
+                var error = await response.json();
+                msg.textContent = error.error || 'Er ging iets mis. Probeer het opnieuw.';
+                msg.className = 'error';
+            }
+        } catch(err) {
+            msg.textContent = 'Kan geen verbinding maken. Controleer je internetverbinding.';
+            msg.className = 'error';
+        }
+
+        btn.disabled = false;
+        btn.textContent = origText;
+    });
+
+    function toonModal() {
+        document.getElementById('successModal').classList.add('active');
+        var sec = 10;
+        var cd = document.getElementById('countdown');
+        countdownTimer = setInterval(function() {
+            sec--;
+            cd.textContent = sec;
+            if (sec <= 0) { sluitModal(); }
+        }, 1000);
+    }
+
+    function sluitModal() {
+        document.getElementById('successModal').classList.remove('active');
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('leadForm').reset();
+        document.getElementById('praktijk_code').value = PRACTICE_CODE;
+        window.location.href = 'thankyou.html?s=' + PRACTICE_CODE;
+    }
+</script>
+
+</body>
+</html>
