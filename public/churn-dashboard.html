@@ -1314,6 +1314,10 @@
                     <div class="metric-label">CPC</div>
                     <div class="metric-value" id="metaCPC">€0,00</div>
                 </div>
+                <div class="metric-card">
+                    <div class="metric-label">Page Views</div>
+                    <div class="metric-value" id="metaPageViews">0</div>
+                </div>
             </div>
             <div class="meta-campaigns-table">
                 <div style="font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px;">Active Campaigns</div>
@@ -2713,32 +2717,9 @@
                     return;
                 }
                 
-                // Get verified leads from database (bron = Facebook or Instagram)
-                try {
-                    const leadsRes = await fetch(`/api/leads`);
-                    const leadsData = await leadsRes.json();
-                    
-                    // API returns array directly
-                    if (Array.isArray(leadsData)) {
-                        // Filter: only Soestdijk + Facebook/Instagram
-                        const metaLeads = leadsData.filter(lead => {
-                            // Match practice
-                            if (lead.praktijk_code !== practiceCode) return false;
-                            
-                            // Match bron (Facebook or Instagram)
-                            const bron = (lead.bron || '').toLowerCase();
-                            return bron === 'facebook' || bron === 'instagram';
-                        });
-                        
-                        // Count = 7
-                        summary.verified_leads = metaLeads.length;
-                    } else {
-                        summary.verified_leads = 0;
-                    }
-                } catch (leadsError) {
-                    console.warn('Could not fetch leads for Meta verification:', leadsError);
-                    summary.verified_leads = 0;
-                }
+                // Leads (Meta) komen rechtstreeks uit de Meta API summary (total_conversions)
+                // Geen aparte database-call nodig
+                summary.verified_leads = summary.total_conversions || 0;
                 
                 // Show section
                 document.getElementById('metaMarketingSection').style.display = 'block';
@@ -2794,9 +2775,10 @@
             document.getElementById('metaConversions').textContent = 
                 data.total_conversions || 0;
             
-            // Leads (Meta) - Verified leads from database with bron Facebook/Instagram
+            // Leads (Meta) - Rechtstreeks uit Meta API (fb_pixel_lead events)
+            // Dit zijn de daadwerkelijke leads die Meta telt via de pixel op thankyou.html
             document.getElementById('metaVerifiedLeads').textContent = 
-                data.verified_leads || 0;
+                data.total_conversions || 0;
             
             // Cost Per Lead
             document.getElementById('metaCostPerLead').textContent = 
@@ -2805,6 +2787,10 @@
             // CPC
             document.getElementById('metaCPC').textContent = 
                 `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
+
+            // Page Views (landing_page_view actions uit Meta API)
+            document.getElementById('metaPageViews').textContent =
+                formatNumber(data.total_page_views || 0);
             
             // ROAS (estimated)
             const estimatedLeadValue = 150; // Average patient lifetime value
