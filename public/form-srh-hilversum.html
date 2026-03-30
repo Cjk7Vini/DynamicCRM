@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aanmelden - Sportrevalidatie Centrum Hilversum</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.8;
+            color: #393939;
+            background: linear-gradient(135deg, #0a1f3c 0%, #1a3a5c 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+            padding: 50px;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+
+        .form-logo {
+            max-width: 200px;
+            height: auto;
+            margin: 0 auto 24px;
+            display: block;
+        }
+
+        .practice-badge {
+            background: #0a1f3c;
+            color: #e8a020;
+            padding: 8px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            border: 2px solid #e8a020;
+        }
+
+        h1 {
+            font-family: 'Poppins', sans-serif;
+            color: #0a1f3c;
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .form-subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .benefits-list {
+            background: #f4f7fb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0a1f3c;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #444;
+            font-size: 15px;
+        }
+
+        .benefit-item:last-child { margin-bottom: 0; }
+
+        .check-icon { color: #e8a020; font-weight: bold; font-size: 18px; }
+
+        .form-group { margin-bottom: 22px; }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: 600;
+            color: #222;
+            font-size: 15px;
+        }
+
+        .required { color: #e74c3c; }
+
+        input, select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #dde3ec;
+            border-radius: 9px;
+            font-size: 15px;
+            transition: all 0.25s ease;
+            font-family: 'Poppins', sans-serif;
+            color: #222;
+            background: #fafbfd;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #0a1f3c;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(10, 31, 60, 0.08);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 4px;
+            accent-color: #0a1f3c;
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .checkbox-label a {
+            color: #0a1f3c;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .checkbox-label a:hover { text-decoration: underline; }
+
+        .submit-button {
+            background: linear-gradient(135deg, #0a1f3c 0%, #1a3a5c 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 18px rgba(10, 31, 60, 0.3);
+            font-family: 'Poppins', sans-serif;
+            letter-spacing: 0.3px;
+        }
+
+        .submit-button:hover {
+            background: linear-gradient(135deg, #1a3a5c 0%, #0a1f3c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(10, 31, 60, 0.4);
+        }
+
+        .submit-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 16px;
+            color: #888;
+            font-size: 13px;
+        }
+
+        #msg {
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            text-align: center;
+            display: none;
+            font-size: 14px;
+        }
+        #msg.success { background: #d4edda; color: #155724; display: block; border: 1px solid #c3e6cb; }
+        #msg.error   { background: #f8d7da; color: #721c24; display: block; border: 1px solid #f5c6cb; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .success-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 48px 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
+        }
+
+        .success-icon {
+            width: 76px; height: 76px;
+            background: linear-gradient(135deg, #0a1f3c 0%, #1a3a5c 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 24px rgba(10, 31, 60, 0.3);
+        }
+
+        .success-icon svg {
+            width: 46px; height: 46px;
+            stroke: white; stroke-width: 3;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+
+        .success-modal h2 {
+            color: #0a1f3c;
+            font-size: 26px;
+            margin-bottom: 14px;
+            font-weight: 700;
+        }
+
+        .success-modal p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .practice-name-highlight {
+            color: #e8a020;
+            font-weight: 700;
+        }
+
+        .success-modal .close-button {
+            background: linear-gradient(135deg, #0a1f3c 0%, #1a3a5c 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 22px;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .success-modal .close-button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .auto-close-note {
+            color: #aaa;
+            font-size: 13px;
+            margin-top: 14px;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 640px) {
+            .form-container { padding: 30px 24px; }
+            h1 { font-size: 22px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=1177365577340703&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+
+<div class="form-container">
+    <div class="form-header">
+        <img src="/images/SRH-Los-2022.png" alt="Sportrevalidatie Centrum Hilversum" class="form-logo">
+        <h1>Aanmelden bij Sportrevalidatie Centrum Hilversum</h1>
+        <p class="form-subtitle">Vul het formulier in en wij nemen contact met je op</p>
+    </div>
+
+    <div class="benefits-list">
+        <div class="benefit-item">
+            <span class="check-icon">✓</span>
+            <span>Persoonlijk revalidatieplan op maat</span>
+        </div>
+        <div class="benefit-item">
+            <span class="check-icon">✓</span>
+            <span>Gratis kennismakingsgesprek</span>
+        </div>
+        <div class="benefit-item">
+            <span class="check-icon">✓</span>
+            <span>Informatie over behandelingen en tarieven</span>
+        </div>
+    </div>
+
+    <div id="msg"></div>
+
+    <form id="leadForm">
+        <input type="hidden" id="praktijk_code" name="praktijk_code" value="9F8009">
+
+        <div class="form-group">
+            <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+            <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+        </div>
+
+        <div class="form-group">
+            <label for="emailadres">E-mailadres <span class="required">*</span></label>
+            <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
+        </div>
+
+        <div class="form-group">
+            <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+            <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+        </div>
+
+        <div class="form-group">
+            <label for="bron">Hoe heb je ons gevonden?</label>
+            <select id="bron" name="bron">
+                <option value="">Selecteer...</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Google">Google</option>
+                <option value="Huisarts/Specialist">Huisarts of specialist</option>
+                <option value="Vrienden/Familie">Vrienden of familie</option>
+                <option value="Anders">Anders</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="doel">Waarvoor wil je je aanmelden?</label>
+            <select id="doel" name="doel">
+                <option value="">Selecteer...</option>
+                <option value="Sportrevalidatie">Sportrevalidatie</option>
+                <option value="Fysiotherapie">Fysiotherapie</option>
+                <option value="Blessurepreventie">Blessurepreventie</option>
+                <option value="Conditie opbouwen">Conditie opbouwen</option>
+                <option value="Herstel na operatie">Herstel na operatie</option>
+                <option value="Anders">Anders</option>
+            </select>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+            <label for="toestemming" class="checkbox-label">
+                Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen over mijn aanmelding. <span class="required">*</span>
+            </label>
+        </div>
+
+        <button type="submit" class="submit-button" id="submitButton">
+            Verstuur mijn aanmelding
+        </button>
+
+        <div class="security-note">
+            <span>Je gegevens worden veilig verwerkt en nooit gedeeld met derden</span>
+        </div>
+    </form>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+    <div class="success-modal">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52">
+                <polyline points="14 27 22 35 38 19"/>
+            </svg>
+        </div>
+        <h2>Gegevens succesvol verstuurd!</h2>
+        <p>Je aanmelding is verstuurd naar</p>
+        <p class="practice-name-highlight" id="modalPracticeName">Sportrevalidatie Centrum Hilversum</p>
+        <p style="margin-top: 16px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
+        <button class="close-button" onclick="sluitModal()">Sluiten</button>
+        <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+    </div>
+</div>
+
+<script>
+    var API_URL = 'https://dynamiccrm.onrender.com';
+    var PRACTICE_CODE = '9F8009';
+    var PRACTICE_NAME = 'Sportrevalidatie Centrum Hilversum';
+    var countdownTimer;
+
+    document.getElementById('praktijk_code').value = PRACTICE_CODE;
+
+    document.getElementById('leadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        var btn = document.getElementById('submitButton');
+        var msg = document.getElementById('msg');
+        var origText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Bezig met verzenden...';
+        msg.style.display = 'none';
+
+        var email = document.getElementById('emailadres').value.trim();
+        var phone = document.getElementById('telefoon').value.trim();
+
+        if (!email || !email.includes('@') || !email.includes('.')) {
+            msg.textContent = 'Voer een geldig e-mailadres in.';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        var phoneDigits = phone.replace(/\D/g, '');
+        if (!phone || phoneDigits.length < 10) {
+            msg.textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers).';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        var formData = {
+            praktijk_code: PRACTICE_CODE,
+            volledige_naam: document.getElementById('volledige_naam').value.trim(),
+            emailadres: email,
+            telefoon: phoneDigits,
+            bron: document.getElementById('bron').value || null,
+            doel: document.getElementById('doel').value || null,
+            toestemming: document.getElementById('toestemming').checked
+        };
+
+        try {
+            var response = await fetch(API_URL + '/leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                if (typeof fbq !== 'undefined') { fbq('track', 'Lead'); }
+                toonModal();
+            } else {
+                var error = await response.json();
+                msg.textContent = error.error || 'Er ging iets mis. Probeer het opnieuw.';
+                msg.className = 'error';
+            }
+        } catch (err) {
+            msg.textContent = 'Kan geen verbinding maken. Controleer je internetverbinding.';
+            msg.className = 'error';
+        }
+
+        btn.disabled = false;
+        btn.textContent = origText;
+    });
+
+    function toonModal() {
+        var modal = document.getElementById('successModal');
+        modal.classList.add('active');
+
+        var sec = 10;
+        var cd = document.getElementById('countdown');
+        countdownTimer = setInterval(function() {
+            sec--;
+            cd.textContent = sec;
+            if (sec <= 0) { sluitModal(); }
+        }, 1000);
+    }
+
+    function sluitModal() {
+        document.getElementById('successModal').classList.remove('active');
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('leadForm').reset();
+        document.getElementById('praktijk_code').value = PRACTICE_CODE;
+    }
+</script>
+
+<footer style="text-align:center;padding:20px;font-size:12px;color:rgba(255,255,255,0.4);margin-top:8px;">
+    Copyright &copy; Dynamic Health Consultancy
+</footer>
+
+</body>
+</html>
