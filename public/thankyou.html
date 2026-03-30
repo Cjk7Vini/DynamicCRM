@@ -188,6 +188,15 @@
     }
     loadPracticeName();
 
+    // Meta conversie tracking — Lead event op thankyou pagina
+    // Dit is de juiste plek: alleen iemand die het formulier
+    // succesvol heeft verstuurd bereikt deze pagina.
+    try {
+      if (typeof fbq !== 'undefined') {
+        fbq('track', 'Lead');
+      }
+    } catch(e) {}
+
     var s = 10;
     var cd = document.getElementById('countdown');
     var iv = setInterval(function() {
