@@ -3370,104 +3370,93 @@ async function genereerBezettingExcel(data) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
 
-  const { maand, jaar, praktijkCode, matenNummers, totalen, medewerkerUren, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers } = data;
+  const { maand, jaar, praktijkCode, matenNummers, medewerkers, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers } = data;
 
   const aantalFtN  = Number(aantalFt)  || 0;
   const aantalPtN  = Number(aantalPt)  || 0;
   const ptUrenN    = Number(ptUrenPerMaand) || 72;
   const n          = aantalFtN + aantalPtN || 1;
-  const gemAgenda  = Math.round(((aantalFtN * 144) + (aantalPtN * ptUrenN)) / n * 100) / 100;
-  const totAgenda  = gemAgenda * n;
+  const totAgenda  = (aantalFtN * 144) + (aantalPtN * ptUrenN);
+  const gemAgenda  = Math.round(totAgenda / n * 100) / 100;
 
-  const SALARIS    = Math.round(3950 * 1.30); // 5135
-
-  // Totaalcijfers
-  const totOmzet  = Number(totalen.omzet)  || 0;
-  const totNieuw  = Number(totalen.nieuw)  || 0;
-  const totOverig = Number(totalen.overig) || 0;
-  const totVerlof = Number(totalen.verlof) || 0;
-  const totZiekte = Number(totalen.ziekte) || 0;
-
-  // Individuele behandeluren per medewerker
-  const mwUren = Array.isArray(medewerkerUren) ? medewerkerUren : [];
-  const totPtUren = mwUren.reduce((s, u) => s + (Number(u) || 0), 0);
-  const totBeh    = Math.round(totPtUren * 2);
-
-  // Forecast
-  const forecast = berekenForecast(Number(aantalKamers) || n, n);
+  const SALARIS    = Math.round(3950 * 1.30);
+  const forecast   = berekenForecast(Number(aantalKamers) || n, n);
 
   // Stijlen
-  const hFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
-  const tFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
-  const fFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4FD' } };
-  const rFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4E4' } };
-  const gFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F4EA' } };
-  const oFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } };
+  const hFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+  const tFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  const fFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4FD' } };
+  const gFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F4EA' } };
+  const oFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } };
+  const rFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4E4' } };
   const bold   = { bold: true };
   const center = { horizontal: 'center' };
   const right  = { horizontal: 'right' };
 
-  // ── SHEET 1: Werkblad 1 (bezettingsgraad) ──
+  // ── SHEET 1: Werkblad 1 ──
   const ws = wb.addWorksheet('Werkblad 1');
-
   ws.addRow([]);
   const r2 = ws.addRow([`${maand} ${jaar}`]);
   r2.getCell(1).font = bold;
 
   const headers = [
     'Personeel', 'Omzet', 'Salaris incl. alle kosten',
-    'Effectieve vulling 85%', 'Aantal nieuwe pt\'s', 'Percentage nieuwe',
-    'Aantal behandelingen', 'Totaal agenda uren', 'Aantal uren Pt\'s',
-    'Sportgroep/overleg/overig', 'Verlof', 'Ziekte',
+    'Effectieve vulling 85%', 'Nieuwe patiënten', 'Percentage nieuwe',
+    'Behandelingen', 'Agenda uren', 'Uren patiënten',
+    'Overig/overleg', 'Verlof', 'Ziekte',
     '', 'Forecast maand', 'Realisatie %'
   ];
   const r3 = ws.addRow(headers);
   r3.eachCell(cell => { cell.font = bold; cell.fill = hFill; cell.alignment = center; });
 
-  // Per medewerker
-  const gemOmzet  = Math.round(totOmzet  / n * 100) / 100;
-  const gemNieuw  = Math.round(totNieuw  / n * 100) / 100;
-  const gemOverig = Math.round(totOverig / n * 100) / 100;
-  const gemVerlof = Math.round(totVerlof / n * 100) / 100;
-  const gemZiekte = Math.round(totZiekte / n * 100) / 100;
-  const gemBeh    = Math.round(totBeh    / n);
+  // Totalen voor totaalblok
+  var totBeh = 0, totNieuw = 0, totPtU = 0, totVerlof = 0, totZiekte = 0, totOmzet = 0;
+
+  const mws = Array.isArray(medewerkers) ? medewerkers : [];
 
   for (let i = 0; i < n; i++) {
-    const ptUren     = Number(mwUren[i]) || 0;
-    const beh        = Math.round(ptUren * 2);
-    const vulling    = gemAgenda > 0 ? Math.round(((ptUren + gemVerlof + gemZiekte) / gemAgenda) * 10000) / 100 : 0;
-    const pctNieuw   = beh > 0 ? Math.round((gemNieuw / beh) * 10000) / 100 : 0;
-    const realisatie = forecast.perMedewerker.maand > 0 ? Math.round((beh / forecast.perMedewerker.maand) * 10000) / 100 : 0;
+    const m      = mws[i] || {};
+    const ptU    = Number(m.pturen)  || 0;
+    const nieuw  = Number(m.nieuw)   || 0;
+    const overig = Number(m.overig)  || 0;
+    const verlof = Number(m.verlof)  || 0;
+    const ziekte = Number(m.ziekte)  || 0;
+    const beh    = Number(m.beh)     || Math.round(ptU * 2);
+    const omzet  = Number(m.omzet)   || Math.round(beh * 35);
+
+    const vul    = gemAgenda > 0 ? Math.round(((ptU + verlof + ziekte) / gemAgenda) * 10000) / 100 : 0;
+    const pctN   = beh > 0 ? Math.round((nieuw / beh) * 10000) / 100 : 0;
+    const real   = forecast.perMedewerker.maand > 0 ? Math.round((beh / forecast.perMedewerker.maand) * 10000) / 100 : 0;
 
     const rij = ws.addRow([
-      `${i + 1}.`, gemOmzet, SALARIS,
-      vulling, gemNieuw, pctNieuw,
-      beh, gemAgenda, ptUren,
-      gemOverig, gemVerlof, gemZiekte,
-      '', forecast.perMedewerker.maand, realisatie
+      `${i + 1}.`, omzet, SALARIS,
+      vul, nieuw, pctN,
+      beh, gemAgenda, ptU,
+      overig, verlof, ziekte,
+      '', forecast.perMedewerker.maand, real
     ]);
 
     rij.getCell(4).numFmt  = '0.00';
     rij.getCell(6).numFmt  = '0.00';
     rij.getCell(15).numFmt = '0.00';
 
-    // Kleur vulling cel (kolom 4)
     const vCel = rij.getCell(4);
-    if (vulling >= 85)      { vCel.fill = gFill; }
-    else if (vulling >= 70) { vCel.fill = oFill; }
-    else                    { vCel.fill = rFill; }
+    vCel.fill = vul >= 85 ? gFill : vul >= 70 ? oFill : rFill;
 
-    // Kleur realisatie cel (kolom 15)
     const rCel = rij.getCell(15);
-    if (realisatie >= 85)      { rCel.fill = gFill; }
-    else if (realisatie >= 70) { rCel.fill = oFill; }
-    else                       { rCel.fill = rFill; }
+    rCel.fill = real >= 85 ? gFill : real >= 70 ? oFill : rFill;
+
+    totBeh   += beh;
+    totNieuw += nieuw;
+    totPtU   += ptU;
+    totVerlof += verlof;
+    totZiekte += ziekte;
+    totOmzet  += omzet;
   }
 
   ws.addRow([]);
 
   // Totaalblok
-  const totPtU   = mwUren.reduce((s, u) => s + (Number(u) || 0), 0);
   const pctNT    = totBeh > 0    ? Math.round((totNieuw / totBeh) * 10000) / 100 : 0;
   const pctV     = totAgenda > 0 ? Math.round((totVerlof / totAgenda) * 10000) / 100 : 0;
   const pctZ     = totAgenda > 0 ? Math.round((totZiekte / totAgenda) * 10000) / 100 : 0;
@@ -3481,7 +3470,7 @@ async function genereerBezettingExcel(data) {
     [tR,      'Totaal', null],
     [tR + 2,  'Totaal omzet:', totOmzet],
     [tR + 3,  'Totaal behandelingen:', totBeh],
-    [tR + 4,  'Totaal aantal nieuwe pt\'s:', totNieuw],
+    [tR + 4,  'Totaal nieuwe patiënten:', totNieuw],
     [tR + 5,  'Totaal agenda uren:', totAgenda],
     [tR + 6,  'Totaal verlof uren:', totVerlof],
     [tR + 7,  'Totaal ziekte uren:', totZiekte],
@@ -3504,23 +3493,20 @@ async function genereerBezettingExcel(data) {
 
   // ── SHEET 2: Forecast ──
   const wf = wb.addWorksheet('Forecast');
-
   wf.addRow([]);
   const fh = wf.addRow(['FORECAST', `${maand} ${jaar}`, '', `Praktijk: ${praktijkCode || '-'}`]);
   fh.getCell(1).font = { bold: true, size: 14 };
   wf.addRow([]);
 
-  const fHeaders = ['', 'Per medewerker', '', 'Totaal praktijk'];
-  const fh2 = wf.addRow(fHeaders);
+  const fh2 = wf.addRow(['', 'Per medewerker', '', 'Totaal praktijk']);
   fh2.eachCell(cell => { cell.font = bold; cell.fill = fFill; });
 
-  const fRijen = [
+  [
     ['Forecast behandelingen per jaar',  forecast.perMedewerker.jaar,  '', forecast.totaal.jaar],
     ['Forecast behandelingen per maand', forecast.perMedewerker.maand, '', forecast.totaal.maand],
     ['Forecast behandelingen per week',  forecast.perMedewerker.week,  '', forecast.totaal.week],
     ['Forecast behandelingen per dag',   forecast.perMedewerker.dag,   '', forecast.totaal.dag],
-  ];
-  fRijen.forEach(r => {
+  ].forEach(r => {
     const row = wf.addRow(r);
     row.getCell(1).font = bold;
     row.getCell(2).fill = fFill;
@@ -3528,19 +3514,16 @@ async function genereerBezettingExcel(data) {
   });
 
   wf.addRow([]);
-  const fh3 = wf.addRow(['Realisatie deze maand', '', '', '']);
-  fh3.getCell(1).font = bold;
-
-  const realisatieTotaal = forecast.totaal.maand > 0 ? Math.round((totBeh / forecast.totaal.maand) * 10000) / 100 : 0;
-  wf.addRow(['Werkelijk behandelingen', totBeh, '', '']);
-  wf.addRow(['Forecast maand (praktijk)', forecast.totaal.maand, '', '']);
-  const rRow = wf.addRow(['Realisatie %', `${realisatieTotaal}%`, '', '']);
+  wf.addRow(['Realisatie deze maand']).getCell(1).font = bold;
+  const realPct = forecast.totaal.maand > 0 ? Math.round((totBeh / forecast.totaal.maand) * 10000) / 100 : 0;
+  wf.addRow(['Werkelijk behandelingen', totBeh]);
+  wf.addRow(['Forecast maand (praktijk)', forecast.totaal.maand]);
+  const rRow = wf.addRow(['Realisatie %', `${realPct}%`]);
   rRow.getCell(1).font = bold;
-  rRow.getCell(2).fill = realisatieTotaal >= 85 ? gFill : realisatieTotaal >= 70 ? oFill : rFill;
+  rRow.getCell(2).fill = realPct >= 85 ? gFill : realPct >= 70 ? oFill : rFill;
 
   wf.addRow([]);
-  const fh4 = wf.addRow(['Instellingen forecast', '', '', '']);
-  fh4.getCell(1).font = bold;
+  wf.addRow(['Instellingen forecast']).getCell(1).font = bold;
   [
     ['Aantal behandelkamers', Number(aantalKamers) || n],
     ['Uren werkweek', 40],
@@ -3549,14 +3532,8 @@ async function genereerBezettingExcel(data) {
     ['Correctiefactor', '15%'],
   ].forEach(r => wf.addRow(r));
 
-  wf.getColumn(1).width = 36;
-  wf.getColumn(2).width = 22;
-  wf.getColumn(4).width = 22;
-
-  // Kolombreedte werkblad 1
-  [12,12,26,20,18,18,20,18,16,28,10,10,44,18,16].forEach((w,i) => {
-    ws.getColumn(i+1).width = w;
-  });
+  wf.getColumn(1).width = 36; wf.getColumn(2).width = 22; wf.getColumn(4).width = 22;
+  [12,14,26,20,18,18,20,16,16,26,10,10,4,18,16].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   return await wb.xlsx.writeBuffer();
 }
@@ -3564,17 +3541,16 @@ async function genereerBezettingExcel(data) {
 // POST /api/bezetting/opslaan
 app.post('/api/bezetting/opslaan', async (req, res) => {
   try {
-    const { maand, jaar, praktijkCode, matenNummers, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers, totalen, medewerkerUren } = req.body;
+    const { maand, jaar, praktijkCode, matenNummers, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers, medewerkers } = req.body;
 
-    if (!maand || !jaar || !totalen) {
-      return res.status(400).json({ error: 'Maand, jaar en totaalcijfers zijn verplicht' });
+    if (!maand || !jaar || !Array.isArray(medewerkers) || medewerkers.length === 0) {
+      return res.status(400).json({ error: 'Maand, jaar en medewerkerdata zijn verplicht' });
     }
 
     const aantalFtN = Number(aantalFt) || 0;
     const aantalPtN = Number(aantalPt) || 0;
     const ptUrenN   = Number(ptUrenPerMaand) || 72;
-    const aantalMedewerkers = aantalFtN + aantalPtN || 1;
-    const agendaUrenTotaal  = (aantalFtN * 144) + (aantalPtN * ptUrenN);
+    const aantalMedewerkers = aantalFtN + aantalPtN || medewerkers.length;
 
     const opgeslagen = await withWriteConnection(async (client) => {
       await client.query(`
@@ -3593,7 +3569,7 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
            (maand, jaar, praktijk_code, maten_nummers, medewerkers_data)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         [maand, jaar, praktijkCode || null, matenNummers || null,
-         JSON.stringify({ aantalMedewerkers, agendaUrenTotaal, aantalKamers, totalen, medewerkerUren })]
+         JSON.stringify({ aantalMedewerkers, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers, medewerkers })]
       );
       return result.rows[0];
     });
@@ -3601,12 +3577,11 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
     const excelBuffer = await genereerBezettingExcel({
       maand, jaar, praktijkCode, matenNummers,
       aantalFt, aantalPt, ptUrenPerMaand, aantalKamers,
-      totalen, medewerkerUren
+      medewerkers
     });
 
+    const totBeh = medewerkers.reduce((s, m) => s + (Number(m.beh) || 0), 0);
     const forecast = berekenForecast(Number(aantalKamers) || aantalMedewerkers, aantalMedewerkers);
-    const totPtUren = Array.isArray(medewerkerUren) ? medewerkerUren.reduce((s, u) => s + (Number(u) || 0), 0) : 0;
-    const totBeh = Math.round(totPtUren * 2);
     const realisatie = forecast.totaal.maand > 0 ? Math.round((totBeh / forecast.totaal.maand) * 10000) / 100 : 0;
 
     const bestandsnaam = `Bezettingsgraad_${praktijkCode || 'praktijk'}_${maand}_${jaar}.xlsx`;
@@ -3620,7 +3595,7 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
             <span style="color:#fff;font-size:17px;font-weight:700">Dynamic Health Consultancy</span>
           </div>
           <div style="background:#fff;padding:28px;border-radius:0 0 12px 12px">
-            <h2 style="color:#111827;margin:0 0 16px">Bezettingsgraad rapport ontvangen</h2>
+            <h2 style="color:#111827;margin:0 0 16px">Nieuw bezettingsgraad rapport ontvangen</h2>
             <table style="width:100%;font-size:14px;border-collapse:collapse">
               <tr><td style="color:#6b7280;padding:6px 0;width:160px">Maand/jaar</td><td style="color:#111827;font-weight:600">${maand} ${jaar}</td></tr>
               <tr><td style="color:#6b7280;padding:6px 0">Praktijkcode</td><td style="color:#111827;font-weight:600">${praktijkCode || 'Niet opgegeven'}</td></tr>
@@ -3629,7 +3604,7 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
               <tr><td style="color:#6b7280;padding:6px 0">Realisatie</td><td style="color:#111827;font-weight:600">${realisatie}%</td></tr>
               <tr><td style="color:#6b7280;padding:6px 0">Rapport ID</td><td style="color:#111827;font-weight:600">#${opgeslagen.id}</td></tr>
             </table>
-            <p style="color:#6b7280;font-size:13px;margin-top:20px">Excel rapport bijgevoegd als bijlage (2 tabbladen: Werkblad 1 + Forecast).</p>
+            <p style="color:#6b7280;font-size:13px;margin-top:20px">Excel rapport bijgevoegd als bijlage (2 tabbladen: Werkblad 1 en Forecast).</p>
           </div>
         </div>
       `,

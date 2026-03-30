@@ -15,7 +15,7 @@
     .header-div { width: 1px; height: 24px; background: rgba(255,255,255,0.2); }
     .header-title { color: #fff; font-size: 14px; font-weight: 600; }
 
-    .main { max-width: 900px; margin: 0 auto; padding: 28px 20px 80px; }
+    .main { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
 
     .sec { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
     .sec-head { background: #111827; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
@@ -41,25 +41,6 @@
     .ac { font-size: 12px; font-weight: 600; color: #059669; }
     .agenda-note { font-size: 12px; color: #6b7280; margin-top: 12px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px; }
 
-    /* Medewerker behandeluren tabel */
-    .mw-table { width: 100%; border-collapse: collapse; }
-    .mw-table th { background: #f3f4f6; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 8px 12px; text-align: left; border-bottom: 1.5px solid #e5e7eb; }
-    .mw-table th.r { text-align: right; }
-    .mw-table td { padding: 6px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-    .mw-table tr:last-child td { border-bottom: none; }
-    .mw-nr { font-size: 13px; font-weight: 600; color: #6b7280; width: 80px; }
-    .mw-input { width: 100px; padding: 7px 10px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
-    .mw-input:focus { border-color: #111827; }
-    .mw-vulling { font-size: 13px; font-weight: 600; text-align: right; padding: 4px 10px; border-radius: 6px; min-width: 70px; display: inline-block; }
-    .mw-vulling.g { background: #ecfdf5; color: #065f46; }
-    .mw-vulling.o { background: #fffbeb; color: #92400e; }
-    .mw-vulling.r { background: #fef2f2; color: #991b1b; }
-    .mw-beh { font-size: 13px; color: #374151; text-align: right; }
-    .mw-real { font-size: 13px; font-weight: 600; text-align: right; padding: 4px 10px; border-radius: 6px; min-width: 70px; display: inline-block; }
-    .mw-real.g { background: #ecfdf5; color: #065f46; }
-    .mw-real.o { background: #fffbeb; color: #92400e; }
-    .mw-real.r { background: #fef2f2; color: #991b1b; }
-
     /* Forecast box */
     .forecast-box { background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 16px 20px; }
     .forecast-box h3 { font-size: 12px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; }
@@ -69,25 +50,33 @@
     .fc-val { font-size: 18px; font-weight: 700; color: #1e40af; }
     .fc-sub { font-size: 10px; color: #9ca3af; }
 
-    .invoer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .inv-card { border: 1.5px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-    .inv-card-head { background: #f3f4f6; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }
-    .inv-card-body { padding: 12px 14px; }
-    .inv-card input { width: 100%; padding: 10px 12px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 16px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; margin-bottom: 6px; }
-    .inv-card input:focus { border-color: #111827; }
-    .inv-card .sub { font-size: 11px; color: #9ca3af; }
+    /* Medewerker tabel */
+    .mw-table { width: 100%; border-collapse: collapse; }
+    .mw-table th { background: #f3f4f6; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 12px; text-align: right; border-bottom: 1.5px solid #e5e7eb; white-space: nowrap; }
+    .mw-table th:first-child { text-align: left; width: 120px; }
+    .mw-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; text-align: right; }
+    .mw-table td:first-child { text-align: left; }
+    .mw-table tr:last-child td { border-bottom: none; }
+    .mw-nr { font-size: 13px; font-weight: 600; color: #374151; }
+    .mw-input { width: 88px; padding: 6px 8px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 500; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
+    .mw-input:focus { border-color: #111827; }
+    .mw-val { font-size: 13px; color: #374151; }
+    .mw-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; display: inline-block; }
+    .mw-badge.g { background: #ecfdf5; color: #065f46; }
+    .mw-badge.o { background: #fffbeb; color: #92400e; }
+    .mw-badge.r { background: #fef2f2; color: #991b1b; }
 
-    .resultaat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .r-blok h3 { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6; }
-    .r-rij { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f9fafb; }
-    .r-rij:last-child { border-bottom: none; }
-    .r-lbl { font-size: 13px; color: #6b7280; }
-    .r-val { font-size: 14px; font-weight: 600; color: #111827; }
-    .r-val.g { color: #059669; }
-    .r-val.o { color: #d97706; }
+    /* Totaalcijfers grid */
+    .totaal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .tot-card { border: 1.5px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+    .tot-head { background: #f3f4f6; padding: 9px 14px; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }
+    .tot-body { padding: 10px 14px; }
+    .tot-body input { width: 100%; padding: 9px 10px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; margin-bottom: 5px; }
+    .tot-body input:focus { border-color: #111827; }
+    .tot-sub { font-size: 10px; color: #9ca3af; }
 
     .opslaan-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-    .opslaan-info { font-size: 13px; color: #6b7280; line-height: 1.6; }
+    .opslaan-info { font-size: 13px; color: #6b7280; line-height: 1.7; }
     .opslaan-info strong { color: #111827; }
     .btn-opslaan { background: #111827; color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; }
     .btn-opslaan:hover { background: #1f2937; }
@@ -97,11 +86,11 @@
     .feedback.ok  { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
     .feedback.err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
-    @media (max-width: 640px) {
+    @media (max-width: 700px) {
       .grid4 { grid-template-columns: 1fr 1fr; }
-      .invoer-grid { grid-template-columns: 1fr 1fr; }
-      .resultaat-grid { grid-template-columns: 1fr; }
+      .totaal-grid { grid-template-columns: 1fr 1fr; }
       .fc-grid { grid-template-columns: 1fr 1fr; }
+      .grid3 { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -180,17 +169,17 @@
         <div class="fc-grid">
           <div class="fc-item">
             <div class="fc-lbl">Per medewerker / jaar</div>
-            <div class="fc-val" id="fc-mw-jaar">3.196</div>
+            <div class="fc-val" id="fc-mw-jaar">3.060</div>
             <div class="fc-sub">behandelingen</div>
           </div>
           <div class="fc-item">
             <div class="fc-lbl">Per medewerker / maand</div>
-            <div class="fc-val" id="fc-mw-maand">266</div>
+            <div class="fc-val" id="fc-mw-maand">255</div>
             <div class="fc-sub">behandelingen</div>
           </div>
           <div class="fc-item">
             <div class="fc-lbl">Praktijk totaal / maand</div>
-            <div class="fc-val" id="fc-tot-maand">266</div>
+            <div class="fc-val" id="fc-tot-maand">255</div>
             <div class="fc-sub">behandelingen</div>
           </div>
           <div class="fc-item">
@@ -203,10 +192,10 @@
     </div>
   </div>
 
-  <!-- BEHANDELUREN PER MEDEWERKER -->
+  <!-- INVOER PER MEDEWERKER -->
   <div class="sec">
     <div class="sec-head">
-      <h2>Behandeluren per medewerker</h2>
+      <h2>Invoer per medewerker</h2>
       <span class="sec-badge" id="mw-badge">0 medewerkers</span>
     </div>
     <div class="sec-body" style="padding:0">
@@ -215,88 +204,18 @@
           <thead>
             <tr>
               <th>Medewerker</th>
-              <th class="r">Uren patiënten</th>
-              <th class="r">Behandelingen</th>
-              <th class="r">Vulling %</th>
-              <th class="r">Realisatie %</th>
+              <th>Uren patiënten</th>
+              <th>Nieuwe patiënten</th>
+              <th>Overige uren</th>
+              <th>Verlofuren</th>
+              <th>Ziekteuren</th>
+              <th>Behandelingen</th>
+              <th>Vulling %</th>
+              <th>Realisatie %</th>
             </tr>
           </thead>
           <tbody id="mw-tbody"></tbody>
         </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- OVERIGE TOTAALCIJFERS -->
-  <div class="sec">
-    <div class="sec-head">
-      <h2>Overige totaalcijfers</h2>
-      <span class="sec-badge" id="inv-badge">Hele praktijk</span>
-    </div>
-    <div class="sec-body">
-      <div class="invoer-grid">
-        <div class="inv-card">
-          <div class="inv-card-head">Totaal omzet (€)</div>
-          <div class="inv-card-body">
-            <input type="number" id="i-omzet" placeholder="0" min="0" oninput="herbereken()">
-            <div class="sub">Totale praktijkomzet deze maand</div>
-          </div>
-        </div>
-        <div class="inv-card">
-          <div class="inv-card-head">Nieuwe patiënten</div>
-          <div class="inv-card-body">
-            <input type="number" id="i-nieuw" placeholder="0" min="0" oninput="herbereken()">
-            <div class="sub">Nieuwe intakes deze maand</div>
-          </div>
-        </div>
-        <div class="inv-card">
-          <div class="inv-card-head">Overige uren</div>
-          <div class="inv-card-body">
-            <input type="number" id="i-overig" placeholder="0" min="0" step="0.5" oninput="herbereken()">
-            <div class="sub">Vergadering, overleg, reistijd</div>
-          </div>
-        </div>
-        <div class="inv-card">
-          <div class="inv-card-head">Verlofuren</div>
-          <div class="inv-card-body">
-            <input type="number" id="i-verlof" placeholder="0" min="0" step="0.5" oninput="herbereken()">
-            <div class="sub">Opgenomen verlof heel team</div>
-          </div>
-        </div>
-        <div class="inv-card">
-          <div class="inv-card-head">Ziekteuren</div>
-          <div class="inv-card-body">
-            <input type="number" id="i-ziekte" placeholder="0" min="0" step="0.5" oninput="herbereken()">
-            <div class="sub">Ziekteverzuim heel team</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- RESULTAAT -->
-  <div class="sec">
-    <div class="sec-head"><h2>Resultaat</h2><span class="sec-badge">Automatisch berekend</span></div>
-    <div class="sec-body">
-      <div class="resultaat-grid">
-        <div class="r-blok">
-          <h3>Totalen</h3>
-          <div class="r-rij"><span class="r-lbl">Totaal omzet</span><span class="r-val" id="r-omzet">€ 0</span></div>
-          <div class="r-rij"><span class="r-lbl">Totaal behandelingen</span><span class="r-val" id="r-beh">0</span></div>
-          <div class="r-rij"><span class="r-lbl">Totaal nieuwe patiënten</span><span class="r-val" id="r-nieuw">0</span></div>
-          <div class="r-rij"><span class="r-lbl">Totaal agenda-uren</span><span class="r-val" id="r-agenda">0</span></div>
-          <div class="r-rij"><span class="r-lbl">Totaal verlofuren</span><span class="r-val" id="r-verlof">0</span></div>
-          <div class="r-rij"><span class="r-lbl">Totaal ziekteuren</span><span class="r-val" id="r-ziekte">0</span></div>
-        </div>
-        <div class="r-blok">
-          <h3>Percentages</h3>
-          <div class="r-rij"><span class="r-lbl">Percentage nieuwe patiënten</span><span class="r-val g" id="r-pn">0%</span></div>
-          <div class="r-rij"><span class="r-lbl">Percentage verlof</span><span class="r-val o" id="r-pv">0%</span></div>
-          <div class="r-rij"><span class="r-lbl">Percentage ziekte</span><span class="r-val o" id="r-pz">0%</span></div>
-          <div class="r-rij"><span class="r-lbl">Effectieve vulling met ziekte</span><span class="r-val g" id="r-vm">0%</span></div>
-          <div class="r-rij"><span class="r-lbl">Effectieve vulling zonder ziekte</span><span class="r-val g" id="r-vz">0%</span></div>
-          <div class="r-rij"><span class="r-lbl">Maten aandeel van omzet</span><span class="r-val" id="r-maten">0%</span></div>
-        </div>
       </div>
     </div>
   </div>
@@ -307,7 +226,7 @@
     <div class="sec-body">
       <div class="opslaan-bar">
         <div class="opslaan-info">
-          Rapport wordt opgeslagen en als Excel verstuurd naar<br>
+          Rapport wordt opgeslagen. Lars ontvangt een melding via<br>
           <strong>lars@dynamic-health-consultancy.nl</strong>
         </div>
         <button class="btn-opslaan" id="btn-opslaan" onclick="opslaan()">
@@ -321,15 +240,14 @@
 </main>
 
 <script>
-  // ── Forecast berekening (exact zelfde formules als Excel) ──
-  function berekenForecast(kamers, n) {
-    var behPerWeek     = (40 * 60) / 30;          // 80
-    var wekenNietProd  = (25 + 0) / 5;            // 5
-    var wekenProd      = 45;                   // 45 productieve weken
-    var behJaar        = wekenProd * behPerWeek;   // 3600
-    var fcJaar         = behJaar - behJaar * 0.15; // 3060
-    var fcMaand        = fcJaar / 12;
-    var k              = kamers || n || 1;
+  // Forecast berekening
+  function berekenForecast(kamers, totMW) {
+    var behPerWeek = (40 * 60) / 30;       // 80
+    var wekenProd  = 45;
+    var behJaar    = wekenProd * behPerWeek; // 3600
+    var fcJaar     = behJaar - behJaar * 0.15; // 3060
+    var fcMaand    = fcJaar / 12;            // 255
+    var k          = kamers || totMW || 1;
     return {
       mwJaar:   Math.round(fcJaar),
       mwMaand:  Math.round(fcMaand),
@@ -337,25 +255,30 @@
     };
   }
 
+  // Omzet schatting op achtergrond (niet zichtbaar in calculator, wel in Excel)
+  function berekenOmzetSchatting(behandelingen) {
+    // Gemiddeld 35 euro per behandeling als schatting
+    return Math.round(behandelingen * 35);
+  }
+
   var MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
   var nu = new Date();
   document.getElementById('maand').value = MAANDEN[nu.getMonth()];
   document.getElementById('jaar').value  = nu.getFullYear();
 
-  function n(id)   { return parseFloat(document.getElementById(id)?.value) || 0; }
+  function nv(id)  { return parseFloat(document.getElementById(id)?.value) || 0; }
   function el(id)  { return document.getElementById(id); }
   function set(id, val) { var e = el(id); if (e) e.textContent = val; }
 
   function kleur(val, norm) {
-    if (val >= norm)        return 'g';
-    if (val >= norm * 0.82) return 'o';
+    if (val >= norm)         return 'g';
+    if (val >= norm * 0.82)  return 'o';
     return 'r';
   }
 
   var aantalMW = 0;
 
-  function bouwMedewerkersTabel(totMW, gemAgenda, fc) {
-    if (totMW === aantalMW) { herbereken(); return; }
+  function bouwTabel(totMW) {
     aantalMW = totMW;
     var tbody = el('mw-tbody');
     tbody.innerHTML = '';
@@ -363,10 +286,14 @@
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td class="mw-nr">Medewerker ' + i + '</td>' +
-        '<td style="text-align:right"><input class="mw-input" type="number" id="mw-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td class="mw-beh" id="beh-' + i + '" style="text-align:right">0</td>' +
-        '<td style="text-align:right"><span class="mw-vulling r" id="vul-' + i + '">0%</span></td>' +
-        '<td style="text-align:right"><span class="mw-real r" id="real-' + i + '">0%</span></td>';
+        '<td><input class="mw-input" type="number" id="pt-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="ni-' + i + '" min="0" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="ov-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="vl-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="zk-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td class="mw-val" id="beh-' + i + '">0</td>' +
+        '<td><span class="mw-badge r" id="vul-' + i + '">0%</span></td>' +
+        '<td><span class="mw-badge r" id="real-' + i + '">0%</span></td>';
       tbody.appendChild(tr);
     }
     el('mw-badge').textContent = totMW + ' medewerkers';
@@ -374,92 +301,57 @@
   }
 
   function herbereken() {
-    var ft    = n('ft');
-    var pt    = n('pt');
-    var ptUur = n('pt-uur') || 72;
-    var kamers = n('kamers') || 1;
-    var totMW = ft + pt;
+    var ft     = nv('ft');
+    var pt     = nv('pt');
+    var ptUur  = nv('pt-uur') || 72;
+    var kamers = nv('kamers') || 1;
+    var totMW  = ft + pt;
 
     var ftUren    = ft * 144;
     var ptUren    = pt * ptUur;
     var totAgenda = ftUren + ptUren;
-    var gemAgenda = totMW > 0 ? Math.round(totAgenda / totMW * 10) / 10 : 0;
+    var gemAgenda = totMW > 0 ? Math.round(totAgenda / totMW * 10) / 10 : 144;
 
     el('ft-res').textContent = '= ' + ftUren.toLocaleString('nl-NL') + ' uur';
     el('pt-res').textContent = '= ' + Math.round(ptUren) + ' uur';
-    el('inv-badge').textContent = totMW > 0 ? 'Totaalcijfers voor ' + totMW + ' medewerkers' : 'Hele praktijk';
     el('agenda-note').textContent = totMW > 0
       ? totMW + ' medewerkers \u2014 gemiddeld ' + gemAgenda + ' agenda-uren per medewerker per maand'
       : 'Vul het aantal medewerkers in om te beginnen.';
+    el('mw-badge').textContent = totMW > 0 ? totMW + ' medewerkers' : '0 medewerkers';
 
-    // Rebuild tabel als aantal gewijzigd
-    if (totMW !== aantalMW) {
-      bouwMedewerkersTabel(totMW, gemAgenda);
-      return;
-    }
+    if (totMW !== aantalMW) { bouwTabel(totMW); return; }
 
-    // Forecast
     var fc = berekenForecast(kamers, totMW);
     set('fc-mw-jaar',   fc.mwJaar.toLocaleString('nl-NL'));
     set('fc-mw-maand',  fc.mwMaand.toLocaleString('nl-NL'));
     set('fc-tot-maand', fc.totMaand.toLocaleString('nl-NL'));
 
-    // Per medewerker behandeluren
-    var totPtUren = 0;
-    var verlof = n('i-verlof') / (totMW || 1);
-    var ziekte = n('i-ziekte') / (totMW || 1);
+    var totBeh = 0;
 
     for (var i = 1; i <= totMW; i++) {
-      var uren  = parseFloat(el('mw-' + i)?.value) || 0;
-      var beh   = Math.round(uren * 2);
-      var vul   = gemAgenda > 0 ? Math.round(((uren + verlof + ziekte) / gemAgenda) * 1000) / 10 : 0;
-      var real  = fc.mwMaand > 0 ? Math.round((beh / fc.mwMaand) * 1000) / 10 : 0;
+      var ptU  = parseFloat(el('pt-' + i)?.value) || 0;
+      var vl   = parseFloat(el('vl-' + i)?.value) || 0;
+      var zk   = parseFloat(el('zk-' + i)?.value) || 0;
+      var beh  = Math.round(ptU * 2);
+
+      // Vulling = (behandeluren + verlof + ziekte) / agenda-uren per medewerker
+      var agendaMW = totMW > 0 ? totAgenda / totMW : 144;
+      var vul  = agendaMW > 0 ? Math.round(((ptU + vl + zk) / agendaMW) * 1000) / 10 : 0;
+      var real = fc.mwMaand > 0 ? Math.round((beh / fc.mwMaand) * 1000) / 10 : 0;
 
       set('beh-' + i, beh);
 
       var vEl = el('vul-' + i);
-      if (vEl) { vEl.textContent = vul + '%'; vEl.className = 'mw-vulling ' + kleur(vul, 85); }
+      if (vEl) { vEl.textContent = vul + '%'; vEl.className = 'mw-badge ' + kleur(vul, 85); }
 
       var rEl = el('real-' + i);
-      if (rEl) { rEl.textContent = real + '%'; rEl.className = 'mw-real ' + kleur(real, 85); }
+      if (rEl) { rEl.textContent = real + '%'; rEl.className = 'mw-badge ' + kleur(real, 85); }
 
-      totPtUren += uren;
+      totBeh += beh;
     }
 
-    var totBeh   = Math.round(totPtUren * 2);
-    var totNieuw = n('i-nieuw');
-    var totVerlof = n('i-verlof');
-    var totZiekte = n('i-ziekte');
-    var totOmzet  = n('i-omzet');
-
-    // Forecast realisatie
     var fcReal = fc.totMaand > 0 ? Math.round((totBeh / fc.totMaand) * 1000) / 10 : 0;
     set('fc-real', fcReal + '%');
-
-    // Resultaat totalen
-    set('r-omzet',  '\u20ac ' + Math.round(totOmzet).toLocaleString('nl-NL'));
-    set('r-beh',    totBeh.toLocaleString('nl-NL'));
-    set('r-nieuw',  Math.round(totNieuw));
-    set('r-agenda', Math.round(totAgenda * 10) / 10);
-    set('r-verlof', Math.round(totVerlof * 10) / 10);
-    set('r-ziekte', Math.round(totZiekte * 10) / 10);
-
-    var pn = totBeh > 0    ? Math.round(totNieuw  / totBeh    * 1000) / 10 : 0;
-    var pv = totAgenda > 0 ? Math.round(totVerlof / totAgenda * 1000) / 10 : 0;
-    var pz = totAgenda > 0 ? Math.round(totZiekte / totAgenda * 1000) / 10 : 0;
-    var vm = totAgenda > 0 ? Math.round((totPtUren + totZiekte + totVerlof) / totAgenda * 1000) / 10 : 0;
-    var vz = totAgenda > 0 ? Math.round((totPtUren + totVerlof) / totAgenda * 1000) / 10 : 0;
-
-    set('r-pn', pn + '%');
-    set('r-pv', pv + '%');
-    set('r-pz', pz + '%');
-    set('r-vm', vm + '%');
-    set('r-vz', vz + '%');
-
-    var matenStr = el('maten')?.value || '';
-    var matenNrs = matenStr.split(',').map(function(s) { return parseInt(s.trim()); }).filter(function(x) { return !isNaN(x) && x >= 1; });
-    var pctMaten = totMW > 0 && matenNrs.length > 0 ? Math.round(matenNrs.length / totMW * 1000) / 10 : 0;
-    set('r-maten', pctMaten + '%');
   }
 
   async function opslaan() {
@@ -474,7 +366,7 @@
       return;
     }
 
-    var ft = n('ft'), pt = n('pt');
+    var ft = nv('ft'), pt = nv('pt');
     if (ft + pt === 0) {
       fb.className = 'feedback err';
       fb.style.display = 'block';
@@ -486,11 +378,21 @@
     btn.textContent = 'Bezig met versturen...';
     fb.style.display = 'none';
 
-    // Verzamel behandeluren per medewerker
     var totMW = ft + pt;
-    var medewerkerUren = [];
+    var medewerkers = [];
     for (var i = 1; i <= totMW; i++) {
-      medewerkerUren.push(parseFloat(el('mw-' + i)?.value) || 0);
+      var ptU = parseFloat(el('pt-' + i)?.value) || 0;
+      var beh = Math.round(ptU * 2);
+      medewerkers.push({
+        nr:      i,
+        pturen:  ptU,
+        nieuw:   parseFloat(el('ni-' + i)?.value) || 0,
+        overig:  parseFloat(el('ov-' + i)?.value) || 0,
+        verlof:  parseFloat(el('vl-' + i)?.value) || 0,
+        ziekte:  parseFloat(el('zk-' + i)?.value) || 0,
+        beh:     beh,
+        omzet:   berekenOmzetSchatting(beh) // achtergrond berekening voor Excel
+      });
     }
 
     try {
@@ -504,23 +406,16 @@
           matenNummers:   el('maten')?.value.trim() || '',
           aantalFt:       ft,
           aantalPt:       pt,
-          ptUrenPerMaand: n('pt-uur') || 72,
-          aantalKamers:   n('kamers') || 1,
-          medewerkerUren: medewerkerUren,
-          totalen: {
-            omzet:  n('i-omzet'),
-            nieuw:  n('i-nieuw'),
-            overig: n('i-overig'),
-            verlof: n('i-verlof'),
-            ziekte: n('i-ziekte')
-          }
+          ptUrenPerMaand: nv('pt-uur') || 72,
+          aantalKamers:   nv('kamers') || 1,
+          medewerkers:    medewerkers
         })
       });
 
       var data = await res.json();
       if (data.success) {
         fb.className = 'feedback ok';
-        fb.textContent = 'Rapport #' + data.id + ' opgeslagen en verstuurd naar lars@dynamic-health-consultancy.nl';
+        fb.textContent = 'Rapport #' + data.id + ' opgeslagen. Lars ontvangt een notificatie.';
       } else {
         fb.className = 'feedback err';
         fb.textContent = data.error || 'Er is iets misgegaan.';
