@@ -191,8 +191,8 @@
             </div>
 
             <div class="form-group">
-                <label for="doel">Waar ben je in geïnteresseerd? <span class="required">*</span></label>
-                <select id="doel" name="doel" required>
+                <label for="doel">Waar ben je in geïnteresseerd?</label>
+                <select id="doel" name="doel">
                     <option value="">Maak een keuze</option>
                     <option value="Afvallen">Afvallen</option>
                     <option value="Fitter worden">Fitter worden</option>
@@ -200,7 +200,6 @@
                     <option value="Klachten voorkomen">Klachten voorkomen</option>
                     <option value="Sportprestaties verbeteren">Sportprestaties verbeteren</option>
                 </select>
-                <span class="error-message" id="error-doel">Maak een keuze</span>
             </div>
 
             <div class="form-group">
@@ -251,9 +250,6 @@
                 });
 
                 if (response.ok) {
-                    if (typeof fbq !== 'undefined') {
-                        fbq('track', 'Lead');
-                    }
                     window.location.href = 'thankyou.html';
                 } else {
                     alert('Er ging iets mis. Probeer het opnieuw.');
