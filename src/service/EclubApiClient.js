@@ -81,6 +81,26 @@ class EclubApiClient {
       return response.data;
 
     } catch (error) {
+      // Bij 401: wis cache en probeer eenmalig opnieuw met verse token
+      if (error.response?.status === 401) {
+        console.warn(`⚠️ [ECLUB-API] 401 op GET ${url} — token vernieuwen en retry...`);
+        this.authService.tokenCache.delete(businessId);
+        try {
+          const freshCookie = await this.authService.authenticate(businessId);
+          const retry = await axios({
+            method: 'get',
+            baseURL: this.baseUrl,
+            url,
+            params,
+            headers: { 'Cookie': freshCookie, ...headers },
+            timeout: 30000
+          });
+          console.log(`✅ [ECLUB-API] Retry succesvol voor GET ${url}`);
+          return retry.data;
+        } catch (retryError) {
+          throw this.makeEclubApiError(retryError, 'get', url, params);
+        }
+      }
       throw this.makeEclubApiError(error, 'get', url, params);
     }
   }
@@ -121,6 +141,25 @@ class EclubApiClient {
       return response.data;
 
     } catch (error) {
+      if (error.response?.status === 401) {
+        console.warn(`⚠️ [ECLUB-API] 401 op POST ${url} — token vernieuwen en retry...`);
+        this.authService.tokenCache.delete(businessId);
+        try {
+          const freshCookie = await this.authService.authenticate(businessId);
+          const retry = await axios({
+            method: 'post',
+            baseURL: this.baseUrl,
+            url,
+            data,
+            headers: { 'Cookie': freshCookie, 'Content-Type': 'application/json' },
+            timeout: 30000
+          });
+          console.log(`✅ [ECLUB-API] Retry succesvol voor POST ${url}`);
+          return retry.data;
+        } catch (retryError) {
+          throw this.makeEclubApiError(retryError, 'post', url, data);
+        }
+      }
       throw this.makeEclubApiError(error, 'post', url, data);
     }
   }
@@ -161,6 +200,25 @@ class EclubApiClient {
       return response.data;
 
     } catch (error) {
+      if (error.response?.status === 401) {
+        console.warn(`⚠️ [ECLUB-API] 401 op PATCH ${url} — token vernieuwen en retry...`);
+        this.authService.tokenCache.delete(businessId);
+        try {
+          const freshCookie = await this.authService.authenticate(businessId);
+          const retry = await axios({
+            method: 'patch',
+            baseURL: this.baseUrl,
+            url,
+            data: patch,
+            headers: { 'Cookie': freshCookie, 'Content-Type': 'application/json' },
+            timeout: 30000
+          });
+          console.log(`✅ [ECLUB-API] Retry succesvol voor PATCH ${url}`);
+          return retry.data;
+        } catch (retryError) {
+          throw this.makeEclubApiError(retryError, 'patch', url, patch);
+        }
+      }
       throw this.makeEclubApiError(error, 'patch', url, patch);
     }
   }

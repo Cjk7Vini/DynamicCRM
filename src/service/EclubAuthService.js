@@ -38,15 +38,15 @@ class EclubAuthService {
   async isValid(businessId) {
     // Check memory cache first
     const cached = this.tokenCache.get(businessId);
-    if (cached && Date.now() < cached.expiresAt - (5 * 60 * 1000)) {
-      // Valid if expires in more than 5 minutes
+    if (cached && Date.now() < cached.expiresAt - (30 * 60 * 1000)) {
+      // Valid if expires in more than 30 minutes
       return true;
     }
 
     // Check database as fallback (in case server restarted)
     try {
       const dbToken = await this.loadFromDatabase(businessId);
-      if (dbToken && Date.now() < dbToken.expiresAt - (5 * 60 * 1000)) {
+      if (dbToken && Date.now() < dbToken.expiresAt - (30 * 60 * 1000)) {
         // Restore to cache
         this.tokenCache.set(businessId, dbToken);
         return true;
