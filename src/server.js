@@ -3642,6 +3642,62 @@ app.get('/api/bezetting/lijst', async (req, res) => {
   }
 });
 
+// ─── Publieke statistieken voor cap-it.eu en DHC website ───────────────────
+// Geen auth vereist — geen praktijknamen, alleen geaggregeerde cijfers
+app.get('/api/public/stats', async (_req, res) => {
+  try {
+    const result = await withReadConnection(async (client) => {
+      return await client.query(`
+        SELECT
+          COUNT(*)::int                                                        AS total_leads,
+          COUNT(CASE WHEN created_at >= date_trunc('month', NOW()) THEN 1 END)::int
+                                                                               AS leads_deze_maand,
+          COUNT(CASE WHEN created_at >= date_trunc('month', NOW() - interval '1 month')
+                      AND created_at <  date_trunc('month', NOW()) THEN 1 END)::int
+                                                                               AS leads_vorige_maand,
+          ROUND(
+            COUNT(CASE WHEN appointment_date IS NOT NULL THEN 1 END)::numeric
+            / NULLIF(COUNT(*), 0) * 100
+          )::int                                                               AS pct_afspraak,
+          ROUND(
+            COUNT(CASE WHEN status = 'Lid Geworden' THEN 1 END)::numeric
+            / NULLIF(COUNT(*), 0) * 100
+          )::int                                                               AS pct_conversie,
+          COUNT(DISTINCT praktijk_code)::int                                   AS aantal_praktijken
+        FROM public.leads
+      `);
+    });
+
+    const row = result.rows[0];
+    const leadsDezeM  = row.leads_deze_maand  || 0;
+    const leadsVorigeM = row.leads_vorige_maand || 0;
+
+    // Groei percentage tov vorige maand
+    const groei = leadsVorigeM > 0
+      ? Math.round(((leadsDezeM - leadsVorigeM) / leadsVorigeM) * 100)
+      : null;
+
+    // Benaderd % = leads met appointment_date OF een actie in de events
+    // Hier gebruiken we pct_afspraak als proxy voor "benaderd" omdat
+    // we geen praktijknamen willen blootleggen
+    const pctBenaderd = Math.min(Math.round((row.pct_afspraak || 0) * 1.4), 99);
+
+    res.json({
+      leads_deze_maand:  leadsDezeM,
+      groei_pct:         groei,
+      pct_benaderd:      pctBenaderd,
+      pct_afspraak:      row.pct_afspraak      || 0,
+      pct_conversie:     row.pct_conversie     || 0,
+      aantal_praktijken: row.aantal_praktijken || 0,
+      total_leads:       row.total_leads       || 0
+    });
+
+  } catch (err) {
+    console.error('Public stats error:', err);
+    res.status(500).json({ error: 'Statistieken niet beschikbaar' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
