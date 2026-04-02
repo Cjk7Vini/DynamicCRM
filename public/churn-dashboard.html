@@ -1709,6 +1709,10 @@
                 if (stage === 'lost') {
                     html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Status</th>';
                 }
+
+                if (stage === 'won') {
+                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #16a34a;">Lid sinds</th>';
+                }
                 
                 html += '</tr></thead><tbody>';
                 
@@ -1740,6 +1744,13 @@
                     
                     if (stage === 'lost') {
                         html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${lead.status || 'Niet Geïnteresseerd'}</span></td>`;
+                    }
+
+                    if (stage === 'won') {
+                        const lidSinds = lead.lid_geworden_op
+                            ? new Date(lead.lid_geworden_op).toLocaleDateString('nl-NL')
+                            : '-';
+                        html += `<td style="padding: 12px; font-size: 14px; color: #16a34a; font-weight: 600;">${lidSinds}</td>`;
                     }
                     
                     html += '</tr>';
@@ -2369,8 +2380,8 @@
                 stages.forEach((stage, idx) => {
                     const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
                     const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
-                    // Make awareness, intent, and lost clickable
-                    const isClickable = ['awareness', 'intent', 'lost'].includes(stage.stage);
+                    // Make awareness, intent, lost and won clickable
+                    const isClickable = ['awareness', 'intent', 'lost', 'won'].includes(stage.stage);
                     const cursor = isClickable ? 'cursor: pointer;' : '';
                     const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
                     
