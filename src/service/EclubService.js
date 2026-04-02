@@ -486,8 +486,9 @@ export default class EclubService {
           return await client.query(`
             UPDATE public.leads
             SET
-              is_lid         = true,
+              is_lid          = true,
               lid_geworden_op = COALESCE(lid_geworden_op, $2::date),
+              funnel_stage    = 'won',
               updated_at      = NOW()
             WHERE LOWER(emailadres) = $1
               AND praktijk_code = $3

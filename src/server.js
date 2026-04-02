@@ -2006,7 +2006,7 @@ app.get('/api/funnel', async (req, res) => {
           SUM(expected_value) as pipeline_value
         FROM public.leads
         WHERE 1=1
-        AND funnel_stage != 'won'
+        AND funnel_stage != 'lost'
       `;
       
       const params = [];
@@ -2041,7 +2041,8 @@ app.get('/api/funnel', async (req, res) => {
             WHEN 'intent' THEN 3
             WHEN 'consideration' THEN 4
             WHEN 'decision' THEN 5
-            WHEN 'lost' THEN 6
+            WHEN 'won' THEN 6
+            WHEN 'lost' THEN 7
           END
       `;
       
@@ -2076,15 +2077,17 @@ app.get('/api/funnel', async (req, res) => {
       };
     });
     
-    // Add Won (Lid) stage with 0 count
-    enrichedStages.push({
-      stage: 'won',
-      stage_name: 'Lid',
-      count: 0,
-      avg_likelihood: 0,
-      pipeline_value: 0,
-      conversion_rate: '0.0'
-    });
+    // Add Lost stage if not present
+    if (!enrichedStages.find(s => s.stage === 'lost')) {
+      enrichedStages.push({
+        stage: 'lost',
+        stage_name: 'Geen interesse',
+        count: 0,
+        avg_likelihood: 0,
+        pipeline_value: 0,
+        conversion_rate: '0.0'
+      });
+    }
     
     res.json({
       success: true,
