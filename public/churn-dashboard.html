@@ -1812,7 +1812,7 @@
                     return;
                 }
 
-                const res = await fetch('/api/churn/practices');
+                const res = await fetch('/api/churn/practices', { credentials: 'include' });
                 const data = await res.json();
                 
                 if (data.success && data.practices) {
@@ -1882,30 +1882,36 @@
         // Load KPIs
         async function loadKPIs() {
             try {
-                const res = await fetch('/api/practice-performance' + buildQueryString());
+                const res = await fetch('/api/practice-performance' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (data.success && data.data) {
-                    // Calculate totals
                     const totalLeads = data.data.reduce((sum, p) => sum + parseInt(p.total_leads || 0), 0);
                     const totalConverted = data.data.reduce((sum, p) => sum + parseInt(p.lid_geworden || 0), 0);
                     const conversionRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : 0;
                     const activePractices = data.data.filter(p => p.total_leads > 0).length;
-                    
-                    // Update KPI cards
+
+                    // Gem. leads per maand: totaal leads / aantal actieve maanden (min 1)
+                    const avgLeads = data.data.reduce((sum, p) => sum + parseFloat(p.avg_leads_per_month || 0), 0);
+                    const avgLeadsDisplay = activePractices > 0
+                        ? Math.round(avgLeads / activePractices)
+                        : Math.round(totalLeads / Math.max(1, activePractices));
+
                     document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
                     document.getElementById('conversionRate').textContent = conversionRate + '%';
                     document.getElementById('activePractices').textContent = activePractices;
-                    
-                    // Get top source
-                    const sourcesRes = await fetch('/api/sources' + buildQueryString());
+                    document.getElementById('avgLeadsPerMonth').textContent = avgLeadsDisplay || '—';
+
+                    // Top bron ophalen
+                    const sourcesRes = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
                     const sourcesData = await sourcesRes.json();
-                    if (sourcesData.success && sourcesData.sources.length > 0) {
-                        document.getElementById('topSource').textContent = sourcesData.sources[0].source || 'Onbekend';
+                    if (sourcesData.success && sourcesData.sources && sourcesData.sources.length > 0) {
+                        const topBron = document.getElementById('topSource');
+                        if (topBron) topBron.textContent = sourcesData.sources[0].bron || sourcesData.sources[0].source || 'Onbekend';
                     }
-                    
-                    // Calculate average time (mock for now)
-                    document.getElementById('avgTime').textContent = '12d';
+
+                    const avgTimeEl = document.getElementById('avgTime');
+                    if (avgTimeEl) avgTimeEl.textContent = '12d';
                 }
             } catch (error) {
                 console.error('Error loading KPIs:', error);
@@ -1938,7 +1944,7 @@
 
                 if (!data.success || !data.data || data.data.length === 0) {
                     // Fallback naar oude endpoint als geen eclub data
-                    const fallback = await fetch('/api/churn-forecast');
+                    const fallback = await fetch('/api/churn-forecast', { credentials: 'include' });
                     const fallbackData = await fallback.json();
                     if (fallbackData.success) {
                         const allData = [...(fallbackData.historical || []), ...(fallbackData.forecast || [])];
@@ -2025,7 +2031,7 @@
         // Load Conversion Funnel
         async function loadConversionFunnel() {
             try {
-                const res = await fetch('/api/conversion-funnel' + buildQueryString());
+                const res = await fetch('/api/conversion-funnel' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (data.success && data.data) {
@@ -2073,7 +2079,7 @@
         // Load Practice Performance
         async function loadPracticePerformance() {
             try {
-                const res = await fetch('/api/practice-performance');
+                const res = await fetch('/api/practice-performance' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (data.success && data.data) {
@@ -2116,7 +2122,7 @@
         // Load Source Performance
         async function loadSourcePerformance() {
             try {
-                const res = await fetch('/api/sources' + buildQueryString());
+                const res = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (data.success && data.sources) {
@@ -2126,7 +2132,7 @@
                     sourceChart = new Chart(ctx, {
                         type: 'doughnut',
                         data: {
-                            labels: data.sources.map(d => d.source || 'Onbekend'),
+                            labels: data.sources.map(d => d.bron || d.source || 'Onbekend'),
                             datasets: [{
                                 data: data.sources.map(d => d.count),
                                 backgroundColor: [
@@ -2336,7 +2342,7 @@
         // NEW: Load Pipeline Funnel
         async function loadPipelineFunnel() {
             try {
-                const res = await fetch('/api/funnel' + buildQueryString());
+                const res = await fetch('/api/funnel' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (!data.success || !data.stages) {
@@ -2402,7 +2408,7 @@
         // NEW: Load Forecast Comparison
         async function loadForecastComparison() {
             try {
-                const res = await fetch('/api/pipeline-metrics' + buildQueryString());
+                const res = await fetch('/api/pipeline-metrics' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
                 
                 if (!data.success) return;
