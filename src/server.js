@@ -3062,12 +3062,17 @@ app.get('/api/meta/campaigns/:practiceCode', async (req, res) => {
 // Manual sync for specific practice (admin only)
 app.post('/api/meta/sync/:practiceCode', async (req, res) => {
   try {
-    // Check admin auth
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     const { practiceCode } = req.params;
+
+    // Admin mag alles syncen, praktijkgebruiker alleen eigen praktijk
+    if (req.session.role !== 'admin') {
+      if (!req.session.userId) {
+        return res.status(403).json({ error: 'Niet ingelogd' });
+      }
+      if (req.session.practiceCode !== practiceCode) {
+        return res.status(403).json({ error: 'Geen toegang tot deze praktijk' });
+      }
+    }
     
     // Default to last 30 days
     const dateFrom = new Date();
