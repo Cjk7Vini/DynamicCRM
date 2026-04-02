@@ -2733,7 +2733,7 @@
                 return;
             }
             
-            const dateFrom = document.getElementById('dateFrom').value || '2025-01-01';
+            const dateFrom = document.getElementById('dateFrom').value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             const dateTo = document.getElementById('dateTo').value || new Date().toISOString().split('T')[0];
             
             try {
@@ -3060,7 +3060,7 @@
             try {
                 const practice = document.getElementById('practiceFilter')?.value || '';
                 if (!practice) { alert('Selecteer eerst een praktijk'); return; }
-                const dateFrom = document.getElementById('dateFrom')?.value || '2025-01-01';
+                const dateFrom = document.getElementById('dateFrom')?.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 const dateTo   = document.getElementById('dateTo')?.value || new Date().toISOString().slice(0,10);
                 let url = `/api/meta/summary/${practice}?dateFrom=${dateFrom}&dateTo=${dateTo}`;
 
