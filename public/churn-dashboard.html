@@ -1278,45 +1278,77 @@
         </div>
         <div class="card-body">
             <div class="metrics-grid" id="metaMetricsGrid">
+                <!-- Rij 1: Bereik & Weergaven -->
                 <div class="metric-card">
-                    <div class="metric-label">Total Ad Spend</div>
+                    <div class="metric-label">Besteed bedrag</div>
                     <div class="metric-value" id="metaTotalSpend">€0,00</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Impressions</div>
+                    <div class="metric-label">Weergaven</div>
                     <div class="metric-value" id="metaImpressions">0</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Clicks</div>
+                    <div class="metric-label">Bereik</div>
+                    <div class="metric-value" id="metaReach">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Frequentie</div>
+                    <div class="metric-value" id="metaFrequency">0</div>
+                </div>
+                <!-- Rij 2: Klikken -->
+                <div class="metric-card">
+                    <div class="metric-label">Klikken</div>
                     <div class="metric-value" id="metaClicks">0</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">CTR</div>
+                    <div class="metric-label">Unieke klikken</div>
+                    <div class="metric-value" id="metaUniqueClicks">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">CTR (alle)</div>
                     <div class="metric-value" id="metaCTR">0%</div>
                 </div>
-                <div class="metric-card highlight">
-                    <div class="metric-label">Conversions</div>
-                    <div class="metric-value" id="metaConversions">0</div>
-                </div>
-                <div class="metric-card highlight">
-                    <div class="metric-label">Leads (Meta)</div>
-                    <div class="metric-value" id="metaVerifiedLeads">0</div>
-                </div>
                 <div class="metric-card">
-                    <div class="metric-label">Cost per Lead</div>
-                    <div class="metric-value" id="metaCostPerLead">€0,00</div>
+                    <div class="metric-label">Unieke CTR</div>
+                    <div class="metric-value" id="metaUniqueCTR">0%</div>
                 </div>
+                <!-- Rij 3: Kosten -->
                 <div class="metric-card">
-                    <div class="metric-label">ROAS</div>
-                    <div class="metric-value" id="metaROAS">0x</div>
+                    <div class="metric-label">CPM</div>
+                    <div class="metric-value" id="metaCPM">€0,00</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">CPC</div>
                     <div class="metric-value" id="metaCPC">€0,00</div>
                 </div>
+                <div class="metric-card highlight">
+                    <div class="metric-label">Kosten per lead</div>
+                    <div class="metric-value" id="metaCostPerLead">€0,00</div>
+                </div>
+                <div class="metric-card highlight">
+                    <div class="metric-label">Leads (Meta)</div>
+                    <div class="metric-value" id="metaVerifiedLeads">0</div>
+                </div>
+                <!-- Rij 4: Video & Pages -->
                 <div class="metric-card">
                     <div class="metric-label">Page Views</div>
                     <div class="metric-value" id="metaPageViews">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Video 25%</div>
+                    <div class="metric-value" id="metaVideoP25">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Video 50%</div>
+                    <div class="metric-value" id="metaVideoP50">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Video 75%</div>
+                    <div class="metric-value" id="metaVideoP75">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Video 100%</div>
+                    <div class="metric-value" id="metaVideoP100">0</div>
                 </div>
             </div>
             <div class="meta-campaigns-table">
@@ -2755,51 +2787,40 @@
 
         // Display Meta summary metrics
         function displayMetaSummary(data) {
-            // Ad Spend
-            document.getElementById('metaTotalSpend').textContent = 
+            document.getElementById('metaTotalSpend').textContent =
                 `€${parseFloat(data.total_spend || 0).toFixed(2)}`;
-            
-            // Impressions
-            document.getElementById('metaImpressions').textContent = 
+            document.getElementById('metaImpressions').textContent =
                 formatNumber(data.total_impressions || 0);
-            
-            // Clicks
-            document.getElementById('metaClicks').textContent = 
+            document.getElementById('metaReach').textContent =
+                formatNumber(data.total_reach || 0);
+            document.getElementById('metaFrequency').textContent =
+                parseFloat(data.avg_frequency || 0).toFixed(2);
+            document.getElementById('metaClicks').textContent =
                 formatNumber(data.total_clicks || 0);
-            
-            // CTR
-            document.getElementById('metaCTR').textContent = 
+            document.getElementById('metaUniqueClicks').textContent =
+                formatNumber(data.total_unique_clicks || 0);
+            document.getElementById('metaCTR').textContent =
                 `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
-            
-            // Conversions (Meta PageViews)
-            document.getElementById('metaConversions').textContent = 
-                data.total_conversions || 0;
-            
-            // Leads (Meta) - Rechtstreeks uit Meta API (fb_pixel_lead events)
-            // Dit zijn de daadwerkelijke leads die Meta telt via de pixel op thankyou.html
-            document.getElementById('metaVerifiedLeads').textContent = 
-                data.total_conversions || 0;
-            
-            // Cost Per Lead
-            document.getElementById('metaCostPerLead').textContent = 
-                `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
-            
-            // CPC
-            document.getElementById('metaCPC').textContent = 
+            document.getElementById('metaUniqueCTR').textContent =
+                `${parseFloat(data.avg_unique_ctr || 0).toFixed(2)}%`;
+            document.getElementById('metaCPM').textContent =
+                `€${parseFloat(data.avg_cpm || 0).toFixed(2)}`;
+            document.getElementById('metaCPC').textContent =
                 `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
-
-            // Page Views (landing_page_view actions uit Meta API)
+            document.getElementById('metaCostPerLead').textContent =
+                `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
+            document.getElementById('metaVerifiedLeads').textContent =
+                data.verified_leads || 0;
             document.getElementById('metaPageViews').textContent =
                 formatNumber(data.total_page_views || 0);
-            
-            // ROAS (estimated)
-            const estimatedLeadValue = 150; // Average patient lifetime value
-            const totalSpend = parseFloat(data.total_spend || 0);
-            const totalConversions = parseInt(data.total_conversions || 0);
-            const roas = totalSpend > 0 
-                ? ((totalConversions * estimatedLeadValue) / totalSpend).toFixed(1)
-                : '0.0';
-            document.getElementById('metaROAS').textContent = `${roas}x`;
+            document.getElementById('metaVideoP25').textContent =
+                formatNumber(data.total_video_p25 || 0);
+            document.getElementById('metaVideoP50').textContent =
+                formatNumber(data.total_video_p50 || 0);
+            document.getElementById('metaVideoP75').textContent =
+                formatNumber(data.total_video_p75 || 0);
+            document.getElementById('metaVideoP100').textContent =
+                formatNumber(data.total_video_p100 || 0);
         }
 
         // Display Meta campaigns table

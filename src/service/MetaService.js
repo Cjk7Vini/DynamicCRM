@@ -35,12 +35,21 @@ class MetaService {
               'campaign_id',
               'campaign_name',
               'impressions',
+              'reach',
+              'frequency',
               'clicks',
+              'unique_clicks',
               'spend',
               'actions',
               'ctr',
+              'unique_ctr',
               'cpc',
-              'cost_per_action_type'
+              'cpm',
+              'cost_per_action_type',
+              'video_p25_watched_actions',
+              'video_p50_watched_actions',
+              'video_p75_watched_actions',
+              'video_p100_watched_actions'
             ].join(','),
             level: 'campaign',
             time_range: JSON.stringify({
@@ -133,6 +142,13 @@ class MetaService {
     return conversionCosts.length > 0 ? parseFloat(conversionCosts[0].value) || 0 : 0;
   }
 
+  // Parse video views at a given percentage threshold from actions array
+  // Meta returns video_p25/p50/p75/p100_watched_actions as separate arrays
+  parseVideoViews(videoArray) {
+    if (!videoArray || !Array.isArray(videoArray)) return 0;
+    return videoArray.reduce((sum, v) => sum + (parseInt(v.value) || 0), 0);
+  }
+
   // Sync data for a specific practice
   async syncPractice(practiceCode, dateFrom, dateTo) {
     console.log(`🔄 Syncing Meta data for ${practiceCode}...`);
@@ -188,6 +204,10 @@ class MetaService {
           const conversions = this.parseConversions(campaign.actions);
           const costPerConversion = this.parseCostPerConversion(campaign.cost_per_action_type);
           const pageViews = this.parsePageViews(campaign.actions);
+          const videoP25 = this.parseVideoViews(campaign.video_p25_watched_actions);
+          const videoP50 = this.parseVideoViews(campaign.video_p50_watched_actions);
+          const videoP75 = this.parseVideoViews(campaign.video_p75_watched_actions);
+          const videoP100 = this.parseVideoViews(campaign.video_p100_watched_actions);
 
           await this.writeConn(async (client) => {
             await client.query(`
@@ -198,27 +218,45 @@ class MetaService {
                 ad_account_id,
                 date,
                 impressions,
+                reach,
+                frequency,
                 clicks,
+                unique_clicks,
                 spend,
                 conversions,
                 ctr,
+                unique_ctr,
                 cpc,
+                cpm,
                 cost_per_conversion,
                 landing_page_views,
+                video_p25,
+                video_p50,
+                video_p75,
+                video_p100,
                 synced_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
               ON CONFLICT (code, campaign_id, date)
               DO UPDATE SET
-                campaign_name = EXCLUDED.campaign_name,
-                impressions = EXCLUDED.impressions,
-                clicks = EXCLUDED.clicks,
-                spend = EXCLUDED.spend,
-                conversions = EXCLUDED.conversions,
-                ctr = EXCLUDED.ctr,
-                cpc = EXCLUDED.cpc,
-                cost_per_conversion = EXCLUDED.cost_per_conversion,
+                campaign_name      = EXCLUDED.campaign_name,
+                impressions        = EXCLUDED.impressions,
+                reach              = EXCLUDED.reach,
+                frequency          = EXCLUDED.frequency,
+                clicks             = EXCLUDED.clicks,
+                unique_clicks      = EXCLUDED.unique_clicks,
+                spend              = EXCLUDED.spend,
+                conversions        = EXCLUDED.conversions,
+                ctr                = EXCLUDED.ctr,
+                unique_ctr         = EXCLUDED.unique_ctr,
+                cpc                = EXCLUDED.cpc,
+                cpm                = EXCLUDED.cpm,
+                cost_per_conversion= EXCLUDED.cost_per_conversion,
                 landing_page_views = EXCLUDED.landing_page_views,
-                synced_at = NOW()
+                video_p25          = EXCLUDED.video_p25,
+                video_p50          = EXCLUDED.video_p50,
+                video_p75          = EXCLUDED.video_p75,
+                video_p100         = EXCLUDED.video_p100,
+                synced_at          = NOW()
             `, [
               practiceCode,
               campaign.campaign_id,
@@ -226,13 +264,22 @@ class MetaService {
               adAccountId,
               campaign.date_start,
               parseInt(campaign.impressions || 0),
+              parseInt(campaign.reach || 0),
+              parseFloat(campaign.frequency || 0),
               parseInt(campaign.clicks || 0),
+              parseInt(campaign.unique_clicks || 0),
               parseFloat(campaign.spend || 0),
               conversions,
               parseFloat(campaign.ctr || 0),
+              parseFloat(campaign.unique_ctr || 0),
               parseFloat(campaign.cpc || 0),
+              parseFloat(campaign.cpm || 0),
               costPerConversion,
-              pageViews
+              pageViews,
+              videoP25,
+              videoP50,
+              videoP75,
+              videoP100
             ]);
           });
 
@@ -325,19 +372,28 @@ class MetaService {
     const result = await this.readConn(async (client) => {
       return await client.query(`
         SELECT 
-          COUNT(DISTINCT campaign_id) as total_campaigns,
-          COALESCE(SUM(impressions), 0) as total_impressions,
-          COALESCE(SUM(clicks), 0) as total_clicks,
-          COALESCE(SUM(spend), 0) as total_spend,
-          COALESCE(SUM(conversions), 0) as total_conversions,
+          COUNT(DISTINCT campaign_id)            as total_campaigns,
+          COALESCE(SUM(impressions), 0)          as total_impressions,
+          COALESCE(SUM(reach), 0)                as total_reach,
+          COALESCE(SUM(clicks), 0)               as total_clicks,
+          COALESCE(SUM(unique_clicks), 0)        as total_unique_clicks,
+          COALESCE(SUM(spend), 0)                as total_spend,
+          COALESCE(SUM(conversions), 0)          as total_conversions,
+          COALESCE(SUM(landing_page_views), 0)   as total_page_views,
+          COALESCE(SUM(video_p25), 0)            as total_video_p25,
+          COALESCE(SUM(video_p50), 0)            as total_video_p50,
+          COALESCE(SUM(video_p75), 0)            as total_video_p75,
+          COALESCE(SUM(video_p100), 0)           as total_video_p100,
+          ROUND(AVG(ctr), 2)                     as avg_ctr,
+          ROUND(AVG(unique_ctr), 2)              as avg_unique_ctr,
+          ROUND(AVG(cpc), 2)                     as avg_cpc,
+          ROUND(AVG(cpm), 2)                     as avg_cpm,
+          ROUND(AVG(frequency), 2)               as avg_frequency,
           CASE 
             WHEN SUM(conversions) > 0 
             THEN ROUND(SUM(spend) / NULLIF(SUM(conversions), 0), 2)
             ELSE 0 
-          END as avg_cost_per_lead,
-          ROUND(AVG(ctr), 2) as avg_ctr,
-          ROUND(AVG(cpc), 2) as avg_cpc,
-          COALESCE(SUM(landing_page_views), 0) as total_page_views
+          END                                    as avg_cost_per_lead
         FROM meta_ad_performance
         WHERE code = $1
           AND date BETWEEN $2 AND $3
@@ -347,13 +403,22 @@ class MetaService {
     return result.rows[0] || {
       total_campaigns: 0,
       total_impressions: 0,
+      total_reach: 0,
       total_clicks: 0,
+      total_unique_clicks: 0,
       total_spend: 0,
       total_conversions: 0,
-      avg_cost_per_lead: 0,
+      total_page_views: 0,
+      total_video_p25: 0,
+      total_video_p50: 0,
+      total_video_p75: 0,
+      total_video_p100: 0,
       avg_ctr: 0,
+      avg_unique_ctr: 0,
       avg_cpc: 0,
-      total_page_views: 0
+      avg_cpm: 0,
+      avg_frequency: 0,
+      avg_cost_per_lead: 0
     };
   }
 
@@ -363,12 +428,17 @@ class MetaService {
       return await client.query(`
         SELECT 
           campaign_name,
-          SUM(impressions) as impressions,
-          SUM(clicks) as clicks,
-          SUM(spend) as spend,
-          SUM(conversions) as conversions,
-          ROUND(AVG(ctr), 2) as ctr,
-          ROUND(AVG(cpc), 2) as cpc,
+          SUM(impressions)     as impressions,
+          SUM(reach)           as reach,
+          SUM(clicks)          as clicks,
+          SUM(unique_clicks)   as unique_clicks,
+          SUM(spend)           as spend,
+          SUM(conversions)     as conversions,
+          ROUND(AVG(ctr), 2)   as ctr,
+          ROUND(AVG(unique_ctr), 2) as unique_ctr,
+          ROUND(AVG(cpc), 2)   as cpc,
+          ROUND(AVG(cpm), 2)   as cpm,
+          ROUND(AVG(frequency), 2) as frequency,
           CASE 
             WHEN SUM(conversions) > 0 
             THEN ROUND(SUM(spend) / NULLIF(SUM(conversions), 0), 2)
