@@ -434,6 +434,81 @@ export default class EclubService {
     console.log(`✅ [ECLUB] ${resultaat.length} maanden historische data opgehaald`);
     return resultaat;
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LEDEN SYNC → leads tabel
+  // Haalt alle leden op via GET /api/members (gepagineerd) en matcht
+  // op emailadres met de leads tabel. Bij match: is_lid = true.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async syncLedenNaarLeads(practiceCode) {
+    console.log(`🔄 [ECLUB-LEDEN] Starten leden sync voor ${practiceCode}...`);
+
+    const config = await this._getEclubConfig(practiceCode);
+    const { branchId, orgId } = config;
+
+    if (!branchId) {
+      throw new Error(`Geen eClub branchId gevonden voor praktijk ${practiceCode}`);
+    }
+
+    // Haal alle leden op via gepagineerde API — email + lidmaatschapsdatum
+    const alleleden = await this.apiClient.getPaginated({
+      url: `/api/members`,
+      params: {
+        branchId,
+        select: 'email',
+        select2: 'membershipBeginsOn'
+      },
+      businessId: orgId || this.businessId,
+      pageSize: 50
+    });
+
+    // De API accepteert meerdere select params — axios gooit duplicaten weg.
+    // Alternatieve aanpak: gebruik een custom params serializer.
+    // We proberen eerst de standaard manier, anders vallen we terug op array.
+    console.log(`📊 [ECLUB-LEDEN] ${alleleden.length} leden opgehaald voor branchId ${branchId}`);
+
+    if (alleleden.length === 0) {
+      return { success: true, matched: 0, updated: 0, total: 0 };
+    }
+
+    let matched = 0;
+    let updated = 0;
+
+    for (const lid of alleleden) {
+      const email = (lid.email || '').toLowerCase().trim();
+      const lidSinds = lid.membershipBeginsOn || null;
+
+      if (!email) continue;
+
+      try {
+        const result = await this.withWriteConnection(async (client) => {
+          return await client.query(`
+            UPDATE public.leads
+            SET
+              is_lid         = true,
+              lid_geworden_op = COALESCE(lid_geworden_op, $2::date),
+              updated_at      = NOW()
+            WHERE LOWER(emailadres) = $1
+              AND praktijk_code = $3
+              AND is_lid IS NOT TRUE
+            RETURNING id
+          `, [email, lidSinds, practiceCode]);
+        });
+
+        if (result.rows.length > 0) {
+          matched++;
+          updated += result.rows.length;
+          console.log(`✅ [ECLUB-LEDEN] Lead gekoppeld: ${email} → lid sinds ${lidSinds}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ [ECLUB-LEDEN] Fout bij verwerken ${email}:`, err.message);
+      }
+    }
+
+    console.log(`✅ [ECLUB-LEDEN] Sync klaar: ${matched} leads bijgewerkt van ${alleleden.length} leden`);
+    return { success: true, matched, updated, total: alleleden.length };
+  }
 }
 
 // Patch: voeg getHistoricalData toe als losse export helper

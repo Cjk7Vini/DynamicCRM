@@ -3698,6 +3698,19 @@ app.get('/api/public/stats', async (_req, res) => {
   }
 });
 
+// ─── eClub leden → leads sync ────────────────────────────────────────────────
+// Haalt alle leden op via /api/members en zet is_lid = true voor matches
+app.post('/api/eclub/sync-leden/:practiceCode', requireAuth, async (req, res) => {
+  const { practiceCode } = req.params;
+  try {
+    const result = await eclubService.syncLedenNaarLeads(practiceCode);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error(`❌ Leden sync fout voor ${practiceCode}:`, err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });
