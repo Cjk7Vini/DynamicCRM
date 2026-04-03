@@ -2002,7 +2002,6 @@ app.get('/api/funnel', async (req, res) => {
           SUM(expected_value) as pipeline_value
         FROM public.leads
         WHERE 1=1
-        AND funnel_stage != 'lost'
       `;
       
       const params = [];
