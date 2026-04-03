@@ -1618,26 +1618,20 @@ app.get('/api/check-reminders', async (req, res) => {
                     <div style="margin:30px 0">
                       <p style="color:#111827;font-size:15px;font-weight:600;margin-bottom:16px">Na de afspraak:</p>
                       
+                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-bottom:16px">
+                        Na afloop van de afspraak ontvangt u automatisch een e-mail om de uitkomst te registreren.
+                        Mocht de lead niet zijn komen opdagen, klik dan op de onderstaande knop.
+                      </p>
+
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
-                          <td style="padding:0 10px 10px 0" width="50%">
-                            <a href="${attendedUrl}" style="display:block;background:#10b981;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
-                              ✓ Lead is langsgeweest
-                            </a>
-                          </td>
-                          <td style="padding:0 0 10px 10px" width="50%">
+                          <td style="padding:0 0 10px 0">
                             <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
                               ✗ Afspraak gemist
                             </a>
                           </td>
                         </tr>
                       </table>
-
-                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-top:16px">
-                        Als de lead is langsgeweest, kunt u dat bevestigen door de button in te klikken.<br/>
-                        Indien de lead niet is komen opdagen, klik dan op de button "Afspraak gemist".<br/>
-                        Wij zullen namens Dynamic Health Consultancy een email naar de lead sturen dat zij de afspraak hebben gemist.
-                      </p>
                     </div>
 
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
@@ -3712,4 +3706,430 @@ app.post('/api/eclub/sync-leden/:practiceCode', requireAuth, async (req, res) =>
 
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
+});
+
+// ─── FASE 1 — UITKOMST REGISTRATIE (alleen K9X3QY testaccount) ────────────────
+
+// Cron endpoint: 60 minuten na afspraak → email naar praktijk met uitkomst buttons
+// Aanroepen via EasyCron: GET /api/check-outcome
+app.get('/api/check-outcome', async (req, res) => {
+  try {
+    console.log('📋 Checking for outcome emails...');
+
+    const appointments = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT
+          l.id,
+          l.volledige_naam,
+          l.emailadres,
+          l.telefoon,
+          l.appointment_datetime,
+          l.appointment_time,
+          l.praktijk_code,
+          p.naam  AS praktijk_naam,
+          p.email_to AS praktijk_email
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.appointment_datetime IS NOT NULL
+          AND l.status = 'Afspraak Gepland'
+          AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
+          AND l.appointment_datetime <= NOW() - interval '60 minutes'
+          AND l.appointment_datetime >= NOW() - interval '24 hours'
+          AND l.praktijk_code = 'K9X3QY'
+      `);
+      return result.rows;
+    });
+
+    console.log(`📋 ${appointments.length} afspraken klaar voor uitkomst email`);
+
+    for (const appt of appointments) {
+      try {
+        const dateObj = new Date(appt.appointment_datetime);
+
+        const formattedDate = new Intl.DateTimeFormat('nl-NL', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          timeZone: 'Europe/Amsterdam'
+        }).format(dateObj);
+
+        const formattedTime = new Intl.DateTimeFormat('nl-NL', {
+          hour: '2-digit', minute: '2-digit',
+          timeZone: 'Europe/Amsterdam'
+        }).format(dateObj);
+
+        const outcomeToken = generateActionToken(appt.id + '-outcome', appt.praktijk_code);
+        const wonUrl      = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=won&token=${outcomeToken}`;
+        const followupUrl = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=followup&token=${outcomeToken}`;
+        const lostUrl     = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=lost&token=${outcomeToken}`;
+
+        if (appt.praktijk_email && SMTP.host) {
+          const outcomeHtml = `
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;">
+            <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+              <tr><td style="background:#1A1D21;padding:20px 40px;">
+                <span style="color:#ffffff;font-size:15px;font-weight:600;">${appt.praktijk_naam}</span>
+              </td></tr>
+
+              <tr><td style="padding:36px 40px;">
+                <p style="margin:0 0 16px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+
+                <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">
+                  De afspraak met <strong>${appt.volledige_naam}</strong> van vandaag om <strong>${formattedTime}</strong> is zojuist afgelopen.
+                  Fijn als je even aangeeft hoe het gesprek is verlopen, zodat we het dossier up-to-date kunnen houden.
+                </p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;padding:0;margin:0 0 28px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Afspraakgegevens</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>Naam:</strong> ${appt.volledige_naam}</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>E-mail:</strong> ${appt.emailadres || 'niet opgegeven'}</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>Telefoon:</strong> ${appt.telefoon || 'niet opgegeven'}</p>
+                    <p style="margin:0;font-size:14px;color:#1A1D21;"><strong>Afspraak:</strong> ${formattedDate} om ${formattedTime}</p>
+                  </td></tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:15px;color:#3A3D40;line-height:1.6;font-weight:600;">Wat was de uitkomst van dit gesprek?</p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+                  <tr>
+                    <td style="padding:0 0 10px 0;">
+                      <a href="${wonUrl}" style="display:block;background:#10b981;color:#ffffff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+                        ✓ De lead heeft zich ingeschreven als lid
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 0 10px 0;">
+                      <a href="${followupUrl}" style="display:block;background:#f59e0b;color:#ffffff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+                        ⏱ De lead heeft bedenktijd nodig
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 0 0 0;">
+                      <a href="${lostUrl}" style="display:block;background:#f4f4f6;color:#5F5E5A;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid #D3D1C7;">
+                        ✗ De lead heeft geen interesse
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:24px 0 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">
+                  Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong>
+                </p>
+              </td></tr>
+
+              <tr><td style="background:#f4f4f6;padding:14px 40px;border-top:1px solid #e4e4e8;">
+                <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+              </td></tr>
+
+            </table>
+            </td></tr></table>
+            </body></html>`;
+
+          await sendMailResilient({
+            from: SMTP.from,
+            to: appt.praktijk_email,
+            subject: `Hoe is de afspraak verlopen met ${appt.volledige_naam}?`,
+            html: outcomeHtml
+          });
+
+          console.log(`✅ Outcome email verstuurd voor lead ${appt.id}`);
+        }
+
+        await withWriteConnection(async (client) => {
+          await client.query(
+            'UPDATE public.leads SET outcome_sent = TRUE WHERE id = $1',
+            [appt.id]
+          );
+        });
+
+      } catch (err) {
+        console.error(`❌ Outcome email fout voor lead ${appt.id}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, outcome_emails_sent: appointments.length });
+  } catch (error) {
+    console.error('Check outcome error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Outcome action endpoint — verwerkt uitkomst keuze van praktijk
+app.get('/api/appointment-outcome', async (req, res) => {
+  try {
+    const { id, result, token } = req.query;
+
+    if (!id || !result || !token) {
+      return res.status(400).send('Ongeldige parameters');
+    }
+
+    const lead = await withReadConnection(async (client) => {
+      const r = await client.query(`
+        SELECT l.*, p.naam as praktijk_naam, p.email_to as praktijk_email
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.id = $1
+      `, [id]);
+      return r.rows[0];
+    });
+
+    if (!lead) return res.status(404).send('Lead niet gevonden');
+
+    const expectedToken = generateActionToken(id + '-outcome', lead.praktijk_code);
+    if (token !== expectedToken) return res.status(401).send('Ongeldige token');
+
+    // Definieer uitkomst per keuze
+    let newStatus, newStage, followupAt = null;
+
+    if (result === 'won') {
+      newStatus = 'Lid Geworden';
+      newStage  = 'won';
+    } else if (result === 'followup') {
+      newStatus  = 'Bedenktijd';
+      newStage   = 'intent';
+      followupAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    } else if (result === 'lost') {
+      newStatus = 'Geen interesse';
+      newStage  = 'lost';
+    } else {
+      return res.status(400).send('Ongeldige uitkomst');
+    }
+
+    await withWriteConnection(async (client) => {
+      await client.query(`
+        UPDATE public.leads
+        SET status       = $1,
+            funnel_stage = $2,
+            is_lid       = $3,
+            lid_geworden_op = $4,
+            followup_at  = $5,
+            updated_at   = NOW()
+        WHERE id = $6
+      `, [
+        newStatus,
+        newStage,
+        result === 'won' ? true : false,
+        result === 'won' ? new Date() : null,
+        followupAt,
+        id
+      ]);
+
+      await client.query(`
+        INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
+        VALUES ($1, $2, $3, 'practice_action', $4::jsonb)
+      `, [
+        id,
+        lead.praktijk_code,
+        `outcome_${result}`,
+        JSON.stringify({ via: 'outcome_email_button', result })
+      ]);
+    });
+
+    // Bevestigingspagina per uitkomst
+    const pages = {
+      won: {
+        icon: '✓', bg: '#10b981',
+        title: 'Geregistreerd als lid',
+        msg: `${lead.volledige_naam} is succesvol geregistreerd als lid. Het dashboard is bijgewerkt.`
+      },
+      followup: {
+        icon: '⏱', bg: '#f59e0b',
+        title: 'Bedenktijd geregistreerd',
+        msg: `We sturen u over 48 uur een herinnering om de status van ${lead.volledige_naam} bij te werken.`
+      },
+      lost: {
+        icon: '✗', bg: '#ef4444',
+        title: 'Geen interesse geregistreerd',
+        msg: `${lead.volledige_naam} is gemarkeerd als geen interesse. Het dossier is gesloten.`
+      }
+    };
+
+    const page = pages[result];
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="nl">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${page.title}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f3f4f6; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; padding:20px; }
+          .card { background:white; border-radius:16px; padding:40px; max-width:420px; width:100%; text-align:center; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+          .icon { width:80px; height:80px; background:${page.bg}; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-bottom:20px; font-size:36px; color:white; }
+          h1 { color:#111827; font-size:22px; margin:0 0 12px 0; }
+          p { color:#6b7280; font-size:15px; line-height:1.6; margin:0; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">${page.icon}</div>
+          <h1>${page.title}</h1>
+          <p>${page.msg}</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+  } catch (error) {
+    console.error('Appointment outcome error:', error.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// Cron endpoint: 48 uur na bedenktijd → follow-up herinneringsmail naar praktijk
+// Aanroepen via EasyCron: GET /api/check-followup
+app.get('/api/check-followup', async (req, res) => {
+  try {
+    console.log('🔔 Checking for follow-up reminders...');
+
+    const leads = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT
+          l.id,
+          l.volledige_naam,
+          l.emailadres,
+          l.telefoon,
+          l.appointment_datetime,
+          l.praktijk_code,
+          p.naam     AS praktijk_naam,
+          p.email_to AS praktijk_email
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.status = 'Bedenktijd'
+          AND l.followup_at IS NOT NULL
+          AND l.followup_at <= NOW()
+          AND (l.followup_sent IS NULL OR l.followup_sent = FALSE)
+          AND l.praktijk_code = 'K9X3QY'
+      `);
+      return result.rows;
+    });
+
+    console.log(`🔔 ${leads.length} leads klaar voor follow-up herinnering`);
+
+    for (const lead of leads) {
+      try {
+        const dateObj = new Date(lead.appointment_datetime);
+
+        const formattedDate = new Intl.DateTimeFormat('nl-NL', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          timeZone: 'Europe/Amsterdam'
+        }).format(dateObj);
+
+        const formattedTime = new Intl.DateTimeFormat('nl-NL', {
+          hour: '2-digit', minute: '2-digit',
+          timeZone: 'Europe/Amsterdam'
+        }).format(dateObj);
+
+        const outcomeToken = generateActionToken(lead.id + '-outcome', lead.praktijk_code);
+        const wonUrl       = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=won&token=${outcomeToken}`;
+        const followupUrl  = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=followup&token=${outcomeToken}`;
+        const lostUrl      = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=lost&token=${outcomeToken}`;
+
+        if (lead.praktijk_email && SMTP.host) {
+          const followupHtml = `
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;">
+            <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+              <tr><td style="background:#1A1D21;padding:20px 40px;">
+                <span style="color:#ffffff;font-size:15px;font-weight:600;">${lead.praktijk_naam}</span>
+              </td></tr>
+
+              <tr><td style="padding:36px 40px;">
+                <p style="margin:0 0 16px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+
+                <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">
+                  Twee dagen geleden had u een afspraak met <strong>${lead.volledige_naam}</strong>.
+                  Na afloop gaf u aan dat deze persoon nog bedenktijd nodig had.
+                  Is er al meer duidelijkheid over de situatie?
+                </p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;margin:0 0 28px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Gegevens lead</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>Naam:</strong> ${lead.volledige_naam}</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>E-mail:</strong> ${lead.emailadres || 'niet opgegeven'}</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#1A1D21;"><strong>Telefoon:</strong> ${lead.telefoon || 'niet opgegeven'}</p>
+                    <p style="margin:0;font-size:14px;color:#1A1D21;"><strong>Afspraak was op:</strong> ${formattedDate} om ${formattedTime}</p>
+                  </td></tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:15px;color:#3A3D40;line-height:1.6;font-weight:600;">Wat is de huidige stand van zaken?</p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+                  <tr>
+                    <td style="padding:0 0 10px 0;">
+                      <a href="${wonUrl}" style="display:block;background:#10b981;color:#ffffff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+                        ✓ De lead heeft zich alsnog ingeschreven als lid
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 0 10px 0;">
+                      <a href="${followupUrl}" style="display:block;background:#f59e0b;color:#ffffff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+                        ⏱ Er is nog meer bedenktijd nodig
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0;">
+                      <a href="${lostUrl}" style="display:block;background:#f4f4f6;color:#5F5E5A;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid #D3D1C7;">
+                        ✗ De lead heeft geen interesse meer
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:24px 0 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">
+                  Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong>
+                </p>
+              </td></tr>
+
+              <tr><td style="background:#f4f4f6;padding:14px 40px;border-top:1px solid #e4e4e8;">
+                <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+              </td></tr>
+
+            </table>
+            </td></tr></table>
+            </body></html>`;
+
+          await sendMailResilient({
+            from: SMTP.from,
+            to: lead.praktijk_email,
+            subject: `Herinnering: hoe staat het met ${lead.volledige_naam}?`,
+            html: followupHtml
+          });
+
+          console.log(`✅ Follow-up herinnering verstuurd voor lead ${lead.id}`);
+        }
+
+        await withWriteConnection(async (client) => {
+          await client.query(
+            'UPDATE public.leads SET followup_sent = TRUE WHERE id = $1',
+            [lead.id]
+          );
+        });
+
+      } catch (err) {
+        console.error(`❌ Follow-up fout voor lead ${lead.id}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, followup_emails_sent: leads.length });
+  } catch (error) {
+    console.error('Check followup error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
