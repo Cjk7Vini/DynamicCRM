@@ -724,9 +724,11 @@ app.post('/api/confirm-appointment', async (req, res) => {
     }).format(dateObj);
     const formattedTime = updated.time.substring(0, 5);
     
-    const appointmentTypeDisplay = updated.type === 'vitaliteitscheck' 
-      ? 'Vitaliteitscheck (gratis) – Ontdek in 60 minuten waar jouw verbeterpunten liggen' 
-      : 'Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (Duur 30 minuten)';
+    const appointmentTypeDisplay = updated.type === 'vitaliteitscheck'
+      ? 'Intake/Check-up – Ontdek in 60 minuten waar jouw verbeterpunten liggen'
+      : updated.type === 'rondleiding'
+      ? 'Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (30 minuten)'
+      : updated.type || 'Afspraak';
 
     if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
       (async () => {
@@ -809,7 +811,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
                     </div>
 
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0">
-                      We kijken ernaar uit je te ontvangen en samen te werken aan jouw gezondheid.
+                      We kijken ernaar uit je te ontvangen.
                     </p>
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin-top:16px">
                       Sportieve groet,<br/>
@@ -913,7 +915,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
                     </div>
 
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0">
-                      We kijken ernaar uit je te ontvangen en samen te werken aan jouw gezondheid.
+                      We kijken ernaar uit je te ontvangen.
                     </p>
                     <p style="color:#111827;font-size:15px;line-height:1.6;margin:0">
                       Tot snel bij <strong>${updated.lead.praktijk_naam}</strong>
@@ -938,7 +940,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
             to: updated.lead.emailadres,
             subject: `Afspraakbevestiging bij ${updated.lead.praktijk_naam} - ${formattedDate} om ${formattedTime}`,
             html,
-            text: `Beste ${updated.lead.volledige_naam},\n\nWat leuk dat je interesse hebt getoond in ${updated.lead.praktijk_naam}!\nJe afspraak voor een vitaliteitscheck/rondleiding is bevestigd.\n\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nLocatie: ${updated.lead.praktijk_naam}\n\n${updated.notes ? 'Extra informatie: ' + updated.notes + '\n\n' : ''}We kijken ernaar uit je te ontvangen en samen te werken aan jouw gezondheid.\n\nKun je niet op deze tijd? Neem contact met ons op.\n\nMet vriendelijke groet,\n${updated.lead.praktijk_naam}`
+            text: `Beste ${updated.lead.volledige_naam},\n\nWat leuk dat je interesse hebt getoond in ${updated.lead.praktijk_naam}!\nJe afspraak voor een ${appointmentTypeDisplay} is bevestigd.\n\nDatum: ${formattedDate}\nTijd: ${formattedTime}\nLocatie: ${updated.lead.praktijk_naam}\n\n${updated.notes ? 'Extra informatie: ' + updated.notes + '\n\n' : ''}We kijken ernaar uit je te ontvangen.\n\nKun je niet op deze tijd? Neem contact met ons op.\n\nMet vriendelijke groet,\n${updated.lead.praktijk_naam}`
           });
           console.log('AFSPRAAK BEVESTIGING verstuurd naar:', updated.lead.emailadres);
         } catch (mailErr) {
