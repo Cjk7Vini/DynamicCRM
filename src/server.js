@@ -3907,12 +3907,11 @@ app.get('/api/appointment-outcome', async (req, res) => {
     await withWriteConnection(async (client) => {
       await client.query(`
         UPDATE public.leads
-        SET status       = $1,
-            funnel_stage = $2,
-            is_lid       = $3,
+        SET status          = $1,
+            funnel_stage    = $2,
+            is_lid          = $3,
             lid_geworden_op = $4,
-            followup_at  = $5,
-            updated_at   = NOW()
+            followup_at     = $5
         WHERE id = $6
       `, [
         newStatus,

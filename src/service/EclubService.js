@@ -488,8 +488,7 @@ export default class EclubService {
             SET
               is_lid          = true,
               lid_geworden_op = COALESCE(lid_geworden_op, $2::date),
-              funnel_stage    = 'won',
-              updated_at      = NOW()
+              funnel_stage    = 'won'
             WHERE LOWER(emailadres) = $1
               AND praktijk_code = $3
               AND is_lid IS NOT TRUE
