@@ -484,7 +484,6 @@
             });
 
             if (response.ok) {
-                if (typeof fbq !== 'undefined') { fbq('track', 'Lead'); }
                 toonModal();
             } else {
                 var error = await response.json();

@@ -268,10 +268,7 @@
                 });
 
                 if (response.ok) {
-                    if (typeof fbq !== 'undefined') {
-                        fbq('track', 'Lead');
-                    }
-                    window.location.href = 'thankyou.html';
+                    window.location.href = 'thankyou.html?s=952A92';
                 } else {
                     const errorData = await response.json();
                     alert('Er ging iets mis: ' + (errorData.error || 'Probeer het opnieuw'));

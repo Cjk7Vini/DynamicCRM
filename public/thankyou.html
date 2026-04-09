@@ -189,11 +189,17 @@
     loadPracticeName();
 
     // Meta conversie tracking — Lead event op thankyou pagina
-    // Dit is de juiste plek: alleen iemand die het formulier
-    // succesvol heeft verstuurd bereikt deze pagina.
+    // Cookie check voorkomt dubbeltelling als tabblad opnieuw wordt geopend.
     try {
       if (typeof fbq !== 'undefined') {
-        fbq('track', 'Lead');
+        var cookieName = 'dhc_lead_tracked_' + practiceCode;
+        var alreadyTracked = document.cookie.split(';').some(function(c) {
+          return c.trim().startsWith(cookieName + '=');
+        });
+        if (!alreadyTracked) {
+          fbq('track', 'Lead');
+          document.cookie = cookieName + '=1; max-age=86400; path=/; SameSite=Lax';
+        }
       }
     } catch(e) {}
 
