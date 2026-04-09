@@ -4133,3 +4133,170 @@ app.get('/api/check-followup', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ─── FASE 1 STAP D — LEAD REMINDER FLOW (alleen K9X3QY) ──────────────────────
+// Go-live datum: alleen leads aangemaakt ná deze datum worden meegenomen
+const LEAD_REMINDER_GOLIVE = new Date('2026-04-09T00:00:00+02:00');
+
+// Aanroepen via EasyCron: GET /api/check-lead-reminders
+app.get('/api/check-lead-reminders', async (req, res) => {
+  try {
+    console.log('📬 Checking for lead reminders...');
+
+    const leads = await withReadConnection(async (client) => {
+      const result = await client.query(`
+        SELECT
+          l.id,
+          l.volledige_naam,
+          l.emailadres,
+          l.telefoon,
+          l.aangemaakt_op,
+          l.lead_reminder1_sent,
+          l.lead_reminder2_sent,
+          l.praktijk_code,
+          p.naam     AS praktijk_naam,
+          p.email_to AS praktijk_email
+        FROM public.leads l
+        LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE l.funnel_stage = 'awareness'
+          AND (l.appointment_datetime IS NULL)
+          AND l.aangemaakt_op >= $1
+          AND l.praktijk_code = 'K9X3QY'
+          AND (
+            (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
+            OR
+            (l.lead_reminder1_sent = TRUE AND (l.lead_reminder2_sent IS NULL OR l.lead_reminder2_sent = FALSE))
+          )
+      `, [LEAD_REMINDER_GOLIVE]);
+      return result.rows;
+    });
+
+    console.log(`📬 ${leads.length} leads gevonden voor reminder check`);
+
+    let reminder1_sent = 0;
+    let reminder2_sent = 0;
+
+    for (const lead of leads) {
+      try {
+        const now = new Date();
+        const aangemaakt = new Date(lead.aangemaakt_op);
+        const uurOud = (now - aangemaakt) / (1000 * 60 * 60);
+
+        const stuurReminder1 = !lead.lead_reminder1_sent && uurOud >= 48;
+        const stuurReminder2 = lead.lead_reminder1_sent && !lead.lead_reminder2_sent && uurOud >= (48 + 5 * 24);
+
+        if (!stuurReminder1 && !stuurReminder2) continue;
+
+        const isReminder2 = stuurReminder2;
+        const reminderNummer = isReminder2 ? 2 : 1;
+
+        const aanmeldDatum = new Intl.DateTimeFormat('nl-NL', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          timeZone: 'Europe/Amsterdam'
+        }).format(aangemaakt);
+
+        if (lead.praktijk_email && SMTP.host) {
+          const reminderHtml = `
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;">
+            <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+              <tr><td style="background:#1A1D21;padding:20px 40px;">
+                <span style="color:#ffffff;font-size:15px;font-weight:600;">${lead.praktijk_naam}</span>
+              </td></tr>
+
+              <tr><td style="padding:36px 40px;">
+                <h2 style="margin:0 0 8px;font-size:20px;color:#1A1D21;">
+                  ${isReminder2 ? 'Laatste herinnering' : 'Opvolging nodig'} — ${lead.volledige_naam}
+                </h2>
+                <p style="margin:0 0 24px;font-size:14px;color:#6b7280;">
+                  ${isReminder2 ? 'Dit is de tweede en laatste herinnering voor deze lead.' : 'Deze lead heeft zich aangemeld maar nog geen afspraak ingepland.'}
+                </p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:6px;padding:20px;margin-bottom:28px;">
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:4px 0;">Naam</td>
+                    <td style="font-size:13px;color:#1A1D21;font-weight:600;text-align:right;">${lead.volledige_naam}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:4px 0;">Telefoon</td>
+                    <td style="font-size:13px;color:#1A1D21;font-weight:600;text-align:right;">${lead.telefoon || '—'}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:4px 0;">E-mail</td>
+                    <td style="font-size:13px;color:#1A1D21;font-weight:600;text-align:right;">${lead.emailadres}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:4px 0;">Aangemeld op</td>
+                    <td style="font-size:13px;color:#1A1D21;font-weight:600;text-align:right;">${aanmeldDatum}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:4px 0;">Reminder</td>
+                    <td style="font-size:13px;color:#1A1D21;font-weight:600;text-align:right;">${reminderNummer} van 2</td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 20px;font-size:14px;color:#374151;">
+                  Neem contact op met deze lead om een afspraak in te plannen. Klik op de knop hieronder om naar het dashboard te gaan.
+                </p>
+
+                <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+                  <tr>
+                    <td style="background:#333399;border-radius:6px;padding:14px 32px;">
+                      <a href="https://dynamic-health-consultancy.nl/" style="color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">
+                        Ga naar dashboard
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                  Dit is een automatische herinnering van Dynamic Health Consultancy.
+                </p>
+              </td></tr>
+
+            </table>
+            </td></tr>
+            </table>
+            </body>
+            </html>
+          `;
+
+          await sendMailResilient({
+            from: `"${lead.praktijk_naam}" <${SMTP.from}>`,
+            to: lead.praktijk_email,
+            subject: isReminder2
+              ? `Laatste herinnering: ${lead.volledige_naam} heeft nog geen afspraak`
+              : `Opvolging nodig: ${lead.volledige_naam} heeft zich aangemeld`,
+            html: reminderHtml,
+          });
+
+          console.log(`📬 Lead reminder ${reminderNummer} verstuurd voor lead ${lead.id} (${lead.volledige_naam})`);
+        }
+
+        // Markeer de juiste reminder als verstuurd
+        const updateCol = isReminder2 ? 'lead_reminder2_sent' : 'lead_reminder1_sent';
+        await withConnection(async (client) => {
+          await client.query(
+            `UPDATE public.leads SET ${updateCol} = TRUE WHERE id = $1`,
+            [lead.id]
+          );
+        });
+
+        isReminder2 ? reminder2_sent++ : reminder1_sent++;
+
+      } catch (err) {
+        console.error(`❌ Lead reminder fout voor lead ${lead.id}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, reminder1_sent, reminder2_sent });
+  } catch (error) {
+    console.error('Check lead reminders error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
