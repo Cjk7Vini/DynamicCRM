@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Health — Analytics</title>
+    <title>Dynamic Health Analytics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1696,7 +1696,7 @@
     <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
             <div>
-                <div class="card-title">Leads per maand — actueel vs forecast</div>
+                <div class="card-title">Leads per maand: actueel vs forecast</div>
                 <div class="card-subtitle">Historisch gemiddelde als voorspelling voor komende maanden</div>
             </div>
             <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--text-3);">
@@ -1731,7 +1731,7 @@
     <div class="card">
         <div class="card-body" style="text-align:center;padding:60px;color:var(--text-3);">
             <div style="font-size:32px;margin-bottom:12px;">📈</div>
-            <div style="font-size:15px;font-weight:500;color:var(--text-2);margin-bottom:6px;">ROI per lead — komt binnenkort</div>
+            <div style="font-size:15px;font-weight:500;color:var(--text-2);margin-bottom:6px;">ROI per lead: komt binnenkort</div>
             <div style="font-size:13px;">Deze module wordt gebouwd zodra de Meta spend data betrouwbaar genoeg is om te koppelen aan gewonnen leden.</div>
         </div>
     </div>
@@ -1783,7 +1783,7 @@
     <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
             <div>
-                <div class="card-title">Reminder verstuurd — geen opvolging</div>
+                <div class="card-title">Reminder verstuurd, geen opvolging</div>
                 <div class="card-subtitle">Lead reminder verstuurd maar praktijk heeft nog geen afspraak ingepland</div>
             </div>
             <span class="badge badge-amber" id="kwalNoFollowupBadge">0</span>
@@ -3571,7 +3571,7 @@
                 info.style.display = 'block';
                 sel.style.display = 'none';
                 document.getElementById('apptModalLeadName').textContent = naam;
-                document.getElementById('apptModalLeadMeta').textContent = [email, tel].filter(Boolean).join(' — ');
+                document.getElementById('apptModalLeadMeta').textContent = [email, tel].filter(Boolean).join(', ');
                 document.getElementById('apptModalTitle').textContent = 'Afspraak inplannen voor ' + naam;
             } else {
                 info.style.display = 'none';
@@ -3834,7 +3834,8 @@
             if (e.target === this) closeApptModal();
         });
 
-
+        // Sidebar dropdown toggle
+        function toggleDropdown(id) {
             const el = document.getElementById(id);
             if (el) el.classList.toggle('open');
         }
