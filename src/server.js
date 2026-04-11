@@ -4152,6 +4152,7 @@ app.get('/api/check-lead-reminders', async (req, res) => {
           l.telefoon,
           l.aangemaakt_op,
           l.lead_reminder1_sent,
+          l.lead_reminder1_sent_at,
           l.lead_reminder2_sent,
           l.praktijk_code,
           p.naam     AS praktijk_naam,
@@ -4182,8 +4183,11 @@ app.get('/api/check-lead-reminders', async (req, res) => {
         const aangemaakt = new Date(lead.aangemaakt_op);
         const uurOud = (now - aangemaakt) / (1000 * 60 * 60);
 
+        const reminder1SentAt = lead.lead_reminder1_sent_at ? new Date(lead.lead_reminder1_sent_at) : null;
+        const uurSindsReminder1 = reminder1SentAt ? (now - reminder1SentAt) / (1000 * 60 * 60) : 0;
+
         const stuurReminder1 = !lead.lead_reminder1_sent && uurOud >= 48;
-        const stuurReminder2 = lead.lead_reminder1_sent && !lead.lead_reminder2_sent && uurOud >= (48 + 5 * 24);
+        const stuurReminder2 = lead.lead_reminder1_sent && !lead.lead_reminder2_sent && uurSindsReminder1 >= (5 * 24);
 
         if (!stuurReminder1 && !stuurReminder2) continue;
 
@@ -4280,9 +4284,10 @@ app.get('/api/check-lead-reminders', async (req, res) => {
 
         // Markeer de juiste reminder als verstuurd
         const updateCol = isReminder2 ? 'lead_reminder2_sent' : 'lead_reminder1_sent';
+        const extraCol = isReminder2 ? '' : ', lead_reminder1_sent_at = NOW()';
         await withConnection(async (client) => {
           await client.query(
-            `UPDATE public.leads SET ${updateCol} = TRUE WHERE id = $1`,
+            `UPDATE public.leads SET ${updateCol} = TRUE${extraCol} WHERE id = $1`,
             [lead.id]
           );
         });
