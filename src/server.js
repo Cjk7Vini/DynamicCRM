@@ -715,7 +715,8 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
                l.lead_reminder1_sent, l.lead_reminder2_sent, l.lead_reminder1_sent_at
         FROM public.leads l
         WHERE l.funnel_stage = 'awareness'
-          AND (l.appointment_datetime IS NULL)
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
           AND (l.lead_reminder1_sent = TRUE OR l.lead_reminder2_sent = TRUE)
           ${practiceFilter}
         ORDER BY l.aangemaakt_op DESC
@@ -729,7 +730,8 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
                l.lead_reminder1_sent, l.lead_reminder2_sent
         FROM public.leads l
         WHERE l.funnel_stage = 'awareness'
-          AND (l.appointment_datetime IS NULL)
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
           AND l.aangemaakt_op < NOW() - INTERVAL '14 days'
           AND (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
           ${practiceFilter}

@@ -3552,9 +3552,13 @@
 
                 const now = new Date();
                 const week = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                const upcoming = leads.filter(l => { const d = new Date(l.appointment_datetime); return d >= now && d <= week; }).length;
+                const getDt = l => {
+                    const raw = l.appointment_datetime || (l.appointment_date ? l.appointment_date + 'T' + (l.appointment_time || '09:00:00') : null);
+                    return raw ? new Date(raw) : null;
+                };
+                const upcoming = leads.filter(l => { const d = getDt(l); return d && d >= now && d <= week; }).length;
                 const won = leads.filter(l => l.funnel_stage === 'won').length;
-                const noOutcome = leads.filter(l => !l.outcome_sent && new Date(l.appointment_datetime) < now && l.funnel_stage === 'intent').length;
+                const noOutcome = leads.filter(l => { const d = getDt(l); return !l.outcome_sent && d && d < now && l.funnel_stage === 'intent'; }).length;
                 const conv = leads.length ? Math.round(won / leads.length * 100) : 0;
 
                 document.getElementById('apptTotal').textContent = leads.length;
@@ -3585,9 +3589,10 @@
             if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken gevonden</td></tr>'; return; }
             const uitkomstMap = { won: ['Lid geworden','badge-green'], intent: ['Open','badge-gray'], lost: ['Geen interesse','badge-red'] };
             tbody.innerHTML = filtered.map(l => {
-                const d = new Date(l.appointment_datetime);
-                const datum = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
-                const tijd = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+                const rawDt = l.appointment_datetime || (l.appointment_date ? l.appointment_date + 'T09:00:00' : null);
+                const d = rawDt ? new Date(rawDt) : null;
+                const datum = d && !isNaN(d) ? d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : (l.appointment_date || '—');
+                const tijd = d && !isNaN(d) ? d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : (l.appointment_time ? l.appointment_time.substring(0,5) : '—');
                 const [label, cls] = uitkomstMap[l.funnel_stage] || ['Open','badge-gray'];
                 const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
                 return `<tr>
@@ -3647,6 +3652,29 @@
             document.getElementById('tabUitkomst').style.color = isAfspraak ? 'var(--text-2)' : 'white';
             document.getElementById('apptModalSaveBtn').textContent = isAfspraak ? 'Afspraak opslaan' : 'Uitkomst opslaan';
             document.getElementById('apptModalMsg').style.display = 'none';
+            if (!isAfspraak) laadUitkomstDropdown();
+        }
+
+        async function laadUitkomstDropdown() {
+            const pc = getActivePracticeCode();
+            const sel = document.getElementById('uitkomstLeadDropdown');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Laden...</option>';
+            try {
+                const res = await fetch(`/api/afspraken${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
+                const data = await res.json();
+                const leads = (data.leads || []).filter(l => l.funnel_stage === 'intent');
+                if (!leads.length) {
+                    sel.innerHTML = '<option value="">Geen leads met openstaande afspraak</option>';
+                } else {
+                    sel.innerHTML = '<option value="">Selecteer een lead met afspraak...</option>' +
+                        leads.map(l => `<option value="${l.id}">${l.volledige_naam || l.emailadres}</option>`).join('');
+                }
+                // Update ook apptData als het nog leeg is
+                if (!apptData.length) { apptData = data.leads || []; renderApptTable(apptData); }
+            } catch(e) {
+                sel.innerHTML = '<option value="">Fout bij laden</option>';
+            }
         }
 
         function openUitkomstVoorLead(leadId) {
