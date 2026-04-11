@@ -5,3222 +5,907 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic Health — Analytics</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
-            --bg:          #f4f4f6;
-            --surface:     #ffffff;
-            --surface-2:   #f9f9fb;
-            --border:      #e4e4e8;
-            --border-2:    #d0d0d6;
-            --text-1:      #0f0f12;
-            --text-2:      #5a5a72;
-            --text-3:      #9090a8;
-            --accent:      #2BB8A3;
-            --accent-2:    #1a9985;
-            --green:       #99cc33;
-            --red:         #e5334a;
-            --amber:       #f59e0b;
-            --sidebar-w:   240px;
-            --header-h:    60px;
-            --radius:      10px;
-            --radius-sm:   6px;
-            --shadow:      0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
-            --shadow-md:   0 4px 16px rgba(0,0,0,.08);
+            --bg: #f4f4f6; --surface: #ffffff; --surface-2: #f9f9fb;
+            --border: #e4e4e8; --border-2: #d0d0d6;
+            --text-1: #0f0f12; --text-2: #5a5a72; --text-3: #9090a8;
+            --accent: #2BB8A3; --accent-2: #1a9985;
+            --green: #99cc33; --red: #e5334a; --amber: #f59e0b;
+            --sidebar-w: 240px; --header-h: 60px;
+            --radius: 10px; --radius-sm: 6px;
+            --shadow: 0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+            --shadow-md: 0 4px 16px rgba(0,0,0,.08);
         }
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text-1); font-size: 14px; line-height: 1.55; }
 
-        body {
-            font-family: 'DM Sans', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text-1);
-            font-size: 14px;
-            line-height: 1.55;
-        }
-
-        /* ── SIDEBAR ─────────────────────────────── */
-        .sidebar {
-            position: fixed;
-            inset: 0 auto 0 0;
-            width: var(--sidebar-w);
-            background: var(--accent);
-            display: flex;
-            flex-direction: column;
-            z-index: 200;
-            overflow-y: auto;
-        }
-
-        .sidebar-brand {
-            height: var(--header-h);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 0 20px;
-            border-bottom: 1px solid rgba(255,255,255,.12);
-            flex-shrink: 0;
-        }
-
-        .sidebar-brand-icon {
-            width: 28px; height: 28px;
-            background: white;
-            border-radius: 7px;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .sidebar-brand-icon svg { width: 16px; height: 16px; }
-
-        .sidebar-brand-name {
-            color: white;
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: -0.2px;
-        }
-
-        .sidebar-nav {
-            padding: 16px 0;
-            flex: 1;
-        }
-
-        .sidebar-section-label {
-            padding: 8px 20px 4px;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            color: rgba(255,255,255,.4);
-        }
-
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 20px;
-            color: rgba(255,255,255,.7);
-            font-size: 13.5px;
-            font-weight: 400;
-            cursor: pointer;
-            border-left: 2px solid transparent;
-            transition: color .15s, background .15s, border-color .15s;
-            text-decoration: none;
-        }
-
-        .sidebar-item:hover {
-            background: rgba(255,255,255,.08);
-            color: white;
-        }
-
-        .sidebar-item.active {
-            background: rgba(255,255,255,.12);
-            color: white;
-            border-left-color: var(--green);
-            font-weight: 500;
-        }
-
-        .sidebar-item svg {
-            width: 16px; height: 16px;
-            flex-shrink: 0;
-            opacity: .7;
-        }
-
+        /* SIDEBAR */
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-w); background: var(--accent); display: flex; flex-direction: column; z-index: 200; overflow-y: auto; }
+        .sidebar-brand { height: var(--header-h); display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,.12); flex-shrink: 0; }
+        .sidebar-brand-icon { width: 28px; height: 28px; background: white; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar-brand-name { color: white; font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+        .sidebar-nav { padding: 16px 0; flex: 1; }
+        .sidebar-section-label { padding: 8px 20px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: rgba(255,255,255,.4); }
+        .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; color: rgba(255,255,255,.7); font-size: 13.5px; cursor: pointer; border-left: 2px solid transparent; transition: color .15s, background .15s, border-color .15s; }
+        .sidebar-item:hover { background: rgba(255,255,255,.08); color: white; }
+        .sidebar-item.active { background: rgba(255,255,255,.12); color: white; border-left-color: var(--green); font-weight: 500; }
+        .sidebar-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: .7; }
         .sidebar-item.active svg { opacity: 1; }
-
-        /* Dropdown in sidebar */
         .sidebar-dropdown { overflow: hidden; }
-
         .sidebar-dropdown-items { display: none; }
         .sidebar-dropdown.open .sidebar-dropdown-items { display: block; }
-
-        .sidebar-dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 7px 20px 7px 46px;
-            color: rgba(255,255,255,.6);
-            font-size: 13px;
-            cursor: pointer;
-            transition: color .15s, background .15s;
-        }
-
-        .sidebar-dropdown-item:hover {
-            background: rgba(255,255,255,.07);
-            color: white;
-        }
-
-        .sidebar-dropdown-arrow {
-            margin-left: auto;
-            transition: transform .2s;
-            opacity: .5;
-        }
-
+        .sidebar-dropdown-item { display: flex; align-items: center; gap: 8px; padding: 7px 20px 7px 46px; color: rgba(255,255,255,.6); font-size: 13px; cursor: pointer; transition: color .15s, background .15s; }
+        .sidebar-dropdown-item:hover { background: rgba(255,255,255,.07); color: white; }
+        .sidebar-dropdown-item.active-sub { color: white; font-weight: 500; }
+        .sidebar-dropdown-arrow { margin-left: auto; transition: transform .2s; opacity: .5; }
         .sidebar-dropdown.open .sidebar-dropdown-arrow { transform: rotate(180deg); }
-
-        .sidebar-footer {
-            padding: 16px 0;
-            border-top: 1px solid rgba(255,255,255,.12);
-        }
-
-        /* Filter section in sidebar */
-        .sidebar-filters {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255,255,255,.12);
-        }
-
-        .sidebar-filter-label {
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            color: rgba(255,255,255,.4);
-            margin-bottom: 8px;
-            display: block;
-        }
-
-        .sidebar-select {
-            width: 100%;
-            padding: 7px 10px;
-            background: rgba(255,255,255,.1);
-            border: 1px solid rgba(255,255,255,.2);
-            border-radius: var(--radius-sm);
-            color: white;
-            font-size: 13px;
-            font-family: inherit;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,.6)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            padding-right: 28px;
-            margin-bottom: 8px;
-            cursor: pointer;
-        }
-
-        .sidebar-select:focus { outline: none; border-color: rgba(255,255,255,.4); }
-        .sidebar-select option { background: var(--accent); }
-
-        .sidebar-input {
-            width: 100%;
-            padding: 7px 10px;
-            background: rgba(255,255,255,.1);
-            border: 1px solid rgba(255,255,255,.2);
-            border-radius: var(--radius-sm);
-            color: white;
-            font-size: 13px;
-            font-family: inherit;
-            margin-bottom: 8px;
-        }
-
+        .sidebar-filters { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.12); }
+        .sidebar-filter-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 8px; display: block; }
+        .sidebar-select { width: 100%; padding: 7px 10px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius-sm); color: white; font-size: 13px; font-family: inherit; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,.6)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; margin-bottom: 8px; cursor: pointer; }
+        .sidebar-input { width: 100%; padding: 7px 10px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius-sm); color: white; font-size: 13px; font-family: inherit; margin-bottom: 8px; }
         .sidebar-input::placeholder { color: rgba(255,255,255,.35); }
-        .sidebar-input:focus { outline: none; border-color: rgba(255,255,255,.4); }
 
-        .sidebar-input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1) opacity(0.5);
-        }
-
-        /* Eclub sync in sidebar */
-        .sidebar-sync-section {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255,255,255,.12);
-        }
-
-        /* ── TOPBAR ───────────────────────────────── */
-        .topbar {
-            position: fixed;
-            top: 0;
-            left: var(--sidebar-w);
-            right: 0;
-            height: var(--header-h);
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 28px;
-            z-index: 100;
-        }
-
-        .topbar-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-1);
-            letter-spacing: -0.3px;
-        }
-
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all .15s;
-            border: 1px solid transparent;
-            white-space: nowrap;
-        }
-
-        .btn-ghost {
-            background: transparent;
-            border-color: var(--border);
-            color: var(--text-2);
-        }
-
+        /* TOPBAR */
+        .topbar { position: fixed; top: 0; left: var(--sidebar-w); right: 0; height: var(--header-h); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; z-index: 100; }
+        .topbar-title { font-size: 16px; font-weight: 600; color: var(--text-1); letter-spacing: -0.3px; }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
+        .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-2); }
         .btn-ghost:hover { background: var(--bg); color: var(--text-1); }
-
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-primary:hover { background: #2a2a80; }
-
-        .btn-danger {
-            background: transparent;
-            border-color: var(--border);
-            color: var(--red);
-        }
-
+        .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn-primary:hover { background: var(--accent-2); }
+        .btn-danger { background: transparent; border-color: var(--border); color: var(--red); }
         .btn-danger:hover { background: #fef2f3; border-color: var(--red); }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-2); color: white; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
 
-        .btn-sync-green {
-            background: var(--green);
-            color: #1a3300;
-            font-weight: 600;
-        }
+        /* MAIN */
+        .main { margin-left: var(--sidebar-w); margin-top: var(--header-h); padding: 28px; min-height: calc(100vh - var(--header-h)); }
 
-        .btn-sync-green:hover { background: #88bb2a; }
-        .btn-sync-green:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; }
+        /* SECTIONS */
+        .section { display: none; }
+        .section.active { display: block; }
 
-        /* user avatar */
-        .user-avatar {
-            width: 32px; height: 32px;
-            border-radius: 50%;
-            background: var(--accent-2);
-            color: white;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .user-details { line-height: 1.3; }
-        .user-email { font-size: 13px; font-weight: 500; color: var(--text-1); }
-        .user-role { font-size: 11px; color: var(--text-3); }
-
-        /* ── MAIN ─────────────────────────────────── */
-        .main {
-            margin-left: var(--sidebar-w);
-            margin-top: var(--header-h);
-            padding: 28px;
-            min-height: calc(100vh - var(--header-h));
-        }
-
-        /* ── CARDS ────────────────────────────────── */
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 18px 20px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .card-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-1);
-        }
-
-        .card-subtitle {
-            font-size: 12px;
-            color: var(--text-3);
-            margin-top: 2px;
-        }
-
+        /* CARDS */
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+        .card-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+        .card-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
         .card-body { padding: 20px; }
 
-        /* ── KPI GRID ─────────────────────────────── */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 14px;
-            margin-bottom: 24px;
-        }
-
-        .kpi-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 18px 20px;
-            box-shadow: var(--shadow);
-        }
-
-        .kpi-label {
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            color: var(--text-3);
-            margin-bottom: 8px;
-        }
-
-        .kpi-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-1);
-            letter-spacing: -1px;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .kpi-sub {
-            font-size: 11px;
-            color: var(--text-3);
-            margin-top: 4px;
-        }
-
-        /* ── CHARTS ROW ───────────────────────────── */
-        .charts-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .chart-wrap {
-            position: relative;
-            height: 280px;
-        }
-
-        /* ── SECTION TITLE ────────────────────────── */
-        .section-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-2);
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-            margin-bottom: 14px;
-            margin-top: 28px;
-        }
-
-        .section-title:first-child { margin-top: 0; }
-
-        /* ── PIPELINE FUNNEL ──────────────────────── */
-        .funnel-container { padding: 0 20px 20px; }
-
-        .funnel-stage {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .funnel-stage:last-child { border-bottom: none; }
-
-        .funnel-bar-wrap {
-            flex: 1;
-        }
-
-        .funnel-bar {
-            min-width: 160px;
-            height: 44px;
-            border-radius: 6px;
-            transition: width .4s ease;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 0 14px;
-            color: white;
-            font-weight: 600;
-            font-size: 13px;
-            overflow: visible;
-        }
-
-        .funnel-bar.awareness  { background: #1a56db; }
-        .funnel-bar.intent     { background: #0891b2; }
-        .funnel-bar.won        { background: #16a34a; }
-        .funnel-bar.lost       { background: #dc2626; }
-        .funnel-bar.contacted  { background: #0891b2; }
-        .funnel-bar.consideration { background: #d97706; }
-
-        .funnel-bar:hover { filter: brightness(1.08); }
-
-        .funnel-count { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: white; }
-
-        .funnel-stats {
-            min-width: 120px;
-            text-align: right;
-            font-size: 12px;
-            color: var(--text-3);
-        }
-
-        .conversion-rate {
-            display: block;
-            font-weight: 600;
-            color: #16a34a;
-            margin-top: 2px;
-        }
-
-        /* ── HOT LEADS TABLE ──────────────────────── */
+        /* TABLE */
         .table { width: 100%; border-collapse: collapse; }
-
-        .table th {
-            text-align: left;
-            padding: 8px 12px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-            color: var(--text-3);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .table td {
-            padding: 10px 12px;
-            font-size: 13px;
-            border-bottom: 1px solid var(--border);
-            color: var(--text-1);
-        }
-
+        .table th { text-align: left; padding: 8px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--border); }
+        .table td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-1); }
         .table tr:last-child td { border-bottom: none; }
         .table tr:hover td { background: var(--surface-2); }
+        .table tbody tr { cursor: pointer; }
 
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .badge-blue { background: #e8f0fe; color: #1a56db; }
+        /* BADGES */
+        .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .badge-green { background: #e6f6ec; color: #1a7c3e; }
+        .badge-blue { background: #e8f0fe; color: #1a56db; }
         .badge-amber { background: #fef3c7; color: #92400e; }
         .badge-red { background: #fde8eb; color: #9b1c2e; }
+        .badge-gray { background: #f1f1f4; color: #5a5a72; }
 
-        /* ── META & ECLUB SECTIONS ────────────────── */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-        }
+        /* AFSPRAKEN */
+        .appt-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .appt-filter-select { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; color: var(--text-1); background: white; cursor: pointer; }
+        .appt-search { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; color: var(--text-1); min-width: 200px; }
+        .appt-search:focus { outline: none; border-color: var(--accent); }
 
-        .metric-card {
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 14px 16px;
-        }
-
-        .metric-card.highlight {
-            background: #eef3ff;
-            border-color: #c7d7fd;
-        }
-
-        .metric-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: var(--text-3);
-            margin-bottom: 6px;
-        }
-
-        .metric-value {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text-1);
-            letter-spacing: -0.5px;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .meta-campaigns-table { margin-top: 16px; }
-
-        /* eclub period selector */
-        .eclub-period-selectors {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .period-select {
-            padding: 6px 10px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-family: inherit;
-            color: var(--text-1);
-            background: white;
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5a72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            padding-right: 24px;
-        }
-
-        .period-select:focus { outline: none; border-color: var(--accent); }
-
-        /* eclub status dot */
-        .status-dot {
-            display: inline-block;
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
-
-        .status-dot.green { background: var(--green); }
-        .status-dot.red { background: var(--red); }
-        .status-dot.amber { background: var(--amber); }
-
-        /* ── MODALS ───────────────────────────────── */
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.4);
-            z-index: 500;
-            backdrop-filter: blur(2px);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal.active { display: flex; }
-
-        .modal-content {
-            background: var(--surface);
-            border-radius: 14px;
-            box-shadow: var(--shadow-md);
-            width: 90%;
-            max-width: 560px;
-            overflow: hidden;
-        }
-
-        .modal-header {
-            padding: 20px 24px 16px;
-            font-size: 16px;
-            font-weight: 600;
-            border-bottom: 1px solid var(--border);
-        }
-
+        /* AFSPRAAK MODAL */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500; backdrop-filter: blur(2px); justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: white; border-radius: 14px; box-shadow: var(--shadow-md); width: 90%; max-width: 520px; overflow: hidden; }
+        .modal-header { padding: 20px 24px 16px; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 20px 24px; }
-        .modal-footer {
-            padding: 14px 24px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-
+        .modal-footer { padding: 14px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
         .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; font-family: inherit; color: var(--text-1); transition: border-color .15s; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .lead-info-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 18px; }
+        .lead-info-box .lead-name { font-size: 15px; font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+        .lead-info-box .lead-meta { font-size: 12px; color: var(--text-3); }
 
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-2);
-            margin-bottom: 5px;
-        }
+        /* SEIZOENSPATRONEN */
+        .chart-wrap { position: relative; }
+        .insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+        .insight-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+        .insight-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 6px; }
+        .insight-value { font-size: 24px; font-weight: 700; color: var(--text-1); letter-spacing: -0.5px; }
+        .insight-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+        .insight-card.highlight { border-color: var(--accent); background: #f0faf8; }
+        .insight-card.highlight .insight-value { color: var(--accent-2); }
 
-        .form-group input {
-            width: 100%;
-            padding: 9px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            font-size: 14px;
-            font-family: inherit;
-            color: var(--text-1);
-            transition: border-color .15s;
-        }
+        .advice-block { background: #f0faf8; border: 1px solid #b2e0d8; border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+        .advice-block .advice-title { font-size: 14px; font-weight: 600; color: var(--accent-2); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .advice-block .advice-title svg { width: 16px; height: 16px; }
+        .advice-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+        .advice-item:last-child { margin-bottom: 0; }
+        .advice-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(51,51,153,.1);
-        }
+        .forecast-bar { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .forecast-bar:last-child { border-bottom: none; }
+        .forecast-month { font-size: 13px; font-weight: 500; color: var(--text-1); min-width: 80px; }
+        .forecast-bars { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .forecast-bar-inner { height: 10px; border-radius: 5px; }
+        .forecast-bar-actual { background: var(--accent); }
+        .forecast-bar-predicted { background: #c7e8e3; }
+        .forecast-nums { font-size: 12px; color: var(--text-3); min-width: 80px; text-align: right; }
 
-        .password-requirements {
-            font-size: 11px;
-            color: var(--text-3);
-            margin-top: 4px;
-        }
+        .season-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .season-hot { background: #fde8eb; color: #9b1c2e; }
+        .season-warm { background: #fef3c7; color: #92400e; }
+        .season-cool { background: #e8f0fe; color: #1a56db; }
 
-        #passwordMessage, #idleWarning {
-            padding: 10px 14px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            margin-bottom: 14px;
-        }
-
-        /* idle warning */
-        #idleWarning {
-            display: none;
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: var(--surface);
-            border: 1px solid var(--amber);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            padding: 16px 20px;
-            z-index: 400;
-            max-width: 320px;
-        }
-
-        #idleWarning.show { display: block; }
-
-        /* leads modal */
-        #leadsModal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.4);
-            z-index: 500;
-            backdrop-filter: blur(2px);
-            justify-content: center;
-            align-items: center;
-        }
-
-        #leadsModal.active { display: flex; }
-
-        /* ── PRACTICE PERFORMANCE ─────────────────── */
-        #practicePerformanceChart {
-            height: 200px;
-        }
-
-        /* ── RESPONSIVE ───────────────────────────── */
-        @media (max-width: 900px) {
-            .charts-row { grid-template-columns: 1fr; }
-            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        @media (max-width: 640px) {
-            .sidebar { transform: translateX(-100%); }
-            .main, .topbar { margin-left: 0; left: 0; }
-        }
-
-        /* ── FORECAST ─────────────────────────────── */
-        .forecast-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .forecast-card {
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 14px 16px;
-        }
-
-        .forecast-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: var(--text-3);
-            margin-bottom: 4px;
-        }
-
-        .forecast-value {
-            font-size: 26px;
-            font-weight: 700;
-            color: var(--text-1);
-            font-variant-numeric: tabular-nums;
-        }
-
-        .forecast-sub {
-            font-size: 11px;
-            color: var(--text-3);
-            margin-top: 2px;
-        }
-
-        /* ── SOURCE CHART ─────────────────────────── */
-        #sourceChart { height: 200px !important; }
-
-
-        /* ── USER DROPDOWN ────────────────────────── */
-        .user-dropdown-btn {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 6px 12px 6px 6px;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all .15s;
-            font-family: inherit;
-            color: var(--text-1);
-        }
-
-        .user-dropdown-btn:hover {
-            background: var(--bg);
-            border-color: var(--border-2);
-        }
-
-        .user-dropdown-menu {
-            position: absolute;
-            top: calc(100% + 8px);
-            right: 0;
-            width: 240px;
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.10);
-            z-index: 300;
-            overflow: hidden;
-            animation: dropdownFade .15s ease;
-        }
-
-        @keyframes dropdownFade {
-            from { opacity: 0; transform: translateY(-6px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .dropdown-section-label {
-            padding: 8px 14px 4px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.7px;
-            text-transform: uppercase;
-            color: var(--text-3);
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 14px;
-            font-size: 13.5px;
-            color: var(--text-1);
-            cursor: pointer;
-            transition: background .12s;
-        }
-
-        .dropdown-item svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-3); }
-
-        .dropdown-item:hover { background: var(--bg); }
-
-        .dropdown-item-danger { color: var(--red); }
-        .dropdown-item-danger svg { color: var(--red); }
-        .dropdown-item-danger:hover { background: #fef2f3; }
-
-        .dropdown-divider {
-            height: 1px;
-            background: var(--border);
-            margin: 4px 0;
-        }
-        /* ── SCROLLBAR ────────────────────────────── */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
-
-        /* btn-logout alias */
-        .btn-logout {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all .15s;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--red);
-        }
-
-        .btn-logout:hover { background: #fef2f3; border-color: var(--red); }
-
-        /* btn-sync alias */
-        .btn-sync {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all .15s;
-            border: 1px solid var(--border);
-            background: white;
-            color: var(--text-2);
-        }
-
-        .btn-sync:hover { background: var(--bg); color: var(--text-1); }
-        .btn-sync:disabled { opacity: .5; cursor: not-allowed; }
-
-        /* meta-sync-btn alias */
-        .meta-sync-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 16px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all .15s;
-            border: none;
-            background: var(--green);
-            color: #1a3300;
-        }
-
-        .meta-sync-btn:hover { background: #88bb2a; }
-        .meta-sync-btn:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
+<!-- SIDEBAR -->
 <aside class="sidebar">
     <div class="sidebar-brand">
-        <img src="images/dynamic-logo-2.png" alt="Dynamic Health" style="height:36px; width:auto; object-fit:contain; flex-shrink:0;">
+        <div class="sidebar-brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2BB8A3" stroke-width="2.5" width="16" height="16">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+        </div>
         <span class="sidebar-brand-name">Dynamic Health</span>
     </div>
-
     <nav class="sidebar-nav">
-
         <div class="sidebar-section-label">Overzicht</div>
-        <div class="sidebar-item active">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-            </svg>
+        <div class="sidebar-item" onclick="showSection('dashboard', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             Dashboard
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Leads</div>
         <div class="sidebar-dropdown" id="leadsDropdown">
             <div class="sidebar-item" onclick="toggleDropdown('leadsDropdown')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
                 Leads
-                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Nieuw (Awareness)</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid geworden</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('lost','Geen interesse')">Geen interesse</div>
+                <div class="sidebar-dropdown-item">Nieuw (Awareness)</div>
+                <div class="sidebar-dropdown-item">Benaderd</div>
+                <div class="sidebar-dropdown-item">Lid geworden</div>
+                <div class="sidebar-dropdown-item">Geen interesse</div>
             </div>
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Afspraken</div>
-        <div class="sidebar-item" onclick="">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
+        <div class="sidebar-item" onclick="showSection('afspraken', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Afspraken
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Marketing</div>
         <div class="sidebar-dropdown" id="marketingDropdown">
             <div class="sidebar-item" onclick="toggleDropdown('marketingDropdown')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 Marketing
-                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="document.getElementById('metaMarketingSection').scrollIntoView({behavior:'smooth'})">Meta performance</div>
-                <div class="sidebar-dropdown-item" onclick="document.getElementById('sourceChart').closest('.card').scrollIntoView({behavior:'smooth'})">Lead bronnen</div>
+                <div class="sidebar-dropdown-item">Meta performance</div>
+                <div class="sidebar-dropdown-item">Lead bronnen</div>
             </div>
-        </div>
-
-        <div class="sidebar-section-label" style="margin-top:8px;">Retentie</div>
-        <div class="sidebar-item" onclick="document.getElementById('eclubSection') && document.getElementById('eclubSection').scrollIntoView({behavior:'smooth'})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            eClub retentie
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Rapportages</div>
-        <div class="sidebar-dropdown" id="rapportagesDropdown">
+        <div class="sidebar-dropdown open" id="rapportagesDropdown">
             <div class="sidebar-item" onclick="toggleDropdown('rapportagesDropdown')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="20" x2="18" y2="10"/>
-                    <line x1="12" y1="20" x2="12" y2="4"/>
-                    <line x1="6" y1="20" x2="6" y2="14"/>
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 Rapportages
-                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item">Seizoenspatronen</div>
-                <div class="sidebar-dropdown-item">ROI per lead</div>
-                <div class="sidebar-dropdown-item">Lead kwaliteit</div>
+                <div class="sidebar-dropdown-item active-sub" onclick="showSection('seizoen', this)">Seizoenspatronen</div>
+                <div class="sidebar-dropdown-item" onclick="showSection('roi', this)">ROI per lead</div>
+                <div class="sidebar-dropdown-item" onclick="showSection('kwaliteit', this)">Lead kwaliteit</div>
             </div>
         </div>
-
     </nav>
 
-    <!-- Filters -->
     <div class="sidebar-filters">
         <span class="sidebar-filter-label">Filters</span>
-
-        <select id="practiceFilter" class="sidebar-select" onchange="applyFilters()">
-            <option value="">Alle praktijken</option>
-        </select>
-
-        <div id="practiceSearchGroup" style="display:none;">
-            <input type="text" id="practiceSearch" class="sidebar-input"
-                placeholder="Zoek praktijk..."
-                oninput="filterPractices()">
-        </div>
-
-        <input type="date" id="dateFrom" class="sidebar-input" onchange="applyFilters()" title="Van datum">
-        <input type="date" id="dateTo" class="sidebar-input" onchange="applyFilters()" title="Tot datum">
-
-        <select id="sourceFilter" class="sidebar-select" onchange="applyFilters()">
-            <option value="">Alle bronnen</option>
-            <option value="Facebook">Facebook</option>
-            <option value="Instagram">Instagram</option>
-            <option value="Google">Google</option>
-            <option value="Vrienden/Familie">Vrienden/Familie</option>
-            <option value="Voucher">Voucher</option>
-        </select>
-
-        <select id="statusFilter" class="sidebar-select" onchange="applyFilters()">
-            <option value="">Alle statussen</option>
-            <option value="new">Nieuw</option>
-            <option value="contacted">Benaderd</option>
-            <option value="converted">Lid geworden</option>
-        </select>
+        <select class="sidebar-select"><option>Alle praktijken</option><option>Fysiopraktijk De Jong</option></select>
+        <input type="date" class="sidebar-input">
+        <input type="date" class="sidebar-input">
     </div>
-
-    <!-- eClub sidebar sync -->
-    <div class="sidebar-sync-section" id="eclubSyncSection" style="display:none;">
-        <span class="sidebar-filter-label">eClub Sync</span>
-        <div style="font-size:12px; color:rgba(255,255,255,.5); margin-bottom:8px;">
-            Laatste sync: <span id="lastSyncTime">—</span><br>
-            Leden: <span id="eclubMemberCount">—</span>
-        </div>
-        <button id="btnEclubSync" class="btn btn-ghost" style="width:100%; background:rgba(255,255,255,.1); color:white; border-color:rgba(255,255,255,.2);" onclick="syncEclub()">
-            <span id="syncButtonText">Sync leden</span>
-        </button>
-        <div id="syncStatus" style="margin-top:8px; font-size:12px; display:none;"></div>
-    </div>
-
-
 </aside>
 
-<!-- ── TOPBAR ────────────────────────────────────────────────────── -->
+<!-- TOPBAR -->
 <header class="topbar">
-    <span class="topbar-title">Analytics</span>
+    <span class="topbar-title" id="topbarTitle">Analytics</span>
     <div class="topbar-right">
-        <button class="btn btn-ghost" onclick="refreshData()">↻ Vernieuwen</button>
-
-        <!-- User dropdown button -->
-        <div class="user-dropdown-wrap" id="userInfo" style="display:none; position:relative;">
-            <button class="user-dropdown-btn" onclick="toggleUserMenu()" id="userDropdownBtn">
-                <div class="user-avatar" id="userIcon">A</div>
-                <div class="user-details">
-                    <div class="user-email" id="userEmail">—</div>
-                    <div class="user-role" id="userRole">—</div>
-                </div>
-                <svg style="width:14px;height:14px;flex-shrink:0;transition:transform .2s;" id="userDropdownArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-
-            <div class="user-dropdown-menu" id="userDropdownMenu" style="display:none;">
-                <div class="dropdown-section-label">Account</div>
-                <div class="dropdown-item" onclick="openPasswordModal(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                    Wachtwoord wijzigen
-                </div>
-                <div class="dropdown-item" onclick="closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                    Instellingen
-                </div>
-
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-section-label">Export</div>
-
-                <div class="dropdown-item" onclick="exportToExcel(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    Leads exporteren
-                </div>
-                <div class="dropdown-item" onclick="exportMetaData(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    Meta data exporteren
-                </div>
-                <div class="dropdown-item" onclick="exportEclubData(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-                    eClub data exporteren
-                </div>
-
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-section-label">Sync</div>
-                <div class="dropdown-item" onclick="syncMetaData(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                    Sync Meta
-                </div>
-                <div class="dropdown-item" onclick="syncEclub(); closeUserMenu()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                    Sync eClub
-                </div>
-
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-item dropdown-item-danger" onclick="logout()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-                    Uitloggen
-                </div>
-            </div>
-        </div>
+        <button class="btn btn-ghost">↻ Vernieuwen</button>
+        <div class="user-avatar">C</div>
     </div>
 </header>
 
-<!-- ── WACHTWOORD MODAL ──────────────────────────────────────────── -->
-<div class="modal" id="passwordModal">
-    <div class="modal-content">
-        <div class="modal-header">Wachtwoord wijzigen</div>
-        <div class="modal-body">
-            <div id="passwordMessage"></div>
-            <form id="passwordForm" onsubmit="changePassword(event)">
-                <div class="form-group">
-                    <label>Huidig wachtwoord</label>
-                    <input type="password" id="currentPassword" required autocomplete="current-password">
-                </div>
-                <div class="form-group">
-                    <label>Nieuw wachtwoord</label>
-                    <input type="password" id="newPassword" required minlength="8" autocomplete="new-password">
-                    <div class="password-requirements">Minimaal 8 tekens, inclusief hoofdletter, kleine letter en cijfer</div>
-                </div>
-                <div class="form-group">
-                    <label>Bevestig nieuw wachtwoord</label>
-                    <input type="password" id="confirmPassword" required autocomplete="new-password">
-                </div>
-                <div class="modal-footer" style="padding: 0; border: none; margin-top: 4px;">
-                    <button type="button" class="btn btn-ghost" onclick="closePasswordModal()">Annuleren</button>
-                    <button type="submit" class="btn btn-primary">Opslaan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ── LEADS MODAL ───────────────────────────────────────────────── -->
-<div id="leadsModal">
-    <div class="modal-content" style="max-width:800px;">
-        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <span id="leadsModalTitle">Leads</span>
-            <button onclick="closeLeadsModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-3); line-height:1;">&times;</button>
-        </div>
-        <div id="leadsModalContent" style="max-height:500px; overflow-y:auto; padding: 4px 0;"></div>
-    </div>
-</div>
-
-<!-- ── IDLE WARNING ──────────────────────────────────────────────── -->
-<div id="idleWarning">
-    <div style="font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:6px;">Sessie verloopt</div>
-    <div id="idleWarningText" style="font-size:13px; color:var(--text-2); margin-bottom:12px;"></div>
-    <div style="display:flex; gap:8px;">
-        <button class="btn btn-primary" onclick="onActivity()" style="flex:1;">Actief blijven</button>
-        <button class="btn btn-ghost" onclick="handleIdleLogout()">Uitloggen</button>
-    </div>
-</div>
-
-<!-- ── MAIN CONTENT ──────────────────────────────────────────────── -->
+<!-- MAIN -->
 <main class="main">
 
-    <!-- KPI row -->
-    <div class="kpi-grid" id="kpiGrid">
-        <div class="kpi-card">
-            <div class="kpi-label">Totaal leads</div>
-            <div class="kpi-value" id="totalLeads">—</div>
-            <div class="kpi-sub">Alle leads in database</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Conversie ratio</div>
-            <div class="kpi-value" id="conversionRate">—</div>
-            <div class="kpi-sub">Lead → Lid geworden</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Actieve praktijken</div>
-            <div class="kpi-value" id="activePractices">—</div>
-            <div class="kpi-sub">Praktijken met leads</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Gem. leads/maand</div>
-            <div class="kpi-value" id="avgLeadsPerMonth">—</div>
-            <div class="kpi-sub">Huidige praktijk</div>
-        </div>
-    </div>
+    <!-- ── AFSPRAKEN SECTIE ─────────────────────────────────────── -->
+    <div class="section" id="section-afspraken">
 
-    <!-- Charts row -->
-    <div class="charts-row">
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+            <div class="insight-card">
+                <div class="insight-label">Totaal afspraken</div>
+                <div class="insight-value">47</div>
+                <div class="insight-sub">Alle tijden</div>
+            </div>
+            <div class="insight-card highlight">
+                <div class="insight-label">Komende 7 dagen</div>
+                <div class="insight-value">8</div>
+                <div class="insight-sub">Ingepland</div>
+            </div>
+            <div class="insight-card">
+                <div class="insight-label">Conversie</div>
+                <div class="insight-value">61%</div>
+                <div class="insight-sub">Afspraak naar lid</div>
+            </div>
+            <div class="insight-card">
+                <div class="insight-label">Geen uitkomst</div>
+                <div class="insight-value">6</div>
+                <div class="insight-sub">Wacht op registratie</div>
+            </div>
+        </div>
+
+        <!-- Afspraken tabel -->
         <div class="card">
             <div class="card-header">
                 <div>
-                    <div class="card-title">Churn Forecast</div>
-                    <div class="card-subtitle">Ledenverloop per maand (eClub)</div>
+                    <div class="card-title">Afspraken overzicht</div>
+                    <div class="card-subtitle">Alle geplande en afgeronde afspraken</div>
+                </div>
+                <div class="appt-filters">
+                    <input type="text" class="appt-search" placeholder="Zoek op naam...">
+                    <select class="appt-filter-select">
+                        <option>Alle uitkomsten</option>
+                        <option>Lid geworden</option>
+                        <option>Bedenktijd</option>
+                        <option>Geen interesse</option>
+                        <option>Open</option>
+                    </select>
+                    <select class="appt-filter-select">
+                        <option>Alle types</option>
+                        <option>Intake/Check-up</option>
+                        <option>Rondleiding</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="openAfspraakModal(null)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Afspraak inplannen
+                    </button>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="chart-wrap">
-                    <canvas id="churnForecastChart"></canvas>
-                </div>
-            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Datum</th>
+                        <th>Tijd</th>
+                        <th>Type</th>
+                        <th>Uitkomst</th>
+                        <th>Actie</th>
+                    </tr>
+                </thead>
+                <tbody id="afsprakenBody">
+                </tbody>
+            </table>
         </div>
 
+        <!-- Leads zonder afspraak -->
         <div class="card">
             <div class="card-header">
-                <div class="card-title">Lead bronnen</div>
-            </div>
-            <div class="card-body">
-                <div class="chart-wrap" style="height:200px;">
-                    <canvas id="sourceChart"></canvas>
+                <div>
+                    <div class="card-title">Leads zonder afspraak</div>
+                    <div class="card-subtitle">Awareness leads die nog geen afspraak hebben ingepland</div>
                 </div>
-                <div id="topSource" style="margin-top:12px; font-size:12px; color:var(--text-3);">Top bron: <strong id="topSourceName">—</strong></div>
             </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Naam</th>
+                        <th>Aangemeld</th>
+                        <th>Bron</th>
+                        <th>Doel</th>
+                        <th>Actie</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsZonderAfspraakBody">
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Sales pipeline + forecast row -->
-    <div class="charts-row">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Sales pipeline</div>
+    <!-- ── SEIZOENSPATRONEN SECTIE ──────────────────────────────── -->
+    <div class="section" id="section-seizoen">
+
+        <!-- Advies blok -->
+        <div class="advice-block">
+            <div class="advice-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Marketingadvies op basis van historische data
             </div>
-            <div id="pipelineFunnelContainer" class="funnel-container"></div>
+            <div class="advice-item"><div class="advice-dot"></div>Januari en september zijn je sterkste maanden, gemiddeld 18 leads/maand. Start campagnes 2-3 weken eerder (mid-december en mid-augustus) om de piek te vangen.</div>
+            <div class="advice-item"><div class="advice-dot"></div>Juli is je zwakste maand (gem. 6 leads). Verlaag je Meta budget in juli met 40% en hervereel budget naar augustus voor het najaarsherstel.</div>
+            <div class="advice-item"><div class="advice-dot"></div>Conversie is het hoogst in Q1 (68%). Leads die in januari binnenkomen converteren vaker. Verhoog je budget in Q1 voor maximale ROI.</div>
+            <div class="advice-item"><div class="advice-dot"></div>Volgende hoge piek verwacht: <strong>september 2026</strong>. Aanbevolen campagnestart: <strong>18 augustus 2026</strong>.</div>
         </div>
 
-        <div class="card">
+        <!-- KPI inzichten -->
+        <div class="insight-grid">
+            <div class="insight-card highlight">
+                <div class="insight-label">Beste maand ooit</div>
+                <div class="insight-value">Januari</div>
+                <div class="insight-sub">Gem. 18 leads/maand</div>
+            </div>
+            <div class="insight-card">
+                <div class="insight-label">Zwakste maand</div>
+                <div class="insight-value">Juli</div>
+                <div class="insight-sub">Gem. 6 leads/maand</div>
+            </div>
+            <div class="insight-card">
+                <div class="insight-label">Beste conversie kwartaal</div>
+                <div class="insight-value">Q1</div>
+                <div class="insight-sub">68% lead naar lid</div>
+            </div>
+            <div class="insight-card">
+                <div class="insight-label">Volgende campagne</div>
+                <div class="insight-value">18 aug</div>
+                <div class="insight-sub">Voor septemberpiek</div>
+            </div>
+        </div>
+
+        <!-- Leads per maand + forecast -->
+        <div class="card" style="margin-bottom:20px;">
             <div class="card-header">
-                <div class="card-title">Verwacht vs werkelijk</div>
+                <div>
+                    <div class="card-title">Leads per maand: actueel vs forecast</div>
+                    <div class="card-subtitle">Historisch gemiddelde als voorspelling voor komende maanden</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--text-3);">
+                    <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:var(--accent);border-radius:2px;display:inline-block;"></span>Actueel</span>
+                    <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#c7e8e3;border-radius:2px;display:inline-block;border:1px dashed var(--accent);"></span>Forecast</span>
+                </div>
             </div>
             <div class="card-body">
-                <div class="forecast-grid">
-                    <div class="forecast-card">
-                        <div class="forecast-label">Verwacht</div>
-                        <div class="forecast-value" id="forecastExpected">—</div>
-                        <div class="forecast-sub">Op basis van likelihood</div>
-                    </div>
-                    <div class="forecast-card">
-                        <div class="forecast-label">Actueel</div>
-                        <div class="forecast-value" id="forecastActual">—</div>
-                        <div class="forecast-sub">Daadwerkelijk gewonnen</div>
-                    </div>
-                </div>
-                <div id="gapDescription" style="font-size:12px;color:var(--text-3);margin-top:2px;"></div>
-            <div id="gapValue" style="font-size:22px;font-weight:700;color:var(--text-2);margin-top:4px;"></div>
-                <div class="chart-wrap" style="height:140px; margin-top:12px;">
-                    <canvas id="conversionFunnelChart"></canvas>
+                <div class="chart-wrap" style="height:260px;">
+                    <canvas id="seizoenChart"></canvas>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Practice performance + hot leads -->
-    <div class="charts-row">
-        <div class="card" id="performanceCard">
-            <!-- Admin view -->
-            <div id="adminPerformanceView">
+        <!-- Conversie per kwartaal -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Praktijk prestaties</div>
+                    <div class="card-title">Conversie per kwartaal</div>
                 </div>
-                <div class="card-body" id="practicePerformanceContainer">
+                <div class="card-body">
                     <div class="chart-wrap" style="height:200px;">
-                        <canvas id="practiceChart"></canvas>
+                        <canvas id="kwartaalChart"></canvas>
                     </div>
                 </div>
             </div>
-            <!-- Practice user view -->
-            <div id="practiceOwnView" style="display:none;">
+
+            <div class="card">
                 <div class="card-header">
-                    <div class="card-title" id="practiceOwnTitle">Mijn praktijk</div>
+                    <div class="card-title">Seizoensindeling</div>
+                    <div class="card-subtitle">Op basis van historische lead volumes</div>
                 </div>
-                <div class="card-body" id="practiceOwnContainer">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Leads deze maand</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownLeadsMonth">-</div>
+                <div class="card-body">
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
+                            <div style="font-size:13px;font-weight:500;">Januari, September</div>
+                            <span class="season-badge season-hot">Topmaanden</span>
                         </div>
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Totaal leads</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownLeadsTotal">-</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
+                            <div style="font-size:13px;font-weight:500;">Februari, Maart, Oktober</div>
+                            <span class="season-badge season-warm">Sterk</span>
                         </div>
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Afspraken gepland</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownAfspraken">-</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
+                            <div style="font-size:13px;font-weight:500;">April, Mei, November</div>
+                            <span class="season-badge season-cool">Gemiddeld</span>
                         </div>
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Actieve leden (eClub)</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownEclubLeden">-</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
+                            <div style="font-size:13px;font-weight:500;">Juni, Juli, Augustus, December</div>
+                            <span class="season-badge badge-gray" style="background:#fde8eb;color:#9b1c2e;">Laag</span>
                         </div>
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Churn % (eClub)</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownChurnPct">-</div>
-                        </div>
-                        <div style="background:#f9f9fb;border-radius:8px;padding:14px;">
-                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#9090a8;margin-bottom:6px;">Retentie % (eClub)</div>
-                            <div style="font-size:26px;font-weight:700;color:#0f0f12;" id="ownRetentiePct">-</div>
+                        <div style="margin-top:8px;padding:12px 14px;background:#fef3c7;border-radius:var(--radius-sm);border:1px solid #fcd34d;">
+                            <div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">Aanbevolen campagneplanning 2026</div>
+                            <div style="font-size:12px;color:#78350f;line-height:1.6;">
+                                Start campagne: <strong>18 aug</strong> (voor sept piek)<br>
+                                Verlaag budget: <strong>juni t/m aug</strong><br>
+                                Verdubbel inzet: <strong>dec voor jan piek</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Hot leads</div>
-                <div class="badge badge-amber" id="hotLeadsCount">0</div>
-            </div>
-            <div class="card-body" style="padding:0;">
-                <table class="table" id="hotLeadsTable">
-                    <thead>
-                        <tr>
-                            <th>Naam</th>
-                            <th>Kans</th>
-                            <th>Stadium</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hotLeadsBody">
-                        <tr><td colspan="3" style="text-align:center; color:var(--text-3); padding:24px;" id="hotLeadsList">Laden...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div><!-- end charts-row -->
-    <span id="avgTime" style="display:none;"></span>
+    </div>
 
-    <!-- Meta Marketing -->
-    <div class="card" id="metaMarketingSection" style="display:none; margin-bottom:16px;">
-        <div class="card-header">
-            <div>
-                <div class="card-title">Meta Marketing Performance</div>
-                <div class="card-subtitle" id="metaLastSync">Laatste sync: —</div>
-            </div>
-            <button class="btn btn-sync" onclick="syncMetaData()">Sync Nu</button>
-        </div>
-        <div class="card-body">
-            <div class="metrics-grid" id="metaMetricsGrid">
-                <!-- Rij 1: Bereik & Weergaven -->
-                <div class="metric-card">
-                    <div class="metric-label">Besteed bedrag</div>
-                    <div class="metric-value" id="metaTotalSpend">€0,00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Weergaven</div>
-                    <div class="metric-value" id="metaImpressions">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Bereik</div>
-                    <div class="metric-value" id="metaReach">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Frequentie</div>
-                    <div class="metric-value" id="metaFrequency">0</div>
-                </div>
-                <!-- Rij 2: Klikken -->
-                <div class="metric-card">
-                    <div class="metric-label">Klikken</div>
-                    <div class="metric-value" id="metaClicks">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Unieke klikken</div>
-                    <div class="metric-value" id="metaUniqueClicks">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">CTR (alle)</div>
-                    <div class="metric-value" id="metaCTR">0%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Unieke CTR</div>
-                    <div class="metric-value" id="metaUniqueCTR">0%</div>
-                </div>
-                <!-- Rij 3: Kosten -->
-                <div class="metric-card">
-                    <div class="metric-label">CPM</div>
-                    <div class="metric-value" id="metaCPM">€0,00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">CPC</div>
-                    <div class="metric-value" id="metaCPC">€0,00</div>
-                </div>
-                <div class="metric-card highlight">
-                    <div class="metric-label">Kosten per lead</div>
-                    <div class="metric-value" id="metaCostPerLead">€0,00</div>
-                </div>
-                <div class="metric-card highlight">
-                    <div class="metric-label">Leads (Meta)</div>
-                    <div class="metric-value" id="metaVerifiedLeads">0</div>
-                </div>
-                <!-- Rij 4: Video & Pages -->
-                <div class="metric-card">
-                    <div class="metric-label">Page Views</div>
-                    <div class="metric-value" id="metaPageViews">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Video 25%</div>
-                    <div class="metric-value" id="metaVideoP25">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Video 50%</div>
-                    <div class="metric-value" id="metaVideoP50">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Video 75%</div>
-                    <div class="metric-value" id="metaVideoP75">0</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Video 100%</div>
-                    <div class="metric-value" id="metaVideoP100">0</div>
-                </div>
-            </div>
-            <div class="meta-campaigns-table">
-                <div style="font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px;">Active Campaigns</div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Campaign</th>
-                            <th>Spend</th>
-                            <th>Conversions</th>
-                            <th>CPL</th>
-                        </tr>
-                    </thead>
-                    <tbody id="metaCampaignsBody">
-                        <tr><td colspan="4" style="text-align:center; color:var(--text-3); padding:16px;">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="chart-wrap" style="height:180px; margin-top:16px;">
-                <canvas id="metaCampaignChart"></canvas>
+    <!-- ── ROI PER LEAD SECTIE ─────────────────────────────────── -->
+    <div class="section" id="section-roi">
+        <div class="card">
+            <div class="card-body" style="text-align:center;padding:60px;color:var(--text-3);">
+                <div style="font-size:32px;margin-bottom:12px;">📈</div>
+                <div style="font-size:15px;font-weight:500;color:var(--text-2);margin-bottom:6px;">ROI per lead: komt binnenkort</div>
+                <div style="font-size:13px;">Deze module wordt gebouwd zodra de Meta spend data betrouwbaar genoeg is om te koppelen aan gewonnen leden. Kosten per lid per praktijk, campagne en bron.</div>
             </div>
         </div>
     </div>
 
-    <!-- eClub Ledendata -->
-    <div class="card" style="margin-bottom:24px;">
-        <div class="card-header">
-            <div>
-                <div class="card-title">eClub Ledendata</div>
-                <div class="card-subtitle">
-                    <span class="status-dot" id="eclubStatusDot"></span>
-                    <span id="eclubStatus">Niet gekoppeld</span>
-                </div>
+    <!-- ── LEAD KWALITEIT SECTIE ───────────────────────────────── -->
+    <div class="section" id="section-kwaliteit">
+
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+            <div class="insight-card" style="border-color:var(--red);background:#fef2f3;">
+                <div class="insight-label" style="color:#9b1c2e;">Geen uitkomst</div>
+                <div class="insight-value" style="color:var(--red);">6</div>
+                <div class="insight-sub">Afspraak geweest, niks geregistreerd</div>
             </div>
-            <div class="eclub-period-selectors">
-                <select id="eclubPeriodeType" class="period-select" onchange="onEclubPeriodeTypeChange()">
-                    <option value="maand">Maand</option>
-                    <option value="kwartaal">Kwartaal</option>
-                    <option value="jaar">Jaar</option>
-                </select>
-                <select id="eclubMaandSelect" class="period-select" onchange="syncEclub()">
-                    <option value="1">Januari</option><option value="2">Februari</option>
-                    <option value="3">Maart</option><option value="4">April</option>
-                    <option value="5">Mei</option><option value="6">Juni</option>
-                    <option value="7">Juli</option><option value="8">Augustus</option>
-                    <option value="9">September</option><option value="10">Oktober</option>
-                    <option value="11">November</option><option value="12">December</option>
-                </select>
-                <select id="eclubKwartaalSelect" class="period-select" onchange="syncEclub()" style="display:none;">
-                    <option value="1">Q1 (jan–mrt)</option><option value="2">Q2 (apr–jun)</option>
-                    <option value="3">Q3 (jul–sep)</option><option value="4">Q4 (okt–dec)</option>
-                </select>
-                <select id="eclubJaarSelect" class="period-select" onchange="syncEclub()"></select>
-                <button class="meta-sync-btn" onclick="syncEclub()">Sync Nu</button>
+            <div class="insight-card" style="border-color:var(--amber);background:#fffbeb;">
+                <div class="insight-label" style="color:#92400e;">Geen opvolging</div>
+                <div class="insight-value" style="color:var(--amber);">4</div>
+                <div class="insight-sub">Reminder verstuurd, geen actie</div>
+            </div>
+            <div class="insight-card" style="border-color:#1a56db;background:#eff4ff;">
+                <div class="insight-label" style="color:#1a56db;">Oud zonder afspraak</div>
+                <div class="insight-value" style="color:#1a56db;">9</div>
+                <div class="insight-sub">Meer dan 14 dagen, nog awareness</div>
+            </div>
+            <div class="insight-card highlight">
+                <div class="insight-label">Totaal aandacht nodig</div>
+                <div class="insight-value">19</div>
+                <div class="insight-sub">Leads buiten normale flow</div>
             </div>
         </div>
-        <div class="card-body">
-            <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
-                <div class="metric-card highlight">
-                    <div class="metric-label">Actieve leden</div>
-                    <div class="metric-value" id="eclubVisited">—</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Nieuwe leden</div>
-                    <div class="metric-value" id="eclubRegistrations">—</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Gestopt</div>
-                    <div class="metric-value" id="eclubPending">—</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Churn %</div>
-                    <div class="metric-value" id="eclubConversionRate">—</div>
-                </div>
-            </div>
 
-            <div style="font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px;">Overige KPI's</div>
-            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
-                <div class="metric-card">
-                    <div class="metric-label">Leden aantal</div>
-                    <div class="metric-value" id="eclubActiveMembers">—</div>
-                    <div class="kpi-sub"><span id="eclubNewMembers">—</span> gestart | <span id="eclubChurnedMembers">—</span> gestopt</div>
+        <!-- Geen uitkomst tabel -->
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Afspraken zonder uitkomst</div>
+                    <div class="card-subtitle">Afspraak heeft plaatsgevonden maar geen lid/bedenktijd/geen interesse geregistreerd</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Gem. duur lidmaatschap</div>
-                    <div class="metric-value" id="eclubAvgDuration">—</div>
+                <span class="badge badge-red">6 leads</span>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Naam</th>
+                        <th>Afspraakdatum</th>
+                        <th>Type</th>
+                        <th>Dagen geleden</th>
+                        <th>Actie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="font-weight:500;">Tom de Boer</td>
+                        <td>8 apr 2026</td>
+                        <td>Intake/Check-up</td>
+                        <td><span class="badge badge-red">3 dagen</span></td>
+                        <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;">Registreer uitkomst</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Daan van Dijk</td>
+                        <td>7 apr 2026</td>
+                        <td>Rondleiding</td>
+                        <td><span class="badge badge-red">4 dagen</span></td>
+                        <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;">Registreer uitkomst</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Petra Wolters</td>
+                        <td>5 apr 2026</td>
+                        <td>Intake/Check-up</td>
+                        <td><span class="badge badge-red">6 dagen</span></td>
+                        <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;">Registreer uitkomst</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Reminder verstuurd, geen opvolging -->
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Reminder verstuurd: geen opvolging</div>
+                    <div class="card-subtitle">Lead reminder 1 of 2 verstuurd maar praktijk heeft nog geen actie ondernomen</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Aantal bezoeken</div>
-                    <div class="metric-value" id="eclubTotalVisits">—</div>
+                <span class="badge badge-amber">4 leads</span>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Naam</th>
+                        <th>Aangemeld</th>
+                        <th>Reminder</th>
+                        <th>Verstuurd op</th>
+                        <th>Actie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="font-weight:500;">Kevin Smits</td>
+                        <td>28 mrt 2026</td>
+                        <td><span class="badge badge-amber">Reminder 2</span></td>
+                        <td>9 apr 2026</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openAfspraakModal(null, 99, 'Kevin Smits', 'Instagram')">Inplannen</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Fatima El Ouali</td>
+                        <td>30 mrt 2026</td>
+                        <td><span class="badge badge-blue">Reminder 1</span></td>
+                        <td>1 apr 2026</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openAfspraakModal(null, 100, 'Fatima El Ouali', 'Facebook')">Inplannen</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Bas Timmermans</td>
+                        <td>1 apr 2026</td>
+                        <td><span class="badge badge-blue">Reminder 1</span></td>
+                        <td>3 apr 2026</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openAfspraakModal(null, 101, 'Bas Timmermans', 'Google')">Inplannen</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Oud zonder afspraak -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Oud zonder afspraak</div>
+                    <div class="card-subtitle">Meer dan 14 dagen in awareness zonder afspraak of reminder</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Retentie</div>
-                    <div class="metric-value" id="eclubRetention">—</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Omzet per locatie</div>
-                    <div class="metric-value" id="eclubRevenue">—</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Omzet per lid</div>
-                    <div class="metric-value" id="eclubRevenuePerMember">—</div>
-                </div>
+                <span class="badge badge-blue">9 leads</span>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Naam</th>
+                        <th>Aangemeld</th>
+                        <th>Dagen oud</th>
+                        <th>Bron</th>
+                        <th>Actie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="font-weight:500;">Ingrid Brouwers</td>
+                        <td>15 mrt 2026</td>
+                        <td><span class="badge badge-red">27 dagen</span></td>
+                        <td>Instagram</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;">Inplannen</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Jeroen Koster</td>
+                        <td>20 mrt 2026</td>
+                        <td><span class="badge badge-red">22 dagen</span></td>
+                        <td>Google</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;">Inplannen</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Mirjam Hoekstra</td>
+                        <td>24 mrt 2026</td>
+                        <td><span class="badge badge-amber">18 dagen</span></td>
+                        <td>Facebook</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;">Inplannen</button></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:500;">Lars van den Berg</td>
+                        <td>26 mrt 2026</td>
+                        <td><span class="badge badge-amber">16 dagen</span></td>
+                        <td>Vrienden/Familie</td>
+                        <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;">Inplannen</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── DASHBOARD PLACEHOLDER ───────────────────────────────── -->
+    <div class="section active" id="section-dashboard">
+        <div class="card">
+            <div class="card-body" style="text-align:center;padding:60px;color:var(--text-3);">
+                <div style="font-size:32px;margin-bottom:12px;">📊</div>
+                <div style="font-size:15px;font-weight:500;color:var(--text-2);margin-bottom:6px;">Dit is de preview</div>
+                <div style="font-size:13px;">Klik op <strong>Afspraken</strong> of <strong>Seizoenspatronen</strong> in de sidebar om de nieuwe modules te bekijken.</div>
             </div>
         </div>
     </div>
 
 </main>
 
-    <script>
-        // User session state
-        let currentUser = null;
-        
-        // Chart instances
-        let churnForecastChart, conversionFunnelChart, practiceChart, sourceChart;
-
-        // Check authentication on page load
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/auth/me', { credentials: 'include' });
-                if (!res.ok) {
-                    window.location.href = '/login.html';
-                    return false;
-                }
-                const data = await res.json();
-                currentUser = data.user;
-                updateUserUI();
-                return true;
-            } catch (err) {
-                console.error('Auth check failed:', err);
-                window.location.href = '/login.html';
-                return false;
-            }
-        }
-
-        // Update user info in header
-        function updateUserUI() {
-            if (!currentUser) return;
-            
-            const userInfo = document.getElementById('userInfo');
-            const userIcon = document.getElementById('userIcon');
-            const userEmail = document.getElementById('userEmail');
-            const userRole = document.getElementById('userRole');
-            
-            // Show user info
-            userInfo.style.display = 'flex';
-            
-            // Set user icon (first letter of email)
-            userIcon.textContent = currentUser.email.charAt(0).toUpperCase();
-            
-            // Set email and role
-            userEmail.textContent = currentUser.email;
-            userRole.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Praktijk';
-            
-            // If practice user, hide admin-only features
-            if (currentUser.role === 'practice') {
-                hideAdminFeatures();
-            }
-        }
-
-        // Hide admin-only features for practice users
-        function hideAdminFeatures() {
-            // Verberg praktijk dropdown
-            const practiceFilter = document.getElementById('practiceFilter');
-            if (practiceFilter) practiceFilter.style.display = 'none';
-
-            // Verberg zoekbalk praktijken
-            const practiceSearchGroup = document.getElementById('practiceSearchGroup');
-            if (practiceSearchGroup) practiceSearchGroup.style.display = 'none';
-
-            // Wissel admin performance view naar eigen praktijk view
-            const adminView = document.getElementById('adminPerformanceView');
-            if (adminView) adminView.style.display = 'none';
-            const ownView = document.getElementById('practiceOwnView');
-            if (ownView) ownView.style.display = 'block';
-
-            // Laad eigen prestaties
-            loadOwnPracticeStats();
-        }
-
-        async function loadOwnPracticeStats() {
-            try {
-                const practiceCode = getPracticeCode();
-                if (!practiceCode) return;
-
-                // Titel instellen
-                const titleEl = document.getElementById('practiceOwnTitle');
-                if (titleEl && currentUser.praktijkNaam) titleEl.textContent = currentUser.praktijkNaam;
-
-                // Leads ophalen
-                const leadsRes = await fetch(`/api/funnel?practice=${practiceCode}`, { credentials: 'include' });
-                const leadsData = await leadsRes.json();
-
-                if (leadsData && leadsData.stages) {
-                    const total = leadsData.stages.reduce((s, st) => s + (parseInt(st.count) || 0), 0);
-                    const intent = leadsData.stages.find(s => s.stage === 'intent');
-                    document.getElementById('ownLeadsTotal').textContent = total || 0;
-                    document.getElementById('ownAfspraken').textContent = intent ? parseInt(intent.count) || 0 : 0;
-                }
-
-                // Leads deze maand
-                const now = new Date();
-                const dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                const dateTo = now.toISOString().split('T')[0];
-                const monthRes = await fetch(`/api/leads-by-stage?stage=awareness&practice=${practiceCode}&dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' });
-                const monthData = await monthRes.json();
-                document.getElementById('ownLeadsMonth').textContent = monthData && monthData.leads ? monthData.leads.length : 0;
-
-                // eClub data
-                const eclubRes = await fetch(`/api/eclub/kpis/${practiceCode}?jaar=${now.getFullYear()}&maand=${now.getMonth() + 1}`, { credentials: 'include' });
-                const eclubData = await eclubRes.json();
-
-                if (eclubData && eclubData.success && eclubData.data) {
-                    const d = eclubData.data;
-                    document.getElementById('ownEclubLeden').textContent = d.leden_actief || '-';
-                    document.getElementById('ownChurnPct').textContent = d.churn_pct > 0 ? d.churn_pct + '%' : '-';
-                    document.getElementById('ownRetentiePct').textContent = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
-                }
-            } catch (error) {
-                console.error('Own practice stats error:', error);
-            }
-        }
-
-        // Logout function
-        async function logout() {
-            try {
-                await fetch('/api/auth/logout', { 
-                    method: 'POST',
-                    credentials: 'include' 
-                });
-            } catch (err) {
-                console.error('Logout failed:', err);
-            }
-            window.location.href = '/login.html';
-        }
-
-        // Password change modal functions
-        function openPasswordModal() {
-            document.getElementById('passwordModal').classList.add('active');
-            document.getElementById('passwordForm').reset();
-            document.getElementById('passwordMessage').innerHTML = '';
-        }
-
-        function closePasswordModal() {
-            document.getElementById('passwordModal').classList.remove('active');
-        }
-
-        async function changePassword(event) {
-            event.preventDefault();
-            
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const messageDiv = document.getElementById('passwordMessage');
-            
-            // Validate
-            if (newPassword !== confirmPassword) {
-                messageDiv.innerHTML = '<div class="error-message">Nieuwe wachtwoorden komen niet overeen</div>';
-                return;
-            }
-            
-            if (newPassword.length < 8) {
-                messageDiv.innerHTML = '<div class="error-message">Wachtwoord moet minimaal 8 tekens zijn</div>';
-                return;
-            }
-            
-            // Check password strength
-            const hasUpper = /[A-Z]/.test(newPassword);
-            const hasLower = /[a-z]/.test(newPassword);
-            const hasNumber = /[0-9]/.test(newPassword);
-            
-            if (!hasUpper || !hasLower || !hasNumber) {
-                messageDiv.innerHTML = '<div class="error-message">Wachtwoord moet een hoofdletter, kleine letter en cijfer bevatten</div>';
-                return;
-            }
-            
-            try {
-                const res = await fetch('/api/auth/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        currentPassword,
-                        newPassword
-                    })
-                });
-                
-                const data = await res.json();
-                
-                if (res.ok) {
-                    messageDiv.innerHTML = '<div class="success-message">✅ Wachtwoord succesvol gewijzigd!</div>';
-                    setTimeout(() => {
-                        closePasswordModal();
-                    }, 2000);
-                } else {
-                    messageDiv.innerHTML = `<div class="error-message">${data.error || 'Fout bij wijzigen wachtwoord'}</div>`;
-                }
-            } catch (error) {
-                console.error('Change password error:', error);
-                messageDiv.innerHTML = '<div class="error-message">Fout bij wijzigen wachtwoord. Probeer opnieuw.</div>';
-            }
-        }
-
-        // Close modal on background click
-        document.addEventListener('click', (e) => {
-            const modal = document.getElementById('passwordModal');
-            if (e.target === modal) {
-                closePasswordModal();
-            }
-            
-            const leadsModal = document.getElementById('leadsModal');
-            if (e.target === leadsModal) {
-                closeLeadsModal();
-            }
-        });
-
-        // Leads modal functions
-        function closeLeadsModal() {
-            document.getElementById('leadsModal').classList.remove('active');
-        }
-
-        let isLoadingLeads = false;
-        
-        async function showLeadsForStage(stage, stageName) {
-            if (isLoadingLeads) return;
-            isLoadingLeads = true;
-            
-            const modal = document.getElementById('leadsModal');
-            const title = document.getElementById('leadsModalTitle');
-            const content = document.getElementById('leadsModalContent');
-            
-            title.textContent = stageName;
-            content.innerHTML = '<div style="text-align: center; padding: 40px; color: #86868b;">Laden...</div>';
-            modal.classList.add('active');
-            
-            try {
-                const queryString = buildQueryString();
-                const url = `/api/leads-by-stage?stage=${stage}${queryString.replace('?', '&')}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                if (!data.success || !data.leads || data.leads.length === 0) {
-                    content.innerHTML = '<div style="text-align: center; padding: 40px; color: #86868b;">Geen leads gevonden</div>';
-                    return;
-                }
-                
-                let html = '<table style="width: 100%; border-collapse: collapse;">';
-                html += '<thead><tr style="background: #f5f5f7; text-align: left;">';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Naam</th>';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Email</th>';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Telefoon</th>';
-                html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Binnenkomst</th>';
-                
-                if (stage === 'intent') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Afspraak Datum</th>';
-                }
-                
-                if (stage === 'lost') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #1d1d1f;">Status</th>';
-                }
-
-                if (stage === 'won') {
-                    html += '<th style="padding: 12px; font-size: 12px; font-weight: 600; color: #16a34a;">Lid sinds</th>';
-                }
-                
-                html += '</tr></thead><tbody>';
-                
-                data.leads.forEach(lead => {
-                    html += '<tr style="border-bottom: 1px solid #e5e5e5;">';
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
-                    
-                    // Timestamp binnenkomst
-                    const ts = lead.aangemaakt_op ? new Date(lead.aangemaakt_op).toLocaleString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
-                    html += `<td style="padding: 12px; font-size: 13px; color: #86868b;">${ts}</td>`;
-                    
-                    if (stage === 'intent') {
-                        const appointmentDate = lead.appointment_date || lead.afspraak_datum;
-                        const appointmentTime = lead.appointment_time || '';
-                        let displayDate = '-';
-                        
-                        if (appointmentDate) {
-                            const date = new Date(appointmentDate);
-                            displayDate = date.toLocaleDateString('nl-NL');
-                            if (appointmentTime) {
-                                displayDate += ' ' + appointmentTime.substring(0, 5);
-                            }
-                        }
-                        
-                        html += `<td style="padding: 12px; font-size: 14px;">${displayDate}</td>`;
-                    }
-                    
-                    if (stage === 'lost') {
-                        html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${lead.status || 'Niet Geïnteresseerd'}</span></td>`;
-                    }
-
-                    if (stage === 'won') {
-                        const lidSinds = lead.lid_geworden_op
-                            ? new Date(lead.lid_geworden_op).toLocaleDateString('nl-NL')
-                            : '-';
-                        html += `<td style="padding: 12px; font-size: 14px; color: #16a34a; font-weight: 600;">${lidSinds}</td>`;
-                    }
-                    
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table>';
-                content.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Load leads error:', error);
-                content.innerHTML = '<div style="text-align: center; padding: 40px; color: #c62828;">Fout bij laden leads</div>';
-            } finally {
-                isLoadingLeads = false;
-            }
-        }
-
-        // Initialize dashboard
-        async function init() {
-            // Check auth first
-            const isAuthenticated = await checkAuth();
-            if (!isAuthenticated) return;
-            
-            // Start idle detection
-            startIdleDetection();
-            
-            await loadPractices();
-            await loadKPIs();
-            await loadChurnForecast();
-            await loadConversionFunnel();
-            await loadPracticePerformance();
-            await loadSourcePerformance();
-            
-            // NEW: Enhanced dashboard features
-            await loadPipelineFunnel();
-            await loadForecastComparison();
-            await loadHotLeads();
-            await loadMetaMarketing();
-            await loadEclubData();
-        }
-
-        // Load practices for dropdown
-        // Store all practices globally for search
-        let allPractices = [];
-
-        async function loadPractices() {
-            try {
-                // Practice users: set their own code directly, skip full list
-                if (currentUser && currentUser.role === 'practice') {
-                    const code = getPracticeCode();
-                    if (code) {
-                        const select = document.getElementById('practiceFilter');
-                        select.innerHTML = '';
-                        const opt = document.createElement('option');
-                        opt.value = code;
-                        opt.textContent = code;
-                        opt.selected = true;
-                        select.appendChild(opt);
-                    }
-                    return;
-                }
-
-                const res = await fetch('/api/churn/practices', { credentials: 'include' });
-                const data = await res.json();
-                
-                if (data.success && data.practices) {
-                    allPractices = data.practices; // Store globally
-                    
-                    const select = document.getElementById('practiceFilter');
-                    select.innerHTML = '<option value="">Alle praktijken</option>';
-                    
-                    data.practices.forEach(practice => {
-                        const option = document.createElement('option');
-                        option.value = practice.code;
-                        option.textContent = practice.naam;
-                        option.dataset.naam = practice.naam.toLowerCase();
-                        select.appendChild(option);
-                    });
-
-                    // Show search box for admin only
-                    if (currentUser && currentUser.role === 'admin') {
-                        document.getElementById('practiceSearchGroup').style.display = 'block';
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading practices:', error);
-            }
-        }
-
-        // Filter practices based on search input (admin only)
-        function filterPractices() {
-            const searchInput = document.getElementById('practiceSearch').value.toLowerCase().trim();
-            const select = document.getElementById('practiceFilter');
-            
-            if (!searchInput) {
-                // Reset - show all options
-                const options = select.getElementsByTagName('option');
-                for (let i = 0; i < options.length; i++) {
-                    options[i].style.display = '';
-                }
-                return;
-            }
-
-            // Filter and focus dropdown
-            const options = select.getElementsByTagName('option');
-            let firstMatch = null;
-
-            for (let i = 1; i < options.length; i++) { // Skip first "Alle praktijken"
-                const option = options[i];
-                const naam = option.textContent.toLowerCase();
-                
-                if (naam.includes(searchInput)) {
-                    option.style.display = '';
-                    if (!firstMatch) {
-                        firstMatch = option;
-                    }
-                } else {
-                    option.style.display = 'none';
-                }
-            }
-
-            // Auto-select first match if exists
-            if (firstMatch && allPractices.length > 0) {
-                select.value = firstMatch.value;
-                // Trigger change to update dashboard
-                select.dispatchEvent(new Event('change'));
-            }
-        }
-
-        // Load KPIs
-        async function loadKPIs() {
-            try {
-                const res = await fetch('/api/practice-performance' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (data.success && data.data) {
-                    const totalLeads = data.data.reduce((sum, p) => sum + parseInt(p.total_leads || 0), 0);
-                    const totalConverted = data.data.reduce((sum, p) => sum + parseInt(p.lid_geworden || 0), 0);
-                    const conversionRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : 0;
-                    const activePractices = data.data.filter(p => p.total_leads > 0).length;
-
-                    // Gem. leads per maand: totaal leads / aantal actieve maanden (min 1)
-                    const avgLeads = data.data.reduce((sum, p) => sum + parseFloat(p.avg_leads_per_month || 0), 0);
-                    const avgLeadsDisplay = activePractices > 0
-                        ? Math.round(avgLeads / activePractices)
-                        : Math.round(totalLeads / Math.max(1, activePractices));
-
-                    document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
-                    document.getElementById('conversionRate').textContent = conversionRate + '%';
-                    document.getElementById('activePractices').textContent = activePractices;
-                    document.getElementById('avgLeadsPerMonth').textContent = avgLeadsDisplay || '—';
-
-                    // Top bron ophalen
-                    const sourcesRes = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
-                    const sourcesData = await sourcesRes.json();
-                    if (sourcesData.success && sourcesData.sources && sourcesData.sources.length > 0) {
-                        const topBron = document.getElementById('topSource');
-                        if (topBron) topBron.textContent = sourcesData.sources[0].bron || sourcesData.sources[0].source || 'Onbekend';
-                    }
-
-                    const avgTimeEl = document.getElementById('avgTime');
-                    if (avgTimeEl) avgTimeEl.textContent = '12d';
-                }
-            } catch (error) {
-                console.error('Error loading KPIs:', error);
-            }
-        }
-
-        // Load Churn Forecast Chart - eClub historische data
-        async function loadChurnForecast() {
-            try {
-                const practice = document.getElementById('practiceFilter')?.value
-                    || (currentUser && getPracticeCode()) || null;
-
-                // Zonder praktijk: lege grafiek tonen
-                if (!practice) {
-                    const ctx = document.getElementById('churnForecastChart');
-                    if (churnForecastChart) churnForecastChart.destroy();
-                    churnForecastChart = new Chart(ctx, {
-                        type: 'line',
-                        data: { labels: [], datasets: [] },
-                        options: { responsive: true, maintainAspectRatio: false }
-                    });
-                    return;
-                }
-
-                const res = await fetch(`/api/eclub/history/${practice}`, { credentials: 'include' });
-                const data = await res.json();
-
-                const ctx = document.getElementById('churnForecastChart');
-                if (churnForecastChart) churnForecastChart.destroy();
-
-                if (!data.success || !data.data || data.data.length === 0) {
-                    // Fallback naar oude endpoint als geen eclub data
-                    const fallback = await fetch('/api/churn-forecast', { credentials: 'include' });
-                    const fallbackData = await fallback.json();
-                    if (fallbackData.success) {
-                        const allData = [...(fallbackData.historical || []), ...(fallbackData.forecast || [])];
-                        churnForecastChart = new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: allData.map(d => d.month),
-                                datasets: [
-                                    { label: 'Total Members', data: allData.map(d => d.total_members),
-                                      borderColor: '#06c', backgroundColor: 'rgba(0,102,204,0.1)', borderWidth: 2, tension: 0.4 },
-                                    { label: 'Churned Members', data: allData.map(d => d.churned_members),
-                                      borderColor: '#ff3b30', backgroundColor: 'rgba(255,59,48,0.1)', borderWidth: 2, tension: 0.4 }
-                                ]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false,
-                                plugins: { legend: { display: true, position: 'bottom' } },
-                                scales: { y: { beginAtZero: true } } }
-                        });
-                    }
-                    return;
-                }
-
-                // Echte eClub data
-                const history = data.data;
-
-                churnForecastChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: history.map(d => d.periode),
-                        datasets: [
-                            {
-                                label: 'Actieve leden',
-                                data: history.map(d => d.subscribed),
-                                borderColor: '#06c',
-                                backgroundColor: 'rgba(0,102,204,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4,
-                                fill: true
-                            },
-                            {
-                                label: 'Gestopt',
-                                data: history.map(d => d.expiring),
-                                borderColor: '#ff3b30',
-                                backgroundColor: 'rgba(255,59,48,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Nieuw',
-                                data: history.map(d => d.new),
-                                borderColor: '#10b981',
-                                backgroundColor: 'rgba(16,185,129,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true, position: 'bottom' },
-                            tooltip: {
-                                callbacks: {
-                                    afterBody: (items) => {
-                                        const idx = items[0]?.dataIndex;
-                                        if (idx === undefined) return;
-                                        const d = history[idx];
-                                        return [`Retentie: ${d.retentie_pct}%`, `Churn: ${d.churn_pct}%`];
-                                    }
-                                }
-                            }
-                        },
-                        scales: { y: { beginAtZero: false } }
-                    }
-                });
-
-            } catch (error) {
-                console.error('Error loading churn forecast:', error);
-                showError('churnForecastChart', error.message);
-            }
-        }
-
-        // Load Conversion Funnel
-        async function loadConversionFunnel() {
-            try {
-                const res = await fetch('/api/conversion-funnel' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (data.success && data.data) {
-                    const ctx = document.getElementById('conversionFunnelChart');
-                    if (conversionFunnelChart) conversionFunnelChart.destroy();
-                    
-                    conversionFunnelChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: data.data.map(d => d.stage),
-                            datasets: [{
-                                label: 'Count',
-                                data: data.data.map(d => d.count),
-                                backgroundColor: [
-                                    '#06c',
-                                    '#34c759',
-                                    '#ff9500',
-                                    '#ff3b30'
-                                ]
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading funnel:', error);
-                showError('conversionFunnelChart', error.message);
-            }
-        }
-
-        // Load Practice Performance
-        async function loadPracticePerformance() {
-            try {
-                const res = await fetch('/api/practice-performance' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (data.success && data.data) {
-                    const topPractices = data.data.slice(0, 10);
-                    
-                    const ctx = document.getElementById('practiceChart');
-                    if (practiceChart) practiceChart.destroy();
-                    
-                    practiceChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: topPractices.map(d => d.praktijk_naam || d.praktijk_code),
-                            datasets: [{
-                                label: 'Gemiddelde Leads per Maand',
-                                data: topPractices.map(d => parseFloat(d.avg_leads_per_month) || 0),
-                                backgroundColor: '#06c'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading practice performance:', error);
-            }
-        }
-
-        // Load Source Performance
-        async function loadSourcePerformance() {
-            try {
-                const res = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (data.success && data.sources) {
-                    const ctx = document.getElementById('sourceChart');
-                    if (sourceChart) sourceChart.destroy();
-                    
-                    sourceChart = new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: data.sources.map(d => d.bron || d.source || 'Onbekend'),
-                            datasets: [{
-                                data: data.sources.map(d => d.count),
-                                backgroundColor: [
-                                    '#2563eb', // Blue
-                                    '#10b981', // Green
-                                    '#f59e0b', // Orange
-                                    '#8b5cf6', // Purple
-                                    '#ef4444', // Red
-                                    '#06b6d4', // Cyan
-                                    '#ec4899', // Pink
-                                    '#14b8a6', // Teal
-                                    '#f97316', // Deep Orange
-                                    '#6366f1', // Indigo
-                                    '#84cc16', // Lime
-                                    '#a855f7'  // Violet
-                                ]
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading sources:', error);
-            }
-        }
-
-        // Build query string from filters
-        function getPracticeCode() {
-            if (!currentUser) return null;
-            return currentUser.practiceCode || currentUser.practice_code || null; // normalize camelCase vs underscore
-        }
-
-        function buildQueryString() {
-            const params = new URLSearchParams();
-            
-            // If practice user, force their practice code
-            if (currentUser && currentUser.role === 'practice' && getPracticeCode()) {
-                params.append('practice', getPracticeCode());
-            } else if (currentUser && currentUser.role === 'admin') {
-                // Admin can filter by practice - only if explicitly selected
-                const practiceFilter = document.getElementById('practiceFilter');
-                if (practiceFilter && practiceFilter.value) {
-                    params.append('practice', practiceFilter.value);
-                }
-                // If no filter selected, show ALL (don't add practice param)
-            }
-            
-            const source = document.getElementById('sourceFilter').value;
-            if (source) params.append('source', source);
-            
-            const dateFrom = document.getElementById('dateFrom').value;
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            
-            const dateTo = document.getElementById('dateTo').value;
-            if (dateTo) params.append('dateTo', dateTo);
-            
-            const status = document.getElementById('statusFilter').value;
-            if (status) params.append('status', status);
-            
-            const queryString = params.toString();
-            return queryString ? '?' + queryString : '';
-        }
-
-        // Apply filters
-        function applyFilters() {
-            loadKPIs();
-            loadConversionFunnel();
-            loadPracticePerformance();
-            loadSourcePerformance();
-            
-            // NEW: Also reload enhanced sections
-            loadPipelineFunnel();
-            loadForecastComparison();
-            loadHotLeads();
-            loadMetaMarketing();
-            loadEclubData();
-        }
-
-        // Refresh all data
-        function refreshData() {
-            init();
-        }
-
-        // Show error message
-        function showError(elementId, message) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                const parent = element.parentElement;
-                parent.innerHTML = `<div class="error-message">Error: ${message}</div>`;
-            }
-        }
-
-        // Get current filter values
-        function getCurrentFilters() {
-            return {
-                practice: document.getElementById('practiceFilter')?.value || '',
-                source: document.getElementById('sourceFilter')?.value || '',
-                status: document.getElementById('statusFilter')?.value || '',
-                dateFrom: document.getElementById('dateFrom')?.value || '',
-                dateTo: document.getElementById('dateTo')?.value || ''
-            };
-        }
-
-        // Excel Export Function
-        async function exportToExcel() {
-            try {
-                const filters = getCurrentFilters();
-                
-                // Practijenaam bepalen
-                let practiceName = 'Alle praktijken';
-                const practiceCode = getPracticeCode();
-                if (practiceCode) {
-                    const practiceFilter = document.getElementById('practiceFilter');
-                    const selectedOption = Array.from(practiceFilter.options).find(opt => opt.value === practiceCode);
-                    practiceName = selectedOption ? selectedOption.text : practiceCode;
-                } else if (currentUser && currentUser.role !== 'practice') {
-                    practiceName = document.getElementById('practiceFilter').selectedOptions[0]?.text || 'Alle praktijken';
-                }
-
-                const dateRange = filters.dateFrom && filters.dateTo
-                    ? `${filters.dateFrom} tot ${filters.dateTo}`
-                    : 'Alle data';
-
-                const [funnelRes, performanceRes, sourcesRes, forecastRes] = await Promise.all([
-                    fetch('/api/funnel' + buildQueryString(), { credentials: 'include' }),
-                    fetch('/api/practice-performance' + buildQueryString(), { credentials: 'include' }),
-                    fetch('/api/sources' + buildQueryString(), { credentials: 'include' }),
-                    fetch('/api/churn-forecast' + buildQueryString(), { credentials: 'include' })
-                ]);
-
-                const funnelData      = await funnelRes.json();
-                const performanceData = await performanceRes.json();
-                const sourcesData     = await sourcesRes.json();
-                const forecastData    = await forecastRes.json();
-
-                const wb = XLSX.utils.book_new();
-
-                // Sheet 1: Funnel — gebruik .stages
-                if (funnelData.success && funnelData.stages && funnelData.stages.length > 0) {
-                    const funnelSheet = XLSX.utils.json_to_sheet(funnelData.stages.map(d => ({
-                        'Stage':        d.stage_name || d.stage,
-                        'Aantal':       d.count,
-                        'Conversie %':  d.conversion_rate ? `${d.conversion_rate}%` : '-'
-                    })));
-                    XLSX.utils.book_append_sheet(wb, funnelSheet, 'Conversie Funnel');
-                }
-
-                // Sheet 2: Praktijk performance — gebruik .data
-                if (performanceData.success && performanceData.data && performanceData.data.length > 0) {
-                    const perfSheet = XLSX.utils.json_to_sheet(performanceData.data.map(d => ({
-                        'Praktijk':      d.practice_name || d.praktijk_naam,
-                        'Totaal Leads':  d.total_leads,
-                        'Afspraken':     d.appointments,
-                        'Conversies':    d.conversions || d.lid_geworden,
-                        'Conversie %':   d.conversion_rate ? `${d.conversion_rate}%` : '0%'
-                    })));
-                    XLSX.utils.book_append_sheet(wb, perfSheet, 'Praktijk Performance');
-                }
-
-                // Sheet 3: Lead bronnen — gebruik .sources (niet .data!)
-                if (sourcesData.success && sourcesData.sources && sourcesData.sources.length > 0) {
-                    const sourcesSheet = XLSX.utils.json_to_sheet(sourcesData.sources.map(d => ({
-                        'Bron':          d.bron || d.source || 'Onbekend',
-                        'Aantal Leads':  d.count
-                    })));
-                    XLSX.utils.book_append_sheet(wb, sourcesSheet, 'Lead Bronnen');
-                }
-
-                // Sheet 4: Churn forecast — gebruik .forecast
-                if (forecastData.success && forecastData.forecast && forecastData.forecast.length > 0) {
-                    const forecastSheet = XLSX.utils.json_to_sheet(forecastData.forecast.map(d => ({
-                        'Maand':             d.month,
-                        'Totaal leden':      d.total_members,
-                        'Voorspelde churn':  d.churned_members,
-                        'Prognose':          d.is_forecast ? 'Ja' : 'Nee'
-                    })));
-                    XLSX.utils.book_append_sheet(wb, forecastSheet, 'Churn Forecast');
-                }
-
-                // Sheet 5: Metadata
-                const metaSheet = XLSX.utils.json_to_sheet([
-                    { 'Parameter': 'Export datum',      'Waarde': new Date().toLocaleString('nl-NL') },
-                    { 'Parameter': 'Praktijk',           'Waarde': practiceName },
-                    { 'Parameter': 'Datum bereik',       'Waarde': dateRange },
-                    { 'Parameter': 'Gegenereerd door',   'Waarde': 'Dynamic Health Analytics' }
-                ]);
-                XLSX.utils.book_append_sheet(wb, metaSheet, 'Export Info');
-
-                const timestamp = new Date().toISOString().split('T')[0];
-                XLSX.writeFile(wb, `DHC_Analytics_${timestamp}.xlsx`);
-                alert('Rapportage succesvol geexporteerd!');
-
-            } catch (error) {
-                console.error('Export error:', error);
-                alert('Fout bij exporteren: ' + error.message);
-            }
-        }
-
-        // NEW: Load Pipeline Funnel
-        async function loadPipelineFunnel() {
-            try {
-                const res = await fetch('/api/funnel' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (!data.success || !data.stages) {
-                    document.getElementById('pipelineFunnelContainer').innerHTML = 
-                        '<div style="text-align:center;color:#86868b;padding:20px;">Geen data beschikbaar</div>';
-                    return;
-                }
-                
-                // Define expected stages with defaults
-                const expectedStages = [
-                    { stage: 'awareness', stage_name: 'Leads', count: 0 },
-                    { stage: 'intent', stage_name: 'Benaderd', count: 0 },
-                    { stage: 'won', stage_name: 'Lid', count: 0 },
-                    { stage: 'lost', stage_name: 'Geen interesse', count: 0 }
-                ];
-
-                // Merge with actual data
-                const stagesMap = {};
-                data.stages.forEach(stage => {
-                    stagesMap[stage.stage] = stage;
-                });
-
-                const stages = expectedStages.map(expected => {
-                    if (stagesMap[expected.stage]) {
-                        return stagesMap[expected.stage];
-                    }
-                    return expected;
-                });
-
-                const total = Math.max(stages[0]?.count || 1, 1);
-                
-                let html = '';
-                stages.forEach((stage, idx) => {
-                    const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
-                    const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
-                    // Make awareness, intent, lost and won clickable
-                    const isClickable = ['awareness', 'intent', 'lost', 'won'].includes(stage.stage);
-                    const cursor = isClickable ? 'cursor: pointer;' : '';
-                    const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
-                    
-                    html += `
-                        <div class="funnel-stage">
-                            <div class="funnel-bar ${stage.stage}" style="width: ${percentage}%; ${cursor}" ${onClick}>
-                                <span>${stage.stage_name}</span>
-                                <span class="funnel-count">${stage.count}</span>
-                            </div>
-                            <div class="funnel-stats">
-                                <div>${(stage.count / total * 100).toFixed(1)}% of total</div>
-                                ${idx > 0 ? `<span class="conversion-rate">${convRate}% conversion</span>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                document.getElementById('pipelineFunnelContainer').innerHTML = html;
-            } catch (error) {
-                console.error('Pipeline funnel error:', error);
-                document.getElementById('pipelineFunnelContainer').innerHTML = 
-                    '<div style="text-align:center;color:#c62828;padding:20px;">Error loading funnel</div>';
-            }
-        }
-
-        // NEW: Load Forecast Comparison
-        async function loadForecastComparison() {
-            try {
-                const res = await fetch('/api/pipeline-metrics' + buildQueryString(), { credentials: 'include' });
-                const data = await res.json();
-                
-                if (!data.success) return;
-                
-                const expected = data.expected_conversions || 0;
-                const actual = data.won_deals || 0;
-                const gap = actual - expected;
-                const gapPercent = expected > 0 ? ((gap / expected) * 100).toFixed(1) : 0;
-                
-                document.getElementById('forecastExpected').textContent = expected;
-                document.getElementById('forecastActual').textContent = actual;
-                document.getElementById('gapValue').textContent = 
-                    `${gap >= 0 ? '+' : ''}${gap} (${gapPercent}%)`;
-                
-                const gapDesc = document.getElementById('gapDescription');
-                if (gap >= 0) {
-                    gapDesc.textContent = 'Boven forecast - excellent performance';
-                    gapDesc.style.color = '#10b981';
-                } else if (gap > -3) {
-                    gapDesc.textContent = 'Licht onder forecast - nog bij te halen';
-                    gapDesc.style.color = '#f59e0b';
-                } else {
-                    gapDesc.textContent = 'Onder forecast - actie vereist';
-                    gapDesc.style.color = '#ef4444';
-                }
-            } catch (error) {
-                console.error('Forecast comparison error:', error);
-            }
-        }
-
-        // NEW: Load Hot Leads
-        async function loadHotLeads() {
-            try {
-                // Use buildQueryString to apply practice isolation
-                const queryString = buildQueryString();
-                const url = `/api/hot-leads?limit=5${queryString ? '&' + queryString.substring(1) : ''}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                const container = document.getElementById('hotLeadsList');
-                
-                if (!data.success || !data.leads || data.leads.length === 0) {
-                    container.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:12px;">Geen hot leads</div>';
-                    return;
-                }
-                
-                let html = '';
-                data.leads.forEach(lead => {
-                    html += `
-                        <div class="hot-lead-item">
-                            <div class="hot-lead-name">${lead.volledige_naam}</div>
-                            <div class="hot-lead-meta">
-                                <span>${lead.praktijk_naam || 'Geen praktijk'}</span>
-                                <span>${lead.funnel_stage}</span>
-                                <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
-                                <span>€${parseFloat(lead.expected_value || 0).toFixed(0)}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            } catch (error) {
-                console.error('Hot leads error:', error);
-                document.getElementById('hotLeadsList').innerHTML = 
-                    '<div style="text-align:center;color:#c62828;padding:20px;font-size:12px;">Error loading hot leads</div>';
-            }
-        }
-
-        // ECLUB FUNCTIONS
-        // Initialiseer jaar selector en stel huidige periode in
-        function initEclubPeriodeSelector() {
-            const nu = new Date();
-            const huidigJaar  = nu.getFullYear();
-            const huidigMaand = nu.getMonth() + 1;
-
-            // Vul jaar selector: huidig jaar t/m 3 jaar terug
-            const jaarSelect = document.getElementById('eclubJaarSelect');
-            if (jaarSelect) {
-                jaarSelect.innerHTML = '';
-                for (let j = huidigJaar; j >= huidigJaar - 3; j--) {
-                    const opt = document.createElement('option');
-                    opt.value = j;
-                    opt.textContent = j;
-                    jaarSelect.appendChild(opt);
-                }
-            }
-
-            // Stel huidige maand in
-            const maandSelect = document.getElementById('eclubMaandSelect');
-            if (maandSelect) maandSelect.value = huidigMaand;
-
-            // Stel huidig kwartaal in
-            const kwartaalSelect = document.getElementById('eclubKwartaalSelect');
-            if (kwartaalSelect) kwartaalSelect.value = Math.ceil(huidigMaand / 3);
-        }
-
-        function onEclubPeriodeTypeChange() {
-            const type = document.getElementById('eclubPeriodeType').value;
-            document.getElementById('eclubMaandSelect').style.display    = type === 'maand'    ? 'block' : 'none';
-            document.getElementById('eclubKwartaalSelect').style.display = type === 'kwartaal' ? 'block' : 'none';
-            syncEclub();
-        }
-
-        // Geeft { jaar, maandVan, maandTot } terug op basis van huidige selector
-        function getEclubPeriode() {
-            const type = document.getElementById('eclubPeriodeType')?.value || 'maand';
-            const jaar = parseInt(document.getElementById('eclubJaarSelect')?.value || new Date().getFullYear());
-
-            if (type === 'maand') {
-                const maand = parseInt(document.getElementById('eclubMaandSelect')?.value || (new Date().getMonth() + 1));
-                return { jaar, maandVan: maand, maandTot: maand };
-            }
-            if (type === 'kwartaal') {
-                const q = parseInt(document.getElementById('eclubKwartaalSelect')?.value || 1);
-                return { jaar, maandVan: (q - 1) * 3 + 1, maandTot: q * 3 };
-            }
-            // Jaar
-            return { jaar, maandVan: 1, maandTot: 12 };
-        }
-
-        async function loadEclubData() {
-            try {
-                const practice = document.getElementById('practiceFilter').value
-                    || (currentUser && getPracticeCode()) || null;
-                if (!practice) return;
-
-                const { jaar, maandVan, maandTot } = getEclubPeriode();
-
-                // Voor kwartaal/jaar: gemiddelde over de maanden heen
-                // We halen altijd de laatste maand van de periode op als huidig snapshot
-                const res = await fetch(
-                    `/api/eclub/kpis/${practice}?jaar=${jaar}&maand=${maandTot}`,
-                    { credentials: 'include' }
-                );
-                const response = await res.json();
-
-                if (!response.success) {
-                    document.getElementById('eclubStatus').textContent = 'Fout bij ophalen';
-                    document.getElementById('eclubStatus').style.color = '#ef4444';
-                    return;
-                }
-
-                const d = response.data;
-
-                document.getElementById('eclubStatus').textContent = 'Gekoppeld';
-                document.getElementById('eclubStatus').style.color = '#10b981';
-
-                document.getElementById('eclubVisited').textContent      = d.leden_actief   || 0;
-                document.getElementById('eclubRegistrations').textContent = d.leden_gestart  || 0;
-                document.getElementById('eclubPending').textContent       = d.leden_gestopt  || 0;
-                document.getElementById('eclubConversionRate').textContent = d.churn_pct > 0 ? d.churn_pct + '%' : '0%';
-
-                document.getElementById('eclubActiveMembers').textContent   = d.leden_actief || 0;
-                document.getElementById('eclubNewMembers').textContent      = d.leden_gestart || 0;
-                document.getElementById('eclubChurnedMembers').textContent  = d.leden_gestopt || 0;
-                document.getElementById('eclubAvgDuration').textContent     = d.gem_duur_lidmaatschap_maanden > 0 ? Math.round(d.gem_duur_lidmaatschap_maanden) + ' mnd' : '-';
-                document.getElementById('eclubTotalVisits').textContent     = d.totaal_bezoeken || 0;
-                document.getElementById('eclubRetention').textContent       = d.retentie_pct > 0 ? d.retentie_pct + '%' : '-';
-                document.getElementById('eclubRevenue').textContent         = d.omzet_excl_btw > 0 ? '€' + parseFloat(d.omzet_excl_btw).toFixed(2) : '-';
-                document.getElementById('eclubRevenuePerMember').textContent = d.omzet_per_lid > 0 ? '€' + parseFloat(d.omzet_per_lid).toFixed(2) : '-';
-
-            } catch (error) {
-                console.error('Eclub data error:', error);
-                document.getElementById('eclubStatus').textContent = 'Fout';
-                document.getElementById('eclubStatus').style.color = '#ef4444';
-            }
-        }
-
-        async function syncEclub() {
-            const practice = document.getElementById('practiceFilter').value
-                || (currentUser && getPracticeCode())
-                || null;
-            if (!practice) {
-                alert('Selecteer eerst een praktijk');
-                return;
-            }
-
-            const btn = document.querySelector('.meta-sync-btn[onclick="syncEclub()"]');
-            if (btn) { btn.disabled = true; btn.textContent = 'Laden...'; }
-
-            try {
-                await loadEclubData();
-                if (btn) btn.textContent = 'Vernieuwd ✓';
-                setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; } }, 2000);
-            } catch (error) {
-                console.error('Eclub sync error:', error);
-                alert('Fout bij laden: ' + error.message);
-                if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; }
-            }
-        }
-
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', init);
-
-        // ============================================
-        // IDLE DETECTION & AUTO-LOGOUT
-        // ============================================
-
-        let idleTimer = null;
-        let heartbeatInterval = null;
-        let lastActivity = Date.now();
-        const IDLE_TIMEOUT = 60 * 60 * 1000; // 1 hour
-        const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 minutes
-        const WARNING_TIME = 5 * 60 * 1000; // Warn 5 min before logout
-
-        function startIdleDetection() {
-            // Track user activity
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-            
-            activityEvents.forEach(event => {
-                document.addEventListener(event, onActivity, true);
-            });
-
-            // Start heartbeat to keep session alive
-            heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
-
-            // Start idle checker
-            checkIdle();
-        }
-
-        function onActivity() {
-            lastActivity = Date.now();
-        }
-
-        async function sendHeartbeat() {
-            try {
-                // Only send heartbeat if there was recent activity
-                const idleTime = Date.now() - lastActivity;
-                if (idleTime < HEARTBEAT_INTERVAL) {
-                    await fetch('/api/auth/heartbeat', {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
-                }
-            } catch (error) {
-                console.error('Heartbeat failed:', error);
-            }
-        }
-
-        function checkIdle() {
-            const idleTime = Date.now() - lastActivity;
-            
-            if (idleTime >= IDLE_TIMEOUT) {
-                // Auto logout
-                handleIdleLogout();
-            } else if (idleTime >= IDLE_TIMEOUT - WARNING_TIME) {
-                // Show warning
-                showIdleWarning(Math.floor((IDLE_TIMEOUT - idleTime) / 1000));
-            }
-
-            // Check again in 10 seconds
-            idleTimer = setTimeout(checkIdle, 10000);
-        }
-
-        function showIdleWarning(secondsLeft) {
-            const minutes = Math.ceil(secondsLeft / 60);
-            
-            // Only show once
-            if (document.getElementById('idleWarning')) return;
-
-            const warning = document.createElement('div');
-            warning.id = 'idleWarning';
-            warning.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                background: #ff9800;
-                color: white;
-                padding: 16px 24px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 10000;
-                font-size: 14px;
-                max-width: 300px;
-            `;
-            warning.innerHTML = `
-                <strong>⚠️ Sessie verloopt binnenkort</strong><br>
-                Je wordt over ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} uitgelogd wegens inactiviteit.
-            `;
-            document.body.appendChild(warning);
-
-            // Remove warning on activity
-            const removeWarning = () => {
-                warning?.remove();
-                activityEvents.forEach(event => {
-                    document.removeEventListener(event, removeWarning, true);
-                });
-            };
-
-            const activityEvents = ['mousedown', 'keypress', 'click'];
-            activityEvents.forEach(event => {
-                document.addEventListener(event, removeWarning, true);
-            });
-        }
-
-        async function handleIdleLogout() {
-            // Clear intervals
-            if (heartbeatInterval) clearInterval(heartbeatInterval);
-            if (idleTimer) clearTimeout(idleTimer);
-
-            // Logout
-            try {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
-
-            // Redirect with message
-            alert('Je bent uitgelogd wegens inactiviteit.');
-            window.location.href = '/login.html';
-        }
-
-        // ============================================
-        // META MARKETING FUNCTIONS
-        // ============================================
-
-        let metaChart = null;
-
-        // Load Meta Marketing data
-        async function loadMetaMarketing() {
-            const practiceCode = currentUser.role === 'admin' 
-                ? document.getElementById('practiceFilter').value 
-                : getPracticeCode();
-                
-            if (!practiceCode) {
-                document.getElementById('metaMarketingSection').style.display = 'none';
-                return;
-            }
-            
-            const dateFrom = document.getElementById('dateFrom').value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const dateTo = document.getElementById('dateTo').value || new Date().toISOString().split('T')[0];
-            
-            try {
-                // Get summary (conversies komen uit Meta API via sync)
-                const summaryRes = await fetch(
-                    `/api/meta/summary/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
-                );
-                const summary = await summaryRes.json();
-                
-                // Check if Meta enabled
-                if (!summary.meta_enabled) {
-                    document.getElementById('metaMarketingSection').style.display = 'none';
-                    return;
-                }
-                
-                // Leads (Meta) komen rechtstreeks uit de Meta API summary (total_conversions)
-                // Geen aparte database-call nodig
-                summary.verified_leads = summary.total_conversions || 0;
-                
-                // Show section
-                document.getElementById('metaMarketingSection').style.display = 'block';
-                displayMetaSummary(summary);
-                
-                // Get campaigns
-                const campaignsRes = await fetch(
-                    `/api/meta/campaigns/${practiceCode}?dateFrom=${dateFrom}&dateTo=${dateTo}`
-                );
-                const campaigns = await campaignsRes.json();
-                
-                displayMetaCampaigns(campaigns);
-                displayMetaChart(campaigns);
-                
-                // Update sync time
-                document.getElementById('metaLastSync').textContent = 
-                    `Laatste sync: ${new Date().toLocaleString('nl-NL')}`;
-                    
-            } catch (error) {
-                console.error('Meta marketing error:', error);
-                // Show section but with error message
-                document.getElementById('metaMarketingSection').style.display = 'block';
-                document.getElementById('metaCampaignsBody').innerHTML = `
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.8); padding: 24px;">
-                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 600; color: #1d1d1f;">Meta data niet beschikbaar</div>
-                            <div style="font-size: 12px;">Configureer eerst Meta credentials voor deze praktijk</div>
-                        </td>
-                    </tr>
-                `;
-            }
-        }
-
-        // Display Meta summary metrics
-        function displayMetaSummary(data) {
-            document.getElementById('metaTotalSpend').textContent =
-                `€${parseFloat(data.total_spend || 0).toFixed(2)}`;
-            document.getElementById('metaImpressions').textContent =
-                formatNumber(data.total_impressions || 0);
-            document.getElementById('metaReach').textContent =
-                formatNumber(data.total_reach || 0);
-            document.getElementById('metaFrequency').textContent =
-                parseFloat(data.avg_frequency || 0).toFixed(2);
-            document.getElementById('metaClicks').textContent =
-                formatNumber(data.total_clicks || 0);
-            document.getElementById('metaUniqueClicks').textContent =
-                formatNumber(data.total_unique_clicks || 0);
-            document.getElementById('metaCTR').textContent =
-                `${parseFloat(data.avg_ctr || 0).toFixed(2)}%`;
-            document.getElementById('metaUniqueCTR').textContent =
-                `${parseFloat(data.avg_unique_ctr || 0).toFixed(2)}%`;
-            document.getElementById('metaCPM').textContent =
-                `€${parseFloat(data.avg_cpm || 0).toFixed(2)}`;
-            document.getElementById('metaCPC').textContent =
-                `€${parseFloat(data.avg_cpc || 0).toFixed(2)}`;
-            document.getElementById('metaCostPerLead').textContent =
-                `€${parseFloat(data.avg_cost_per_lead || 0).toFixed(2)}`;
-            document.getElementById('metaVerifiedLeads').textContent =
-                data.verified_leads || 0;
-            document.getElementById('metaPageViews').textContent =
-                formatNumber(data.total_page_views || 0);
-            document.getElementById('metaVideoP25').textContent =
-                formatNumber(data.total_video_p25 || 0);
-            document.getElementById('metaVideoP50').textContent =
-                formatNumber(data.total_video_p50 || 0);
-            document.getElementById('metaVideoP75').textContent =
-                formatNumber(data.total_video_p75 || 0);
-            document.getElementById('metaVideoP100').textContent =
-                formatNumber(data.total_video_p100 || 0);
-        }
-
-        // Display Meta campaigns table
-        function displayMetaCampaigns(campaigns) {
-            const tbody = document.getElementById('metaCampaignsBody');
-            
-            if (!campaigns || campaigns.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: rgba(255,255,255,0.6); padding: 24px;">
-                            Geen actieve campagnes in geselecteerde periode
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = campaigns.slice(0, 10).map(campaign => `
-                <tr>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${campaign.campaign_name}">
-                        ${campaign.campaign_name}
-                    </td>
-                    <td>€${parseFloat(campaign.spend || 0).toFixed(2)}</td>
-                    <td>${campaign.conversions || 0}</td>
-                    <td>€${parseFloat(campaign.cost_per_conversion || 0).toFixed(2)}</td>
-                </tr>
-            `).join('');
-        }
-
-        // Display Meta chart
-        function displayMetaChart(campaigns) {
-            const ctx = document.getElementById('metaCampaignChart');
-            if (!ctx) return;
-            
-            // Destroy existing chart
-            if (metaChart) {
-                metaChart.destroy();
-            }
-            
-            if (!campaigns || campaigns.length === 0) {
-                ctx.parentElement.innerHTML = `
-                    <div style="text-align: center; color: rgba(255,255,255,0.6); padding: 40px;">
-                        Geen campagne data beschikbaar
-                    </div>
-                `;
-                return;
-            }
-            
-            // Limit to top 10 campaigns by spend
-            const topCampaigns = campaigns.slice(0, 10);
-            
-            metaChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: topCampaigns.map(c => c.campaign_name.substring(0, 25)),
-                    datasets: [
-                        {
-                            label: 'Ad Spend (€)',
-                            data: topCampaigns.map(c => parseFloat(c.spend || 0)),
-                            backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                            borderColor: '#06c',
-                            borderWidth: 2,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Conversions',
-                            data: topCampaigns.map(c => c.conversions || 0),
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            borderColor: '#10b981',
-                            borderWidth: 2,
-                            yAxisID: 'y1'
-                        }
-                    ]
+<!-- AFSPRAAK MODAL -->
+<div class="modal-overlay" id="afspraakModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span id="modalTitle">Afspraak inplannen</span>
+            <button onclick="closeAfspraakModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-3);">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="lead-info-box" id="modalLeadInfo" style="display:none;">
+                <div class="lead-name" id="modalLeadName">—</div>
+                <div class="lead-meta" id="modalLeadMeta">—</div>
+            </div>
+            <div id="modalLeadSelect" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label>Lead selecteren</label>
+                    <select id="leadSelectDropdown" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;" onchange="selectLead(this.value)">
+                        <option value="">Selecteer een lead...</option>
+                        <option value="1">Sarah de Vries</option>
+                        <option value="2">Mark Jansen</option>
+                        <option value="3">Lisa Bakker</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Datum</label>
+                    <input type="date" id="apptDate">
+                </div>
+                <div class="form-group">
+                    <label>Tijd</label>
+                    <input type="time" id="apptTime">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Type afspraak</label>
+                <select id="apptType">
+                    <option value="vitaliteitscheck">Intake/Check-up</option>
+                    <option value="rondleiding">Rondleiding</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notities <span style="color:var(--text-3);font-weight:400;">(optioneel)</span></label>
+                <input type="text" id="apptNotes" placeholder="Bijv. voorkeur ochtend, blessure heup...">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeAfspraakModal()">Annuleren</button>
+            <button class="btn btn-primary" onclick="saveAfspraak()">Afspraak opslaan</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── DUMMY DATA ─────────────────────────────────────────────────────
+const afspraken = [
+    { id: 1, naam: 'Emma Visser',      datum: '2026-04-14', tijd: '09:00', type: 'Intake/Check-up', uitkomst: 'won' },
+    { id: 2, naam: 'Tom de Boer',      datum: '2026-04-14', tijd: '10:30', type: 'Rondleiding',     uitkomst: 'open' },
+    { id: 3, naam: 'Sophie Mulder',    datum: '2026-04-15', tijd: '11:00', type: 'Intake/Check-up', uitkomst: 'followup' },
+    { id: 4, naam: 'Niels Smit',       datum: '2026-04-16', tijd: '14:00', type: 'Intake/Check-up', uitkomst: 'lost' },
+    { id: 5, naam: 'Anna Pietersen',   datum: '2026-04-17', tijd: '09:30', type: 'Rondleiding',     uitkomst: 'won' },
+    { id: 6, naam: 'Daan van Dijk',    datum: '2026-04-18', tijd: '13:00', type: 'Intake/Check-up', uitkomst: 'open' },
+    { id: 7, naam: 'Julia Hendriks',   datum: '2026-04-11', tijd: '10:00', type: 'Intake/Check-up', uitkomst: 'won' },
+    { id: 8, naam: 'Rick Vermeer',     datum: '2026-04-10', tijd: '15:30', type: 'Rondleiding',     uitkomst: 'lost' },
+];
+
+const leadsZonderAfspraak = [
+    { id: 9,  naam: 'Sarah de Vries', aangemeld: '2026-04-09', bron: 'Instagram', doel: 'Fitter worden' },
+    { id: 10, naam: 'Mark Jansen',    aangemeld: '2026-04-10', bron: 'Facebook',  doel: 'Afvallen' },
+    { id: 11, naam: 'Lisa Bakker',    aangemeld: '2026-04-11', bron: 'Google',    doel: 'Rugklachten' },
+];
+
+const uitkomstLabels = {
+    won:      { label: 'Lid geworden',   cls: 'badge-green' },
+    open:     { label: 'Open',           cls: 'badge-gray' },
+    followup: { label: 'Bedenktijd',     cls: 'badge-amber' },
+    lost:     { label: 'Geen interesse', cls: 'badge-red' },
+};
+
+// ── RENDER AFSPRAKEN ───────────────────────────────────────────────
+function renderAfspraken() {
+    const tbody = document.getElementById('afsprakenBody');
+    tbody.innerHTML = afspraken.map(a => {
+        const u = uitkomstLabels[a.uitkomst];
+        const datum = new Date(a.datum).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+        return `<tr>
+            <td style="font-weight:500;">${a.naam}</td>
+            <td>${datum}</td>
+            <td>${a.tijd}</td>
+            <td>${a.type}</td>
+            <td><span class="badge ${u.cls}">${u.label}</span></td>
+            <td>${a.uitkomst === 'open' ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openAfspraakModal(${a.id})">Uitkomst</button>` : ''}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderLeadsZonderAfspraak() {
+    const tbody = document.getElementById('leadsZonderAfspraakBody');
+    tbody.innerHTML = leadsZonderAfspraak.map(l => {
+        const datum = new Date(l.aangemeld).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+        return `<tr>
+            <td style="font-weight:500;">${l.naam}</td>
+            <td>${datum}</td>
+            <td>${l.bron}</td>
+            <td>${l.doel}</td>
+            <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openAfspraakModal(null, ${l.id}, '${l.naam}', '${l.bron}')">Inplannen</button></td>
+        </tr>`;
+    }).join('');
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────
+let selectedLeadId = null;
+
+function openAfspraakModal(afspraakId, leadId, leadNaam, leadMeta) {
+    selectedLeadId = leadId || null;
+    const modal = document.getElementById('afspraakModal');
+    const leadInfo = document.getElementById('modalLeadInfo');
+    const leadSelect = document.getElementById('modalLeadSelect');
+
+    if (leadId && leadNaam) {
+        // Vanuit leads zonder afspraak tabel
+        leadInfo.style.display = 'block';
+        leadSelect.style.display = 'none';
+        document.getElementById('modalLeadName').textContent = leadNaam;
+        document.getElementById('modalLeadMeta').textContent = `Bron: ${leadMeta}`;
+        document.getElementById('modalTitle').textContent = `Afspraak inplannen voor ${leadNaam}`;
+    } else {
+        // Algemeen inplannen
+        leadInfo.style.display = 'none';
+        leadSelect.style.display = 'block';
+        document.getElementById('modalTitle').textContent = 'Afspraak inplannen';
+        document.getElementById('leadSelectDropdown').value = '';
+    }
+
+    modal.classList.add('active');
+}
+
+function closeAfspraakModal() {
+    document.getElementById('afspraakModal').classList.remove('active');
+    selectedLeadId = null;
+}
+
+function selectLead(val) {
+    selectedLeadId = val || null;
+}
+
+function saveAfspraak() {
+    const date = document.getElementById('apptDate').value;
+    const time = document.getElementById('apptTime').value;
+    if (!date || !time) { alert('Vul datum en tijd in.'); return; }
+    // In productie: POST naar /api/leads/:id/book-appointment
+    alert('In productie: afspraak wordt opgeslagen via de API.');
+    closeAfspraakModal();
+}
+
+// ── SEIZOEN CHARTS ─────────────────────────────────────────────────
+function buildSeizoenChart() {
+    const ctx = document.getElementById('seizoenChart');
+    if (!ctx) return;
+
+    const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+    const actueel = [18, 14, 15, 11, 10, 7, 6, 9, 17, 13, 11, 8];
+    const forecast = [null, null, null, null, null, null, null, null, null, null, null, null];
+    // Vanaf huidige maand forecast tonen
+    const currentMonth = 3; // april = index 3
+    for (let i = currentMonth; i < 12; i++) {
+        forecast[i] = [17, 13, 11, 9, 6, 7, 9, 16, 14, 12, 9][i - currentMonth] || null;
+    }
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [
+                {
+                    label: 'Actueel',
+                    data: actueel.map((v, i) => i < currentMonth ? v : null),
+                    backgroundColor: '#2BB8A3',
+                    borderRadius: 4,
+                    order: 1,
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: { 
-                                color: '#1d1d1f',
-                                font: {
-                                    size: 13
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { 
-                                color: '#86868b',
-                                maxRotation: 45,
-                                minRotation: 45,
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { 
-                                color: '#f5f5f7',
-                                drawBorder: false
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            position: 'left',
-                            title: { 
-                                display: true, 
-                                text: 'Spend (€)', 
-                                color: '#86868b',
-                                font: {
-                                    size: 12,
-                                    weight: 500
-                                }
-                            },
-                            ticks: { 
-                                color: '#86868b',
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { 
-                                color: '#f5f5f7',
-                                drawBorder: false
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            title: { 
-                                display: true, 
-                                text: 'Conversions', 
-                                color: '#86868b',
-                                font: {
-                                    size: 12,
-                                    weight: 500
-                                }
-                            },
-                            ticks: { 
-                                color: '#86868b',
-                                font: {
-                                    size: 11
-                                }
-                            },
-                            grid: { drawOnChartArea: false }
-                        }
+                {
+                    label: 'Forecast',
+                    data: forecast,
+                    backgroundColor: '#c7e8e3',
+                    borderColor: '#2BB8A3',
+                    borderWidth: 1,
+                    borderDash: [4, 4],
+                    borderRadius: 4,
+                    order: 2,
+                },
+                {
+                    label: 'Trend',
+                    data: [18, 14, 15, 11, 10, 7, 6, 9, 17, 13, 11, 8],
+                    type: 'line',
+                    borderColor: '#e5334a',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.4,
+                    order: 0,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? '—'} leads`
                     }
                 }
-            });
-        }
-
-        // Manual sync Meta data
-        async function syncMetaData() {
-            const practiceCode = currentUser.role === 'admin' 
-                ? document.getElementById('practiceFilter').value 
-                : getPracticeCode();
-                
-            if (!practiceCode) {
-                alert('Selecteer eerst een praktijk');
-                return;
-            }
-            
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '⏳ Syncing...';
-            
-            try {
-                const res = await fetch(`/api/meta/sync/${practiceCode}`, { 
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                if (!res.ok) {
-                    throw new Error('Sync failed');
-                }
-                
-                await loadMetaMarketing();
-                alert('Meta data gesynchroniseerd!');
-            } catch (error) {
-                console.error('Sync error:', error);
-                alert('Sync mislukt: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#9090a8', font: { size: 11 } } },
+                y: { beginAtZero: true, ticks: { color: '#9090a8', font: { size: 11 } }, grid: { color: '#f0f0f4' } }
             }
         }
+    });
+}
 
-        // Helper: Format large numbers
-        function formatNumber(num) {
-            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
-        }
-
-        // ============================================
-        // Update applyFilters to also load Eclub data en grafiek
-        const originalApplyFilters = applyFilters;
-        applyFilters = function() {
-            originalApplyFilters();
-            loadEclubData();
-            loadChurnForecast();
-        };
-
-        // Initialiseer periode selector
-        initEclubPeriodeSelector();
-
-        // Sidebar dropdown toggle
-        function toggleDropdown(id) {
-            const el = document.getElementById(id);
-            if (el) el.classList.toggle('open');
-        }
-
-        // User dropdown menu
-        function toggleUserMenu() {
-            const menu = document.getElementById('userDropdownMenu');
-            const arrow = document.getElementById('userDropdownArrow');
-            const isOpen = menu.style.display !== 'none';
-            menu.style.display = isOpen ? 'none' : 'block';
-            if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
-        }
-
-        function closeUserMenu() {
-            const menu = document.getElementById('userDropdownMenu');
-            const arrow = document.getElementById('userDropdownArrow');
-            if (menu) menu.style.display = 'none';
-            if (arrow) arrow.style.transform = '';
-        }
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(e) {
-            const wrap = document.getElementById('userInfo');
-            if (wrap && !wrap.contains(e.target)) closeUserMenu();
-        });
-
-        // Meta data export
-        async function exportMetaData() {
-            try {
-                const practice = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
-                if (!practice) { alert('Selecteer eerst een praktijk'); return; }
-                const dateFrom = document.getElementById('dateFrom')?.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                const dateTo   = document.getElementById('dateTo')?.value || new Date().toISOString().slice(0,10);
-
-                const res  = await fetch(`/api/meta/summary/${practice}?dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' });
-                const d    = await res.json();
-
-                // Meta summary geeft direct het object terug — geen .data wrapper
-                if (!d.meta_enabled) { alert('Meta is niet ingeschakeld voor deze praktijk'); return; }
-
-                const ws = XLSX.utils.aoa_to_sheet([
-                    ['Meta Marketing Export', practice, new Date().toLocaleDateString('nl-NL')],
-                    ['Periode', `${dateFrom} tot ${dateTo}`],
-                    [],
-                    ['KPI', 'Waarde'],
-                    ['Besteed bedrag (EUR)',    parseFloat(d.total_spend || 0).toFixed(2)],
-                    ['Weergaven',              d.total_impressions || 0],
-                    ['Bereik',                 d.total_reach || 0],
-                    ['Frequentie',             parseFloat(d.avg_frequency || 0).toFixed(2)],
-                    ['Klikken',                d.total_clicks || 0],
-                    ['Unieke klikken',         d.total_unique_clicks || 0],
-                    ['CTR (alle)',             (parseFloat(d.avg_ctr || 0).toFixed(2)) + '%'],
-                    ['Unieke CTR',             (parseFloat(d.avg_unique_ctr || 0).toFixed(2)) + '%'],
-                    ['CPM (EUR)',              parseFloat(d.avg_cpm || 0).toFixed(2)],
-                    ['CPC (EUR)',              parseFloat(d.avg_cpc || 0).toFixed(2)],
-                    ['Kosten per lead (EUR)',  parseFloat(d.avg_cost_per_lead || 0).toFixed(2)],
-                    ['Leads (Meta)',           d.total_conversions || 0],
-                    ['Page Views',             d.total_page_views || 0],
-                    ['Video 25%',              d.total_video_p25 || 0],
-                    ['Video 50%',              d.total_video_p50 || 0],
-                    ['Video 75%',              d.total_video_p75 || 0],
-                    ['Video 100%',             d.total_video_p100 || 0],
-                ]);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Meta Marketing');
-                XLSX.writeFile(wb, `meta-export-${practice}-${dateFrom}-${dateTo}.xlsx`);
-            } catch(e) { alert('Fout bij exporteren Meta data: ' + e.message); }
-        }
-
-        // eClub data export
-        async function exportEclubData() {
-            try {
-                const practice = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
-                if (!practice) { alert('Selecteer eerst een praktijk'); return; }
-
-                const { jaar, maandTot } = getEclubPeriode();
-                const res  = await fetch(`/api/eclub/kpis/${practice}?jaar=${jaar}&maand=${maandTot}`, { credentials: 'include' });
-                const data = await res.json();
-                if (!data.success || !data.data) { alert('Geen eClub data beschikbaar voor deze praktijk'); return; }
-
-                // data.data bevat de KPI velden
-                const d = data.data;
-                const ws = XLSX.utils.aoa_to_sheet([
-                    ['eClub Export', practice, new Date().toLocaleDateString('nl-NL')],
-                    ['Periode', `${jaar}-${String(maandTot).padStart(2,'0')}`],
-                    [],
-                    ['KPI', 'Waarde'],
-                    ['Actieve leden',                d.active_members || 0],
-                    ['Nieuwe leden',                 d.new_members || 0],
-                    ['Gestopte leden',               d.churned_members || 0],
-                    ['Bevroren leden',               d.frozen_members || 0],
-                    ['Totaal bezoeken',              d.total_visits || 0],
-                    ['Gem. bezoeken per lid',        d.avg_visits_per_member || 0],
-                    ['Gem. duur lidmaatschap (mnd)', d.avg_membership_months || 0],
-                    ['Maandomzet excl. BTW (EUR)',   parseFloat(d.total_monthly_revenue || 0).toFixed(2)],
-                    ['Omzet per lid (EUR)',           parseFloat(d.revenue_per_member || 0).toFixed(2)],
-                    ['Retentie %',                   d.retention_pct || '0%'],
-                    ['Churn %',                      d.churn_pct || '0%'],
-                ]);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'eClub KPIs');
-                XLSX.writeFile(wb, `eclub-export-${practice}-${jaar}-${String(maandTot).padStart(2,'0')}.xlsx`);
-            } catch(e) { alert('Fout bij exporteren eClub data: ' + e.message); }
-        }
-
-        // Patch eclubStatus to also update dot color
-        const _origLoadEclubData = loadEclubData;
-        loadEclubData = async function() {
-            await _origLoadEclubData.apply(this, arguments);
-            const status = document.getElementById('eclubStatus');
-            const dot    = document.getElementById('eclubStatusDot');
-            if (!status || !dot) return;
-            if (status.textContent === 'Gekoppeld') {
-                dot.className = 'status-dot green';
-            } else if (status.textContent.startsWith('Fout')) {
-                dot.className = 'status-dot red';
-            } else {
-                dot.className = 'status-dot amber';
+function buildKwartaalChart() {
+    const ctx = document.getElementById('kwartaalChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+            datasets: [{
+                label: 'Conversie %',
+                data: [68, 54, 48, 59],
+                backgroundColor: ['#2BB8A3', '#99cc33', '#f59e0b', '#1a56db'],
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#9090a8' } },
+                y: { beginAtZero: true, max: 100, ticks: { color: '#9090a8', callback: v => v + '%' }, grid: { color: '#f0f0f4' } }
             }
-        };
+        }
+    });
+}
 
-    </script>
+// ── NAVIGATIE ──────────────────────────────────────────────────────
+function showSection(name, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+
+    const section = document.getElementById('section-' + name);
+    if (section) section.classList.add('active');
+    if (el) el.classList.add('active');
+
+    const titles = { afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', dashboard: 'Analytics', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit' };
+    document.getElementById('topbarTitle').textContent = titles[name] || 'Analytics';
+
+    if (name === 'seizoen') {
+        setTimeout(() => { buildSeizoenChart(); buildKwartaalChart(); }, 50);
+    }
+}
+
+function toggleDropdown(id) {
+    document.getElementById(id).classList.toggle('open');
+}
+
+// ── INIT ───────────────────────────────────────────────────────────
+renderAfspraken();
+renderLeadsZonderAfspraak();
+</script>
 </body>
 </html>
