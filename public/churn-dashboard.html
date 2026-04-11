@@ -963,7 +963,7 @@
     <nav class="sidebar-nav">
 
         <div class="sidebar-section-label">Overzicht</div>
-        <div class="sidebar-item active">
+        <div class="sidebar-item active" onclick="showDashboardSection('dashboard', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                 <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
@@ -3467,8 +3467,17 @@
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
+            if (name === 'dashboard') {
+                // Herlaad dashboard data
+                applyFilters();
+            }
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
-            if (name === 'seizoen' && !seizoenChartsBuilt) { loadSeizoenData(); seizoenChartsBuilt = true; }
+            if (name === 'seizoen') {
+                // Altijd herlaad — praktijk kan gewisseld zijn
+                seizoenChartsBuilt = false;
+                loadSeizoenData();
+                seizoenChartsBuilt = true;
+            }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
         }
 
@@ -3611,11 +3620,16 @@
             btn.textContent = 'Opslaan...';
 
             try {
+                // Haal server-side token op
+                const tokenRes = await fetch(`/api/appointment-token?lead_id=${lid}&practice_code=${pc}`, { credentials: 'include' });
+                const tokenData = await tokenRes.json();
+                if (!tokenRes.ok || !tokenData.token) throw new Error(tokenData.error || 'Token ophalen mislukt');
+
                 const res = await fetch('/api/confirm-appointment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: generateApptToken(lid, pc) })
+                    body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: tokenData.token })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Fout');
@@ -3635,10 +3649,6 @@
             el.style.display = 'block';
             el.style.background = colors[type] || '#f9f9fb';
             el.textContent = text;
-        }
-
-        function generateApptToken(leadId, practiceCode) {
-            return btoa(leadId + '-' + practiceCode + '-' + Date.now()).replace(/=/g,'');
         }
 
         // ── SEIZOENSPATRONEN ──────────────────────────────────────────

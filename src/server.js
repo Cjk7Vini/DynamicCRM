@@ -672,6 +672,21 @@ app.get('/api/lead-info', async (req, res) => {
   }
 });
 
+// Token endpoint voor dashboard afspraak modal
+app.get('/api/appointment-token', async (req, res) => {
+  try {
+    const { lead_id, practice_code } = req.query;
+    if (!lead_id || !practice_code) return res.status(400).json({ error: 'Ontbrekende velden' });
+    if (!req.session?.practiceCode && req.session?.role !== 'admin') {
+      return res.status(401).json({ error: 'Niet ingelogd' });
+    }
+    const token = generateActionToken(lead_id, practice_code);
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/confirm-appointment', async (req, res) => {
   try {
     const { lead_id, practice_code, token, date, time, type, notes } = req.body;
