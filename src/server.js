@@ -672,6 +672,37 @@ app.get('/api/lead-info', async (req, res) => {
   }
 });
 
+// GET /api/afspraken — alle leads met afspraak voor dashboard afspraken sectie
+app.get('/api/afspraken', async (req, res) => {
+  try {
+    const { practice } = req.query;
+    const leads = await withReadConnection(async (client) => {
+      let query = `
+        SELECT
+          l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
+          l.aangemaakt_op, l.appointment_date, l.appointment_time,
+          l.appointment_datetime, l.funnel_stage, l.status,
+          l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
+          COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
+        FROM public.leads l
+        WHERE l.appointment_datetime IS NOT NULL
+      `;
+      const params = [];
+      if (practice) {
+        query += ` AND l.praktijk_code = $1`;
+        params.push(practice);
+      }
+      query += ` ORDER BY l.appointment_datetime DESC LIMIT 200`;
+      const result = await client.query(query, params);
+      return result.rows;
+    });
+    res.json({ success: true, leads });
+  } catch (err) {
+    console.error('Afspraken error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Token endpoint voor dashboard afspraak modal
 app.get('/api/appointment-token', async (req, res) => {
   try {
@@ -689,7 +720,7 @@ app.get('/api/appointment-token', async (req, res) => {
 
 app.post('/api/confirm-appointment', async (req, res) => {
   try {
-    const { lead_id, practice_code, token, date, time, type, notes } = req.body;
+    const { lead_id, practice_code, token, date, time, type, notes, via } = req.body;
 
     if (!lead_id || !practice_code || !token || !date || !time || !type) {
       return res.status(400).json({ error: 'Ontbrekende velden' });
@@ -745,7 +776,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
       ? 'Rondleiding – Ervaar onze locatie en ontdek hoe wij werken aan gezondheid, kracht en balans (30 minuten)'
       : updated.type || 'Afspraak';
 
-    if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass) {
+    if (updated.lead.emailadres && SMTP.host && SMTP.user && SMTP.pass && via !== 'dashboard') {
       (async () => {
         try {
           let html;

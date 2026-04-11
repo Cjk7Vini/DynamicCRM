@@ -2632,7 +2632,17 @@
 
         // Refresh all data
         function refreshData() {
-            init();
+            // Herlaad actieve sectie
+            const activeSection = document.querySelector('.dash-section.active');
+            if (activeSection) {
+                const name = activeSection.id.replace('dash-', '');
+                if (name === 'dashboard') init();
+                else if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
+                else if (name === 'seizoen') { seizoenChartsBuilt = false; loadSeizoenData(); }
+                else if (name === 'kwaliteit') loadLeadKwaliteit();
+            } else {
+                init();
+            }
         }
 
         // Show error message
@@ -3495,9 +3505,9 @@
         async function loadAfspraken() {
             const pc = getActivePracticeCode();
             try {
-                const res = await fetch(`/api/leads-by-stage?stage=all&practice=${pc}&hasAppointment=true`, { credentials: 'include' });
+                const res = await fetch(`/api/afspraken${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
                 const data = await res.json();
-                const leads = (data.leads || []).filter(l => l.appointment_datetime);
+                const leads = data.leads || [];
                 apptData = leads;
                 renderApptTable(leads);
 
@@ -3636,7 +3646,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: tokenData.token })
+                    body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: tokenData.token, via: 'dashboard' })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Fout');
