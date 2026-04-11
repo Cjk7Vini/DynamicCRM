@@ -1054,7 +1054,7 @@
     <div class="sidebar-filters">
         <span class="sidebar-filter-label">Filters</span>
 
-        <select id="practiceFilter" class="sidebar-select" onchange="applyFilters()">
+        <select id="practiceFilter" class="sidebar-select" onchange="onPracticeFilterChange()">
             <option value="">Alle praktijken</option>
         </select>
 
@@ -3495,6 +3495,18 @@
             if (currentUser.role === 'practice') return getPracticeCode() || '';
             // Admin: gebruik geselecteerde praktijk uit dropdown
             return document.getElementById('practiceFilter')?.value || '';
+        }
+
+        function onPracticeFilterChange() {
+            // Herlaad het hoofddashboard altijd
+            applyFilters();
+            // Herlaad ook de actieve nieuwe sectie
+            const activeSection = document.querySelector('.dash-section.active');
+            if (!activeSection || activeSection.id === 'dash-dashboard') return;
+            const name = activeSection.id.replace('dash-', '');
+            if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
+            else if (name === 'seizoen') { loadSeizoenData(); }
+            else if (name === 'kwaliteit') { loadLeadKwaliteit(); }
         }
 
         // ── SECTIE NAVIGATIE ──────────────────────────────────────────
