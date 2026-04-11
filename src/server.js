@@ -676,40 +676,30 @@ app.get('/api/lead-info', async (req, res) => {
 app.get('/api/lead-kwaliteit', async (req, res) => {
   try {
     const { practice } = req.query;
-    const practiceFilter = practice ? `AND l.praktijk_code = $1` : '';
-    const params = practice ? [practice] : [];
-
     const data = await withReadConnection(async (client) => {
-      // 1. Afspraken zonder uitkomst: afspraak voorbij, in intent, outcome_sent = false
-      const r1 = await client.query(`
+
+      const buildParams = () => practice ? [practice] : [];
+      const pc = (n) => practice ? `AND l.praktijk_code = $${n}` : '';
+
+      // 1. Afspraken zonder uitkomst: intent, afspraak voorbij, geen outcome
+      const q1 = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
-               l.aangemaakt_op,
-               COALESCE(l.appointment_datetime,
-                 CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
-                 THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
-                 WHEN l.appointment_date IS NOT NULL
-                 THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
-                 ELSE NULL END
-               ) AS appointment_datetime,
-               l.funnel_stage,
+               l.aangemaakt_op, l.appointment_date, l.appointment_time,
+               l.appointment_datetime, l.funnel_stage,
                l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
                COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
         FROM public.leads l
         WHERE l.funnel_stage = 'intent'
           AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
-          AND COALESCE(l.appointment_datetime,
-                CASE WHEN l.appointment_date IS NOT NULL
-                THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
-                ELSE NULL END
-              ) < NOW()
           AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
-          ${practiceFilter}
-        ORDER BY appointment_datetime DESC
+          ${pc(1)}
+        ORDER BY l.aangemaakt_op DESC
         LIMIT 100
-      `, params);
+      `;
+      const r1 = await client.query(q1, buildParams());
 
-      // 2. Reminder verstuurd maar geen afspraak
-      const r2 = await client.query(`
+      // 2. Reminder verstuurd, awareness, geen afspraak
+      const q2 = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
                l.aangemaakt_op, l.funnel_stage,
                l.lead_reminder1_sent, l.lead_reminder2_sent, l.lead_reminder1_sent_at
@@ -718,13 +708,14 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
           AND l.appointment_datetime IS NULL
           AND l.appointment_date IS NULL
           AND (l.lead_reminder1_sent = TRUE OR l.lead_reminder2_sent = TRUE)
-          ${practiceFilter}
+          ${pc(1)}
         ORDER BY l.aangemaakt_op DESC
         LIMIT 100
-      `, params);
+      `;
+      const r2 = await client.query(q2, buildParams());
 
-      // 3. Oud zonder afspraak: meer dan 14 dagen in awareness, geen reminder
-      const r3 = await client.query(`
+      // 3. Oud zonder afspraak: awareness, 14+ dagen, geen reminder
+      const q3 = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
                l.aangemaakt_op, l.funnel_stage,
                l.lead_reminder1_sent, l.lead_reminder2_sent
@@ -734,10 +725,11 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
           AND l.appointment_date IS NULL
           AND l.aangemaakt_op < NOW() - INTERVAL '14 days'
           AND (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
-          ${practiceFilter}
+          ${pc(1)}
         ORDER BY l.aangemaakt_op ASC
         LIMIT 100
-      `, params);
+      `;
+      const r3 = await client.query(q3, buildParams());
 
       return {
         geen_uitkomst: r1.rows,
@@ -748,7 +740,7 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
 
     res.json({ success: true, ...data });
   } catch (err) {
-    console.error('Lead kwaliteit error:', err.message);
+    console.error('Lead kwaliteit error:', err.message, err.stack);
     res.status(500).json({ error: err.message });
   }
 });

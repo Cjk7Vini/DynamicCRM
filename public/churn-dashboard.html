@@ -3661,19 +3661,20 @@
             if (!sel) return;
             sel.innerHTML = '<option value="">Laden...</option>';
             try {
-                const res = await fetch(`/api/afspraken${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
+                // Haal intent leads direct op via leads-by-stage
+                const url = `/api/leads-by-stage?stage=intent${pc ? '&practice=' + pc : ''}`;
+                const res = await fetch(url, { credentials: 'include' });
                 const data = await res.json();
-                const leads = (data.leads || []).filter(l => l.funnel_stage === 'intent');
+                const leads = data.leads || [];
                 if (!leads.length) {
-                    sel.innerHTML = '<option value="">Geen leads met openstaande afspraak</option>';
+                    sel.innerHTML = '<option value="">Geen leads met afspraak</option>';
                 } else {
                     sel.innerHTML = '<option value="">Selecteer een lead met afspraak...</option>' +
                         leads.map(l => `<option value="${l.id}">${l.volledige_naam || l.emailadres}</option>`).join('');
                 }
-                // Update ook apptData als het nog leeg is
-                if (!apptData.length) { apptData = data.leads || []; renderApptTable(apptData); }
             } catch(e) {
                 sel.innerHTML = '<option value="">Fout bij laden</option>';
+                console.error('laadUitkomstDropdown error:', e);
             }
         }
 
@@ -3972,15 +3973,17 @@
                     tbody1.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken zonder uitkomst</td></tr>';
                 } else {
                     tbody1.innerHTML = noOutcome.map(l => {
-                        const d = new Date(l.appointment_datetime);
-                        const dagen = Math.floor((now - d) / (1000*60*60*24));
+                        const rawDt = l.appointment_datetime || (l.appointment_date ? l.appointment_date + 'T' + (l.appointment_time || '09:00:00') : null);
+                        const d = rawDt ? new Date(rawDt) : null;
+                        const dagen = d ? Math.floor((now - d) / (1000*60*60*24)) : 0;
+                        const datumStr = d && !isNaN(d) ? d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'}) : (l.appointment_date || '—');
                         const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
                         const dagenCls = dagen > 5 ? 'badge-red' : 'badge-amber';
                         return `<tr>
-                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
-                            <td>${d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}</td>
+                            <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
+                            <td>${datumStr}</td>
                             <td>${type}</td>
                             <td><span class="badge ${dagenCls}">${dagen} dag${dagen !== 1 ? 'en' : ''}</span></td>
                         </tr>`;
