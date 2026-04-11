@@ -3447,6 +3447,13 @@
         // Initialiseer periode selector
         initEclubPeriodeSelector();
 
+        function getActivePracticeCode() {
+            if (!currentUser) return '';
+            if (currentUser.role === 'practice') return getPracticeCode() || '';
+            // Admin: gebruik geselecteerde praktijk uit dropdown
+            return document.getElementById('practiceFilter')?.value || '';
+        }
+
         // ── SECTIE NAVIGATIE ──────────────────────────────────────────
         let seizoenChartsBuilt = false;
 
@@ -3486,7 +3493,7 @@
         let apptLeadId = null;
 
         async function loadAfspraken() {
-            const pc = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+            const pc = getActivePracticeCode();
             try {
                 const res = await fetch(`/api/leads-by-stage?stage=all&practice=${pc}&hasAppointment=true`, { credentials: 'include' });
                 const data = await res.json();
@@ -3543,7 +3550,7 @@
         }
 
         async function loadLeadsZonderAfspraak() {
-            const pc = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+            const pc = getActivePracticeCode();
             try {
                 const res = await fetch(`/api/leads-by-stage?stage=awareness&practice=${pc}`, { credentials: 'include' });
                 const data = await res.json();
@@ -3615,7 +3622,7 @@
             if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
             if (!date || !time) { showApptMsg('Vul datum en tijd in.', 'amber'); return; }
 
-            const pc = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+            const pc = getActivePracticeCode();
             btn.disabled = true;
             btn.textContent = 'Opslaan...';
 
@@ -3656,7 +3663,7 @@
         let seizoenKwartaalChartInstance = null;
 
         async function loadSeizoenData() {
-            const pc = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+            const pc = getActivePracticeCode();
             const maanden = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Dec'];
 
             try {
@@ -3775,7 +3782,7 @@
 
         // ── LEAD KWALITEIT ────────────────────────────────────────────
         async function loadLeadKwaliteit() {
-            const pc = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+            const pc = getActivePracticeCode();
             const now = new Date();
 
             try {
@@ -3875,7 +3882,7 @@
         // Meta data export
         async function exportMetaData() {
             try {
-                const practice = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+                const practice = getActivePracticeCode();
                 if (!practice) { alert('Selecteer eerst een praktijk'); return; }
                 const dateFrom = document.getElementById('dateFrom')?.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 const dateTo   = document.getElementById('dateTo')?.value || new Date().toISOString().slice(0,10);
@@ -3918,7 +3925,7 @@
         // eClub data export
         async function exportEclubData() {
             try {
-                const practice = getPracticeCode() || document.getElementById('practiceFilter')?.value || '';
+                const practice = getActivePracticeCode();
                 if (!practice) { alert('Selecteer eerst een praktijk'); return; }
 
                 const { jaar, maandTot } = getEclubPeriode();
