@@ -4211,7 +4211,7 @@ app.get('/api/check-lead-reminders', async (req, res) => {
 
               <tr><td style="padding:36px 40px;">
                 <h2 style="margin:0 0 8px;font-size:20px;color:#1A1D21;">
-                  ${isReminder2 ? 'Laatste herinnering' : 'Opvolging nodig'} — ${lead.volledige_naam}
+                  ${isReminder2 ? 'Laatste herinnering' : 'Opvolging nodig'}: ${lead.volledige_naam}
                 </h2>
                 <p style="margin:0 0 24px;font-size:14px;color:#6b7280;">
                   ${isReminder2 ? 'Dit is de tweede en laatste herinnering voor deze lead.' : 'Deze lead heeft zich aangemeld maar nog geen afspraak ingepland.'}
