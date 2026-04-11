@@ -911,6 +911,7 @@
     </div>
 
     <nav class="sidebar-nav">
+
         <div class="sidebar-section-label">Overzicht</div>
         <div class="sidebar-item active">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -918,6 +919,38 @@
                 <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
             </svg>
             Dashboard
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:8px;">Leads</div>
+        <div class="sidebar-dropdown" id="leadsDropdown">
+            <div class="sidebar-item" onclick="toggleDropdown('leadsDropdown')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                </svg>
+                Leads
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+            <div class="sidebar-dropdown-items">
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Nieuw (Awareness)</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid geworden</div>
+                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('lost','Geen interesse')">Geen interesse</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:8px;">Afspraken</div>
+        <div class="sidebar-item" onclick="">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Afspraken
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Marketing</div>
@@ -932,13 +965,38 @@
                 </svg>
             </div>
             <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Leads</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('lost','Geen interesse')">Geen interesse</div>
+                <div class="sidebar-dropdown-item" onclick="document.getElementById('metaMarketingSection').scrollIntoView({behavior:'smooth'})">Meta performance</div>
+                <div class="sidebar-dropdown-item" onclick="document.getElementById('sourceChart').closest('.card').scrollIntoView({behavior:'smooth'})">Lead bronnen</div>
             </div>
         </div>
 
+        <div class="sidebar-section-label" style="margin-top:8px;">Retentie</div>
+        <div class="sidebar-item" onclick="document.getElementById('eclubSection') && document.getElementById('eclubSection').scrollIntoView({behavior:'smooth'})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            eClub retentie
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:8px;">Rapportages</div>
+        <div class="sidebar-dropdown" id="rapportagesDropdown">
+            <div class="sidebar-item" onclick="toggleDropdown('rapportagesDropdown')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                Rapportages
+                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+            <div class="sidebar-dropdown-items">
+                <div class="sidebar-dropdown-item">Seizoenspatronen</div>
+                <div class="sidebar-dropdown-item">ROI per lead</div>
+                <div class="sidebar-dropdown-item">Lead kwaliteit</div>
+            </div>
+        </div>
 
     </nav>
 
@@ -994,7 +1052,7 @@
 
 <!-- ── TOPBAR ────────────────────────────────────────────────────── -->
 <header class="topbar">
-    <span class="topbar-title">Churn & Conversie Analytics</span>
+    <span class="topbar-title">Analytics</span>
     <div class="topbar-right">
         <button class="btn btn-ghost" onclick="refreshData()">↻ Vernieuwen</button>
 
@@ -1014,6 +1072,10 @@
                 <div class="dropdown-item" onclick="openPasswordModal(); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                     Wachtwoord wijzigen
+                </div>
+                <div class="dropdown-item" onclick="closeUserMenu()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    Instellingen
                 </div>
 
                 <div class="dropdown-divider"></div>
@@ -1186,7 +1248,7 @@
                     </div>
                 </div>
                 <div id="gapDescription" style="font-size:12px;color:var(--text-3);margin-top:2px;"></div>
-            <div id="gapValue" style="font-size:22px;font-weight:700;" style="font-size:13px; color:var(--text-2); margin-top:4px;"></div>
+            <div id="gapValue" style="font-size:22px;font-weight:700;color:var(--text-2);margin-top:4px;"></div>
                 <div class="chart-wrap" style="height:140px; margin-top:12px;">
                     <canvas id="conversionFunnelChart"></canvas>
                 </div>
