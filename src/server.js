@@ -501,7 +501,7 @@ app.post('/leads', async (req, res) => {
       });
 
       if (practice?.email_to && SMTP.host && SMTP.user && SMTP.pass) {
-        const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+        const baseUrl = process.env.BASE_URL || 'https://dynamic-health-consultancy.nl';
         const actionToken = generateActionToken(inserted.id, practice.code);
 
         const html = `
@@ -669,6 +669,73 @@ app.get('/api/lead-info', async (req, res) => {
   } catch (error) {
     console.error('Get lead info error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/lead-kwaliteit — leads buiten normale flow voor dashboard
+app.get('/api/lead-kwaliteit', async (req, res) => {
+  try {
+    const { practice } = req.query;
+    const practiceFilter = practice ? `AND l.praktijk_code = $1` : '';
+    const params = practice ? [practice] : [];
+
+    const data = await withReadConnection(async (client) => {
+      // 1. Afspraken zonder uitkomst: afspraak voorbij, in intent, outcome_sent = false
+      const r1 = await client.query(`
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
+               l.aangemaakt_op, l.appointment_datetime, l.funnel_stage,
+               l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
+               COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
+        FROM public.leads l
+        WHERE l.funnel_stage = 'intent'
+          AND l.appointment_datetime IS NOT NULL
+          AND l.appointment_datetime < NOW()
+          AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
+          ${practiceFilter}
+        ORDER BY l.appointment_datetime DESC
+        LIMIT 100
+      `, params);
+
+      // 2. Reminder verstuurd maar geen afspraak
+      const r2 = await client.query(`
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
+               l.aangemaakt_op, l.funnel_stage,
+               l.lead_reminder1_sent, l.lead_reminder2_sent, l.lead_reminder1_sent_at
+        FROM public.leads l
+        WHERE l.funnel_stage = 'awareness'
+          AND (l.appointment_datetime IS NULL)
+          AND (l.lead_reminder1_sent = TRUE OR l.lead_reminder2_sent = TRUE)
+          ${practiceFilter}
+        ORDER BY l.aangemaakt_op DESC
+        LIMIT 100
+      `, params);
+
+      // 3. Oud zonder afspraak: meer dan 14 dagen in awareness, geen reminder
+      const r3 = await client.query(`
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
+               l.aangemaakt_op, l.funnel_stage,
+               l.lead_reminder1_sent, l.lead_reminder2_sent
+        FROM public.leads l
+        WHERE l.funnel_stage = 'awareness'
+          AND (l.appointment_datetime IS NULL)
+          AND l.aangemaakt_op < NOW() - INTERVAL '14 days'
+          AND (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
+          ${practiceFilter}
+        ORDER BY l.aangemaakt_op ASC
+        LIMIT 100
+      `, params);
+
+      return {
+        geen_uitkomst: r1.rows,
+        reminder_geen_opvolging: r2.rows,
+        oud_zonder_afspraak: r3.rows
+      };
+    });
+
+    res.json({ success: true, ...data });
+  } catch (err) {
+    console.error('Lead kwaliteit error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

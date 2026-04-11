@@ -1021,7 +1021,7 @@
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Retentie</div>
-        <div class="sidebar-item" onclick="document.getElementById('eclubSection') && document.getElementById('eclubSection').scrollIntoView({behavior:'smooth'})">
+        <div class="sidebar-item" onclick="showDashboardSection('dashboard', this); setTimeout(() => { const el = document.querySelector('.card-title') && [...document.querySelectorAll('.card-title')].find(e => e.textContent.includes('eClub')); if(el) el.closest('.card').scrollIntoView({behavior:'smooth'}); }, 100);">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
@@ -1604,7 +1604,6 @@
                 <div class="card-subtitle">Alle geplande en afgeronde afspraken</div>
             </div>
             <div class="appt-filters">
-                <input type="text" class="appt-search" id="apptSearch" placeholder="Zoek op naam..." oninput="filterAfspraken()">
                 <select class="appt-filter-select" id="apptUitkomstFilter" onchange="filterAfspraken()">
                     <option value="">Alle uitkomsten</option>
                     <option value="won">Lid geworden</option>
@@ -1622,14 +1621,17 @@
             <thead>
                 <tr>
                     <th>Lead</th>
+                    <th>Email</th>
+                    <th>Telefoon</th>
                     <th>Datum</th>
                     <th>Tijd</th>
                     <th>Type</th>
                     <th>Uitkomst</th>
+                    <th>Actie</th>
                 </tr>
             </thead>
             <tbody id="apptTableBody">
-                <tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1646,13 +1648,15 @@
             <thead>
                 <tr>
                     <th>Naam</th>
+                    <th>Email</th>
+                    <th>Telefoon</th>
                     <th>Aangemeld</th>
                     <th>Bron</th>
                     <th>Actie</th>
                 </tr>
             </thead>
             <tbody id="leadsZonderAfspraakBody">
-                <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1772,10 +1776,10 @@
         </div>
         <table class="table">
             <thead>
-                <tr><th>Naam</th><th>Afspraakdatum</th><th>Type</th><th>Dagen geleden</th></tr>
+                <tr><th>Naam</th><th>Email</th><th>Telefoon</th><th>Afspraakdatum</th><th>Type</th><th>Dagen geleden</th></tr>
             </thead>
             <tbody id="kwalNoOutcomeBody">
-                <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1790,10 +1794,10 @@
         </div>
         <table class="table">
             <thead>
-                <tr><th>Naam</th><th>Aangemeld</th><th>Reminder</th><th>Actie</th></tr>
+                <tr><th>Naam</th><th>Email</th><th>Telefoon</th><th>Aangemeld</th><th>Bron</th><th>Reminder</th><th>Actie</th></tr>
             </thead>
             <tbody id="kwalNoFollowupBody">
-                <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                <tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1808,10 +1812,10 @@
         </div>
         <table class="table">
             <thead>
-                <tr><th>Naam</th><th>Aangemeld</th><th>Dagen oud</th><th>Bron</th><th>Actie</th></tr>
+                <tr><th>Naam</th><th>Email</th><th>Telefoon</th><th>Aangemeld</th><th>Dagen oud</th><th>Bron</th><th>Actie</th></tr>
             </thead>
             <tbody id="kwalOldNoApptBody">
-                <tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                <tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
             </tbody>
         </table>
     </div>
@@ -1827,39 +1831,68 @@
             <button onclick="closeApptModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-3);">&times;</button>
         </div>
         <div class="appt-modal-body">
-            <div class="appt-lead-info" id="apptModalLeadInfo" style="display:none;">
-                <div class="appt-lead-name" id="apptModalLeadName">—</div>
-                <div class="appt-lead-meta" id="apptModalLeadMeta">—</div>
+            <!-- Tab switcher -->
+            <div id="apptModalTabs" style="display:flex;gap:0;margin-bottom:18px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">
+                <button id="tabAfspraak" onclick="switchApptTab('afspraak')" style="flex:1;padding:8px;font-size:13px;font-weight:500;font-family:inherit;border:none;cursor:pointer;background:var(--accent);color:white;">Afspraak inplannen</button>
+                <button id="tabUitkomst" onclick="switchApptTab('uitkomst')" style="flex:1;padding:8px;font-size:13px;font-weight:500;font-family:inherit;border:none;cursor:pointer;background:var(--surface-2);color:var(--text-2);">Uitkomst registreren</button>
             </div>
-            <div id="apptModalLeadSelect">
+
+            <!-- Tab 1: Afspraak inplannen -->
+            <div id="apptTabAfspraak">
+                <div class="appt-lead-info" id="apptModalLeadInfo" style="display:none;">
+                    <div class="appt-lead-name" id="apptModalLeadName">—</div>
+                    <div class="appt-lead-meta" id="apptModalLeadMeta">—</div>
+                </div>
+                <div id="apptModalLeadSelect">
+                    <div class="form-group">
+                        <label>Lead selecteren</label>
+                        <select id="apptLeadDropdown" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;" onchange="onApptLeadSelect(this.value)">
+                            <option value="">Selecteer een lead...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Datum</label>
+                        <input type="date" id="apptModalDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Tijd</label>
+                        <input type="time" id="apptModalTime">
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label>Lead selecteren</label>
-                    <select id="apptLeadDropdown" class="form-group input" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;" onchange="onApptLeadSelect(this.value)">
-                        <option value="">Selecteer een lead...</option>
+                    <label>Type afspraak</label>
+                    <select id="apptModalType" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;">
+                        <option value="vitaliteitscheck">Intake/Check-up</option>
+                        <option value="rondleiding">Rondleiding</option>
                     </select>
                 </div>
-            </div>
-            <div class="form-row-2">
                 <div class="form-group">
-                    <label>Datum</label>
-                    <input type="date" id="apptModalDate">
-                </div>
-                <div class="form-group">
-                    <label>Tijd</label>
-                    <input type="time" id="apptModalTime">
+                    <label>Notities <span style="color:var(--text-3);font-weight:400;">(optioneel)</span></label>
+                    <input type="text" id="apptModalNotes" placeholder="Bijv. voorkeur ochtend...">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Type afspraak</label>
-                <select id="apptModalType" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;">
-                    <option value="vitaliteitscheck">Intake/Check-up</option>
-                    <option value="rondleiding">Rondleiding</option>
-                </select>
+
+            <!-- Tab 2: Uitkomst registreren -->
+            <div id="apptTabUitkomst" style="display:none;">
+                <div class="form-group">
+                    <label>Lead selecteren</label>
+                    <select id="uitkomstLeadDropdown" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;" onchange="onUitkomstLeadSelect(this.value)">
+                        <option value="">Selecteer een lead met afspraak...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Uitkomst</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;">
+                        <button onclick="setUitkomst('won')" id="btnUitkomstWon" style="padding:10px 6px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;background:white;color:var(--text-1);transition:all .15s;">Lid geworden</button>
+                        <button onclick="setUitkomst('followup')" id="btnUitkomstFollowup" style="padding:10px 6px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;background:white;color:var(--text-1);transition:all .15s;">Bedenktijd</button>
+                        <button onclick="setUitkomst('lost')" id="btnUitkomstLost" style="padding:10px 6px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;background:white;color:var(--text-1);transition:all .15s;">Geen interesse</button>
+                    </div>
+                </div>
+                <div id="uitkomstSelectedInfo" style="display:none;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);font-size:13px;color:var(--text-2);margin-top:4px;"></div>
             </div>
-            <div class="form-group">
-                <label>Notities <span style="color:var(--text-3);font-weight:400;">(optioneel)</span></label>
-                <input type="text" id="apptModalNotes" placeholder="Bijv. voorkeur ochtend...">
-            </div>
+
             <div id="apptModalMsg" style="display:none;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-top:8px;"></div>
         </div>
         <div class="appt-modal-footer">
@@ -3484,23 +3517,17 @@
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
-            if (name === 'dashboard') {
-                // Herlaad dashboard data
-                applyFilters();
-            }
+            if (name === 'dashboard') applyFilters();
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
-            if (name === 'seizoen') {
-                // Altijd herlaad — praktijk kan gewisseld zijn
-                seizoenChartsBuilt = false;
-                loadSeizoenData();
-                seizoenChartsBuilt = true;
-            }
+            if (name === 'seizoen') { loadSeizoenData(); }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
         }
 
         // ── AFSPRAKEN ─────────────────────────────────────────────────
         let apptData = [];
         let apptLeadId = null;
+        let selectedUitkomst = null;
+        let uitkomstLeadId = null;
 
         async function loadAfspraken() {
             const pc = getActivePracticeCode();
@@ -3522,76 +3549,135 @@
                 document.getElementById('apptUpcoming').textContent = upcoming;
                 document.getElementById('apptConversie').textContent = conv + '%';
                 document.getElementById('apptOpenCount').textContent = noOutcome;
+
+                // Vul uitkomst dropdown
+                const metAfspraak = leads.filter(l => l.funnel_stage === 'intent' && !l.outcome_sent);
+                const uitkomstSel = document.getElementById('uitkomstLeadDropdown');
+                if (uitkomstSel) {
+                    uitkomstSel.innerHTML = '<option value="">Selecteer een lead met afspraak...</option>' +
+                        metAfspraak.map(l => `<option value="${l.id}">${l.volledige_naam || l.emailadres}</option>`).join('');
+                }
             } catch(e) {
-                document.getElementById('apptTableBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Fout bij laden</td></tr>';
+                document.getElementById('apptTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Fout bij laden</td></tr>';
             }
         }
 
         function renderApptTable(leads) {
             const tbody = document.getElementById('apptTableBody');
-            if (!leads.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken gevonden</td></tr>'; return; }
+            const uitkomst = document.getElementById('apptUitkomstFilter')?.value || '';
+            let filtered = leads;
+            if (uitkomst) {
+                const map = { won: 'won', lost: 'lost', open: 'intent', followup: 'intent' };
+                filtered = leads.filter(l => l.funnel_stage === (map[uitkomst] || uitkomst));
+            }
+            if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken gevonden</td></tr>'; return; }
             const uitkomstMap = { won: ['Lid geworden','badge-green'], intent: ['Open','badge-gray'], lost: ['Geen interesse','badge-red'] };
-            tbody.innerHTML = leads.map(l => {
+            tbody.innerHTML = filtered.map(l => {
                 const d = new Date(l.appointment_datetime);
                 const datum = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
                 const tijd = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
                 const [label, cls] = uitkomstMap[l.funnel_stage] || ['Open','badge-gray'];
                 const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
                 return `<tr>
-                    <td style="font-weight:500;">${l.volledige_naam || '—'}</td>
+                    <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
+                    <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
+                    <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
                     <td>${datum}</td>
                     <td>${tijd}</td>
                     <td>${type}</td>
                     <td><span class="badge ${cls}">${label}</span></td>
+                    <td>${l.funnel_stage === 'intent' && !l.outcome_sent ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openUitkomstVoorLead(${l.id})">Uitkomst</button>` : ''}</td>
                 </tr>`;
             }).join('');
         }
 
-        function filterAfspraken() {
-            const q = document.getElementById('apptSearch').value.toLowerCase();
-            const uitkomst = document.getElementById('apptUitkomstFilter').value;
-            let filtered = apptData;
-            if (q) filtered = filtered.filter(l => (l.volledige_naam || '').toLowerCase().includes(q));
-            if (uitkomst) {
-                const map = { won: 'won', lost: 'lost', open: 'intent', followup: 'intent' };
-                filtered = filtered.filter(l => l.funnel_stage === (map[uitkomst] || uitkomst));
-            }
-            renderApptTable(filtered);
-        }
+        function filterAfspraken() { renderApptTable(apptData); }
 
         async function loadLeadsZonderAfspraak() {
             const pc = getActivePracticeCode();
             try {
-                const res = await fetch(`/api/leads-by-stage?stage=awareness&practice=${pc}`, { credentials: 'include' });
+                const res = await fetch(`/api/leads-by-stage?stage=awareness${pc ? '&practice=' + pc : ''}`, { credentials: 'include' });
                 const data = await res.json();
-                const leads = (data.leads || []).filter(l => !l.appointment_datetime);
+                const leads = (data.leads || []).filter(l => !l.appointment_date);
                 document.getElementById('leadsZonderAfspraakCount').textContent = leads.length;
                 const tbody = document.getElementById('leadsZonderAfspraakBody');
-                if (!leads.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads zonder afspraak</td></tr>'; return; }
+                if (!leads.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads zonder afspraak</td></tr>'; return; }
                 tbody.innerHTML = leads.map(l => {
                     const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
                     return `<tr>
-                        <td style="font-weight:500;">${l.volledige_naam || '—'}</td>
+                        <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
+                        <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
+                        <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
                         <td>${datum}</td>
-                        <td>${l.bron || '—'}</td>
+                        <td>${l.bron||'—'}</td>
                         <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id}, '${(l.volledige_naam||'').replace(/'/g,"\\'")}', '${l.emailadres||''}', '${l.telefoon||''}')">Inplannen</button></td>
                     </tr>`;
                 }).join('');
                 populateApptLeadDropdown(leads);
-            } catch(e) {}
+            } catch(e) { console.error('loadLeadsZonderAfspraak error:', e); }
         }
 
         function populateApptLeadDropdown(leads) {
             const sel = document.getElementById('apptLeadDropdown');
-            sel.innerHTML = '<option value="">Selecteer een lead...</option>' + leads.map(l => `<option value="${l.id}" data-naam="${l.volledige_naam||''}" data-email="${l.emailadres||''}" data-tel="${l.telefoon||''}">${l.volledige_naam || l.emailadres}</option>`).join('');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Selecteer een lead...</option>' +
+                leads.map(l => `<option value="${l.id}" data-naam="${l.volledige_naam||''}" data-email="${l.emailadres||''}" data-tel="${l.telefoon||''}">${l.volledige_naam || l.emailadres}</option>`).join('');
         }
 
+        // ── MODAL TABS ────────────────────────────────────────────────
+        function switchApptTab(tab) {
+            const isAfspraak = tab === 'afspraak';
+            document.getElementById('apptTabAfspraak').style.display = isAfspraak ? 'block' : 'none';
+            document.getElementById('apptTabUitkomst').style.display = isAfspraak ? 'none' : 'block';
+            document.getElementById('tabAfspraak').style.background = isAfspraak ? 'var(--accent)' : 'var(--surface-2)';
+            document.getElementById('tabAfspraak').style.color = isAfspraak ? 'white' : 'var(--text-2)';
+            document.getElementById('tabUitkomst').style.background = isAfspraak ? 'var(--surface-2)' : 'var(--accent)';
+            document.getElementById('tabUitkomst').style.color = isAfspraak ? 'var(--text-2)' : 'white';
+            document.getElementById('apptModalSaveBtn').textContent = isAfspraak ? 'Afspraak opslaan' : 'Uitkomst opslaan';
+            document.getElementById('apptModalMsg').style.display = 'none';
+        }
+
+        function openUitkomstVoorLead(leadId) {
+            openApptModal(null);
+            switchApptTab('uitkomst');
+            setTimeout(() => {
+                const sel = document.getElementById('uitkomstLeadDropdown');
+                if (sel) { sel.value = leadId; onUitkomstLeadSelect(leadId); }
+            }, 50);
+        }
+
+        function setUitkomst(type) {
+            selectedUitkomst = type;
+            const colors = { won: '#16a34a', followup: '#d97706', lost: '#dc2626' };
+            const labels = { won: 'Lid geworden', followup: 'Bedenktijd nodig', lost: 'Geen interesse' };
+            ['won','followup','lost'].forEach(t => {
+                const btn = document.getElementById('btnUitkomst' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (btn) {
+                    btn.style.borderColor = t === type ? colors[t] : 'var(--border)';
+                    btn.style.background = t === type ? colors[t] : 'white';
+                    btn.style.color = t === type ? 'white' : 'var(--text-1)';
+                }
+            });
+            const info = document.getElementById('uitkomstSelectedInfo');
+            info.style.display = 'block';
+            info.textContent = `Geselecteerd: ${labels[type]}`;
+        }
+
+        function onUitkomstLeadSelect(val) {
+            uitkomstLeadId = val || null;
+        }
+
+        // ── MODAL OPEN/CLOSE ──────────────────────────────────────────
         function openApptModal(leadId, naam, email, tel) {
             apptLeadId = leadId || null;
+            selectedUitkomst = null;
+            uitkomstLeadId = null;
             const info = document.getElementById('apptModalLeadInfo');
             const sel = document.getElementById('apptModalLeadSelect');
             const msg = document.getElementById('apptModalMsg');
             msg.style.display = 'none';
+
+            switchApptTab('afspraak');
 
             if (leadId && naam) {
                 info.style.display = 'block';
@@ -3608,55 +3694,83 @@
             document.getElementById('apptModalDate').value = '';
             document.getElementById('apptModalTime').value = '';
             document.getElementById('apptModalNotes').value = '';
+            // Reset uitkomst knoppen
+            ['Won','Followup','Lost'].forEach(t => {
+                const btn = document.getElementById('btnUitkomst' + t);
+                if (btn) { btn.style.borderColor = 'var(--border)'; btn.style.background = 'white'; btn.style.color = 'var(--text-1)'; }
+            });
             document.getElementById('apptModalOverlay').classList.add('active');
         }
 
         function closeApptModal() {
             document.getElementById('apptModalOverlay').classList.remove('active');
             apptLeadId = null;
+            selectedUitkomst = null;
+            uitkomstLeadId = null;
         }
 
-        function onApptLeadSelect(val) {
-            apptLeadId = val || null;
-        }
+        function onApptLeadSelect(val) { apptLeadId = val || null; }
 
         async function saveApptModal() {
-            const lid = apptLeadId || document.getElementById('apptLeadDropdown').value;
-            const date = document.getElementById('apptModalDate').value;
-            const time = document.getElementById('apptModalTime').value;
-            const type = document.getElementById('apptModalType').value;
-            const notes = document.getElementById('apptModalNotes').value;
-            const msg = document.getElementById('apptModalMsg');
+            const isUitkomst = document.getElementById('apptTabUitkomst').style.display !== 'none';
             const btn = document.getElementById('apptModalSaveBtn');
+            const msg = document.getElementById('apptModalMsg');
 
-            if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
-            if (!date || !time) { showApptMsg('Vul datum en tijd in.', 'amber'); return; }
+            if (isUitkomst) {
+                // Uitkomst registreren
+                const lid = uitkomstLeadId || document.getElementById('uitkomstLeadDropdown')?.value;
+                if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
+                if (!selectedUitkomst) { showApptMsg('Selecteer een uitkomst.', 'amber'); return; }
 
-            const pc = getActivePracticeCode();
-            btn.disabled = true;
-            btn.textContent = 'Opslaan...';
+                const pc = getActivePracticeCode();
+                btn.disabled = true; btn.textContent = 'Opslaan...';
+                try {
+                    const tokenRes = await fetch(`/api/appointment-token?lead_id=${lid}&practice_code=${pc}`, { credentials: 'include' });
+                    const tokenData = await tokenRes.json();
+                    if (!tokenRes.ok) throw new Error(tokenData.error || 'Token fout');
 
-            try {
-                // Haal server-side token op
-                const tokenRes = await fetch(`/api/appointment-token?lead_id=${lid}&practice_code=${pc}`, { credentials: 'include' });
-                const tokenData = await tokenRes.json();
-                if (!tokenRes.ok || !tokenData.token) throw new Error(tokenData.error || 'Token ophalen mislukt');
+                    const res = await fetch(`/api/appointment-outcome?id=${lid}&result=${selectedUitkomst}&token=${tokenData.token}`, { credentials: 'include' });
+                    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Fout'); }
+                    showApptMsg('Uitkomst geregistreerd!', 'green');
+                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadKwaliteit(); }, 1200);
+                } catch(e) {
+                    showApptMsg('Fout: ' + e.message, 'red');
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Uitkomst opslaan';
+                }
+            } else {
+                // Afspraak inplannen
+                const lid = apptLeadId || document.getElementById('apptLeadDropdown')?.value;
+                const date = document.getElementById('apptModalDate').value;
+                const time = document.getElementById('apptModalTime').value;
+                const type = document.getElementById('apptModalType').value;
+                const notes = document.getElementById('apptModalNotes').value;
 
-                const res = await fetch('/api/confirm-appointment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: tokenData.token, via: 'dashboard' })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Fout');
-                showApptMsg('Afspraak opgeslagen!', 'green');
-                setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadsZonderAfspraak(); }, 1200);
-            } catch(e) {
-                showApptMsg('Fout: ' + e.message, 'red');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Afspraak opslaan';
+                if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
+                if (!date || !time) { showApptMsg('Vul datum en tijd in.', 'amber'); return; }
+
+                const pc = getActivePracticeCode();
+                btn.disabled = true; btn.textContent = 'Opslaan...';
+                try {
+                    const tokenRes = await fetch(`/api/appointment-token?lead_id=${lid}&practice_code=${pc}`, { credentials: 'include' });
+                    const tokenData = await tokenRes.json();
+                    if (!tokenRes.ok) throw new Error(tokenData.error || 'Token fout');
+
+                    const res = await fetch('/api/confirm-appointment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ lead_id: lid, practice_code: pc, date, time, type, notes, token: tokenData.token, via: 'dashboard' })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Fout');
+                    showApptMsg('Afspraak opgeslagen!', 'green');
+                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadsZonderAfspraak(); }, 1200);
+                } catch(e) {
+                    showApptMsg('Fout: ' + e.message, 'red');
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Afspraak opslaan';
+                }
             }
         }
 
@@ -3796,21 +3910,12 @@
             const now = new Date();
 
             try {
-                // Leads zonder uitkomst: afspraak voorbij, nog in intent, outcome_sent false
-                const res1 = await fetch(`/api/leads-by-stage?stage=intent&practice=${pc}`, { credentials: 'include' });
-                const d1 = await res1.json();
-                const noOutcome = (d1.leads || []).filter(l => l.appointment_datetime && new Date(l.appointment_datetime) < now && !l.outcome_sent);
+                const res = await fetch(`/api/lead-kwaliteit${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
+                const data = await res.json();
 
-                // Leads met reminder verstuurd maar geen afspraak
-                const res2 = await fetch(`/api/leads-by-stage?stage=awareness&practice=${pc}`, { credentials: 'include' });
-                const d2 = await res2.json();
-                const allAwareness = d2.leads || [];
-                const withReminder = allAwareness.filter(l => l.lead_reminder1_sent && !l.appointment_datetime);
-                const oldNoAppt = allAwareness.filter(l => {
-                    const days = (now - new Date(l.aangemaakt_op)) / (1000 * 60 * 60 * 24);
-                    return days > 14 && !l.appointment_datetime;
-                });
-
+                const noOutcome = data.geen_uitkomst || [];
+                const withReminder = data.reminder_geen_opvolging || [];
+                const oldNoAppt = data.oud_zonder_afspraak || [];
                 const total = noOutcome.length + withReminder.length + oldNoAppt.length;
 
                 document.getElementById('kwalNoOutcome').textContent = noOutcome.length;
@@ -3823,33 +3928,69 @@
 
                 // Geen uitkomst tabel
                 const tbody1 = document.getElementById('kwalNoOutcomeBody');
-                if (!noOutcome.length) { tbody1.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken zonder uitkomst</td></tr>'; }
-                else tbody1.innerHTML = noOutcome.map(l => {
-                    const d = new Date(l.appointment_datetime);
-                    const dagen = Math.floor((now - d) / (1000*60*60*24));
-                    const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
-                    const dagenCls = dagen > 5 ? 'badge-red' : 'badge-amber';
-                    return `<tr><td style="font-weight:500;">${l.volledige_naam||'—'}</td><td>${d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}</td><td>${type}</td><td><span class="badge ${dagenCls}">${dagen} dagen</span></td></tr>`;
-                }).join('');
+                if (!noOutcome.length) {
+                    tbody1.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken zonder uitkomst</td></tr>';
+                } else {
+                    tbody1.innerHTML = noOutcome.map(l => {
+                        const d = new Date(l.appointment_datetime);
+                        const dagen = Math.floor((now - d) / (1000*60*60*24));
+                        const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
+                        const dagenCls = dagen > 5 ? 'badge-red' : 'badge-amber';
+                        return `<tr>
+                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
+                            <td>${d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}</td>
+                            <td>${type}</td>
+                            <td><span class="badge ${dagenCls}">${dagen} dag${dagen !== 1 ? 'en' : ''}</span></td>
+                        </tr>`;
+                    }).join('');
+                }
 
                 // Reminder geen opvolging tabel
                 const tbody2 = document.getElementById('kwalNoFollowupBody');
-                if (!withReminder.length) { tbody2.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads in deze categorie</td></tr>'; }
-                else tbody2.innerHTML = withReminder.map(l => {
-                    const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day:'numeric', month:'short' });
-                    const rem = l.lead_reminder2_sent ? '<span class="badge badge-amber">Reminder 2</span>' : '<span class="badge badge-blue">Reminder 1</span>';
-                    return `<tr><td style="font-weight:500;">${l.volledige_naam||'—'}</td><td>${datum}</td><td>${rem}</td><td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${(l.volledige_naam||'').replace(/'/g,"\\'")}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td></tr>`;
-                }).join('');
+                if (!withReminder.length) {
+                    tbody2.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads in deze categorie</td></tr>';
+                } else {
+                    tbody2.innerHTML = withReminder.map(l => {
+                        const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day:'numeric', month:'short' });
+                        const rem = l.lead_reminder2_sent
+                            ? '<span class="badge badge-amber">Reminder 2</span>'
+                            : '<span class="badge badge-blue">Reminder 1</span>';
+                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\'");
+                        return `<tr>
+                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
+                            <td>${datum}</td>
+                            <td>${l.bron||'&mdash;'}</td>
+                            <td>${rem}</td>
+                            <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${veiligNaam}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td>
+                        </tr>`;
+                    }).join('');
+                }
 
                 // Oud zonder afspraak tabel
                 const tbody3 = document.getElementById('kwalOldNoApptBody');
-                if (!oldNoAppt.length) { tbody3.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads in deze categorie</td></tr>'; }
-                else tbody3.innerHTML = oldNoAppt.map(l => {
-                    const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day:'numeric', month:'short' });
-                    const dagen = Math.floor((now - new Date(l.aangemaakt_op)) / (1000*60*60*24));
-                    const dagenCls = dagen > 21 ? 'badge-red' : 'badge-amber';
-                    return `<tr><td style="font-weight:500;">${l.volledige_naam||'—'}</td><td>${datum}</td><td><span class="badge ${dagenCls}">${dagen} dagen</span></td><td>${l.bron||'—'}</td><td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${(l.volledige_naam||'').replace(/'/g,"\\'")}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td></tr>`;
-                }).join('');
+                if (!oldNoAppt.length) {
+                    tbody3.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Geen leads in deze categorie</td></tr>';
+                } else {
+                    tbody3.innerHTML = oldNoAppt.map(l => {
+                        const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day:'numeric', month:'short' });
+                        const dagen = Math.floor((now - new Date(l.aangemaakt_op)) / (1000*60*60*24));
+                        const dagenCls = dagen > 21 ? 'badge-red' : 'badge-amber';
+                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\'");
+                        return `<tr>
+                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
+                            <td>${datum}</td>
+                            <td><span class="badge ${dagenCls}">${dagen} dag${dagen !== 1 ? 'en' : ''}</span></td>
+                            <td>${l.bron||'&mdash;'}</td>
+                            <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${veiligNaam}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td>
+                        </tr>`;
+                    }).join('');
+                }
 
             } catch(e) {
                 console.error('Lead kwaliteit error:', e);
