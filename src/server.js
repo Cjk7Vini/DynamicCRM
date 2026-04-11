@@ -683,16 +683,28 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
       // 1. Afspraken zonder uitkomst: afspraak voorbij, in intent, outcome_sent = false
       const r1 = await client.query(`
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
-               l.aangemaakt_op, l.appointment_datetime, l.funnel_stage,
+               l.aangemaakt_op,
+               COALESCE(l.appointment_datetime,
+                 CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
+                 THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
+                 WHEN l.appointment_date IS NOT NULL
+                 THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
+                 ELSE NULL END
+               ) AS appointment_datetime,
+               l.funnel_stage,
                l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
                COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
         FROM public.leads l
         WHERE l.funnel_stage = 'intent'
-          AND l.appointment_datetime IS NOT NULL
-          AND l.appointment_datetime < NOW()
+          AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
+          AND COALESCE(l.appointment_datetime,
+                CASE WHEN l.appointment_date IS NOT NULL
+                THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
+                ELSE NULL END
+              ) < NOW()
           AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
           ${practiceFilter}
-        ORDER BY l.appointment_datetime DESC
+        ORDER BY appointment_datetime DESC
         LIMIT 100
       `, params);
 
@@ -748,20 +760,28 @@ app.get('/api/afspraken', async (req, res) => {
         SELECT
           l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
           l.aangemaakt_op, l.appointment_date, l.appointment_time,
-          l.appointment_datetime, l.funnel_stage, l.status,
+          l.appointment_datetime,
+          COALESCE(l.appointment_datetime,
+            CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
+            THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
+            WHEN l.appointment_date IS NOT NULL
+            THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
+            ELSE NULL END
+          ) AS appt_dt,
+          l.funnel_stage, l.status,
           l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
           COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
         FROM public.leads l
-        WHERE l.appointment_datetime IS NOT NULL
+        WHERE (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
       `;
       const params = [];
       if (practice) {
         query += ` AND l.praktijk_code = $1`;
         params.push(practice);
       }
-      query += ` ORDER BY l.appointment_datetime DESC LIMIT 200`;
+      query += ` ORDER BY COALESCE(l.appointment_datetime, l.appointment_date::timestamp) DESC LIMIT 200`;
       const result = await client.query(query, params);
-      return result.rows;
+      return result.rows.map(r => ({ ...r, appointment_datetime: r.appt_dt || r.appointment_datetime }));
     });
     res.json({ success: true, leads });
   } catch (err) {
