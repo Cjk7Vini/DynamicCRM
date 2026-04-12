@@ -157,19 +157,6 @@
           <div class="fte-calc" id="fte-calc">Vul FTE in om te beginnen</div>
         </div>
 
-        <!-- Minuten per behandeling -->
-        <div class="invoer-box">
-          <div class="invoer-box-title">Minuten per behandeling</div>
-          <div class="invoer-box-sub">Invulveld (standaard 20 min)</div>
-          <div class="invoer-row">
-            <input type="number" id="min-beh" value="20" min="5" max="120" step="5" oninput="herbereken()">
-            <span class="invoer-lbl">minuten</span>
-          </div>
-          <div style="margin-top:10px;font-size:11px;color:#6b7280;">
-            Uren werkweek: <strong>36u</strong> (vast) &nbsp;|&nbsp; Weken/jaar: <strong>44</strong> (vast)
-          </div>
-        </div>
-
         <!-- Behandelkamers -->
         <div class="invoer-box">
           <div class="invoer-box-title">Behandelkamers</div>
@@ -178,12 +165,26 @@
             <input type="number" id="kamers" value="1" min="1" max="30" oninput="herbereken()">
             <span class="invoer-lbl">kamers</span>
           </div>
+          <div style="margin-top:10px;font-size:11px;color:#6b7280;">
+            Uren werkweek: <strong>36u</strong> (vast) &nbsp;|&nbsp; Weken/jaar: <strong>44</strong> (vast)
+          </div>
+        </div>
+
+        <!-- Vaste waarden info -->
+        <div class="invoer-box">
+          <div class="invoer-box-title">Behandelduur</div>
+          <div class="invoer-box-sub">Vaste waarden</div>
+          <div style="font-size:13px;color:#374151;line-height:2;">
+            <div>Normale behandeling: <strong>30 min</strong></div>
+            <div>Nieuwe patient: <strong>60 min</strong> (2 slots)</div>
+            <div style="margin-top:8px;font-size:11px;color:#9ca3af;">Capaciteit = behandelingen + nieuwe patienten</div>
+          </div>
         </div>
       </div>
 
       <!-- Forecast resultaat -->
       <div class="forecast-box">
-        <h3>Forecast (36u/week, 44 weken, <span id="fc-min-lbl">20</span> min/behandeling)</h3>
+        <h3>Forecast (36u/week, 44 weken, 30 min/behandeling)</h3>
         <div class="fc-grid">
           <div class="fc-item">
             <div class="fc-lbl">Behandelingen / week</div>
@@ -267,9 +268,11 @@
   document.getElementById('maand').value = MAANDEN[nu.getMonth()];
   document.getElementById('jaar').value  = nu.getFullYear();
 
-  // Vaste waarden uit Excel
-  var UREN_WERKWEEK = 36;  // vast
-  var WEKEN_JAAR    = 44;  // vast
+  // Vaste waarden (conform Excel Lars)
+  var UREN_WERKWEEK  = 36;   // vast
+  var WEKEN_JAAR     = 44;   // vast
+  var MIN_NORMAAL    = 30;   // normale behandeling = 30 min = 1 slot
+  // Nieuwe patient = 60 min = 2 slots (wordt verrekend in capaciteitsberekening)
 
   function nv(id)  { return parseFloat(document.getElementById(id)?.value) || 0; }
   function el(id)  { return document.getElementById(id); }
@@ -277,20 +280,20 @@
   function fmt(n)  { return n.toLocaleString('nl-NL'); }
 
   function kleurBadge(val) {
-    if (val >= 85)       return 'g';
-    if (val >= 70)       return 'o';
+    if (val >= 85) return 'g';
+    if (val >= 70) return 'o';
     return 'r';
   }
 
-  // Bereken forecast op basis van Excel formule:
-  // beh_per_week = FTE * (36 * 60 / min_per_beh)
-  // maandbasis   = beh_per_week * FTE  <- zoals in Excel: 648 * 6 = 3888
+  // Forecast formule conform Excel:
+  // beh_per_week = FTE * (36u * 60 / 30min) = FTE * 72
+  // maandbasis   = beh_per_week * FTE
   // jaarbasis    = maandbasis * 44
-  function berekenForecast(fte, minPerBeh) {
-    if (!fte || !minPerBeh) return { pw: 0, pm: 0, pj: 0 };
-    var behPW  = fte * (UREN_WERKWEEK * 60 / minPerBeh);   // behandelingen per week totaal
-    var pm     = Math.round(behPW * fte);                   // maandbasis = beh/week * FTE
-    var pj     = pm * WEKEN_JAAR;                           // jaarbasis
+  function berekenForecast(fte) {
+    if (!fte) return { pw: 0, pm: 0, pj: 0 };
+    var behPW = fte * (UREN_WERKWEEK * 60 / MIN_NORMAAL); // bv. 6 * 72 = 432
+    var pm    = Math.round(behPW * fte);                  // bv. 432 * 6 = 2592
+    var pj    = pm * WEKEN_JAAR;                          // bv. 2592 * 44 = 114048
     return { pw: Math.round(behPW), pm: pm, pj: pj };
   }
 
@@ -335,25 +338,21 @@
   }
 
   function herbereken() {
-    var fte       = nv('fte');
-    var minPerBeh = nv('min-beh') || 20;
-    var kamers    = nv('kamers') || 1;
-    var n         = Math.round(fte);  // aantal medewerker rijen = afgerond FTE
+    var fte    = nv('fte');
+    var kamers = nv('kamers') || 1;
+    var n      = Math.round(fte); // aantal medewerker rijen
 
-    // Update forecast label
-    set('fc-min-lbl', minPerBeh);
-
-    var fc = berekenForecast(fte, minPerBeh);
-    set('fc-pw', fmt(fc.pw));
-    set('fc-pm', fmt(fc.pm));
-    set('fc-pj', fmt(fc.pj));
+    var fc = berekenForecast(fte);
+    set('fc-pw',  fmt(fc.pw));
+    set('fc-pm',  fmt(fc.pm));
+    set('fc-pj',  fmt(fc.pj));
 
     // FTE info
     var fteCal = el('fte-calc');
     if (fte > 0) {
       var geheel = Math.floor(fte);
       var rest   = Math.round((fte - geheel) * 10) / 10;
-      var txt = geheel + ' voltijds';
+      var txt    = geheel + ' voltijds';
       if (rest > 0) txt += ' + 1 parttime (' + Math.round(rest * 100) + '%)';
       fteCal.textContent = txt + ' | ' + n + ' medewerkers in tabel';
     } else {
@@ -368,8 +367,7 @@
 
     if (n !== aantalMW) { bouwTabel(n); return; }
 
-    // Per medewerker berekeningen
-    var totBeh = 0, totNi = 0, totVld = 0, totZkd = 0, totOvu = 0, totFte = 0;
+    var totBeh = 0, totNi = 0, totVld = 0, totZkd = 0, totOvu = 0, totFte = 0, totSlots = 0;
 
     for (var i = 1; i <= n; i++) {
       var mwFte = parseFloat(el('mw-fte-'+i)?.value) || 1;
@@ -382,11 +380,15 @@
       // Verhouding nieuw/totaal
       var vhd = beh > 0 ? Math.round((ni / beh) * 1000) / 10 : 0;
 
-      // Totaal afwezig = verlof + ziekte + overig (in dagen/uren)
+      // Totaal afwezig
       var taf = vld + zkd + ovu;
 
-      // Capaciteitsberekening = beh / maandbasis_totaal
-      var cap = fc.pm > 0 ? Math.round((beh / fc.pm) * 1000) / 10 : 0;
+      // Effectieve slots = normale beh (1 slot elk) + nieuwe patienten (2 slots elk)
+      // = (beh - ni) * 1 + ni * 2 = beh + ni
+      var effectieveSlots = beh + ni;
+
+      // Capaciteitsberekening = effectieve slots / maandbasis totaal
+      var cap = fc.pm > 0 ? Math.round((effectieveSlots / fc.pm) * 1000) / 10 : 0;
 
       // Target vs Actual = cap - 100%
       var tva = Math.round((cap - 100) * 10) / 10;
@@ -403,7 +405,13 @@
         tvaEl.className = 'mw-badge ' + (tva >= 0 ? 'g' : (tva >= -15 ? 'o' : 'r'));
       }
 
-      totBeh += beh; totNi += ni; totVld += vld; totZkd += zkd; totOvu += ovu; totFte += mwFte;
+      totBeh  += beh;
+      totNi   += ni;
+      totVld  += vld;
+      totZkd  += zkd;
+      totOvu  += ovu;
+      totFte  += mwFte;
+      totSlots += effectieveSlots;
     }
 
     var totVhd = totBeh > 0 ? Math.round((totNi / totBeh) * 1000) / 10 : 0;
@@ -418,7 +426,8 @@
     set('tot-ovu', totOvu);
     set('tot-taf', totTaf);
 
-    var fcReal = fc.pm > 0 ? Math.round((totBeh / fc.pm) * 1000) / 10 : 0;
+    // Realisatie op basis van effectieve slots (incl. nieuwe patienten weging)
+    var fcReal = fc.pm > 0 ? Math.round((totSlots / fc.pm) * 1000) / 10 : 0;
     set('fc-real', fcReal + '%');
   }
 
@@ -444,22 +453,24 @@
     btn.textContent = 'Bezig met versturen...';
     fb.style.display = 'none';
 
-    var minPerBeh = nv('min-beh') || 20;
-    var fc        = berekenForecast(fte, minPerBeh);
+    var fc = berekenForecast(fte);
     var medewerkers = [];
 
     for (var i = 1; i <= n; i++) {
       var mwBeh = parseFloat(el('beh-'+i)?.value) || 0;
+      var mwNi    = parseFloat(el('ni-'+i)?.value) || 0;
+      var mwSlots = mwBeh + mwNi; // effectieve slots: normale(1x) + nieuw(2x)
       medewerkers.push({
         nr:       i,
         naam:     el('nm-'+i)?.value.trim() || ('Medewerker ' + i),
         fte:      parseFloat(el('mw-fte-'+i)?.value) || 1,
         beh:      mwBeh,
-        nieuw:    parseFloat(el('ni-'+i)?.value) || 0,
+        nieuw:    mwNi,
         verlof:   parseFloat(el('vld-'+i)?.value) || 0,
         ziekte:   parseFloat(el('zkd-'+i)?.value) || 0,
         overig:   parseFloat(el('ovu-'+i)?.value) || 0,
-        cap:      fc.pm > 0 ? Math.round((mwBeh / fc.pm) * 1000) / 10 : 0
+        effectieveSlots: mwSlots,
+        cap:      fc.pm > 0 ? Math.round((mwSlots / fc.pm) * 1000) / 10 : 0
       });
     }
 
@@ -472,7 +483,8 @@
           jaar:         parseInt(el('jaar').value),
           praktijkCode: code,
           fte:          fte,
-          minPerBeh:    minPerBeh,
+          minNormaal:   30,
+          minNieuw:     60,
           forecast:     fc,
           medewerkers:  medewerkers
         })
