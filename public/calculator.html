@@ -15,7 +15,7 @@
     .header-div { width: 1px; height: 24px; background: rgba(255,255,255,0.2); }
     .header-title { color: #fff; font-size: 14px; font-weight: 600; }
 
-    .main { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+    .main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
 
     .sec { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
     .sec-head { background: #111827; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
@@ -23,74 +23,84 @@
     .sec-badge { font-size: 11px; background: rgba(255,255,255,0.15); color: #fff; padding: 2px 10px; border-radius: 20px; }
     .sec-body { padding: 22px; }
 
-    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 
     .fld label { display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
     .fld input, .fld select { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 9px; font-size: 14px; font-family: 'Poppins', sans-serif; color: #111827; background: #f9fafb; outline: none; transition: border-color 0.15s; }
     .fld input:focus, .fld select:focus { border-color: #111827; background: #fff; }
 
-    .agenda-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 16px; }
-    .al { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
-    .as { font-size: 11px; color: #9ca3af; font-weight: 400; }
-    .arow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .arow input { width: 62px; padding: 8px 10px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
-    .arow input:focus { border-color: #111827; }
-    .al2 { font-size: 12px; color: #6b7280; }
-    .ac { font-size: 12px; font-weight: 600; color: #059669; }
-    .agenda-note { font-size: 12px; color: #6b7280; margin-top: 12px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px; }
+    /* FTE invoer box */
+    .fte-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; }
+    .fte-box-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .fte-box-sub { font-size: 11px; color: #9ca3af; margin-bottom: 14px; }
+    .fte-row { display: flex; align-items: center; gap: 10px; }
+    .fte-row input { width: 90px; padding: 9px 12px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 16px; font-weight: 600; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
+    .fte-row input:focus { border-color: #111827; }
+    .fte-label { font-size: 13px; color: #6b7280; }
+    .fte-calc { font-size: 12px; font-weight: 600; color: #059669; margin-top: 8px; }
 
-    /* Forecast box */
-    .forecast-box { background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 16px 20px; }
-    .forecast-box h3 { font-size: 12px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; }
-    .fc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .invoer-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; }
+    .invoer-box-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .invoer-box-sub { font-size: 11px; color: #9ca3af; margin-bottom: 14px; }
+    .invoer-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .invoer-row:last-child { margin-bottom: 0; }
+    .invoer-row input { width: 80px; padding: 8px 10px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-weight: 500; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
+    .invoer-row input:focus { border-color: #111827; }
+    .invoer-lbl { font-size: 12px; color: #6b7280; }
+    .invoer-unit { font-size: 11px; color: #9ca3af; }
+
+    /* Forecast */
+    .forecast-box { background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 18px 22px; }
+    .forecast-box h3 { font-size: 11px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 14px; }
+    .fc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .fc-item { text-align: center; }
     .fc-lbl { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
-    .fc-val { font-size: 18px; font-weight: 700; color: #1e40af; }
+    .fc-val { font-size: 20px; font-weight: 700; color: #1e40af; }
     .fc-sub { font-size: 10px; color: #9ca3af; }
+    .fc-inputs { display: flex; gap: 20px; margin-bottom: 16px; flex-wrap: wrap; }
+    .fc-input-item { display: flex; align-items: center; gap: 8px; }
+    .fc-input-item label { font-size: 12px; color: #374151; font-weight: 500; white-space: nowrap; }
+    .fc-input-item input { width: 70px; padding: 7px 10px; text-align: center; border: 1.5px solid #bfdbfe; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: 'Poppins', sans-serif; background: #fff; color: #1e40af; outline: none; }
+    .fc-input-item input:focus { border-color: #1e40af; }
+    .fc-input-item span { font-size: 11px; color: #9ca3af; }
 
     /* Medewerker tabel */
-    .mw-table { width: 100%; border-collapse: collapse; }
-    .mw-table th { background: #f3f4f6; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 12px; text-align: right; border-bottom: 1.5px solid #e5e7eb; white-space: nowrap; }
-    .mw-table th:first-child { text-align: left; width: 120px; }
-    .mw-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; text-align: right; }
-    .mw-table td:first-child { text-align: left; }
-    .mw-table tr:last-child td { border-bottom: none; }
-    .mw-nr { font-size: 13px; font-weight: 600; color: #374151; }
-    .mw-input { width: 88px; padding: 6px 8px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 500; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
+    .mw-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .mw-table th { background: #f3f4f6; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 10px; text-align: right; border-bottom: 1.5px solid #e5e7eb; white-space: nowrap; }
+    .mw-table th:first-child { text-align: left; }
+    .mw-table th:nth-child(2) { text-align: center; }
+    .mw-table td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; text-align: right; }
+    .mw-table td:first-child { text-align: left; font-weight: 500; color: #374151; }
+    .mw-table td:nth-child(2) { text-align: center; }
+    .mw-table tr:last-child td { border-bottom: none; font-weight: 700; background: #f9fafb; }
+    .mw-name { width: 100%; padding: 6px 8px; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
+    .mw-name:focus { border-color: #111827; }
+    .mw-fte { width: 60px; padding: 6px 6px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
+    .mw-fte:focus { border-color: #111827; }
+    .mw-input { width: 72px; padding: 6px 6px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 500; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
     .mw-input:focus { border-color: #111827; }
-    .mw-val { font-size: 13px; color: #374151; }
+    .mw-val { font-size: 13px; color: #374151; font-weight: 500; }
+    .mw-pct { font-size: 12px; color: #374151; }
     .mw-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; display: inline-block; }
     .mw-badge.g { background: #ecfdf5; color: #065f46; }
     .mw-badge.o { background: #fffbeb; color: #92400e; }
     .mw-badge.r { background: #fef2f2; color: #991b1b; }
 
-    /* Totaalcijfers grid */
-    .totaal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .tot-card { border: 1.5px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-    .tot-head { background: #f3f4f6; padding: 9px 14px; font-size: 11px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.4px; }
-    .tot-body { padding: 10px 14px; }
-    .tot-body input { width: 100%; padding: 9px 10px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; margin-bottom: 5px; }
-    .tot-body input:focus { border-color: #111827; }
-    .tot-sub { font-size: 10px; color: #9ca3af; }
+    .agenda-note { font-size: 12px; color: #6b7280; margin-top: 14px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px; }
 
     .opslaan-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .opslaan-info { font-size: 13px; color: #6b7280; line-height: 1.7; }
     .opslaan-info strong { color: #111827; }
-    .btn-opslaan { background: #111827; color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; }
+    .btn-opslaan { background: #111827; color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
     .btn-opslaan:hover { background: #1f2937; }
-    .btn-opslaan:active { transform: scale(0.98); }
-    .btn-opslaan:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+    .btn-opslaan:disabled { background: #9ca3af; cursor: not-allowed; }
     .feedback { display: none; margin-top: 16px; padding: 13px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; }
     .feedback.ok  { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
     .feedback.err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
     @media (max-width: 700px) {
-      .grid4 { grid-template-columns: 1fr 1fr; }
-      .totaal-grid { grid-template-columns: 1fr 1fr; }
+      .grid3 { grid-template-columns: 1fr; }
       .fc-grid { grid-template-columns: 1fr 1fr; }
-      .grid3 { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -108,7 +118,7 @@
   <div class="sec">
     <div class="sec-head"><h2>Rapportage gegevens</h2></div>
     <div class="sec-body">
-      <div class="grid4">
+      <div class="grid3">
         <div class="fld">
           <label>Maand</label>
           <select id="maand">
@@ -118,100 +128,112 @@
             <option>Oktober</option><option>November</option><option>December</option>
           </select>
         </div>
-        <div class="fld"><label>Jaar</label><input type="number" id="jaar" value="2026" min="2020" max="2040"></div>
-        <div class="fld"><label>Praktijkcode</label><input id="code" placeholder="bv. K9X3QY" maxlength="20"></div>
-        <div class="fld"><label>Maten (nummers)</label><input id="maten" placeholder="bv. 1, 3, 5"></div>
+        <div class="fld">
+          <label>Jaar</label>
+          <input type="number" id="jaar" value="2026" min="2020" max="2040">
+        </div>
+        <div class="fld">
+          <label>Praktijkcode</label>
+          <input id="code" placeholder="bv. K9X3QY" maxlength="20">
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- AGENDA-UREN + KAMERS -->
+  <!-- FTE + FORECAST INVOER -->
   <div class="sec">
-    <div class="sec-head"><h2>Agenda-uren en kamers</h2></div>
+    <div class="sec-head"><h2>Praktijk instellingen</h2><span class="sec-badge">Forecast berekening</span></div>
     <div class="sec-body">
-      <div class="grid3" style="margin-bottom:14px">
-        <div class="agenda-box">
-          <div class="al">Fulltimers <span class="as">144 uur/maand</span></div>
-          <div class="arow">
-            <input type="number" id="ft" value="0" min="0" max="20" oninput="herbereken()">
-            <span class="al2">medewerkers</span>
-            <span class="ac" id="ft-res">= 0 uur</span>
+      <div class="grid3" style="margin-bottom:18px;">
+
+        <!-- FTE -->
+        <div class="fte-box">
+          <div class="fte-box-title">Aantal FTE</div>
+          <div class="fte-box-sub">Decimalen toegestaan (bv. 5.8)</div>
+          <div class="fte-row">
+            <input type="number" id="fte" value="0" min="0" max="50" step="0.1" oninput="herbereken()">
+            <span class="fte-label">FTE in dienst</span>
+          </div>
+          <div class="fte-calc" id="fte-calc">Vul FTE in om te beginnen</div>
+        </div>
+
+        <!-- Minuten per behandeling -->
+        <div class="invoer-box">
+          <div class="invoer-box-title">Minuten per behandeling</div>
+          <div class="invoer-box-sub">Invulveld (standaard 20 min)</div>
+          <div class="invoer-row">
+            <input type="number" id="min-beh" value="20" min="5" max="120" step="5" oninput="herbereken()">
+            <span class="invoer-lbl">minuten</span>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#6b7280;">
+            Uren werkweek: <strong>36u</strong> (vast) &nbsp;|&nbsp; Weken/jaar: <strong>44</strong> (vast)
           </div>
         </div>
-        <div class="agenda-box">
-          <div class="al">Parttimers <span class="as">gemiddeld uur/maand</span></div>
-          <div class="arow">
-            <input type="number" id="pt" value="0" min="0" max="20" oninput="herbereken()">
-            <span class="al2">mw x</span>
-            <input type="number" id="pt-uur" value="72" min="1" max="144" oninput="herbereken()">
-            <span class="al2">uur/mnd</span>
-            <span class="ac" id="pt-res">= 0 uur</span>
-          </div>
-        </div>
-        <div class="agenda-box">
-          <div class="al">Behandelkamers <span class="as">voor forecast</span></div>
-          <div class="arow">
-            <input type="number" id="kamers" value="1" min="1" max="20" oninput="herbereken()">
-            <span class="al2">kamers</span>
+
+        <!-- Behandelkamers -->
+        <div class="invoer-box">
+          <div class="invoer-box-title">Behandelkamers</div>
+          <div class="invoer-box-sub">Voor forecast berekening</div>
+          <div class="invoer-row">
+            <input type="number" id="kamers" value="1" min="1" max="30" oninput="herbereken()">
+            <span class="invoer-lbl">kamers</span>
           </div>
         </div>
       </div>
-      <div class="agenda-note" id="agenda-note">Vul het aantal medewerkers in om te beginnen.</div>
-    </div>
-  </div>
 
-  <!-- FORECAST -->
-  <div class="sec">
-    <div class="sec-head"><h2>Forecast</h2><span class="sec-badge">Automatisch berekend</span></div>
-    <div class="sec-body">
+      <!-- Forecast resultaat -->
       <div class="forecast-box">
-        <h3>Maximale theoretische output (40u/week, 30min/behandeling, 25 verlofdagen, 15% correctie)</h3>
+        <h3>Forecast (36u/week, 44 weken, <span id="fc-min-lbl">20</span> min/behandeling)</h3>
         <div class="fc-grid">
           <div class="fc-item">
-            <div class="fc-lbl">Per medewerker / jaar</div>
-            <div class="fc-val" id="fc-mw-jaar">3.060</div>
-            <div class="fc-sub">behandelingen</div>
+            <div class="fc-lbl">Behandelingen / week</div>
+            <div class="fc-val" id="fc-pw">0</div>
+            <div class="fc-sub">totaal praktijk</div>
           </div>
           <div class="fc-item">
-            <div class="fc-lbl">Per medewerker / maand</div>
-            <div class="fc-val" id="fc-mw-maand">255</div>
-            <div class="fc-sub">behandelingen</div>
+            <div class="fc-lbl">Behandelingen / maand</div>
+            <div class="fc-val" id="fc-pm">0</div>
+            <div class="fc-sub">maandbasis</div>
           </div>
           <div class="fc-item">
-            <div class="fc-lbl">Praktijk totaal / maand</div>
-            <div class="fc-val" id="fc-tot-maand">255</div>
-            <div class="fc-sub">behandelingen</div>
+            <div class="fc-lbl">Zittingen / jaar</div>
+            <div class="fc-val" id="fc-pj">0</div>
+            <div class="fc-sub">jaarbasis</div>
           </div>
           <div class="fc-item">
             <div class="fc-lbl">Realisatie deze maand</div>
             <div class="fc-val" id="fc-real">0%</div>
-            <div class="fc-sub">van forecast</div>
+            <div class="fc-sub">van maandbasis</div>
           </div>
         </div>
       </div>
+
+      <div class="agenda-note" id="agenda-note">Vul het aantal FTE in om te beginnen.</div>
     </div>
   </div>
 
   <!-- INVOER PER MEDEWERKER -->
   <div class="sec">
     <div class="sec-head">
-      <h2>Invoer per medewerker</h2>
+      <h2>Overzicht medewerkers</h2>
       <span class="sec-badge" id="mw-badge">0 medewerkers</span>
     </div>
-    <div class="sec-body" style="padding:0">
-      <div style="overflow-x:auto">
+    <div class="sec-body" style="padding:0;">
+      <div style="overflow-x:auto;">
         <table class="mw-table">
           <thead>
             <tr>
-              <th>Medewerker</th>
-              <th>Uren patiënten</th>
-              <th>Nieuwe patiënten</th>
-              <th>Overige uren</th>
-              <th>Verlofuren</th>
-              <th>Ziekteuren</th>
+              <th style="min-width:130px;">Naam</th>
+              <th>FTE</th>
               <th>Behandelingen</th>
-              <th>Vulling %</th>
-              <th>Realisatie %</th>
+              <th>Nieuwe cliënten</th>
+              <th>Verhouding nieuw/totaal</th>
+              <th>Verlofdagen</th>
+              <th>Ziekdagen</th>
+              <th>Overig uren</th>
+              <th>Totaal afwezig</th>
+              <th>Capaciteits%</th>
+              <th>Target vs Actual</th>
             </tr>
           </thead>
           <tbody id="mw-tbody"></tbody>
@@ -226,7 +248,7 @@
     <div class="sec-body">
       <div class="opslaan-bar">
         <div class="opslaan-info">
-          Rapport wordt opgeslagen. Lars ontvangt een melding via<br>
+          Rapport wordt opgeslagen en verstuurd naar<br>
           <strong>lars@dynamic-health-consultancy.nl</strong>
         </div>
         <button class="btn-opslaan" id="btn-opslaan" onclick="opslaan()">
@@ -240,117 +262,163 @@
 </main>
 
 <script>
-  // Forecast berekening
-  function berekenForecast(kamers, totMW) {
-    var behPerWeek = (40 * 60) / 30;       // 80
-    var wekenProd  = 45;
-    var behJaar    = wekenProd * behPerWeek; // 3600
-    var fcJaar     = behJaar - behJaar * 0.15; // 3060
-    var fcMaand    = fcJaar / 12;            // 255
-    var k          = kamers || totMW || 1;
-    return {
-      mwJaar:   Math.round(fcJaar),
-      mwMaand:  Math.round(fcMaand),
-      totMaand: Math.round(fcMaand * k)
-    };
-  }
-
-  // Omzet schatting op achtergrond (niet zichtbaar in calculator, wel in Excel)
-  function berekenOmzetSchatting(behandelingen) {
-    // Gemiddeld 35 euro per behandeling als schatting
-    return Math.round(behandelingen * 35);
-  }
-
   var MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
   var nu = new Date();
   document.getElementById('maand').value = MAANDEN[nu.getMonth()];
   document.getElementById('jaar').value  = nu.getFullYear();
 
+  // Vaste waarden uit Excel
+  var UREN_WERKWEEK = 36;  // vast
+  var WEKEN_JAAR    = 44;  // vast
+
   function nv(id)  { return parseFloat(document.getElementById(id)?.value) || 0; }
   function el(id)  { return document.getElementById(id); }
-  function set(id, val) { var e = el(id); if (e) e.textContent = val; }
+  function set(id, v) { var e = el(id); if (e) e.textContent = v; }
+  function fmt(n)  { return n.toLocaleString('nl-NL'); }
 
-  function kleur(val, norm) {
-    if (val >= norm)         return 'g';
-    if (val >= norm * 0.82)  return 'o';
+  function kleurBadge(val) {
+    if (val >= 85)       return 'g';
+    if (val >= 70)       return 'o';
     return 'r';
   }
 
-  var aantalMW = 0;
+  // Bereken forecast op basis van Excel formule:
+  // beh_per_week = FTE * (36 * 60 / min_per_beh)
+  // maandbasis   = beh_per_week * FTE  <- zoals in Excel: 648 * 6 = 3888
+  // jaarbasis    = maandbasis * 44
+  function berekenForecast(fte, minPerBeh) {
+    if (!fte || !minPerBeh) return { pw: 0, pm: 0, pj: 0 };
+    var behPW  = fte * (UREN_WERKWEEK * 60 / minPerBeh);   // behandelingen per week totaal
+    var pm     = Math.round(behPW * fte);                   // maandbasis = beh/week * FTE
+    var pj     = pm * WEKEN_JAAR;                           // jaarbasis
+    return { pw: Math.round(behPW), pm: pm, pj: pj };
+  }
 
-  function bouwTabel(totMW) {
-    aantalMW = totMW;
+  var aantalMW = -1;
+
+  function bouwTabel(n) {
+    aantalMW = n;
     var tbody = el('mw-tbody');
     tbody.innerHTML = '';
-    for (var i = 1; i <= totMW; i++) {
+    for (var i = 1; i <= n; i++) {
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="mw-nr">Medewerker ' + i + '</td>' +
-        '<td><input class="mw-input" type="number" id="pt-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="ni-' + i + '" min="0" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="ov-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="vl-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="zk-' + i + '" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td class="mw-val" id="beh-' + i + '">0</td>' +
-        '<td><span class="mw-badge r" id="vul-' + i + '">0%</span></td>' +
-        '<td><span class="mw-badge r" id="real-' + i + '">0%</span></td>';
+        '<td><input class="mw-name" type="text" id="nm-'+i+'" placeholder="Medewerker '+i+'" oninput="herbereken()"></td>' +
+        '<td><input class="mw-fte" type="number" id="mw-fte-'+i+'" value="1" min="0.1" max="2" step="0.1" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="beh-'+i+'" min="0" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="ni-'+i+'"  min="0" placeholder="0" oninput="herbereken()"></td>' +
+        '<td class="mw-pct" id="vhd-'+i+'">0%</td>' +
+        '<td><input class="mw-input" type="number" id="vld-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="zkd-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-input" type="number" id="ovu-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
+        '<td class="mw-val" id="taf-'+i+'">0</td>' +
+        '<td><span class="mw-badge r" id="cap-'+i+'">0%</span></td>' +
+        '<td><span class="mw-badge r" id="tva-'+i+'">0%</span></td>';
       tbody.appendChild(tr);
     }
-    el('mw-badge').textContent = totMW + ' medewerkers';
+    // Totaalrij
+    var totRow = document.createElement('tr');
+    totRow.id = 'totrow';
+    totRow.innerHTML =
+      '<td>Totaal</td>' +
+      '<td class="mw-val" id="tot-fte">0</td>' +
+      '<td class="mw-val" id="tot-beh">0</td>' +
+      '<td class="mw-val" id="tot-ni">0</td>' +
+      '<td class="mw-pct" id="tot-vhd">0%</td>' +
+      '<td class="mw-val" id="tot-vld">0</td>' +
+      '<td class="mw-val" id="tot-zkd">0</td>' +
+      '<td class="mw-val" id="tot-ovu">0</td>' +
+      '<td class="mw-val" id="tot-taf">0</td>' +
+      '<td></td><td></td>';
+    tbody.appendChild(totRow);
     herbereken();
   }
 
   function herbereken() {
-    var ft     = nv('ft');
-    var pt     = nv('pt');
-    var ptUur  = nv('pt-uur') || 72;
-    var kamers = nv('kamers') || 1;
-    var totMW  = ft + pt;
+    var fte       = nv('fte');
+    var minPerBeh = nv('min-beh') || 20;
+    var kamers    = nv('kamers') || 1;
+    var n         = Math.round(fte);  // aantal medewerker rijen = afgerond FTE
 
-    var ftUren    = ft * 144;
-    var ptUren    = pt * ptUur;
-    var totAgenda = ftUren + ptUren;
-    var gemAgenda = totMW > 0 ? Math.round(totAgenda / totMW * 10) / 10 : 144;
+    // Update forecast label
+    set('fc-min-lbl', minPerBeh);
 
-    el('ft-res').textContent = '= ' + ftUren.toLocaleString('nl-NL') + ' uur';
-    el('pt-res').textContent = '= ' + Math.round(ptUren) + ' uur';
-    el('agenda-note').textContent = totMW > 0
-      ? totMW + ' medewerkers \u2014 gemiddeld ' + gemAgenda + ' agenda-uren per medewerker per maand'
-      : 'Vul het aantal medewerkers in om te beginnen.';
-    el('mw-badge').textContent = totMW > 0 ? totMW + ' medewerkers' : '0 medewerkers';
+    var fc = berekenForecast(fte, minPerBeh);
+    set('fc-pw', fmt(fc.pw));
+    set('fc-pm', fmt(fc.pm));
+    set('fc-pj', fmt(fc.pj));
 
-    if (totMW !== aantalMW) { bouwTabel(totMW); return; }
-
-    var fc = berekenForecast(kamers, totMW);
-    set('fc-mw-jaar',   fc.mwJaar.toLocaleString('nl-NL'));
-    set('fc-mw-maand',  fc.mwMaand.toLocaleString('nl-NL'));
-    set('fc-tot-maand', fc.totMaand.toLocaleString('nl-NL'));
-
-    var totBeh = 0;
-
-    for (var i = 1; i <= totMW; i++) {
-      var ptU  = parseFloat(el('pt-' + i)?.value) || 0;
-      var vl   = parseFloat(el('vl-' + i)?.value) || 0;
-      var zk   = parseFloat(el('zk-' + i)?.value) || 0;
-      var beh  = Math.round(ptU * 2);
-
-      // Vulling = (behandeluren + verlof + ziekte) / agenda-uren per medewerker
-      var agendaMW = totMW > 0 ? totAgenda / totMW : 144;
-      var vul  = agendaMW > 0 ? Math.round(((ptU + vl + zk) / agendaMW) * 1000) / 10 : 0;
-      var real = fc.mwMaand > 0 ? Math.round((beh / fc.mwMaand) * 1000) / 10 : 0;
-
-      set('beh-' + i, beh);
-
-      var vEl = el('vul-' + i);
-      if (vEl) { vEl.textContent = vul + '%'; vEl.className = 'mw-badge ' + kleur(vul, 85); }
-
-      var rEl = el('real-' + i);
-      if (rEl) { rEl.textContent = real + '%'; rEl.className = 'mw-badge ' + kleur(real, 85); }
-
-      totBeh += beh;
+    // FTE info
+    var fteCal = el('fte-calc');
+    if (fte > 0) {
+      var geheel = Math.floor(fte);
+      var rest   = Math.round((fte - geheel) * 10) / 10;
+      var txt = geheel + ' voltijds';
+      if (rest > 0) txt += ' + 1 parttime (' + Math.round(rest * 100) + '%)';
+      fteCal.textContent = txt + ' | ' + n + ' medewerkers in tabel';
+    } else {
+      fteCal.textContent = 'Vul FTE in om te beginnen';
     }
 
-    var fcReal = fc.totMaand > 0 ? Math.round((totBeh / fc.totMaand) * 1000) / 10 : 0;
+    el('agenda-note').textContent = fte > 0
+      ? fte + ' FTE | beh/week: ' + fmt(fc.pw) + ' | maandbasis: ' + fmt(fc.pm) + ' | jaarbasis: ' + fmt(fc.pj)
+      : 'Vul het aantal FTE in om te beginnen.';
+
+    el('mw-badge').textContent = n > 0 ? n + ' medewerkers' : '0 medewerkers';
+
+    if (n !== aantalMW) { bouwTabel(n); return; }
+
+    // Per medewerker berekeningen
+    var totBeh = 0, totNi = 0, totVld = 0, totZkd = 0, totOvu = 0, totFte = 0;
+
+    for (var i = 1; i <= n; i++) {
+      var mwFte = parseFloat(el('mw-fte-'+i)?.value) || 1;
+      var beh   = parseFloat(el('beh-'+i)?.value) || 0;
+      var ni    = parseFloat(el('ni-'+i)?.value)  || 0;
+      var vld   = parseFloat(el('vld-'+i)?.value) || 0;
+      var zkd   = parseFloat(el('zkd-'+i)?.value) || 0;
+      var ovu   = parseFloat(el('ovu-'+i)?.value) || 0;
+
+      // Verhouding nieuw/totaal
+      var vhd = beh > 0 ? Math.round((ni / beh) * 1000) / 10 : 0;
+
+      // Totaal afwezig = verlof + ziekte + overig (in dagen/uren)
+      var taf = vld + zkd + ovu;
+
+      // Capaciteitsberekening = beh / maandbasis_totaal
+      var cap = fc.pm > 0 ? Math.round((beh / fc.pm) * 1000) / 10 : 0;
+
+      // Target vs Actual = cap - 100%
+      var tva = Math.round((cap - 100) * 10) / 10;
+
+      set('vhd-'+i, vhd + '%');
+      set('taf-'+i, taf);
+
+      var capEl = el('cap-'+i);
+      if (capEl) { capEl.textContent = cap + '%'; capEl.className = 'mw-badge ' + kleurBadge(cap); }
+
+      var tvaEl = el('tva-'+i);
+      if (tvaEl) {
+        tvaEl.textContent = (tva >= 0 ? '+' : '') + tva + '%';
+        tvaEl.className = 'mw-badge ' + (tva >= 0 ? 'g' : (tva >= -15 ? 'o' : 'r'));
+      }
+
+      totBeh += beh; totNi += ni; totVld += vld; totZkd += zkd; totOvu += ovu; totFte += mwFte;
+    }
+
+    var totVhd = totBeh > 0 ? Math.round((totNi / totBeh) * 1000) / 10 : 0;
+    var totTaf = totVld + totZkd + totOvu;
+
+    set('tot-fte', Math.round(totFte * 10) / 10);
+    set('tot-beh', fmt(totBeh));
+    set('tot-ni',  fmt(totNi));
+    set('tot-vhd', totVhd + '%');
+    set('tot-vld', totVld);
+    set('tot-zkd', totZkd);
+    set('tot-ovu', totOvu);
+    set('tot-taf', totTaf);
+
+    var fcReal = fc.pm > 0 ? Math.round((totBeh / fc.pm) * 1000) / 10 : 0;
     set('fc-real', fcReal + '%');
   }
 
@@ -358,19 +426,17 @@
     var btn  = el('btn-opslaan');
     var fb   = el('feedback');
     var code = el('code')?.value.trim();
+    var fte  = nv('fte');
+    var n    = Math.round(fte);
 
     if (!code) {
-      fb.className = 'feedback err';
-      fb.style.display = 'block';
+      fb.className = 'feedback err'; fb.style.display = 'block';
       fb.textContent = 'Vul een praktijkcode in voordat je het rapport verstuurt.';
       return;
     }
-
-    var ft = nv('ft'), pt = nv('pt');
-    if (ft + pt === 0) {
-      fb.className = 'feedback err';
-      fb.style.display = 'block';
-      fb.textContent = 'Vul het aantal medewerkers in.';
+    if (fte === 0) {
+      fb.className = 'feedback err'; fb.style.display = 'block';
+      fb.textContent = 'Vul het aantal FTE in.';
       return;
     }
 
@@ -378,20 +444,22 @@
     btn.textContent = 'Bezig met versturen...';
     fb.style.display = 'none';
 
-    var totMW = ft + pt;
+    var minPerBeh = nv('min-beh') || 20;
+    var fc        = berekenForecast(fte, minPerBeh);
     var medewerkers = [];
-    for (var i = 1; i <= totMW; i++) {
-      var ptU = parseFloat(el('pt-' + i)?.value) || 0;
-      var beh = Math.round(ptU * 2);
+
+    for (var i = 1; i <= n; i++) {
+      var mwBeh = parseFloat(el('beh-'+i)?.value) || 0;
       medewerkers.push({
-        nr:      i,
-        pturen:  ptU,
-        nieuw:   parseFloat(el('ni-' + i)?.value) || 0,
-        overig:  parseFloat(el('ov-' + i)?.value) || 0,
-        verlof:  parseFloat(el('vl-' + i)?.value) || 0,
-        ziekte:  parseFloat(el('zk-' + i)?.value) || 0,
-        beh:     beh,
-        omzet:   berekenOmzetSchatting(beh) // achtergrond berekening voor Excel
+        nr:       i,
+        naam:     el('nm-'+i)?.value.trim() || ('Medewerker ' + i),
+        fte:      parseFloat(el('mw-fte-'+i)?.value) || 1,
+        beh:      mwBeh,
+        nieuw:    parseFloat(el('ni-'+i)?.value) || 0,
+        verlof:   parseFloat(el('vld-'+i)?.value) || 0,
+        ziekte:   parseFloat(el('zkd-'+i)?.value) || 0,
+        overig:   parseFloat(el('ovu-'+i)?.value) || 0,
+        cap:      fc.pm > 0 ? Math.round((mwBeh / fc.pm) * 1000) / 10 : 0
       });
     }
 
@@ -400,18 +468,15 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          maand:          el('maand').value,
-          jaar:           parseInt(el('jaar').value),
-          praktijkCode:   code,
-          matenNummers:   el('maten')?.value.trim() || '',
-          aantalFt:       ft,
-          aantalPt:       pt,
-          ptUrenPerMaand: nv('pt-uur') || 72,
-          aantalKamers:   nv('kamers') || 1,
-          medewerkers:    medewerkers
+          maand:        el('maand').value,
+          jaar:         parseInt(el('jaar').value),
+          praktijkCode: code,
+          fte:          fte,
+          minPerBeh:    minPerBeh,
+          forecast:     fc,
+          medewerkers:  medewerkers
         })
       });
-
       var data = await res.json();
       if (data.success) {
         fb.className = 'feedback ok';
@@ -430,7 +495,7 @@
     btn.textContent = 'Rapport opslaan en versturen';
   }
 
-  el('maten').addEventListener('input', herbereken);
+  // Init
   herbereken();
 </script>
 </body>
