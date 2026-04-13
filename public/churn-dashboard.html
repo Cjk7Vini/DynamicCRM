@@ -1795,16 +1795,19 @@
                 </div>
                 <div id="profielContactRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Contactpersoon</div>
-                    <input type="text" id="profielContactInput" placeholder="Naam contactpersoon" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
+                    <div id="profielContactDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">—</div>
+                    <input type="text" id="profielContactInput" placeholder="Naam contactpersoon" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;display:none;">
                 </div>
                 <div id="profielLocatieRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie</div>
-                    <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
+                    <div id="profielLocatieDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">—</div>
+                    <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;display:none;">
                 </div>
             </div>
             <div id="profielOpslaan" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
             <div id="profielOpslaanKnop" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="slaProfielOp()" style="font-size:13px;">Profiel opslaan</button>
+                <button class="btn btn-primary" id="profielHoofdKnop" onclick="profielKnopKlik()" style="font-size:13px;">Profiel opslaan</button>
+                <button class="btn btn-ghost" id="profielAnnuleerKnop" onclick="annuleerProfielEdit()" style="font-size:13px;display:none;">Annuleren</button>
                 <button class="btn btn-ghost" onclick="openPasswordModal()" style="font-size:13px;">Wachtwoord wijzigen</button>
             </div>
         </div>
@@ -4244,16 +4247,10 @@
                 }
 
                 // Aanpasbare velden
-                const contactInput = document.getElementById('profielContactInput');
-                const locatieInput = document.getElementById('profielLocatieInput');
-                if (contactInput) {
-                    contactInput.value = p.contact_naam || '';
-                    contactInput.style.borderColor = p.contact_naam ? 'var(--accent)' : 'var(--border)';
-                }
-                if (locatieInput) {
-                    locatieInput.value = p.locatie || '';
-                    locatieInput.style.borderColor = p.locatie ? 'var(--accent)' : 'var(--border)';
-                }
+                // Vul velden en zet juiste modus
+                const heeftData = !!(p.contact_naam || p.locatie);
+                zetProfielModus(heeftData ? 'read' : 'edit', p.contact_naam || '', p.locatie || '');
+
                 // Verberg feedback melding bij herladen
                 const fb2 = document.getElementById('profielOpslaan');
                 if (fb2) fb2.style.display = 'none';
@@ -4333,6 +4330,42 @@
             }
         }
 
+        function zetProfielModus(modus, contact, locatie) {
+            const isEdit = modus === 'edit';
+            const contactDisplay = document.getElementById('profielContactDisplay');
+            const contactInput   = document.getElementById('profielContactInput');
+            const locatieDisplay = document.getElementById('profielLocatieDisplay');
+            const locatieInput   = document.getElementById('profielLocatieInput');
+            const hoofdKnop      = document.getElementById('profielHoofdKnop');
+            const annuleerKnop   = document.getElementById('profielAnnuleerKnop');
+
+            if (contactDisplay) { contactDisplay.textContent = contact || '—'; contactDisplay.style.display = isEdit ? 'none' : 'block'; }
+            if (contactInput)   { contactInput.value = contact || ''; contactInput.style.display = isEdit ? 'block' : 'none'; }
+            if (locatieDisplay) { locatieDisplay.textContent = locatie || '—'; locatieDisplay.style.display = isEdit ? 'none' : 'block'; }
+            if (locatieInput)   { locatieInput.value = locatie || ''; locatieInput.style.display = isEdit ? 'block' : 'none'; }
+            if (hoofdKnop)      { hoofdKnop.textContent = isEdit ? 'Profiel opslaan' : 'Profiel wijzigen'; }
+            if (annuleerKnop)   { annuleerKnop.style.display = isEdit && (contact || locatie) ? 'inline-flex' : 'none'; }
+        }
+
+        function profielKnopKlik() {
+            const hoofdKnop = document.getElementById('profielHoofdKnop');
+            if (hoofdKnop?.textContent.trim() === 'Profiel wijzigen') {
+                // Naar edit modus
+                const contact = document.getElementById('profielContactDisplay')?.textContent.replace('—','').trim() || '';
+                const locatie = document.getElementById('profielLocatieDisplay')?.textContent.replace('—','').trim() || '';
+                zetProfielModus('edit', contact, locatie);
+            } else {
+                slaProfielOp();
+            }
+        }
+
+        function annuleerProfielEdit() {
+            const contact = document.getElementById('profielContactInput')?.defaultValue || '';
+            const locatie = document.getElementById('profielLocatieInput')?.defaultValue || '';
+            // Terug naar read modus met originele waarden
+            loadInstellingen();
+        }
+
         async function slaProfielOp() {
             const fb = document.getElementById('profielOpslaan');
             const contact = document.getElementById('profielContactInput')?.value.trim() || '';
@@ -4350,8 +4383,7 @@
                 if (data.success) {
                     fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
                     fb.textContent = 'Profiel opgeslagen.';
-                    // Herlaad profiel zodat opgeslagen data zichtbaar is
-                    setTimeout(() => loadInstellingen(), 500);
+                    setTimeout(() => loadInstellingen(), 600);
                 } else {
                     fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
                     fb.textContent = data.error || 'Fout bij opslaan.';
