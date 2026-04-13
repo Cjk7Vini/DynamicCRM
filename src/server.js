@@ -3960,7 +3960,7 @@ app.get('/api/check-outcome', async (req, res) => {
           AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
           AND l.appointment_datetime <= NOW() - interval '60 minutes'
           AND l.appointment_datetime >= NOW() - interval '24 hours'
-          AND l.praktijk_code = 'K9X3QY'
+          AND l.appointment_datetime >= '2026-04-13T00:00:00+02:00'
       `);
       return result.rows;
     });
@@ -4231,7 +4231,7 @@ app.get('/api/check-followup', async (req, res) => {
           AND l.followup_at IS NOT NULL
           AND l.followup_at <= NOW()
           AND (l.followup_sent IS NULL OR l.followup_sent = FALSE)
-          AND l.praktijk_code = 'K9X3QY'
+          AND l.followup_at >= '2026-04-13T00:00:00+02:00'
       `);
       return result.rows;
     });
@@ -4360,7 +4360,7 @@ app.get('/api/check-followup', async (req, res) => {
 
 // ─── FASE 1 STAP D — LEAD REMINDER FLOW (alleen K9X3QY) ──────────────────────
 // Go-live datum: alleen leads aangemaakt ná deze datum worden meegenomen
-const LEAD_REMINDER_GOLIVE = new Date('2026-04-09T00:00:00+02:00');
+const LEAD_REMINDER_GOLIVE = new Date('2026-04-13T00:00:00+02:00');
 
 // Aanroepen via EasyCron: GET /api/check-lead-reminders
 app.get('/api/check-lead-reminders', async (req, res) => {
@@ -4386,7 +4386,6 @@ app.get('/api/check-lead-reminders', async (req, res) => {
         WHERE l.funnel_stage = 'awareness'
           AND (l.appointment_datetime IS NULL)
           AND l.aangemaakt_op >= $1
-          AND l.praktijk_code = 'K9X3QY'
           AND (
             (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
             OR
