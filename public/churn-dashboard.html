@@ -1781,7 +1781,9 @@
                 </div>
                 <div>
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Rol</div>
-                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielRol">—</div>
+                    <select id="profielRolSelect" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
+                        <option>Laden...</option>
+                    </select>
                 </div>
                 <div>
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijkcode</div>
@@ -1793,17 +1795,17 @@
                 </div>
                 <div>
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Contactpersoon</div>
-                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielContact">—</div>
+                    <input type="text" id="profielContactInput" placeholder="Naam contactpersoon" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
                 </div>
                 <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie</div>
-                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielLocatie">—</div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie / Adres</div>
+                    <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam, Hoofdstraat 1" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
                 </div>
             </div>
-            <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
-                <button class="btn btn-ghost" onclick="openPasswordModal()" style="font-size:13px;">
-                    Wachtwoord wijzigen
-                </button>
+            <div id="profielOpslaan" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
+            <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="slaProfielOp()" style="font-size:13px;">Profiel opslaan</button>
+                <button class="btn btn-ghost" onclick="openPasswordModal()" style="font-size:13px;">Wachtwoord wijzigen</button>
             </div>
         </div>
     </div>
@@ -4214,17 +4216,38 @@
         async function loadInstellingen() {
             try {
                 const res = await fetch('/api/mijn-profiel', { credentials: 'include' });
+                if (!res.ok) {
+                    document.getElementById('licentieOverzicht').innerHTML = `<div style="color:#991b1b;font-size:13px;">Fout bij laden: HTTP ${res.status}</div>`;
+                    return;
+                }
                 const data = await res.json();
-                if (!data.success) return;
+                if (!data.success) {
+                    document.getElementById('licentieOverzicht').innerHTML = `<div style="color:#991b1b;font-size:13px;">Fout: ${data.error || 'onbekend'}</div>`;
+                    return;
+                }
                 const p = data.profiel;
 
                 // Profiel velden
                 document.getElementById('profielEmail').textContent    = p.email || '—';
-                document.getElementById('profielRol').textContent      = p.role === 'admin' ? 'Administrator' : 'Praktijk';
                 document.getElementById('profielCode').textContent     = p.practice_code || '—';
                 document.getElementById('profielNaam').textContent     = p.praktijk_naam || '—';
-                document.getElementById('profielContact').textContent  = p.contact_naam || '—';
-                document.getElementById('profielLocatie').textContent  = p.locatie || '—';
+
+                // Rol dropdown
+                const rolLabels = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
+                const rolSel = document.getElementById('profielRolSelect');
+                if (rolSel) {
+                    rolSel.innerHTML = rolLabels.map(r => `<option value="${r}" ${p.role_label === r ? 'selected' : ''}>${r}</option>`).join('');
+                    if (p.role === 'admin') {
+                        rolSel.disabled = true;
+                        rolSel.innerHTML = '<option>Administrator</option>';
+                    }
+                }
+
+                // Aanpasbare velden
+                const contactInput = document.getElementById('profielContactInput');
+                const locatieInput = document.getElementById('profielLocatieInput');
+                if (contactInput) contactInput.value = p.contact_naam || '';
+                if (locatieInput) locatieInput.value = p.locatie || '';
 
                 // Licenties
                 const now = new Date();
@@ -4291,6 +4314,34 @@
 
             } catch(e) {
                 console.error('loadInstellingen error:', e);
+            }
+        }
+
+        async function slaProfielOp() {
+            const fb = document.getElementById('profielOpslaan');
+            const contact = document.getElementById('profielContactInput')?.value.trim() || '';
+            const locatie = document.getElementById('profielLocatieInput')?.value.trim() || '';
+            const rolLabel = document.getElementById('profielRolSelect')?.value || '';
+            try {
+                const res = await fetch('/api/mijn-profiel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ contact_naam: contact, locatie, role_label: rolLabel })
+                });
+                const data = await res.json();
+                fb.style.display = 'block';
+                if (data.success) {
+                    fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+                    fb.textContent = 'Profiel opgeslagen.';
+                } else {
+                    fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+                    fb.textContent = data.error || 'Fout bij opslaan.';
+                }
+            } catch(e) {
+                fb.style.display = 'block';
+                fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+                fb.textContent = 'Netwerkfout: ' + e.message;
             }
         }
 

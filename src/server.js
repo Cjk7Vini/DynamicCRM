@@ -3117,6 +3117,103 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/mijn-profiel
+app.get('/api/mijn-profiel', requireAuth, async (req, res) => {
+  try {
+    const data = await withReadConnection(async (client) => {
+      const r = await client.query(`
+        SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.role_label,
+               p.naam as praktijk_naam, p.locatie,
+               p.license_type, p.license_start_date, p.license_end_date, p.actief as license_active,
+               p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
+               p.contact_naam, p.contact_telefoon
+        FROM public.users u
+        LEFT JOIN public.praktijken p ON u.practice_code = p.code
+        WHERE u.id = $1
+      `, [req.session.userId]);
+      return r.rows[0];
+    });
+    if (!data) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    res.json({ success: true, profiel: data });
+  } catch (err) {
+    console.error('Mijn profiel error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/mijn-profiel — profiel opslaan
+app.post('/api/mijn-profiel', requireAuth, async (req, res) => {
+  try {
+    const { contact_naam, locatie, role_label } = req.body;
+    await withWriteConnection(async (client) => {
+      // Update praktijk gegevens
+      if (req.session.practiceCode) {
+        await client.query(
+          `UPDATE public.praktijken SET contact_naam=$1, locatie=$2 WHERE code=$3`,
+          [contact_naam || null, locatie || null, req.session.practiceCode]
+        );
+      }
+      // Update role_label op user
+      if (role_label) {
+        await client.query(
+          `UPDATE public.users SET role_label=$1 WHERE id=$2`,
+          [role_label, req.session.userId]
+        );
+      }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Profiel opslaan error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/licentie-aanvraag
+app.post('/api/licentie-aanvraag', requireAuth, async (req, res) => {
+  try {
+    const { licentie_type, bericht } = req.body;
+    if (!licentie_type) return res.status(400).json({ error: 'Licentie type vereist' });
+
+    const user = await withReadConnection(async (client) => {
+      const r = await client.query(`
+        SELECT u.email, u.practice_code, p.naam as praktijk_naam
+        FROM public.users u LEFT JOIN public.praktijken p ON u.practice_code = p.code
+        WHERE u.id = $1
+      `, [req.session.userId]);
+      return r.rows[0];
+    });
+
+    const licNamen = { dashboard: 'Dashboard licentie', nazorg: 'Nazorg portaal licentie', calculator: 'Calculator licentie' };
+    const licNaam = licNamen[licentie_type] || licentie_type;
+
+    await sendMailResilient({
+      from: SMTP.from,
+      to: 'lars@dynamic-health-consultancy.nl',
+      cc: 'stephanie@dynamic-health-consultancy.nl',
+      replyTo: user.email,
+      subject: `Licentie aanvraag: ${licNaam} - ${user.praktijk_naam || user.practice_code}`,
+      html: `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;background:#f3f4f6;padding:20px;">
+        <div style="background:#111827;padding:18px 24px;border-radius:12px 12px 0 0;"><span style="color:#fff;font-size:17px;font-weight:700;">Dynamic Health Consultancy</span></div>
+        <div style="background:#fff;padding:28px;border-radius:0 0 12px 12px;">
+          <h2 style="color:#111827;margin:0 0 16px;">Nieuwe licentie aanvraag</h2>
+          <table style="width:100%;font-size:14px;border-collapse:collapse;">
+            <tr><td style="color:#6b7280;padding:6px 0;width:160px;">Praktijk</td><td style="color:#111827;font-weight:600;">${user.praktijk_naam || 'Onbekend'}</td></tr>
+            <tr><td style="color:#6b7280;padding:6px 0;">Praktijkcode</td><td style="color:#111827;font-weight:600;">${user.practice_code || '—'}</td></tr>
+            <tr><td style="color:#6b7280;padding:6px 0;">E-mail</td><td style="color:#111827;font-weight:600;">${user.email}</td></tr>
+            <tr><td style="color:#6b7280;padding:6px 0;">Aangevraagde licentie</td><td style="color:#111827;font-weight:600;">${licNaam}</td></tr>
+            ${bericht ? `<tr><td style="color:#6b7280;padding:6px 0;">Bericht</td><td style="color:#111827;">${bericht}</td></tr>` : ''}
+          </table>
+        </div>
+      </div>`
+    });
+
+    res.json({ success: true, bericht: `Aanvraag voor ${licNaam} verstuurd.` });
+  } catch (err) {
+    console.error('Licentie aanvraag error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================
 // META MARKETING API ENDPOINTS
 // ============================================
