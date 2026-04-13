@@ -3861,21 +3861,32 @@
             document.getElementById('seizoenAdvies').innerHTML = '<div class="advice-item"><div class="advice-dot"></div>Data wordt geladen...</div>';
 
             try {
-                // Haal alle drie databronnen parallel op
-                const [leadsRes, metaRes, eclubRes] = await Promise.allSettled([
-                    fetch(`/api/leads?practice=${pc}&dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' }),
+                // Haal alle databronnen parallel op
+                // Leads: haal alle stages op via leads-by-stage (werkt voor admin en praktijk)
+                const pcParam = pc ? `&practice=${pc}` : '';
+                const [awarenessRes, intentRes, wonRes, metaRes, eclubRes] = await Promise.allSettled([
+                    fetch(`/api/leads-by-stage?stage=awareness${pcParam}`, { credentials: 'include' }),
+                    fetch(`/api/leads-by-stage?stage=intent${pcParam}`, { credentials: 'include' }),
+                    fetch(`/api/leads-by-stage?stage=won${pcParam}`, { credentials: 'include' }),
                     pc ? fetch(`/api/meta/summary/${pc}?dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' }) : Promise.resolve(null),
                     pc ? fetch(`/api/eclub/history/${pc}?maanden=11`, { credentials: 'include' }) : Promise.resolve(null)
                 ]);
 
-                // Leads verwerken
-                const leadsData = leadsRes.status === 'fulfilled' && leadsRes.value?.ok ? await leadsRes.value.json() : { leads: [] };
-                const leads = leadsData.leads || [];
+                // Leads samenvoegen uit alle stages
+                const parseRes = async (r) => (r.status === 'fulfilled' && r.value?.ok) ? (await r.value.json()).leads || [] : [];
+                const leads = [
+                    ...await parseRes(awarenessRes),
+                    ...await parseRes(intentRes),
+                    ...await parseRes(wonRes)
+                ];
 
                 const perMaand    = Array(12).fill(0);
                 const wonPerMaand = Array(12).fill(0);
+                const huidigJaar  = new Date().getFullYear();
                 leads.forEach(l => {
-                    const m = new Date(l.aangemaakt_op).getMonth();
+                    const d = new Date(l.aangemaakt_op);
+                    if (d.getFullYear() !== huidigJaar) return; // alleen huidig jaar
+                    const m = d.getMonth();
                     perMaand[m]++;
                     if (l.funnel_stage === 'won') wonPerMaand[m]++;
                 });
@@ -3915,7 +3926,7 @@
                             const parts = d.periode.toLowerCase().split(' ');
                             const m = maandMap[parts[0]];
                             if (m === undefined) return;
-                            eclubPerMaand[m] = (d.new || 0) + (d.returning || 0);
+                            eclubPerMaand[m] = d.new || 0; // alleen echt nieuwe leden, geen returning
                             eclubRetentie[m] = d.retentie_pct ? Math.round(d.retentie_pct) : null;
                         });
                     }
