@@ -687,7 +687,7 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
                l.aangemaakt_op, l.appointment_date, l.appointment_time,
                l.appointment_datetime, l.funnel_stage,
                l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
-               COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
+               'vitaliteitscheck' AS appointment_type
         FROM public.leads l
         WHERE l.funnel_stage = 'intent'
           AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
@@ -764,7 +764,7 @@ app.get('/api/afspraken', async (req, res) => {
           ) AS appt_dt,
           l.funnel_stage, l.status,
           l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
-          COALESCE(l.type, 'vitaliteitscheck') AS appointment_type
+          'vitaliteitscheck' AS appointment_type
         FROM public.leads l
         WHERE (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
       `;
