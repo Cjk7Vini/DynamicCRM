@@ -1015,8 +1015,8 @@
                 </svg>
             </div>
             <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="document.getElementById('metaMarketingSection').scrollIntoView({behavior:'smooth'})">Meta performance</div>
-                <div class="sidebar-dropdown-item" onclick="document.getElementById('sourceChart').closest('.card').scrollIntoView({behavior:'smooth'})">Lead bronnen</div>
+                <div class="sidebar-dropdown-item" onclick="showDashboardSection('dashboard',null); setTimeout(()=>{ const el=document.getElementById('metaMarketingSection'); if(el && el.style.display!=='none') el.scrollIntoView({behavior:'smooth'}); else{ const src=document.getElementById('sourceChart'); if(src) src.closest('.card').scrollIntoView({behavior:'smooth'}); }},400)">Meta performance</div>
+                <div class="sidebar-dropdown-item" onclick="showDashboardSection('dashboard',null); setTimeout(()=>{ const src=document.getElementById('sourceChart'); if(src) src.closest('.card').scrollIntoView({behavior:'smooth'}); },400)">Lead bronnen</div>
             </div>
         </div>
 
@@ -2685,16 +2685,27 @@
 
         // Refresh all data
         function refreshData() {
-            // Herlaad actieve sectie
             const activeSection = document.querySelector('.dash-section.active');
-            if (activeSection) {
-                const name = activeSection.id.replace('dash-', '');
-                if (name === 'dashboard') init();
-                else if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
-                else if (name === 'seizoen') { seizoenChartsBuilt = false; loadSeizoenData(); }
-                else if (name === 'kwaliteit') loadLeadKwaliteit();
-            } else {
-                init();
+            const name = activeSection ? activeSection.id.replace('dash-', '') : 'dashboard';
+            if (name === 'dashboard') {
+                // Herlaad dashboard data zonder volledige auth check
+                loadKPIs();
+                loadChurnForecast();
+                loadConversionFunnel();
+                loadPracticePerformance();
+                loadSourcePerformance();
+                loadPipelineFunnel();
+                loadForecastComparison();
+                loadHotLeads();
+                loadMetaMarketing();
+                loadEclubData();
+            } else if (name === 'afspraken') {
+                loadAfspraken();
+                loadLeadsZonderAfspraak();
+            } else if (name === 'seizoen') {
+                loadSeizoenData();
+            } else if (name === 'kwaliteit') {
+                loadLeadKwaliteit();
             }
         }
 
