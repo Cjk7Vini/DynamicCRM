@@ -3886,12 +3886,14 @@
                 if (metaRes.status === 'fulfilled' && metaRes.value?.ok) {
                     const metaData = await metaRes.value.json();
                     if (metaData.meta_enabled && metaData.total_spend) {
-                        metaTotaalSpend = metaData.total_spend || 0;
-                        // Verdeel spend gelijkmatig over maanden met leads als detail niet beschikbaar
-                        const maandenMetLeads = perMaand.filter(v => v > 0).length || 1;
-                        perMaand.forEach((v, i) => {
-                            if (v > 0) metaPerMaand[i] = Math.round(metaTotaalSpend / maandenMetLeads);
-                        });
+                        metaTotaalSpend = parseFloat(metaData.total_spend) || 0;
+                        // Verdeel spend naar rato van leads per maand
+                        const totaalLeads = perMaand.reduce((a,b) => a+b, 0);
+                        if (totaalLeads > 0) {
+                            perMaand.forEach((v, i) => {
+                                if (v > 0) metaPerMaand[i] = Math.round((v / totaalLeads) * metaTotaalSpend);
+                            });
+                        }
                     }
                 }
 
@@ -3903,11 +3905,18 @@
                     const eclubData = await eclubRes.value.json();
                     if (eclubData.success && eclubData.data) {
                         eclubBeschikbaar = true;
+                        const maandMap = {
+                            'jan':0,'feb':1,'mrt':2,'apr':3,'mei':4,'jun':5,
+                            'jul':6,'aug':7,'sep':8,'okt':9,'nov':10,'dec':11
+                        };
                         eclubData.data.forEach(d => {
-                            if (!d.month) return;
-                            const m = new Date(d.month + '-01').getMonth();
-                            eclubPerMaand[m] = d.new_members || 0;
-                            eclubRetentie[m] = d.retention_rate ? Math.round(d.retention_rate) : null;
+                            if (!d.periode) return;
+                            // periode = "mrt 2026" -> maand index
+                            const parts = d.periode.toLowerCase().split(' ');
+                            const m = maandMap[parts[0]];
+                            if (m === undefined) return;
+                            eclubPerMaand[m] = (d.new || 0) + (d.returning || 0);
+                            eclubRetentie[m] = d.retentie_pct ? Math.round(d.retentie_pct) : null;
                         });
                     }
                 }
