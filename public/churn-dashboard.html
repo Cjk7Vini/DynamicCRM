@@ -1785,25 +1785,25 @@
                         <option>Laden...</option>
                     </select>
                 </div>
-                <div>
+                <div id="profielPraktijkcodeRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijkcode</div>
                     <div style="font-size:15px;font-weight:600;color:var(--accent);font-family:monospace;" id="profielCode">—</div>
                 </div>
-                <div>
+                <div id="profielPraktijknaamRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijknaam</div>
                     <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielNaam">—</div>
                 </div>
-                <div>
+                <div id="profielContactRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Contactpersoon</div>
                     <input type="text" id="profielContactInput" placeholder="Naam contactpersoon" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
                 </div>
-                <div>
-                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie / Adres</div>
-                    <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam, Hoofdstraat 1" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
+                <div id="profielLocatieRij">
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie</div>
+                    <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;">
                 </div>
             </div>
             <div id="profielOpslaan" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
-            <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
+            <div id="profielOpslaanKnop" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
                 <button class="btn btn-primary" onclick="slaProfielOp()" style="font-size:13px;">Profiel opslaan</button>
                 <button class="btn btn-ghost" onclick="openPasswordModal()" style="font-size:13px;">Wachtwoord wijzigen</button>
             </div>
@@ -4246,8 +4246,24 @@
                 // Aanpasbare velden
                 const contactInput = document.getElementById('profielContactInput');
                 const locatieInput = document.getElementById('profielLocatieInput');
-                if (contactInput) contactInput.value = p.contact_naam || '';
-                if (locatieInput) locatieInput.value = p.locatie || '';
+                if (contactInput) {
+                    contactInput.value = p.contact_naam || '';
+                    contactInput.style.borderColor = p.contact_naam ? 'var(--accent)' : 'var(--border)';
+                }
+                if (locatieInput) {
+                    locatieInput.value = p.locatie || '';
+                    locatieInput.style.borderColor = p.locatie ? 'var(--accent)' : 'var(--border)';
+                }
+                // Verberg feedback melding bij herladen
+                const fb2 = document.getElementById('profielOpslaan');
+                if (fb2) fb2.style.display = 'none';
+
+                // Admin heeft geen praktijkvelden nodig
+                const isAdmin = p.role === 'admin';
+                ['profielPraktijkcodeRij', 'profielPraktijknaamRij', 'profielContactRij', 'profielLocatieRij', 'profielOpslaanKnop'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = isAdmin ? 'none' : '';
+                });
 
                 // Licenties
                 const now = new Date();
@@ -4334,6 +4350,8 @@
                 if (data.success) {
                     fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
                     fb.textContent = 'Profiel opgeslagen.';
+                    // Herlaad profiel zodat opgeslagen data zichtbaar is
+                    setTimeout(() => loadInstellingen(), 500);
                 } else {
                     fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
                     fb.textContent = data.error || 'Fout bij opslaan.';
