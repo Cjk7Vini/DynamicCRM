@@ -1123,7 +1123,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                     Wachtwoord wijzigen
                 </div>
-                <div class="dropdown-item" onclick="closeUserMenu()">
+                <div class="dropdown-item" onclick="showDashboardSection('instellingen', null); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                     Instellingen
                 </div>
@@ -1762,6 +1762,87 @@
 </div>
 
 <!-- ── LEAD KWALITEIT SECTIE ──────────────────────────────────────── -->
+<!-- ── INSTELLINGEN SECTIE ──────────────────────────────────────── -->
+<div class="dash-section" id="dash-instellingen">
+
+    <!-- Profiel kaart -->
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Mijn profiel</div>
+                <div class="card-subtitle">Accountgegevens en praktijkinformatie</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">E-mailadres</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielEmail">—</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Rol</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielRol">—</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijkcode</div>
+                    <div style="font-size:15px;font-weight:600;color:var(--accent);font-family:monospace;" id="profielCode">—</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijknaam</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielNaam">—</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Contactpersoon</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielContact">—</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielLocatie">—</div>
+                </div>
+            </div>
+            <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+                <button class="btn btn-ghost" onclick="openPasswordModal()" style="font-size:13px;">
+                    Wachtwoord wijzigen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Licentie overzicht -->
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Licenties</div>
+                <div class="card-subtitle">Overzicht van actieve en beschikbare licenties</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:12px;" id="licentieOverzicht">
+                <div style="color:var(--text-3);font-size:13px;">Laden...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Licentie aanvragen -->
+    <div class="card" id="licentieAanvraagCard" style="display:none;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Licentie aanvragen</div>
+                <div class="card-subtitle">Vraag een licentie aan via Dynamic Health Consultancy</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:12px;" id="licentieAanvraagButtons"></div>
+            <div style="margin-top:16px;">
+                <label style="font-size:12px;font-weight:600;color:var(--text-2);display:block;margin-bottom:6px;">Bericht (optioneel)</label>
+                <textarea id="licentieBericht" rows="3" placeholder="Bijv. we willen starten met het nazorg portaal voor 3 therapeuten..." style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical;outline:none;"></textarea>
+            </div>
+            <div id="licentieAanvraagFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
+        </div>
+    </div>
+
+</div>
+
 <div class="dash-section" id="dash-kwaliteit">
     <div class="insight-grid-4">
         <div class="insight-card ic-red">
@@ -2706,6 +2787,8 @@
                 loadSeizoenData();
             } else if (name === 'kwaliteit') {
                 loadLeadKwaliteit();
+            } else if (name === 'instellingen') {
+                loadInstellingen();
             }
         }
 
@@ -3556,7 +3639,7 @@
                 else el.classList.add('active-sub');
             }
 
-            const titles = { dashboard: 'Analytics', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit' };
+            const titles = { dashboard: 'Analytics', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen' };
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
@@ -3564,6 +3647,7 @@
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
             if (name === 'seizoen') { loadSeizoenData(); }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
+            if (name === 'instellingen') { loadInstellingen(); }
         }
 
         // ── AFSPRAKEN ─────────────────────────────────────────────────
@@ -4126,7 +4210,117 @@
             }
         }
 
-        // ── LEAD KWALITEIT ────────────────────────────────────────────
+        // ── INSTELLINGEN ─────────────────────────────────────────────────
+        async function loadInstellingen() {
+            try {
+                const res = await fetch('/api/mijn-profiel', { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) return;
+                const p = data.profiel;
+
+                // Profiel velden
+                document.getElementById('profielEmail').textContent    = p.email || '—';
+                document.getElementById('profielRol').textContent      = p.role === 'admin' ? 'Administrator' : 'Praktijk';
+                document.getElementById('profielCode').textContent     = p.practice_code || '—';
+                document.getElementById('profielNaam').textContent     = p.praktijk_naam || '—';
+                document.getElementById('profielContact').textContent  = p.contact_naam || '—';
+                document.getElementById('profielLocatie').textContent  = p.locatie || '—';
+
+                // Licenties
+                const now = new Date();
+                const fmtDatum = d => d ? new Date(d).toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' }) : null;
+                const isActief = (actief, eind) => actief && (!eind || new Date(eind) > now);
+
+                const licenties = [
+                    {
+                        type: 'dashboard',
+                        naam: 'Dashboard licentie',
+                        actief: isActief(p.license_active, p.license_end_date),
+                        eind: fmtDatum(p.license_end_date),
+                        omschrijving: 'Toegang tot CRM dashboard, leads, afspraken en rapportages'
+                    },
+                    {
+                        type: 'nazorg',
+                        naam: 'Nazorg portaal licentie',
+                        actief: p.nazorg_enabled,
+                        eind: fmtDatum(p.nazorg_license_end_date),
+                        omschrijving: 'Toegang tot het nazorg portaal voor patienten'
+                    },
+                    {
+                        type: 'calculator',
+                        naam: 'Calculator licentie',
+                        actief: false,
+                        eind: null,
+                        omschrijving: 'Bezettingsgraad calculator voor praktijkmanagement'
+                    }
+                ];
+
+                const overzicht = document.getElementById('licentieOverzicht');
+                overzicht.innerHTML = licenties.map(l => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid ${l.actief ? '#a7f3d0' : 'var(--border)'};">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:10px;height:10px;border-radius:50%;background:${l.actief ? '#059669' : '#d1d5db'};flex-shrink:0;"></div>
+                            <div>
+                                <div style="font-size:13px;font-weight:600;color:var(--text-1);">${l.naam}</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${l.omschrijving}</div>
+                                ${l.actief && l.eind ? `<div style="font-size:11px;color:#059669;margin-top:3px;">Geldig tot ${l.eind}</div>` : ''}
+                            </div>
+                        </div>
+                        <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:${l.actief ? '#ecfdf5' : '#f3f4f6'};color:${l.actief ? '#065f46' : '#6b7280'};">
+                            ${l.actief ? 'Actief' : 'Niet actief'}
+                        </span>
+                    </div>
+                `).join('');
+
+                // Aanvraag knoppen voor niet-actieve licenties (niet voor admin)
+                const inactief = p.role !== 'admin' ? licenties.filter(l => !l.actief) : [];
+                const aanvraagCard = document.getElementById('licentieAanvraagCard');
+                const aanvraagBtns = document.getElementById('licentieAanvraagButtons');
+
+                if (inactief.length > 0) {
+                    aanvraagCard.style.display = 'block';
+                    aanvraagBtns.innerHTML = inactief.map(l => `
+                        <button class="btn btn-primary" style="text-align:left;justify-content:flex-start;gap:10px;" onclick="vraagLicentieAan('${l.type}','${l.naam}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            ${l.naam} aanvragen
+                        </button>
+                    `).join('');
+                } else {
+                    aanvraagCard.style.display = 'none';
+                }
+
+            } catch(e) {
+                console.error('loadInstellingen error:', e);
+            }
+        }
+
+        async function vraagLicentieAan(type, naam) {
+            const bericht = document.getElementById('licentieBericht')?.value.trim() || '';
+            const fb = document.getElementById('licentieAanvraagFeedback');
+            try {
+                const res = await fetch('/api/licentie-aanvraag', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ licentie_type: type, bericht })
+                });
+                const data = await res.json();
+                fb.style.display = 'block';
+                if (data.success) {
+                    fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+                    fb.textContent = data.bericht;
+                } else {
+                    fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+                    fb.textContent = data.error || 'Er is iets misgegaan.';
+                }
+            } catch(e) {
+                fb.style.display = 'block';
+                fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+                fb.textContent = 'Netwerkfout: ' + e.message;
+            }
+        }
+
+        // ── LEAD KWALITEIT ────────────────────────────────────────────────
         async function loadLeadKwaliteit() {
             const pc = getActivePracticeCode();
             const now = new Date();
