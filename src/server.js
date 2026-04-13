@@ -4010,7 +4010,7 @@ app.get('/api/appointment-outcome', async (req, res) => {
 
     if (!lead) return res.status(404).send('Lead niet gevonden');
 
-    const expectedToken = generateActionToken(id + '-outcome', lead.praktijk_code);
+    const expectedToken = generateActionToken(id, lead.praktijk_code);
     if (token !== expectedToken) return res.status(401).send('Ongeldige token');
 
     // Definieer uitkomst per keuze
