@@ -285,15 +285,15 @@
     return 'r';
   }
 
-  // Forecast formule conform Excel:
+  // Forecast formule:
   // beh_per_week = FTE * (36u * 60 / 30min) = FTE * 72
-  // maandbasis   = beh_per_week * FTE
-  // jaarbasis    = maandbasis * 44
+  // maandbasis   = beh_per_week * 4 weken
+  // jaarbasis    = beh_per_week * 44 weken
   function berekenForecast(fte) {
     if (!fte) return { pw: 0, pm: 0, pj: 0 };
-    var behPW = fte * (UREN_WERKWEEK * 60 / MIN_NORMAAL); // bv. 6 * 72 = 432
-    var pm    = Math.round(behPW * fte);                  // bv. 432 * 6 = 2592
-    var pj    = pm * WEKEN_JAAR;                          // bv. 2592 * 44 = 114048
+    var behPW = fte * (UREN_WERKWEEK * 60 / MIN_NORMAAL); // bv. 1 FTE * 72 = 72
+    var pm    = Math.round(behPW * 4);                    // bv. 72 * 4 = 288 per maand
+    var pj    = Math.round(behPW * WEKEN_JAAR);           // bv. 72 * 44 = 3168 per jaar
     return { pw: Math.round(behPW), pm: pm, pj: pj };
   }
 
