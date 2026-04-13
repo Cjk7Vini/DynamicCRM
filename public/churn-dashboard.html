@@ -1667,7 +1667,7 @@
     <div class="advice-block">
         <div class="advice-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Marketingadvies op basis van historische data
+            Marketingadvies op basis van leads, eClub leden en Meta spend
         </div>
         <div id="seizoenAdvies">
             <div class="advice-item"><div class="advice-dot"></div>Data wordt geladen...</div>
@@ -1676,12 +1676,12 @@
 
     <div class="insight-grid-4" id="seizoenKpiGrid">
         <div class="insight-card ic-highlight">
-            <div class="insight-label">Beste maand</div>
+            <div class="insight-label">Beste maand leads</div>
             <div class="insight-value" id="seizoenBesteMaand">—</div>
             <div class="insight-sub" id="seizoenBesteSub">—</div>
         </div>
         <div class="insight-card">
-            <div class="insight-label">Zwakste maand</div>
+            <div class="insight-label">Zwakste maand leads</div>
             <div class="insight-value" id="seizoenZwaksteMaand">—</div>
             <div class="insight-sub" id="seizoenZwaksteSub">—</div>
         </div>
@@ -1691,33 +1691,46 @@
             <div class="insight-sub">Lead naar lid</div>
         </div>
         <div class="insight-card">
-            <div class="insight-label">Volgende campagne</div>
-            <div class="insight-value" id="seizoenCampagne">—</div>
-            <div class="insight-sub" id="seizoenCampagneSub">—</div>
+            <div class="insight-label">Totaal Meta spend</div>
+            <div class="insight-value" id="seizoenMetaSpend">—</div>
+            <div class="insight-sub" id="seizoenMetaSub">dit jaar</div>
         </div>
     </div>
 
+    <!-- Gecombineerde grafiek: leads + leden + Meta spend -->
     <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
             <div>
-                <div class="card-title">Leads per maand: actueel vs forecast</div>
-                <div class="card-subtitle">Historisch gemiddelde als voorspelling voor komende maanden</div>
+                <div class="card-title">Leads, leden en Meta spend per maand</div>
+                <div class="card-subtitle">Gecombineerd overzicht van alle databronnen</div>
             </div>
             <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--text-3);">
-                <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:var(--accent);border-radius:2px;display:inline-block;"></span>Actueel</span>
-                <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#c7e8e3;border-radius:2px;display:inline-block;border:1px dashed var(--accent);"></span>Forecast</span>
+                <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#2BB8A3;border-radius:2px;display:inline-block;"></span>Leads</span>
+                <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#333399;border-radius:2px;display:inline-block;"></span>Nieuwe leden</span>
+                <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px;display:inline-block;"></span>Meta spend (x10)</span>
             </div>
         </div>
         <div class="card-body">
-            <div style="position:relative;height:260px;"><canvas id="seizoenMainChart"></canvas></div>
+            <div id="seizoenGecombineerdLeeg" style="display:none;text-align:center;color:var(--text-3);padding:40px;font-size:13px;">Geen data beschikbaar voor deze periode</div>
+            <div style="position:relative;height:280px;"><canvas id="seizoenMainChart"></canvas></div>
         </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
         <div class="card">
-            <div class="card-header"><div class="card-title">Conversie per kwartaal</div></div>
+            <div class="card-header"><div class="card-title">Conversie per kwartaal</div><div class="card-subtitle">Lead naar lid</div></div>
             <div class="card-body"><div style="position:relative;height:200px;"><canvas id="seizoenKwartaalChart"></canvas></div></div>
         </div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Kosten per lead per maand</div>
+                <div class="card-subtitle">Meta spend gedeeld door aantal leads</div>
+            </div>
+            <div class="card-body"><div style="position:relative;height:200px;"><canvas id="seizoenKplChart"></canvas></div></div>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
         <div class="card">
             <div class="card-header">
                 <div class="card-title">Seizoensindeling</div>
@@ -1726,6 +1739,13 @@
             <div class="card-body" id="seizoenIndeling">
                 <div style="color:var(--text-3);font-size:13px;">Laden...</div>
             </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">eClub retentie per maand</div>
+                <div class="card-subtitle" id="seizoenEclubStatus">Laden...</div>
+            </div>
+            <div class="card-body"><div style="position:relative;height:200px;"><canvas id="seizoenEclubChart"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -3826,18 +3846,33 @@
         // ── SEIZOENSPATRONEN ──────────────────────────────────────────
         let seizoenMainChartInstance = null;
         let seizoenKwartaalChartInstance = null;
+        let seizoenKplChartInstance = null;
+        let seizoenEclubChartInstance = null;
 
         async function loadSeizoenData() {
             const pc = getActivePracticeCode();
-            const maanden = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Dec'];
+            const maandNamen = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+            const maandKort  = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+            const currentMonth = new Date().getMonth();
+            const jaar = new Date().getFullYear();
+            const dateFrom = `${jaar}-01-01`;
+            const dateTo   = new Date().toISOString().split('T')[0];
+
+            document.getElementById('seizoenAdvies').innerHTML = '<div class="advice-item"><div class="advice-dot"></div>Data wordt geladen...</div>';
 
             try {
-                const res = await fetch(`/api/leads?practice=${pc}&dateFrom=2025-01-01&dateTo=${new Date().toISOString().split('T')[0]}`, { credentials: 'include' });
-                const data = await res.json();
-                const leads = data.leads || [];
+                // Haal alle drie databronnen parallel op
+                const [leadsRes, metaRes, eclubRes] = await Promise.allSettled([
+                    fetch(`/api/leads?practice=${pc}&dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' }),
+                    pc ? fetch(`/api/meta/summary/${pc}?dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' }) : Promise.resolve(null),
+                    pc ? fetch(`/api/eclub/history/${pc}?maanden=11`, { credentials: 'include' }) : Promise.resolve(null)
+                ]);
 
-                // Bereken leads per maand
-                const perMaand = Array(12).fill(0);
+                // Leads verwerken
+                const leadsData = leadsRes.status === 'fulfilled' && leadsRes.value?.ok ? await leadsRes.value.json() : { leads: [] };
+                const leads = leadsData.leads || [];
+
+                const perMaand    = Array(12).fill(0);
                 const wonPerMaand = Array(12).fill(0);
                 leads.forEach(l => {
                     const m = new Date(l.aangemaakt_op).getMonth();
@@ -3845,53 +3880,85 @@
                     if (l.funnel_stage === 'won') wonPerMaand[m]++;
                 });
 
-                const maandNamen = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
-                const maandKort = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
-                const currentMonth = new Date().getMonth();
+                // Meta verwerken
+                let metaTotaalSpend = 0;
+                const metaPerMaand = Array(12).fill(0);
+                if (metaRes.status === 'fulfilled' && metaRes.value?.ok) {
+                    const metaData = await metaRes.value.json();
+                    if (metaData.meta_enabled && metaData.total_spend) {
+                        metaTotaalSpend = metaData.total_spend || 0;
+                        // Verdeel spend gelijkmatig over maanden met leads als detail niet beschikbaar
+                        const maandenMetLeads = perMaand.filter(v => v > 0).length || 1;
+                        perMaand.forEach((v, i) => {
+                            if (v > 0) metaPerMaand[i] = Math.round(metaTotaalSpend / maandenMetLeads);
+                        });
+                    }
+                }
 
-                // Historisch gemiddelde als forecast
-                const totaal = perMaand.reduce((a,b) => a+b, 0);
-                const gem = totaal > 0 ? Math.round(totaal / Math.max(currentMonth, 1)) : 0;
+                // eClub verwerken
+                const eclubPerMaand = Array(12).fill(0);
+                const eclubRetentie = Array(12).fill(null);
+                let eclubBeschikbaar = false;
+                if (eclubRes.status === 'fulfilled' && eclubRes.value?.ok) {
+                    const eclubData = await eclubRes.value.json();
+                    if (eclubData.success && eclubData.data) {
+                        eclubBeschikbaar = true;
+                        eclubData.data.forEach(d => {
+                            if (!d.month) return;
+                            const m = new Date(d.month + '-01').getMonth();
+                            eclubPerMaand[m] = d.new_members || 0;
+                            eclubRetentie[m] = d.retention_rate ? Math.round(d.retention_rate) : null;
+                        });
+                    }
+                }
 
-                const forecast = perMaand.map((v, i) => i >= currentMonth ? Math.round(gem * [1.2,0.9,0.8,0.7,0.6,0.7,0.8,1.1,1.0,0.9,0.8,1.0][i]) : null);
-
-                // Beste en zwakste maand
+                // KPI berekeningen
                 const maxIdx = perMaand.indexOf(Math.max(...perMaand));
-                const minIdx = perMaand.indexOf(Math.min(...perMaand.filter(v => v > 0)));
+                const actieveWaarden = perMaand.filter(v => v > 0);
+                const minIdx = perMaand.indexOf(Math.min(...(actieveWaarden.length ? actieveWaarden : [0])));
 
                 document.getElementById('seizoenBesteMaand').textContent = maandNamen[maxIdx] || '—';
-                document.getElementById('seizoenBesteSub').textContent = 'Gem. ' + perMaand[maxIdx] + ' leads';
-                document.getElementById('seizoenZwaksteMaand').textContent = maandNamen[minIdx] || '—';
-                document.getElementById('seizoenZwaksteSub').textContent = 'Gem. ' + perMaand[minIdx] + ' leads';
+                document.getElementById('seizoenBesteSub').textContent = perMaand[maxIdx] + ' leads';
+                document.getElementById('seizoenZwaksteMaand').textContent = actieveWaarden.length ? maandNamen[minIdx] : '—';
+                document.getElementById('seizoenZwaksteSub').textContent = actieveWaarden.length ? perMaand[minIdx] + ' leads' : '—';
+
+                const fmtEur = v => v >= 1000 ? '€' + (v/1000).toFixed(1) + 'k' : '€' + Math.round(v);
+                document.getElementById('seizoenMetaSpend').textContent = metaTotaalSpend > 0 ? fmtEur(metaTotaalSpend) : '—';
+                document.getElementById('seizoenMetaSub').textContent = metaTotaalSpend > 0 ? `${jaar} totaal` : 'Geen Meta koppeling';
 
                 // Kwartaal conversie
                 const kwartaalConv = [0,1,2,3].map(q => {
                     const totalQ = perMaand.slice(q*3, q*3+3).reduce((a,b)=>a+b,0);
-                    const wonQ = wonPerMaand.slice(q*3, q*3+3).reduce((a,b)=>a+b,0);
+                    const wonQ   = wonPerMaand.slice(q*3, q*3+3).reduce((a,b)=>a+b,0);
                     return totalQ ? Math.round(wonQ/totalQ*100) : 0;
                 });
                 const besteQ = kwartaalConv.indexOf(Math.max(...kwartaalConv));
                 document.getElementById('seizoenBesteKwartaal').textContent = 'Q' + (besteQ+1);
 
-                // Volgende campagne aanbeveling
-                const volgende = currentMonth < 7 ? 'Sep 2026' : 'Jan 2027';
-                const campagneStart = currentMonth < 7 ? '18 aug 2026' : '15 dec 2026';
-                document.getElementById('seizoenCampagne').textContent = volgende;
-                document.getElementById('seizoenCampagneSub').textContent = 'Start campagne ' + campagneStart;
+                // Kosten per lead per maand
+                const kplPerMaand = perMaand.map((leads, i) =>
+                    leads > 0 && metaPerMaand[i] > 0 ? Math.round(metaPerMaand[i] / leads) : null
+                );
 
                 // Advies
-                const advies = document.getElementById('seizoenAdvies');
-                advies.innerHTML = [
-                    `${maandNamen[maxIdx]} is je sterkste maand (${perMaand[maxIdx]} leads). Start campagnes 2-3 weken eerder voor maximaal bereik.`,
-                    perMaand[minIdx] > 0 ? `${maandNamen[minIdx]} is je zwakste maand (${perMaand[minIdx]} leads). Verlaag Meta budget in deze periode en hervereel naar de maanden erna.` : null,
-                    `Beste conversiekwartaal is Q${besteQ+1} (${kwartaalConv[besteQ]}%). Verhoog inzet in dit kwartaal voor maximale ROI.`,
-                    `Volgende aanbevolen campagnestart: ${campagneStart} voor de ${volgende} piek.`
-                ].filter(Boolean).map(t => `<div class="advice-item"><div class="advice-dot"></div>${t}</div>`).join('');
+                const adviesItems = [];
+                if (perMaand[maxIdx] > 0) adviesItems.push(`${maandNamen[maxIdx]} is de sterkste maand (${perMaand[maxIdx]} leads). Start Meta campagnes 2-3 weken voor deze maand.`);
+                if (actieveWaarden.length && perMaand[minIdx] > 0) adviesItems.push(`${maandNamen[minIdx]} is de zwakste maand (${perMaand[minIdx]} leads). Overweeg budget te verlagen in deze periode.`);
+                if (kwartaalConv[besteQ] > 0) adviesItems.push(`Beste conversiekwartaal is Q${besteQ+1} (${kwartaalConv[besteQ]}%). Verhoog Meta inzet in dit kwartaal voor maximale ROI.`);
+                if (metaTotaalSpend > 0 && leads.length > 0) {
+                    const kpl = Math.round(metaTotaalSpend / leads.length);
+                    adviesItems.push(`Gemiddelde kosten per lead dit jaar: ${fmtEur(kpl)}. ${kpl < 15 ? 'Uitstekend resultaat.' : kpl < 30 ? 'Goed resultaat.' : 'Kijk naar campagne optimalisatie.'}`);
+                }
+                if (eclubBeschikbaar) adviesItems.push(`eClub data is beschikbaar. Vergelijk nieuwe leden met leads per maand voor een volledig beeld van de funnel.`);
+
+                document.getElementById('seizoenAdvies').innerHTML = adviesItems.length
+                    ? adviesItems.map(t => `<div class="advice-item"><div class="advice-dot"></div>${t}</div>`).join('')
+                    : '<div class="advice-item"><div class="advice-dot"></div>Nog niet genoeg data voor advies. Zorg dat leads, Meta en eClub gekoppeld zijn.</div>';
 
                 // Seizoensindeling
                 const hoog = maandKort.filter((m,i) => perMaand[i] >= perMaand[maxIdx] * 0.8);
-                const laag = maandKort.filter((m,i) => perMaand[i] <= perMaand[maxIdx] * 0.4);
-                const mid = maandKort.filter((m,i) => !hoog.includes(m) && !laag.includes(m));
+                const laag = maandKort.filter((m,i) => perMaand[i] > 0 && perMaand[i] <= perMaand[maxIdx] * 0.4);
+                const mid  = maandKort.filter((m,i) => perMaand[i] > 0 && !hoog.includes(m) && !laag.includes(m));
                 document.getElementById('seizoenIndeling').innerHTML = `
                     <div style="display:flex;flex-direction:column;gap:10px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
@@ -3906,32 +3973,60 @@
                             <div style="font-size:13px;font-weight:500;">${laag.join(', ') || '—'}</div>
                             <span class="season-badge season-cool">Laag</span>
                         </div>
-                        <div style="margin-top:4px;padding:12px 14px;background:#fef3c7;border-radius:var(--radius-sm);border:1px solid #fcd34d;">
-                            <div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">Aanbevolen campagneplanning</div>
-                            <div style="font-size:12px;color:#78350f;line-height:1.6;">Volgende campagnestart: <strong>${campagneStart}</strong><br>Verlaag budget: <strong>${laag.join(', ')}</strong></div>
-                        </div>
                     </div>`;
 
-                // Charts
-                if (seizoenMainChartInstance) seizoenMainChartInstance.destroy();
-                if (seizoenKwartaalChartInstance) seizoenKwartaalChartInstance.destroy();
+                // eClub status
+                document.getElementById('seizoenEclubStatus').textContent = eclubBeschikbaar ? 'Nieuwe leden en retentie per maand' : 'Geen eClub koppeling voor deze praktijk';
 
-                const ctx1 = document.getElementById('seizoenMainChart');
-                seizoenMainChartInstance = new Chart(ctx1, {
+                // Charts vernietigen
+                [seizoenMainChartInstance, seizoenKwartaalChartInstance, seizoenKplChartInstance, seizoenEclubChartInstance].forEach(c => { if (c) c.destroy(); });
+
+                // Chart 1: Gecombineerd leads + leden + Meta spend
+                seizoenMainChartInstance = new Chart(document.getElementById('seizoenMainChart'), {
                     type: 'bar',
                     data: {
                         labels: maandKort,
                         datasets: [
-                            { label: 'Actueel', data: perMaand.map((v,i) => i < currentMonth ? v : null), backgroundColor: '#2BB8A3', borderRadius: 4 },
-                            { label: 'Forecast', data: forecast, backgroundColor: '#c7e8e3', borderColor: '#2BB8A3', borderWidth: 1, borderRadius: 4 },
-                            { label: 'Trend', data: perMaand, type: 'line', borderColor: '#e5334a', borderWidth: 2, borderDash: [5,5], pointRadius: 0, fill: false, tension: 0.4 }
+                            {
+                                label: 'Leads',
+                                data: perMaand,
+                                backgroundColor: '#2BB8A3',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Nieuwe leden',
+                                data: eclubBeschikbaar ? eclubPerMaand : Array(12).fill(null),
+                                backgroundColor: '#333399',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Meta spend',
+                                data: metaTotaalSpend > 0 ? metaPerMaand.map(v => v > 0 ? Math.round(v/10) : null) : Array(12).fill(null),
+                                type: 'line',
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245,158,11,0.1)',
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                fill: true,
+                                tension: 0.4,
+                                yAxisID: 'y'
+                            }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#9090a8', font: { size: 11 } } }, y: { beginAtZero: true, ticks: { color: '#9090a8', font: { size: 11 } }, grid: { color: '#f0f0f4' } } } }
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#9090a8', font: { size: 11 } } },
+                            y: { beginAtZero: true, ticks: { color: '#9090a8', font: { size: 11 } }, grid: { color: '#f0f0f4' } }
+                        }
+                    }
                 });
 
-                const ctx2 = document.getElementById('seizoenKwartaalChart');
-                seizoenKwartaalChartInstance = new Chart(ctx2, {
+                // Chart 2: Kwartaal conversie
+                seizoenKwartaalChartInstance = new Chart(document.getElementById('seizoenKwartaalChart'), {
                     type: 'bar',
                     data: {
                         labels: ['Q1','Q2','Q3','Q4'],
@@ -3940,8 +4035,63 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#9090a8' } }, y: { beginAtZero: true, max: 100, ticks: { color: '#9090a8', callback: v => v + '%' }, grid: { color: '#f0f0f4' } } } }
                 });
 
+                // Chart 3: Kosten per lead
+                seizoenKplChartInstance = new Chart(document.getElementById('seizoenKplChart'), {
+                    type: 'line',
+                    data: {
+                        labels: maandKort,
+                        datasets: [{
+                            label: 'Kosten per lead',
+                            data: kplPerMaand,
+                            borderColor: '#e5334a',
+                            backgroundColor: 'rgba(229,51,74,0.08)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            fill: true,
+                            tension: 0.4,
+                            spanGaps: true
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#9090a8' } },
+                            y: { beginAtZero: true, ticks: { color: '#9090a8', callback: v => '€' + v }, grid: { color: '#f0f0f4' } }
+                        }
+                    }
+                });
+
+                // Chart 4: eClub retentie
+                seizoenEclubChartInstance = new Chart(document.getElementById('seizoenEclubChart'), {
+                    type: 'line',
+                    data: {
+                        labels: maandKort,
+                        datasets: [{
+                            label: 'Retentie %',
+                            data: eclubRetentie,
+                            borderColor: '#333399',
+                            backgroundColor: 'rgba(51,51,153,0.08)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            fill: true,
+                            tension: 0.4,
+                            spanGaps: true
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#9090a8' } },
+                            y: { beginAtZero: false, min: 50, max: 100, ticks: { color: '#9090a8', callback: v => v + '%' }, grid: { color: '#f0f0f4' } }
+                        }
+                    }
+                });
+
             } catch(e) {
-                document.getElementById('seizoenAdvies').innerHTML = '<div class="advice-item"><div class="advice-dot"></div>Fout bij laden van data.</div>';
+                console.error('Seizoen error:', e);
+                document.getElementById('seizoenAdvies').innerHTML = '<div class="advice-item"><div class="advice-dot"></div>Fout bij laden: ' + e.message + '</div>';
             }
         }
 
