@@ -675,7 +675,8 @@ app.get('/api/lead-info', async (req, res) => {
 // GET /api/lead-kwaliteit — leads buiten normale flow voor dashboard
 app.get('/api/lead-kwaliteit', async (req, res) => {
   try {
-    const { practice } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     const data = await withReadConnection(async (client) => {
 
       const buildParams = () => practice ? [practice] : [];
@@ -748,7 +749,8 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
 // GET /api/afspraken — alle leads met afspraak voor dashboard afspraken sectie
 app.get('/api/afspraken', async (req, res) => {
   try {
-    const { practice } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     const leads = await withReadConnection(async (client) => {
       let query = `
         SELECT
@@ -1413,7 +1415,8 @@ app.get('/api/training-results/:id', requireAdmin, async (req, res) => {
 // ==================== CHURN ANALYTICS ENDPOINTS ====================
 
 // GET /api/practices - Haal alle actieve praktijken op voor churn dashboard dropdown
-app.get('/api/churn/practices', async (_req, res) => {
+app.get('/api/churn/practices', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   try {
     const rows = await withReadConnection(async (client) => {
       const sql = `
@@ -1435,7 +1438,9 @@ app.get('/api/churn/practices', async (_req, res) => {
 // GET /api/practice-performance - Performance metrics per praktijk
 app.get('/api/practice-performance', async (req, res) => {
   try {
-    const { practice, dateFrom, dateTo, source, status } = req.query;
+    const { dateFrom, dateTo, source, status } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     let sql = `
       SELECT 
@@ -1537,7 +1542,9 @@ app.get('/api/churn-forecast', async (_req, res) => {
 // GET /api/conversion-funnel - Conversie funnel data (OLD)
 app.get('/api/conversion-funnel', async (req, res) => {
   try {
-    const { practice, dateFrom, dateTo, source, status } = req.query;
+    const { dateFrom, dateTo, source, status } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     let sql = `
       SELECT 
@@ -1604,7 +1611,9 @@ app.get('/api/conversion-funnel', async (req, res) => {
 // GET /api/sources - Lead bronnen distributie
 app.get('/api/sources', async (req, res) => {
   try {
-    const { practice, dateFrom, dateTo, status } = req.query;
+    const { dateFrom, dateTo, status } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     let sql = `
       SELECT 
@@ -2118,7 +2127,9 @@ app.get('/api/rebook', async (req, res) => {
 // GET /api/funnel - Pipeline funnel stages with counts and conversion rates
 app.get('/api/funnel', async (req, res) => {
   try {
-    const { practice, from, to, source } = req.query;
+    const { from, to, source } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     const stages = await withReadConnection(async (client) => {
       let query = `
@@ -2225,7 +2236,9 @@ app.get('/api/funnel', async (req, res) => {
 // GET /api/leads-by-stage - Get leads for a specific funnel stage
 app.get('/api/leads-by-stage', async (req, res) => {
   try {
-    const { practice, stage } = req.query;
+    const { stage } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     if (!stage) {
       return res.status(400).json({ error: 'Stage parameter required' });
@@ -2284,7 +2297,9 @@ app.get('/api/leads-by-stage', async (req, res) => {
 // GET /api/pipeline-metrics - Key metrics for KPI cards
 app.get('/api/pipeline-metrics', async (req, res) => {
   try {
-    const { practice, from, to } = req.query;
+    const { from, to } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     const metrics = await withReadConnection(async (client) => {
       let whereClause = 'WHERE 1=1';
@@ -2390,7 +2405,9 @@ app.get('/api/pipeline-metrics', async (req, res) => {
 // GET /api/hot-leads - Leads with high conversion likelihood
 app.get('/api/hot-leads', async (req, res) => {
   try {
-    const { practice, limit = 10 } = req.query;
+    const { limit = 10 } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     const leads = await withReadConnection(async (client) => {
       let query = `
@@ -2444,7 +2461,8 @@ app.get('/api/hot-leads', async (req, res) => {
 // GET /api/growth-data - Monthly growth trends (last 6 months)
 app.get('/api/growth-data', async (req, res) => {
   try {
-    const { practice } = req.query;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
     
     const growth = await withReadConnection(async (client) => {
       let query = `
@@ -2554,8 +2572,56 @@ function checkPracticeAccess(req, res, next) {
     req.query.practice = req.session.practiceCode;
     req.body.practice = req.session.practiceCode;
   }
+
+  if (req.session.role === 'organisation') {
+    const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+    if (requestedPractice && !codes.includes(requestedPractice)) {
+      return res.status(403).json({ error: 'Geen toegang tot deze locatie' });
+    }
+    if (!requestedPractice && codes.length > 0) {
+      req.query.practice = codes[0];
+    }
+  }
   
   next();
+}
+
+// Helper: haal geforceerde practice code op uit sessie
+// Geeft null terug als admin (mag alles zien)
+// Gooit 403 als organisation buiten eigen codes probeert te kijken
+function enforcePracticeAccess(req, res) {
+  const role = req.session?.role;
+  const requested = req.query.practice || req.body.practice || null;
+
+  if (!req.session?.userId) {
+    res.status(401).json({ error: 'Niet ingelogd' });
+    return false;
+  }
+
+  if (role === 'admin') {
+    return requested || null; // admin mag alles, geen forcering
+  }
+
+  if (role === 'practice') {
+    const allowed = req.session.practiceCode;
+    if (requested && requested !== allowed) {
+      res.status(403).json({ error: 'Geen toegang' });
+      return false;
+    }
+    return allowed;
+  }
+
+  if (role === 'organisation') {
+    const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+    if (requested && !codes.includes(requested)) {
+      res.status(403).json({ error: 'Geen toegang tot deze locatie' });
+      return false;
+    }
+    return requested || codes[0] || null;
+  }
+
+  res.status(403).json({ error: 'Geen toegang' });
+  return false;
 }
 
 // ============================================================================
