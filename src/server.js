@@ -2593,6 +2593,7 @@ app.post('/api/auth/login', async (req, res) => {
     req.session.email = user.email;
     req.session.role = user.role;
     req.session.practiceCode = user.practice_code;
+    req.session.organisationCodes = user.organisation_codes || null;
     
     // Force session save before responding
     req.session.save((err) => {
@@ -3092,7 +3093,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const user = await withReadConnection(async (client) => {
       const result = await client.query(
-        'SELECT id, email, role, practice_code FROM public.users WHERE id = $1',
+        'SELECT id, email, role, practice_code, organisation_codes FROM public.users WHERE id = $1',
         [req.session.userId]
       );
       return result.rows[0];
@@ -3108,7 +3109,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
-        practice_code: user.practice_code
+        practice_code: user.practice_code,
+        organisation_codes: user.organisation_codes || null
       }
     });
   } catch (error) {
@@ -3981,7 +3983,7 @@ app.get('/api/check-outcome', async (req, res) => {
           timeZone: 'Europe/Amsterdam'
         }).format(dateObj);
 
-        const outcomeToken = generateActionToken(appt.id + '-outcome', appt.praktijk_code);
+        const outcomeToken = generateActionToken(appt.id, appt.praktijk_code);
         const wonUrl      = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=won&token=${outcomeToken}`;
         const followupUrl = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=followup&token=${outcomeToken}`;
         const lostUrl     = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${appt.id}&result=lost&token=${outcomeToken}`;
@@ -4252,7 +4254,7 @@ app.get('/api/check-followup', async (req, res) => {
           timeZone: 'Europe/Amsterdam'
         }).format(dateObj);
 
-        const outcomeToken = generateActionToken(lead.id + '-outcome', lead.praktijk_code);
+        const outcomeToken = generateActionToken(lead.id, lead.praktijk_code);
         const wonUrl       = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=won&token=${outcomeToken}`;
         const followupUrl  = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=followup&token=${outcomeToken}`;
         const lostUrl      = `https://dynamic-health-consultancy.nl/api/appointment-outcome?id=${lead.id}&result=lost&token=${outcomeToken}`;
