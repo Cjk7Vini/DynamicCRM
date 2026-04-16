@@ -3331,9 +3331,37 @@
                     return;
                 }
                 
-                // Leads (Meta) komen rechtstreeks uit de Meta API summary (total_conversions)
-                // Geen aparte database-call nodig
-                summary.verified_leads = summary.total_conversions || 0;
+                // Leads (Meta) = leads uit database met bron Facebook, Instagram of Facebook/Instagram
+                try {
+                    const leadsRes = await fetch(`/api/leads-by-stage?stage=awareness&practice=${practiceCode}`, { credentials: 'include' });
+                    const leadsData2 = await leadsRes.json();
+                    const leadsIntent = await fetch(`/api/leads-by-stage?stage=intent&practice=${practiceCode}`, { credentials: 'include' });
+                    const leadsIntentData = await leadsIntent.json();
+                    const leadsWon = await fetch(`/api/leads-by-stage?stage=won&practice=${practiceCode}`, { credentials: 'include' });
+                    const leadsWonData = await leadsWon.json();
+
+                    const allLeads = [
+                        ...(leadsData2.leads || []),
+                        ...(leadsIntentData.leads || []),
+                        ...(leadsWonData.leads || [])
+                    ];
+
+                    const metaBronnen = ['facebook', 'instagram', 'facebook/instagram'];
+                    const from = new Date(dateFrom);
+                    const to = new Date(dateTo);
+                    to.setHours(23, 59, 59);
+
+                    const metaLeads = allLeads.filter(l => {
+                        const bron = (l.bron || '').toLowerCase().trim();
+                        const datum = new Date(l.aangemaakt_op);
+                        return metaBronnen.includes(bron) && datum >= from && datum <= to;
+                    });
+
+                    summary.verified_leads = metaLeads.length;
+                } catch(e) {
+                    console.warn('Meta leads database lookup mislukt:', e);
+                    summary.verified_leads = summary.total_conversions || 0;
+                }
                 
                 // Show section
                 document.getElementById('metaMarketingSection').style.display = 'block';
