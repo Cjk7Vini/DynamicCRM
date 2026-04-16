@@ -1048,6 +1048,16 @@
             </div>
         </div>
 
+        <div id="sidebarAlleLocaties" style="display:none;">
+            <div class="sidebar-section-label" style="margin-top:8px;">Organisatie</div>
+            <div class="sidebar-item" onclick="showDashboardSection('allelocaties', this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Alle locaties
+            </div>
+        </div>
+
     </nav>
 
     <!-- Filters -->
@@ -1762,6 +1772,60 @@
 </div>
 
 <!-- ── LEAD KWALITEIT SECTIE ──────────────────────────────────────── -->
+<!-- ── ALLE LOCATIES SECTIE ───────────────────────────────────────── -->
+<div class="dash-section" id="dash-allelocaties">
+
+    <div class="advice-block" style="margin-bottom:20px;">
+        <div class="advice-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Organisatieoverzicht — gemiddelden over alle locaties
+        </div>
+        <div id="alleLocatiesAdvies">
+            <div class="advice-item"><div class="advice-dot"></div>Data wordt geladen...</div>
+        </div>
+    </div>
+
+    <!-- KPI vergelijking per locatie -->
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Vergelijking per locatie</div>
+                <div class="card-subtitle">De 5 belangrijkste KPIs naast elkaar</div>
+            </div>
+            <button class="btn btn-ghost" onclick="loadAlleLocaties()" style="font-size:12px;">Vernieuwen</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="table" id="alleLocatiesTable">
+                <thead>
+                    <tr>
+                        <th>Locatie</th>
+                        <th style="text-align:right;">Leads/maand</th>
+                        <th style="text-align:right;">Conversie %</th>
+                        <th style="text-align:right;">Actieve leden</th>
+                        <th style="text-align:right;">Churn %</th>
+                        <th style="text-align:right;">Kosten/lead</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="alleLocatiesBody">
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leads per locatie grafiek -->
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+            <div class="card-title">Leads per locatie — afgelopen 6 maanden</div>
+        </div>
+        <div class="card-body">
+            <div style="position:relative;height:260px;"><canvas id="alleLocatiesChart"></canvas></div>
+        </div>
+    </div>
+
+</div>
+
 <!-- ── INSTELLINGEN SECTIE ──────────────────────────────────────── -->
 <div class="dash-section" id="dash-instellingen">
 
@@ -2051,11 +2115,20 @@
             
             // Set email and role
             userEmail.textContent = currentUser.email;
-            userRole.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Praktijk';
+            const rolLabels = { admin: 'Administrator', practice: 'Praktijk', organisation: 'Organisatie' };
+            userRole.textContent = rolLabels[currentUser.role] || 'Praktijk';
             
             // If practice user, hide admin-only features
             if (currentUser.role === 'practice') {
                 hideAdminFeatures();
+            }
+            // Organisation en admin: toon alle locaties sidebar
+            if (currentUser.role === 'organisation') {
+                setupOrganisationUI();
+            }
+            if (currentUser.role === 'admin') {
+                const alleLocatiesItem = document.getElementById('sidebarAlleLocaties');
+                if (alleLocatiesItem) alleLocatiesItem.style.display = 'flex';
             }
         }
 
@@ -2358,6 +2431,32 @@
                         opt.textContent = code;
                         opt.selected = true;
                         select.appendChild(opt);
+                    }
+                    return;
+                }
+
+                // Organisation users: toon alleen gekoppelde locaties
+                if (currentUser && currentUser.role === 'organisation') {
+                    const codes = (currentUser.organisation_codes || '').split(',').map(c => c.trim()).filter(Boolean);
+                    if (codes.length > 0) {
+                        const select = document.getElementById('practiceFilter');
+                        select.style.display = 'block';
+                        // Haal namen op via practices API
+                        try {
+                            const res = await fetch('/api/churn/practices', { credentials: 'include' });
+                            const data = await res.json();
+                            const alle = data.practices || [];
+                            select.innerHTML = '<option value="">Alle locaties</option>';
+                            codes.forEach(code => {
+                                const p = alle.find(p => p.code === code);
+                                const opt = document.createElement('option');
+                                opt.value = code;
+                                opt.textContent = p ? p.naam : code;
+                                select.appendChild(opt);
+                            });
+                        } catch(e) {
+                            select.innerHTML = codes.map(c => `<option value="${c}">${c}</option>`).join('');
+                        }
                     }
                     return;
                 }
@@ -2794,6 +2893,8 @@
                 loadLeadKwaliteit();
             } else if (name === 'instellingen') {
                 loadInstellingen();
+            } else if (name === 'allelocaties') {
+                loadAlleLocaties();
             }
         }
 
@@ -3640,8 +3741,22 @@
         function getActivePracticeCode() {
             if (!currentUser) return '';
             if (currentUser.role === 'practice') return getPracticeCode() || '';
-            // Admin: gebruik geselecteerde praktijk uit dropdown
+            // Admin en organisation: gebruik geselecteerde praktijk uit dropdown
             return document.getElementById('practiceFilter')?.value || '';
+        }
+
+        function getOrganisationCodes() {
+            if (!currentUser || currentUser.role !== 'organisation') return [];
+            return (currentUser.organisation_codes || '').split(',').map(c => c.trim()).filter(Boolean);
+        }
+
+        function setupOrganisationUI() {
+            // Toon alle locaties sidebar item
+            const alleLocatiesItem = document.getElementById('sidebarAlleLocaties');
+            if (alleLocatiesItem) alleLocatiesItem.style.display = 'flex';
+            // Toon practiceFilter
+            const pf = document.getElementById('practiceFilter');
+            if (pf) pf.style.display = 'block';
         }
 
         function onPracticeFilterChange() {
@@ -3672,7 +3787,7 @@
                 else el.classList.add('active-sub');
             }
 
-            const titles = { dashboard: 'Analytics', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen' };
+            const titles = { dashboard: 'Analytics', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
@@ -3681,6 +3796,7 @@
             if (name === 'seizoen') { loadSeizoenData(); }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
             if (name === 'instellingen') { loadInstellingen(); }
+            if (name === 'allelocaties') { loadAlleLocaties(); }
         }
 
         // ── AFSPRAKEN ─────────────────────────────────────────────────
@@ -4241,6 +4357,174 @@
                 console.error('Seizoen error:', e);
                 document.getElementById('seizoenAdvies').innerHTML = '<div class="advice-item"><div class="advice-dot"></div>Fout bij laden: ' + e.message + '</div>';
             }
+        }
+
+        // ── ALLE LOCATIES ─────────────────────────────────────────────────
+        let alleLocatiesChartInstance = null;
+
+        async function loadAlleLocaties() {
+            const codes = currentUser.role === 'organisation'
+                ? getOrganisationCodes()
+                : (document.getElementById('practiceFilter')?.value
+                    ? [document.getElementById('practiceFilter').value]
+                    : []);
+
+            if (!codes.length) {
+                document.getElementById('alleLocatiesBody').innerHTML =
+                    '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Geen locaties gekoppeld</td></tr>';
+                return;
+            }
+
+            document.getElementById('alleLocatiesBody').innerHTML =
+                '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>';
+
+            const now = new Date();
+            const maand = now.getMonth() + 1;
+            const jaar = now.getFullYear();
+            const dateFrom = `${jaar}-01-01`;
+            const dateTo = now.toISOString().split('T')[0];
+
+            // Haal data per locatie op
+            const locatieData = await Promise.all(codes.map(async code => {
+                try {
+                    // Leads
+                    const [awRes, intRes, wonRes] = await Promise.all([
+                        fetch(`/api/leads-by-stage?stage=awareness&practice=${code}`, { credentials: 'include' }),
+                        fetch(`/api/leads-by-stage?stage=intent&practice=${code}`, { credentials: 'include' }),
+                        fetch(`/api/leads-by-stage?stage=won&practice=${code}`, { credentials: 'include' })
+                    ]);
+                    const aw = (await awRes.json()).leads || [];
+                    const it = (await intRes.json()).leads || [];
+                    const wo = (await wonRes.json()).leads || [];
+                    const alleLeads = [...aw, ...it, ...wo];
+
+                    // Leads deze maand
+                    const leadsDezeM = alleLeads.filter(l => {
+                        const d = new Date(l.aangemaakt_op);
+                        return d.getMonth()+1 === maand && d.getFullYear() === jaar;
+                    }).length;
+
+                    // Conversie
+                    const totaal = alleLeads.length;
+                    const gewonnen = wo.length;
+                    const conv = totaal > 0 ? Math.round(gewonnen/totaal*100) : 0;
+
+                    // eClub
+                    let actiefLeden = null;
+                    let churnPct = null;
+                    try {
+                        const eclubRes = await fetch(`/api/eclub/kpis/${code}?jaar=${jaar}&maand=${maand}`, { credentials: 'include' });
+                        if (eclubRes.ok) {
+                            const eclub = await eclubRes.json();
+                            actiefLeden = eclub.leden_actief ?? null;
+                            churnPct = eclub.churn_pct ?? null;
+                        }
+                    } catch(e) {}
+
+                    // Meta CPL
+                    let cpl = null;
+                    try {
+                        const metaRes = await fetch(`/api/meta/summary/${code}?dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' });
+                        if (metaRes.ok) {
+                            const meta = await metaRes.json();
+                            if (meta.meta_enabled) cpl = meta.avg_cost_per_lead;
+                        }
+                    } catch(e) {}
+
+                    // Praktijknaam ophalen
+                    let naam = code;
+                    try {
+                        const res = await fetch('/api/churn/practices', { credentials: 'include' });
+                        const data = await res.json();
+                        const p = (data.practices || []).find(p => p.code === code);
+                        if (p) naam = p.naam;
+                    } catch(e) {}
+
+                    return { code, naam, leadsDezeM, conv, actiefLeden, churnPct, cpl, alleLeads };
+                } catch(e) {
+                    return { code, naam: code, leadsDezeM: 0, conv: 0, actiefLeden: null, churnPct: null, cpl: null, alleLeads: [] };
+                }
+            }));
+
+            // Render tabel
+            const tbody = document.getElementById('alleLocatiesBody');
+            tbody.innerHTML = locatieData.map(l => `
+                <tr>
+                    <td style="font-weight:600;">${l.naam}</td>
+                    <td style="text-align:right;">${l.leadsDezeM}</td>
+                    <td style="text-align:right;">${l.conv}%</td>
+                    <td style="text-align:right;">${l.actiefLeden !== null ? l.actiefLeden : '—'}</td>
+                    <td style="text-align:right;">${l.churnPct !== null ? l.churnPct + '%' : '—'}</td>
+                    <td style="text-align:right;">${l.cpl !== null ? '€' + parseFloat(l.cpl).toFixed(2) : '—'}</td>
+                    <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="gaNaarLocatie('${l.code}')">Bekijken</button></td>
+                </tr>
+            `).join('');
+
+            // Gemiddelden rij
+            const gemConv = Math.round(locatieData.reduce((s,l) => s+l.conv, 0) / locatieData.length);
+            const gemLeden = locatieData.filter(l => l.actiefLeden !== null);
+            const gemLedenGem = gemLeden.length ? Math.round(gemLeden.reduce((s,l) => s+l.actiefLeden, 0) / gemLeden.length) : null;
+            const gemChurn = locatieData.filter(l => l.churnPct !== null);
+            const gemChurnGem = gemChurn.length ? Math.round(gemChurn.reduce((s,l) => s+l.churnPct, 0) / gemChurn.length * 10) / 10 : null;
+            const gemLeads = Math.round(locatieData.reduce((s,l) => s+l.leadsDezeM, 0) / locatieData.length * 10) / 10;
+
+            tbody.innerHTML += `
+                <tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border);">
+                    <td>Gemiddelde</td>
+                    <td style="text-align:right;">${gemLeads}</td>
+                    <td style="text-align:right;">${gemConv}%</td>
+                    <td style="text-align:right;">${gemLedenGem !== null ? gemLedenGem : '—'}</td>
+                    <td style="text-align:right;">${gemChurnGem !== null ? gemChurnGem + '%' : '—'}</td>
+                    <td style="text-align:right;">—</td>
+                    <td></td>
+                </tr>`;
+
+            // Advies
+            const beste = [...locatieData].sort((a,b) => b.conv - a.conv)[0];
+            const minste = [...locatieData].sort((a,b) => a.leadsDezeM - b.leadsDezeM)[0];
+            document.getElementById('alleLocatiesAdvies').innerHTML = [
+                beste ? `${beste.naam} heeft de hoogste conversie (${beste.conv}%).` : null,
+                minste && locatieData.length > 1 ? `${minste.naam} heeft de minste leads deze maand (${minste.leadsDezeM}). Overweeg extra inzet.` : null,
+                gemChurnGem !== null ? `Gemiddelde churn over alle locaties: ${gemChurnGem}%.` : null
+            ].filter(Boolean).map(t => `<div class="advice-item"><div class="advice-dot"></div>${t}</div>`).join('');
+
+            // Leads chart per locatie per maand
+            const maandKort = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+            const kleuren = ['#2BB8A3','#333399','#f59e0b','#e5334a','#059669'];
+
+            if (alleLocatiesChartInstance) alleLocatiesChartInstance.destroy();
+            alleLocatiesChartInstance = new Chart(document.getElementById('alleLocatiesChart'), {
+                type: 'bar',
+                data: {
+                    labels: maandKort,
+                    datasets: locatieData.map((l, idx) => ({
+                        label: l.naam,
+                        data: maandKort.map((_, mi) => l.alleLeads.filter(lead => {
+                            const d = new Date(lead.aangemaakt_op);
+                            return d.getMonth() === mi && d.getFullYear() === jaar;
+                        }).length),
+                        backgroundColor: kleuren[idx % kleuren.length],
+                        borderRadius: 4
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11 }, color: '#6b7280' } } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#9090a8', font: { size: 11 } } },
+                        y: { beginAtZero: true, ticks: { color: '#9090a8' }, grid: { color: '#f0f0f4' } }
+                    }
+                }
+            });
+        }
+
+        function gaNaarLocatie(code) {
+            const select = document.getElementById('practiceFilter');
+            if (select) {
+                select.value = code;
+                onPracticeFilterChange();
+            }
+            showDashboardSection('dashboard', null);
         }
 
         // ── INSTELLINGEN ─────────────────────────────────────────────────
