@@ -791,7 +791,7 @@ app.get('/api/appointment-token', async (req, res) => {
   try {
     const { lead_id, practice_code } = req.query;
     if (!lead_id || !practice_code) return res.status(400).json({ error: 'Ontbrekende velden' });
-    if (!req.session?.practiceCode && req.session?.role !== 'admin') {
+    if (!req.session?.practiceCode && req.session?.role !== 'admin' && req.session?.role !== 'organisation') {
       return res.status(401).json({ error: 'Niet ingelogd' });
     }
     const token = generateActionToken(lead_id, practice_code);
@@ -3414,8 +3414,13 @@ app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
     const { practiceCode } = req.params;
     const { jaar, maand } = req.query;
 
-    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
-      return res.status(403).json({ error: 'Geen toegang' });
+    if (req.session.role !== 'admin') {
+      if (req.session.role === 'organisation') {
+        const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+        if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
+      } else if (req.session.practiceCode !== practiceCode) {
+        return res.status(403).json({ error: 'Geen toegang' });
+      }
     }
 
     const kpis = await eclubService.getKPIs(
@@ -3437,8 +3442,13 @@ app.get('/api/eclub/summary/:practiceCode', requireAuth, async (req, res) => {
   try {
     const { practiceCode } = req.params;
 
-    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
-      return res.status(403).json({ error: 'Geen toegang' });
+    if (req.session.role !== 'admin') {
+      if (req.session.role === 'organisation') {
+        const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+        if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
+      } else if (req.session.practiceCode !== practiceCode) {
+        return res.status(403).json({ error: 'Geen toegang' });
+      }
     }
 
     const kpis = await eclubService.getKPIs(practiceCode);
@@ -3484,8 +3494,13 @@ app.get('/api/eclub/history/:practiceCode', requireAuth, async (req, res) => {
     const { practiceCode } = req.params;
     const maanden = req.query.maanden ? parseInt(req.query.maanden) : 11;
 
-    if (req.session.role !== 'admin' && req.session.practiceCode !== practiceCode) {
-      return res.status(403).json({ error: 'Geen toegang' });
+    if (req.session.role !== 'admin') {
+      if (req.session.role === 'organisation') {
+        const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+        if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
+      } else if (req.session.practiceCode !== practiceCode) {
+        return res.status(403).json({ error: 'Geen toegang' });
+      }
     }
 
     const history = await eclubService.getHistoricalData(practiceCode, maanden);
