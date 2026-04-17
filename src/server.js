@@ -530,10 +530,16 @@ app.post('/leads', async (req, res) => {
                   <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Bron:</strong> ${bron || 'Niet opgegeven'}</p>
                 </td></tr>
               </table>
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr><td align="center">
-                <a href="${baseUrl}/${practice.code === '458D05' ? 'appointment-form-kerngezond.html' : 'appointment-form.html'}?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
-                   style="display:inline-block;background:#166534;color:#e6f6ec;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Afspraak inplannen</a>
-              </td></tr></table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr>
+                <td align="center" style="padding:0 8px;">
+                  <a href="${baseUrl}/${practice.code === '458D05' ? 'appointment-form-kerngezond.html' : 'appointment-form.html'}?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
+                     style="display:inline-block;background:#166534;color:#e6f6ec;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Afspraak inplannen</a>
+                </td>
+                <td align="center" style="padding:0 8px;">
+                  <a href="${baseUrl}/api/geen-interesse?lead_id=${inserted.id}&practice_code=${practice.code}&token=${generateActionToken(inserted.id + '-geen-interesse', practice.code)}"
+                     style="display:inline-block;background:#f4f4f6;color:#374151;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;border:1px solid #d1d5db;">Geen interesse</a>
+                </td>
+              </tr></table>
               <p style="margin:0;font-size:13px;color:#9090a8;">Ontvangen op ${formatAms(inserted.aangemaakt_op)}</p>
             </td></tr>
             <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
@@ -3535,6 +3541,39 @@ app.post('/api/eclub/clear-cache', requireAuth, async (req, res) => {
   }
 });
 
+
+// GET /api/geen-interesse - praktijk markeert lead als geen interesse vanuit eerste email
+app.get('/api/geen-interesse', async (req, res) => {
+  try {
+    const { lead_id, practice_code, token } = req.query;
+    if (!lead_id || !practice_code || !token) return res.status(400).send('Ongeldige parameters');
+
+    const expectedToken = generateActionToken(lead_id + '-geen-interesse', practice_code);
+    if (token !== expectedToken) return res.status(401).send('Ongeldige token');
+
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `UPDATE public.leads SET funnel_stage = 'lost', status = 'Geen interesse' WHERE id = $1 AND praktijk_code = $2`,
+        [lead_id, practice_code]
+      );
+    });
+
+    console.log(`[GEEN-INTERESSE] Lead ${lead_id} gemarkeerd als geen interesse vanuit eerste email`);
+
+    res.send(`<!DOCTYPE html>
+      <html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f4f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}
+      .card{background:white;border-radius:12px;padding:40px;max-width:420px;text-align:center;}</style></head>
+      <body><div class="card">
+        <p style="font-size:32px;margin:0 0 16px;">&#10003;</p>
+        <h1 style="font-size:20px;color:#1A1D21;margin:0 0 12px;">Geregistreerd</h1>
+        <p style="font-size:15px;color:#5F5E5A;line-height:1.7;margin:0;">De lead is gemarkeerd als geen interesse en verplaatst naar het juiste stadium in het dashboard.</p>
+      </div></body></html>`);
+  } catch (error) {
+    console.error('Geen interesse error:', error);
+    res.status(500).send('Er is een fout opgetreden.');
+  }
+});
 
 // GET /api/no-interest - lead klikt "Ik heb geen interesse"
 app.get('/api/no-interest', async (req, res) => {
