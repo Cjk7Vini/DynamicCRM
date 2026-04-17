@@ -2996,10 +2996,11 @@ ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Naz
 app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType } = req.body;
+    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, organisationCodes, orgLicenseType } = req.body;
     if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
-    if (!['admin', 'practice'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
+    if (!['admin', 'practice', 'organisation'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
     if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
+    if (role === 'organisation' && !req.body.organisationCodes) return res.status(400).json({ error: 'Minimaal 1 locatie is verplicht' });
     if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
       return res.status(400).json({ error: 'Wachtwoord voldoet niet aan de eisen' });
     }
@@ -3020,9 +3021,17 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
     }
     const newUser = await withWriteConnection(async (client) => {
       const r = await client.query(
-        `INSERT INTO public.users (email, password_hash, role, practice_code, created_at)
-         VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email, role, practice_code`,
-        [email.toLowerCase().trim(), passwordHash, role, role === 'practice' ? practiceCode.toUpperCase().trim() : null]
+        `INSERT INTO public.users (email, password_hash, role, practice_code, organisation_codes, org_license_type, org_license_end_date, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, email, role, practice_code, organisation_codes`,
+        [
+          email.toLowerCase().trim(), passwordHash, role,
+          role === 'practice' ? practiceCode.toUpperCase().trim() : null,
+          role === 'organisation' ? (organisationCodes || null) : null,
+          role === 'organisation' ? (orgLicenseType || '12m') : null,
+          role === 'organisation' && orgLicenseType && orgLicenseType !== 'unlimited'
+            ? new Date(new Date().setMonth(new Date().getMonth() + (orgLicenseType === '12m' ? 12 : 24)))
+            : null
+        ]
       );
       return r.rows[0];
     });
@@ -3046,7 +3055,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
     try {
       await sendWelcomeEmail({ email, praktijkNaam: praktijkNaam || practiceCode || email, password, licenseType: finalLicenseType || 'unlimited', licenseEndDate: licenseEnd, nazorgEnabled: !!nazorgEnabled });
     } catch (mailErr) { console.warn('Welkomstmail mislukt:', mailErr.message); }
-    res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code }, license: { type: finalLicenseType, start: licenseStart, end: licenseEnd } });
+    res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code, organisation_codes: newUser.organisation_codes }, license: { type: finalLicenseType || orgLicenseType, start: licenseStart, end: licenseEnd } });
   } catch (error) { console.error('Create user licensed error:', error); res.status(500).json({ error: 'Fout bij aanmaken gebruiker' }); }
 });
 
@@ -3074,7 +3083,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { search } = req.query;
     const users = await withReadConnection(async (client) => {
-      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned,
+      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active,
                p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
@@ -3608,18 +3617,25 @@ app.patch('/api/admin/users/:id/profile', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { id } = req.params;
-    const { contact_naam, contact_telefoon, locatie } = req.body;
+    const { contact_naam, contact_telefoon, locatie, organisation_codes } = req.body;
     const user = await withReadConnection(async (client) => {
-      const r = await client.query('SELECT practice_code FROM public.users WHERE id=$1', [id]);
+      const r = await client.query('SELECT practice_code, role FROM public.users WHERE id=$1', [id]);
       return r.rows[0];
     });
-    if (!user?.practice_code) return res.status(400).json({ error: 'Geen praktijkcode voor deze gebruiker' });
-    await withWriteConnection(async (client) => {
-      await client.query(
-        `UPDATE public.praktijken SET contact_naam=$1, contact_telefoon=$2, locatie=$3 WHERE code=$4`,
-        [contact_naam || null, contact_telefoon || null, locatie || null, user.practice_code]
-      );
-    });
+    if (!user) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    if (user.role === 'organisation') {
+      // Update organisation_codes
+      await withWriteConnection(async (client) => {
+        await client.query('UPDATE public.users SET organisation_codes=$1 WHERE id=$2', [organisation_codes || null, id]);
+      });
+    } else if (user.practice_code) {
+      await withWriteConnection(async (client) => {
+        await client.query(
+          `UPDATE public.praktijken SET contact_naam=$1, contact_telefoon=$2, locatie=$3 WHERE code=$4`,
+          [contact_naam || null, contact_telefoon || null, locatie || null, user.practice_code]
+        );
+      });
+    }
     res.json({ success: true });
   } catch (e) { console.error('Profile update error:', e); res.status(500).json({ error: 'Fout bij opslaan profiel' }); }
 });
@@ -4467,7 +4483,8 @@ app.get('/api/check-lead-reminders', async (req, res) => {
         FROM public.leads l
         LEFT JOIN public.praktijken p ON p.code = l.praktijk_code
         WHERE l.funnel_stage = 'awareness'
-          AND (l.appointment_datetime IS NULL)
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
           AND l.aangemaakt_op >= $1
           AND (
             (l.lead_reminder1_sent IS NULL OR l.lead_reminder1_sent = FALSE)
@@ -4491,6 +4508,9 @@ app.get('/api/check-lead-reminders', async (req, res) => {
 
         const reminder1SentAt = lead.lead_reminder1_sent_at ? new Date(lead.lead_reminder1_sent_at) : null;
         const uurSindsReminder1 = reminder1SentAt ? (now - reminder1SentAt) / (1000 * 60 * 60) : 0;
+
+        // Extra veiligheidscheck: lead moet aangemaakt zijn NA de GOLIVE datum
+        if (aangemaakt < LEAD_REMINDER_GOLIVE) continue;
 
         const stuurReminder1 = !lead.lead_reminder1_sent && uurOud >= 48;
         const stuurReminder2 = lead.lead_reminder1_sent && !lead.lead_reminder2_sent && uurSindsReminder1 >= (5 * 24);
@@ -4591,7 +4611,7 @@ app.get('/api/check-lead-reminders', async (req, res) => {
         // Markeer de juiste reminder als verstuurd
         const updateCol = isReminder2 ? 'lead_reminder2_sent' : 'lead_reminder1_sent';
         const extraCol = isReminder2 ? '' : ', lead_reminder1_sent_at = NOW()';
-        await withConnection(async (client) => {
+        await withWriteConnection(async (client) => {
           await client.query(
             `UPDATE public.leads SET ${updateCol} = TRUE${extraCol} WHERE id = $1`,
             [lead.id]
