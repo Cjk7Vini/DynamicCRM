@@ -220,7 +220,8 @@
             <div>
               <label>Rol</label>
               <select id="role" onchange="onRoleChange()">
-                <option value="practice">Practice</option>
+                <option value="practice">Praktijk</option>
+                <option value="organisation">Organisatie</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -228,6 +229,26 @@
               <label>Praktijkcode</label>
               <input type="text" id="practiceCode" placeholder="S7F2MW" maxlength="10" style="text-transform:uppercase;">
             </div>
+          </div>
+
+          <!-- Organisatie locaties -->
+          <div id="organisatieSection" style="display:none;">
+            <div class="form-group">
+              <label>Aantal locaties</label>
+              <select id="aantalLocaties" onchange="updateLocatieVelden()">
+                <option value="1">1 locatie</option>
+                <option value="2" selected>2 locaties</option>
+                <option value="3">3 locaties</option>
+                <option value="4">4 locaties</option>
+                <option value="5">5 locaties</option>
+                <option value="6">6 locaties</option>
+                <option value="7">7 locaties</option>
+                <option value="8">8 locaties</option>
+                <option value="9">9 locaties</option>
+                <option value="10">10 locaties</option>
+              </select>
+            </div>
+            <div id="locatieVelden"></div>
           </div>
           <div class="form-group">
             <label>Tijdelijk wachtwoord</label>
@@ -238,10 +259,9 @@
             <div class="form-help">Min. 8 tekens, hoofdletter, kleine letter, cijfer</div>
           </div>
 
+          <!-- Praktijk licenties -->
           <div class="license-section" id="licenseSection">
             <div class="license-section-title">Licenties</div>
-
-            <!-- Dashboard licentie -->
             <div class="lic-row">
               <div class="lic-left">
                 <div class="lic-dot on"></div>
@@ -255,8 +275,6 @@
                 </select>
               </div>
             </div>
-
-            <!-- Nazorg licentie -->
             <div class="lic-row">
               <div class="lic-left">
                 <div class="lic-dot off" id="nazorgDot"></div>
@@ -269,6 +287,24 @@
                   <option value="unlimited">Onbeperkt</option>
                 </select>
                 <div class="toggle" id="nazorgToggle" onclick="toggleNazorg()"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Organisatie licentie -->
+          <div class="license-section" id="orgLicenseSection" style="display:none;">
+            <div class="license-section-title">Organisatie licentie</div>
+            <div class="lic-row">
+              <div class="lic-left">
+                <div class="lic-dot on"></div>
+                <div class="lic-label">Organisatie dashboard</div>
+              </div>
+              <div class="lic-right">
+                <select id="orgLicenseType">
+                  <option value="12m">12 maanden</option>
+                  <option value="24m">24 maanden</option>
+                  <option value="unlimited">Onbeperkt</option>
+                </select>
               </div>
             </div>
           </div>
@@ -405,9 +441,28 @@ function generatePassword() {
 }
 
 function onRoleChange() {
-  const isP = document.getElementById('role').value === 'practice';
+  const role = document.getElementById('role').value;
+  const isP = role === 'practice';
+  const isO = role === 'organisation';
   document.getElementById('practiceCodeGroup').style.visibility = isP ? 'visible' : 'hidden';
   document.getElementById('licenseSection').style.display = isP ? 'block' : 'none';
+  document.getElementById('organisatieSection').style.display = isO ? 'block' : 'none';
+  document.getElementById('orgLicenseSection').style.display = isO ? 'block' : 'none';
+  if (isO) updateLocatieVelden();
+}
+
+function updateLocatieVelden() {
+  const aantal = parseInt(document.getElementById('aantalLocaties').value) || 2;
+  const container = document.getElementById('locatieVelden');
+  const bestaand = Array.from(container.querySelectorAll('input')).map(i => i.value);
+  container.innerHTML = '';
+  for (let i = 0; i < aantal; i++) {
+    const div = document.createElement('div');
+    div.className = 'form-group';
+    div.innerHTML = `<label>Locatie ${i+1} — praktijkcode</label>
+      <input type="text" class="locatie-code" placeholder="Bijv. 77C34D" maxlength="10" style="text-transform:uppercase;" value="${bestaand[i]||''}">`;
+    container.appendChild(div);
+  }
 }
 
 let nazorgOn = false;
@@ -430,6 +485,12 @@ function resetForm() {
   ['email','praktijkNaam','practiceCode'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('password').value = 'Dynamic2026!';
   document.getElementById('createBtn').disabled = false;
+  document.getElementById('role').value = 'practice';
+  document.getElementById('practiceCodeGroup').style.visibility = 'visible';
+  document.getElementById('licenseSection').style.display = 'block';
+  document.getElementById('organisatieSection').style.display = 'none';
+  document.getElementById('orgLicenseSection').style.display = 'none';
+  document.getElementById('locatieVelden').innerHTML = '';
   nazorgOn = false;
   document.getElementById('nazorgToggle').classList.remove('on');
   document.getElementById('nazorgDot').className = 'lic-dot off';
@@ -445,6 +506,16 @@ async function createUser() {
   const licenseType = document.getElementById('licenseType').value;
   const nazorgLicenseType = document.getElementById('nazorgLicenseType').value;
   const password = document.getElementById('password').value;
+  const orgLicenseType = document.getElementById('orgLicenseType')?.value || '12m';
+
+  // Haal locatiecodes op voor organisation
+  let organisationCodes = null;
+  if (role === 'organisation') {
+    const codes = Array.from(document.querySelectorAll('.locatie-code'))
+      .map(i => i.value.trim().toUpperCase()).filter(Boolean);
+    if (!codes.length) { showAlert('createAlert', 'error', 'Voer minimaal 1 praktijkcode in.'); return; }
+    organisationCodes = codes.join(',');
+  }
 
   if (!email || !password) { showAlert('createAlert', 'error', 'Vul alle verplichte velden in.'); return; }
   if (role === 'practice' && !practiceCode) { showAlert('createAlert', 'error', 'Praktijkcode is verplicht.'); return; }
@@ -458,7 +529,7 @@ async function createUser() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType })
+      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType, organisationCodes, orgLicenseType })
     });
     const data = await res.json();
     if (res.ok && data.success) {
@@ -507,6 +578,7 @@ function renderUsers(users) {
   // Filter: only show users with a license or that are admins
   const filtered = users.filter(u =>
     u.role === 'admin' ||
+    u.role === 'organisation' ||
     u.banned ||
     (u.practice_code && (u.license_type || u.license_active === false))
   );
@@ -514,7 +586,9 @@ function renderUsers(users) {
   c.innerHTML = filtered.map(u => {
     const initials = (u.email||'?').slice(0,2).toUpperCase();
     const [bgColor, fgColor] = avatarColors(u.email||'a');
-    const dbBadge = dashboardBadge(u);
+    const dbBadge = u.role === 'organisation'
+      ? '<span class="badge badge-purple">Organisatie</span>'
+      : dashboardBadge(u);
     const nzBadge = nazorgBadge(u);
     const isBanned = u.banned;
     const profileHtml = `
@@ -528,12 +602,24 @@ function renderUsers(users) {
           ${u.license_type ? `<span class="badge badge-${u.license_active !== false ? 'green' : 'red'}">${licenseLabel(u.license_type)}${u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : ''}</span>` : ''}
           ${u.nazorg_enabled ? `<span class="badge badge-purple">Nazorg${u.nazorg_license_end_date ? ' · tot ' + formatDate(u.nazorg_license_end_date) : ''}</span>` : ''}
         </div>
+        ${u.role === 'organisation' ? `
+        <div style="margin-bottom:12px;">
+          <div class="pf-label" style="margin-bottom:8px;">Gekoppelde locaties (praktijkcodes)</div>
+          <div id="pf-org-codes-${u.id}">
+            ${(u.organisation_codes||'').split(',').filter(Boolean).map((code,i) => `
+              <div style="display:flex;gap:6px;margin-bottom:6px;">
+                <input class="pf-input pf-org-code-${u.id}" value="${code.trim()}" style="text-transform:uppercase;flex:1;">
+                <button onclick="this.parentElement.remove()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--red);cursor:pointer;font-size:13px;">×</button>
+              </div>`).join('')}
+          </div>
+          <button onclick="voegLocatieToe(${u.id})" style="margin-top:4px;padding:6px 12px;border:1px solid var(--accent);border-radius:6px;background:white;color:var(--accent);font-size:12px;cursor:pointer;font-family:inherit;">+ Locatie toevoegen</button>
+        </div>` : `
         <div class="profile-grid">
           <div><div class="pf-label">Naam contactpersoon</div><input class="pf-input" id="pf-naam-${u.id}" value="${u.contact_naam||''}"></div>
           <div><div class="pf-label">Telefoonnummer</div><input class="pf-input" id="pf-tel-${u.id}" value="${u.contact_telefoon||''}"></div>
           <div><div class="pf-label">Praktijkcode</div><input class="pf-input" value="${u.practice_code||''}" disabled style="opacity:.6;"></div>
           <div><div class="pf-label">Locatie</div><input class="pf-input" id="pf-loc-${u.id}" value="${u.locatie||''}" placeholder="Adres praktijk..."></div>
-        </div>
+        </div>`}
         <div class="profile-actions">
           <button class="btn-cancel-sm" onclick="closeProfile(${u.id})">Annuleren</button>
           <button class="btn-save" onclick="saveProfile(${u.id})">Opslaan</button>
@@ -599,7 +685,35 @@ function closeProfile(id) {
   if (openProfileId === id) openProfileId = null;
 }
 
+function voegLocatieToe(id) {
+  const container = document.getElementById('pf-org-codes-' + id);
+  const div = document.createElement('div');
+  div.style = 'display:flex;gap:6px;margin-bottom:6px;';
+  div.innerHTML = `<input class="pf-input pf-org-code-${id}" placeholder="Praktijkcode" style="text-transform:uppercase;flex:1;">
+    <button onclick="this.parentElement.remove()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--red);cursor:pointer;font-size:13px;">×</button>`;
+  container.appendChild(div);
+}
+
 async function saveProfile(id) {
+  // Check of het een organisation account is
+  const orgCodes = document.querySelectorAll('.pf-org-code-' + id);
+  if (orgCodes.length > 0) {
+    // Organisation account - sla locaties op
+    const codes = Array.from(orgCodes).map(i => i.value.trim().toUpperCase()).filter(Boolean);
+    try {
+      const res = await fetch('/api/admin/users/' + id + '/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ organisation_codes: codes.join(',') })
+      });
+      const d = await res.json();
+      if (d.success) { closeProfile(id); loadUsers(document.getElementById('searchInput').value.trim()); }
+      else alert('Fout: ' + (d.error || 'onbekend'));
+    } catch { alert('Netwerkfout.'); }
+    return;
+  }
+
   const naam = document.getElementById('pf-naam-' + id)?.value.trim() || '';
   const tel = document.getElementById('pf-tel-' + id)?.value.trim() || '';
   const loc = document.getElementById('pf-loc-' + id)?.value.trim() || '';
