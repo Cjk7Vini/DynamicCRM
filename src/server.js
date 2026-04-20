@@ -1149,6 +1149,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
 });
 
 app.get('/api/metrics', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   const { practice, from, to } = req.query;
   if (!practice || !from || !to) {
     return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
@@ -1180,6 +1181,7 @@ app.get('/api/metrics', async (req, res) => {
 });
 
 app.get('/api/series', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   const { practice, from, to } = req.query;
   if (!practice || !from || !to) {
     return res.status(400).json({ error: 'practice, from, to zijn verplicht' });
@@ -2519,6 +2521,7 @@ app.get('/api/growth-data', async (req, res) => {
 
 // GET /api/practices - List all practices for filter
 app.get('/api/practices', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   try {
     const practices = await withReadConnection(async (client) => {
       const result = await client.query(`
@@ -3059,7 +3062,42 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
       });
     }
     try {
-      await sendWelcomeEmail({ email, praktijkNaam: praktijkNaam || practiceCode || email, password, licenseType: finalLicenseType || 'unlimited', licenseEndDate: licenseEnd, nazorgEnabled: !!nazorgEnabled });
+      if (role === 'organisation') {
+        // Organisatie welkomstmail met gekoppelde locaties
+        const locatieLijst = (organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+        const locatieHtml = locatieLijst.map(c => `<li style="font-size:15px;color:#3A3D40;padding:4px 0;">${c}</li>`).join('');
+        await sendMailResilient({
+          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          to: email,
+          subject: 'Welkom bij Dynamic Health | je organisatie account is aangemaakt',
+          html: `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#1A1D21;padding:24px 40px;"><span style="color:white;font-size:15px;font-weight:600;">Dynamic Health Consultancy</span></td></tr>
+<tr><td style="padding:40px;">
+<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste,</p>
+<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je organisatie account voor het Dynamic Health dashboard is aangemaakt.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;"><tr><td style="padding:24px;">
+<p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Inloggegevens</p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> <a href="https://dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">dynamic-health-consultancy.nl</a></p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Gebruikersnaam:</strong> ${email}</p>
+<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijdelijk wachtwoord:</strong> <span style="font-family:monospace;background:#e8e8ed;padding:2px 8px;border-radius:4px;">${password}</span></p>
+</td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;"><tr><td style="padding:24px;">
+<p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Gekoppelde locaties</p>
+<ul style="margin:0;padding-left:20px;">${locatieHtml}</ul>
+</td></tr></table>
+<p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Via het dashboard kun je alle gekoppelde locaties bekijken en vergelijken.</p>
+<p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+</td></tr>
+<tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
+<p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+</td></tr></table></td></tr></table></body></html>`
+        });
+      } else {
+        await sendWelcomeEmail({ email, praktijkNaam: praktijkNaam || practiceCode || email, password, licenseType: finalLicenseType || 'unlimited', licenseEndDate: licenseEnd, nazorgEnabled: !!nazorgEnabled });
+      }
     } catch (mailErr) { console.warn('Welkomstmail mislukt:', mailErr.message); }
     res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code, organisation_codes: newUser.organisation_codes }, license: { type: finalLicenseType || orgLicenseType, start: licenseStart, end: licenseEnd } });
   } catch (error) { console.error('Create user licensed error:', error); res.status(500).json({ error: 'Fout bij aanmaken gebruiker' }); }
@@ -3069,7 +3107,6 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
 app.post('/api/admin/create-user', requireAuth, async (req, res) => {
   req.body.licenseType = req.body.licenseType || '12m';
   req.body.nazorgEnabled = false;
-  const handler = await import('./server.js').catch(() => null);
   // Forward to licensed endpoint logic inline
   const { email, password, role, practiceCode } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email en wachtwoord verplicht' });
@@ -3308,8 +3345,13 @@ app.get('/api/meta/summary/:practiceCode', async (req, res) => {
     const { dateFrom, dateTo } = req.query;
 
     // Auth check
+    if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
     if (req.session.role === 'practice' && req.session.practiceCode !== practiceCode) {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (req.session.role === 'organisation') {
+      const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+      if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
     }
 
     // Check if Meta enabled for this practice
@@ -3348,8 +3390,13 @@ app.get('/api/meta/campaigns/:practiceCode', async (req, res) => {
     const { dateFrom, dateTo } = req.query;
 
     // Auth check
+    if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
     if (req.session.role === 'practice' && req.session.practiceCode !== practiceCode) {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (req.session.role === 'organisation') {
+      const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+      if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
     }
 
     const campaigns = await metaService.getCampaignPerformance(practiceCode, dateFrom, dateTo);
@@ -3896,6 +3943,7 @@ async function genereerBezettingExcel(data) {
 
 // POST /api/bezetting/opslaan
 app.post('/api/bezetting/opslaan', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   try {
     const { maand, jaar, praktijkCode, matenNummers, aantalFt, aantalPt, ptUrenPerMaand, aantalKamers, medewerkers } = req.body;
 
@@ -3981,6 +4029,7 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
 
 // GET /api/bezetting/lijst
 app.get('/api/bezetting/lijst', async (req, res) => {
+  if (!req.session?.userId) return res.status(401).json({ error: 'Niet ingelogd' });
   try {
     const rows = await withReadConnection(async (client) => {
       const result = await client.query(
@@ -4058,6 +4107,15 @@ app.get('/api/public/stats', async (_req, res) => {
 // Haalt alle leden op via /api/members en zet is_lid = true voor matches
 app.post('/api/eclub/sync-leden/:practiceCode', requireAuth, async (req, res) => {
   const { practiceCode } = req.params;
+  // Controleer toegang: admin mag alles, practice alleen eigen code, organisation alleen gekoppelde codes
+  if (req.session.role !== 'admin') {
+    if (req.session.role === 'organisation') {
+      const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+      if (!codes.includes(practiceCode)) return res.status(403).json({ error: 'Geen toegang' });
+    } else if (req.session.practiceCode !== practiceCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+  }
   try {
     const result = await eclubService.syncLedenNaarLeads(practiceCode);
     res.json({ success: true, ...result });
