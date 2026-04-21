@@ -189,16 +189,21 @@
     loadPracticeName();
 
     // Meta conversie tracking — Lead event op thankyou pagina
-    // Cookie check voorkomt dubbeltelling als tabblad opnieuw wordt geopend.
+    // event_id wordt doorgegeven vanuit het formulier voor deduplicatie met CAPI
+    // Cookie check (sessie) voorkomt dubbeltelling bij tab-heropen
     try {
       if (typeof fbq !== 'undefined') {
-        var cookieName = 'dhc_lead_tracked_' + practiceCode;
+        var eventId = params.get('eid') || null;
+        var cookieName = 'dhc_lead_tracked_' + practiceCode + (eventId ? '_' + eventId : '');
         var alreadyTracked = document.cookie.split(';').some(function(c) {
           return c.trim().startsWith(cookieName + '=');
         });
         if (!alreadyTracked) {
-          fbq('track', 'Lead');
-          document.cookie = cookieName + '=1; max-age=86400; path=/; SameSite=Lax';
+          var fbqOptions = {};
+          if (eventId) fbqOptions.eventID = eventId;
+          fbq('track', 'Lead', {}, fbqOptions);
+          // Sessie cookie: vervalt wanneer browser sluit (geen max-age)
+          document.cookie = cookieName + '=1; path=/; SameSite=Lax';
         }
       }
     } catch(e) {}

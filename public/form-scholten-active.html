@@ -314,7 +314,7 @@
     <script src="/js/meta-pixel.js"></script>
     <noscript>
         <img height="1" width="1" style="display:none"
-             src="https://www.facebook.com/tr?id=1177365577340703&ev=PageView&noscript=1"/>
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
     </noscript>
     <!-- End Meta Pixel -->
 </head>
@@ -466,6 +466,9 @@
             return;
         }
 
+        // Genereer unieke event_id voor deduplicatie tussen pixel en CAPI
+        var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
         var formData = {
             praktijk_code: PRACTICE_CODE,
             volledige_naam: document.getElementById('volledige_naam').value.trim(),
@@ -473,7 +476,9 @@
             telefoon: phoneDigits,
             bron: document.getElementById('bron').value || null,
             doel: document.getElementById('doel').value || null,
-            toestemming: document.getElementById('toestemming').checked
+            toestemming: document.getElementById('toestemming').checked,
+            meta_event_id: eventId,
+            event_source_url: window.location.href
         };
 
         try {
@@ -484,7 +489,7 @@
             });
 
             if (response.ok) {
-                toonModal();
+                toonModal(eventId);
             } else {
                 var error = await response.json();
                 msg.textContent = error.error || 'Er ging iets mis. Probeer het opnieuw.';
@@ -499,7 +504,10 @@
         btn.textContent = origText;
     });
 
-    function toonModal() {
+    var currentEventId = null;
+
+    function toonModal(eventId) {
+        currentEventId = eventId || null;
         document.getElementById('successModal').classList.add('active');
         var sec = 10;
         var cd = document.getElementById('countdown');
@@ -515,7 +523,9 @@
         if (countdownTimer) clearInterval(countdownTimer);
         document.getElementById('leadForm').reset();
         document.getElementById('praktijk_code').value = PRACTICE_CODE;
-        window.location.href = 'thankyou.html?s=' + PRACTICE_CODE;
+        var url = 'thankyou.html?s=' + PRACTICE_CODE;
+        if (currentEventId) url += '&eid=' + encodeURIComponent(currentEventId);
+        window.location.href = url;
     }
 </script>
 

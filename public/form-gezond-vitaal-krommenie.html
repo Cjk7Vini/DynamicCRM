@@ -167,7 +167,7 @@
     <script src="/js/meta-pixel.js"></script>
     <noscript>
         <img height="1" width="1" style="display:none"
-             src="https://www.facebook.com/tr?id=1177365577340703&ev=PageView&noscript=1"/>
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
     </noscript>
     <!-- End Meta Pixel -->
 </head>
@@ -231,8 +231,13 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Bezig met versturen...';
             
+            // Genereer unieke event_id voor deduplicatie tussen pixel en CAPI
+            const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
+            data.meta_event_id = eventId;
+            data.event_source_url = window.location.href;
             
             try {
                 const response = await fetch('/leads', {
@@ -244,7 +249,7 @@
                 });
 
                 if (response.ok) {
-                    window.location.href = 'thankyou.html?s=952A92';
+                    window.location.href = 'thankyou.html?s=952A92&eid=' + encodeURIComponent(eventId);
                 } else {
                     const errorData = await response.json();
                     alert('Er ging iets mis: ' + (errorData.error || 'Probeer het opnieuw'));

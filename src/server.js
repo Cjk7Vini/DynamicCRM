@@ -202,6 +202,8 @@ const leadSchema = Joi.object({
   utm_source: Joi.string().allow('', null),
   utm_medium: Joi.string().allow('', null),
   utm_campaign: Joi.string().allow('', null),
+  meta_event_id: Joi.string().max(100).allow('', null),
+  event_source_url: Joi.string().max(500).allow('', null),
 });
 
 async function recordEvent({ lead_id = null, practice_code, event_type, actor = 'system', metadata = {} }) {
@@ -250,30 +252,39 @@ async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
         .digest('hex');
     };
 
-    // Build event data
-    const eventData = {
-      data: [{
-        event_name: 'Lead',
-        event_time: Math.floor(Date.now() / 1000),
-        action_source: 'website',
-        event_source_url: `https://dynamic-health-consultancy.nl/form.html?s=${practiceCode}`,
-        user_data: {
-          em: hashSHA256(leadData.emailadres),
-          ph: hashSHA256(leadData.telefoon),
-          client_ip_address: requestInfo.ip,
-          client_user_agent: requestInfo.userAgent,
-          fbc: requestInfo.fbc || null, // Facebook click ID from cookie
-          fbp: requestInfo.fbp || null  // Facebook browser ID from cookie
-        },
-        custom_data: {
-          practice_code: practiceCode,
-          lead_source: leadData.bron || 'website',
-          value: 1.00,
-          currency: 'EUR',
-          content_name: 'Fysio Lead Form'
-        }
-      }]
+    // Gebruik de werkelijke URL van het formulier, of fallback naar bekende URL per praktijk
+    const sourceUrl = requestInfo.eventSourceUrl ||
+      `https://dynamic-health-consultancy.nl/form.html?s=${practiceCode}`;
+
+    // Bouw event data
+    const eventPayload = {
+      event_name: 'Lead',
+      event_time: Math.floor(Date.now() / 1000),
+      action_source: 'website',
+      event_source_url: sourceUrl,
+      user_data: {
+        em: hashSHA256(leadData.emailadres),
+        ph: hashSHA256(leadData.telefoon),
+        client_ip_address: requestInfo.ip,
+        client_user_agent: requestInfo.userAgent,
+        fbc: requestInfo.fbc || null,
+        fbp: requestInfo.fbp || null
+      },
+      custom_data: {
+        practice_code: practiceCode,
+        lead_source: leadData.bron || 'website',
+        value: 1.00,
+        currency: 'EUR',
+        content_name: 'Fysio Lead Form'
+      }
     };
+
+    // event_id meesturen voor deduplicatie met pixel Lead event op thankyou pagina
+    if (requestInfo.eventId) {
+      eventPayload.event_id = requestInfo.eventId;
+    }
+
+    const eventData = { data: [eventPayload] };
 
     // Add test event code if in development
     if (process.env.META_TEST_EVENT_CODE) {
@@ -282,7 +293,7 @@ async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
 
     // Send to Meta Conversions API
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${pixelId}/events`,
+      `https://graph.facebook.com/v22.0/${pixelId}/events`,
       eventData,
       {
         params: { access_token: accessToken },
@@ -457,7 +468,9 @@ app.post('/leads', async (req, res) => {
       bron,
       doel,
       toestemming,
-      praktijk_code
+      praktijk_code,
+      meta_event_id,
+      event_source_url
     } = value;
 
     const inserted = await withWriteConnection(async (client) => {
@@ -592,7 +605,9 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
           ip: req.ip,
           userAgent: req.get('user-agent'),
           fbc: req.cookies?._fbc || null,
-          fbp: req.cookies?._fbp || null
+          fbp: req.cookies?._fbp || null,
+          eventId: meta_event_id || null,
+          eventSourceUrl: event_source_url || null
         }
       ).catch(err => {
         console.warn('Meta Conversion API failed (non-critical):', err.message);
