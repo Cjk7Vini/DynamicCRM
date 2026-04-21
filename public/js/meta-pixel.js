@@ -2,6 +2,10 @@
  * meta-pixel.js
  * Shared Meta Pixel tracking voor alle lead forms
  * Plaats dit bestand in: public/js/meta-pixel.js
+ *
+ * Verantwoordelijkheid: alleen PageView tracken op formulierpagina's.
+ * Het Lead event wordt uitsluitend gevuurd op thankyou.html (browser)
+ * en via de Conversions API (server) — met gedeelde event_id voor deduplicatie.
  */
 
 (function() {
@@ -30,56 +34,10 @@
 
   // Init pixel
   fbq('init', PIXEL_ID);
-  
-  // Track PageView
+
+  // Track PageView only — Lead event zit op thankyou.html
   fbq('track', 'PageView');
 
   console.log('✅ Meta Pixel loaded:', PIXEL_ID);
-
-  // Function to track Lead submission
-  window.trackMetaLead = function(practiceCode) {
-    if (typeof fbq !== 'undefined') {
-      fbq('track', 'Lead', {
-        content_name: 'Fysio Lead Form',
-        content_category: 'Lead Generation',
-        practice_code: practiceCode || 'unknown',
-        value: 1.00,
-        currency: 'EUR'
-      });
-      console.log('✅ Meta Lead event tracked for practice:', practiceCode);
-    } else {
-      console.warn('⚠️ Meta Pixel not loaded');
-    }
-  };
-
-  // Auto-track lead on form submit
-  // Zoekt naar form met class "lead-form" of id "leadForm"
-  function setupFormTracking() {
-    const form = document.querySelector('.lead-form, #leadForm, form[action*="leads"]');
-    
-    if (form) {
-      form.addEventListener('submit', function(e) {
-        // Get practice code from URL parameter or data attribute
-        const urlParams = new URLSearchParams(window.location.search);
-        const practiceCode = urlParams.get('s') || 
-                            form.dataset.practice || 
-                            document.body.dataset.practice || 
-                            'unknown';
-        
-        // Track lead (non-blocking)
-        setTimeout(() => {
-          window.trackMetaLead(practiceCode);
-        }, 0);
-      });
-      console.log('✅ Form tracking setup complete');
-    }
-  }
-
-  // Setup when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupFormTracking);
-  } else {
-    setupFormTracking();
-  }
 
 })();
