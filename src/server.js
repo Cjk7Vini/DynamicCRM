@@ -4140,6 +4140,49 @@ app.post('/api/eclub/sync-leden/:practiceCode', requireAuth, async (req, res) =>
   }
 });
 
+
+// POST /api/contact — Contactformulier DHC website
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { naam, email, bericht } = req.body;
+    if (!naam || !email || !bericht) {
+      return res.status(400).json({ error: 'Naam, email en bericht zijn verplicht' });
+    }
+    await sendMailResilient({
+      from: SMTP.from,
+      to: 'admin@dynamic-health-consultancy.nl',
+      replyTo: email,
+      subject: `Nieuw contactbericht van ${naam}`,
+      html: `
+        <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#f4f4f6;padding:32px 0;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin:0 auto;">
+          <tr><td style="background:#1A1D21;padding:24px 40px;">
+            <span style="color:white;font-size:15px;font-weight:600;">Dynamic Health Consultancy</span>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;">Nieuw bericht via het contactformulier op de website.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${naam}</p>
+                <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>E-mail:</strong> <a href="mailto:${email}" style="color:#2BB8A3;">${email}</a></p>
+                <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Bericht:</strong><br>${bericht.replace(/\n/g, '<br>')}</p>
+              </td></tr>
+            </table>
+            <p style="margin:0;font-size:13px;color:#9090a8;">Beantwoord dit bericht door direct te reageren op deze e-mail.</p>
+          </td></tr>
+          <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+            <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+          </td></tr>
+        </table>
+        </div>`,
+      text: `Naam: ${naam}\nE-mail: ${email}\nBericht:\n${bericht}`
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Contact form error:', err.message);
+    res.status(500).json({ error: 'Fout bij versturen' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });

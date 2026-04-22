@@ -62,6 +62,95 @@
             .section { padding: 60px 20px; }
             .pillars-grid { grid-template-columns: 1fr; }
         }
+
+        /* Footer */
+        .site-footer {
+            background: var(--primary);
+            color: #ccc;
+            padding: 60px 60px 30px;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 60px;
+            max-width: 1200px;
+            margin: 0 auto 50px;
+        }
+        .footer-col h4 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--secondary);
+            margin-bottom: 20px;
+        }
+        .footer-col p, .footer-col address {
+            font-size: 14px;
+            line-height: 1.9;
+            font-style: normal;
+            color: #aaa;
+        }
+        .footer-col a {
+            color: #aaa;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .footer-col a:hover { color: var(--secondary); }
+        .footer-form input,
+        .footer-form textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: white;
+            font-family: 'Lato', sans-serif;
+            margin-bottom: 10px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .footer-form input::placeholder,
+        .footer-form textarea::placeholder { color: #666; }
+        .footer-form input:focus,
+        .footer-form textarea:focus { border-color: var(--accent); }
+        .footer-form textarea { resize: vertical; min-height: 90px; }
+        .footer-form button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 11px 28px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            transition: opacity 0.3s;
+            width: 100%;
+        }
+        .footer-form button:hover { opacity: 0.88; }
+        .footer-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #footerMsg {
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+        #footerMsg.success { color: var(--accent); display: block; }
+        #footerMsg.error { color: #f87171; display: block; }
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: #555;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        @media (max-width: 968px) {
+            .site-footer { padding: 50px 20px 24px; }
+            .footer-grid { grid-template-columns: 1fr; gap: 40px; }
+        }
     </style>
 </head>
 <body>
@@ -136,4 +225,85 @@
             </div>
             <p style="font-size: 17px; line-height: 1.8; margin-bottom: 30px;">We werken niet met standaard trainingen of losse adviezen. We kijken naar het geheel. Strategie, team, marketing, uitvoering. Alles moet kloppen, anders werkt het niet. We blijven betrokken tot het echt landt. En we werken met scenarios en praktijkvoorbeelden, niet met theorie.</p>
             <p style="font-size: 17px; line-height: 1.8; margin-bottom: 30px;">We kennen de sector. We weten wat de transitie naar leefstijlzorg vraagt. En we weten dat het alleen werkt als je team er klaar voor is en je verhaal klopt.</p>
-            <p style="font-size: 20px; font-weight: 600; text-align: center; color: var(--primary); margin-top: 40px;">We bouwen samen aan een praktijk die groeit in leden, omzet én impact.
+            <p style="font-size: 20px; font-weight: 600; text-align: center; color: var(--primary); margin-top: 40px;">We bouwen samen aan een praktijk die groeit in leden, omzet én impact.</p>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        <div class="footer-grid">
+
+            <!-- Kolom 1: Over -->
+            <div class="footer-col">
+                <h4>Dynamic Health Consultancy</h4>
+                <p>De transitiepartner voor preventieve leefstijlzorg. We begeleiden praktijken en leefstijlcentra in de overgang van curatieve zorg naar duurzame groei.</p>
+            </div>
+
+            <!-- Kolom 2: Contactgegevens -->
+            <div class="footer-col">
+                <h4>Contact</h4>
+                <address>
+                    Diamantlaan 1<br>
+                    2132 WV Hoofddorp<br>
+                    Nederland
+                </address>
+            </div>
+
+            <!-- Kolom 3: Contactformulier -->
+            <div class="footer-col">
+                <h4>Neem contact met ons op</h4>
+                <form class="footer-form" id="footerContactForm">
+                    <input type="text" id="footerNaam" placeholder="Naam" required>
+                    <input type="email" id="footerEmail" placeholder="E-mailadres" required>
+                    <textarea id="footerBericht" placeholder="Uw bericht..." required></textarea>
+                    <button type="submit" id="footerBtn">Verstuur</button>
+                    <p id="footerMsg"></p>
+                </form>
+            </div>
+
+        </div>
+
+        <div class="footer-bottom">
+            Copyright &copy; 2026 Dynamic Health Consultancy &mdash; Alle rechten voorbehouden
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('footerContactForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('footerBtn');
+            const msg = document.getElementById('footerMsg');
+            const naam = document.getElementById('footerNaam').value.trim();
+            const email = document.getElementById('footerEmail').value.trim();
+            const bericht = document.getElementById('footerBericht').value.trim();
+
+            btn.disabled = true;
+            btn.textContent = 'Versturen...';
+            msg.className = '';
+            msg.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ naam, email, bericht })
+                });
+                if (res.ok) {
+                    msg.textContent = 'Bericht verstuurd! We nemen zo snel mogelijk contact op.';
+                    msg.className = 'success';
+                    this.reset();
+                } else {
+                    msg.textContent = 'Er ging iets mis. Probeer het opnieuw.';
+                    msg.className = 'error';
+                }
+            } catch(err) {
+                msg.textContent = 'Geen verbinding. Probeer het later opnieuw.';
+                msg.className = 'error';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Verstuur';
+        });
+    </script>
+
+</body>
+</html>
