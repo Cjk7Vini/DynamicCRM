@@ -215,11 +215,11 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Bezig met versturen...';
             
-            // Genereer unieke event_id voor deduplicatie tussen pixel en CAPI
-            const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
+            
+            // eventId voor de fetch genereren zodat server het ontvangt voor CAPI deduplicatie
+            const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             data.meta_event_id = eventId;
             data.event_source_url = window.location.href;
             
@@ -233,7 +233,10 @@
                 });
 
                 if (response.ok) {
-                    window.location.href = 'thankyou.html?s=T6PV9A&eid=' + encodeURIComponent(eventId);
+                    const resData = await response.json().catch(() => ({}));
+                    const submitToken = resData.submit_token || '';
+                    const leadId = resData.lead?.id || '';
+                    window.location.href = 'thankyou.html?s=T6PV9A&eid=' + encodeURIComponent(eventId) + '&st=' + encodeURIComponent(submitToken) + '&lid=' + encodeURIComponent(leadId);
                 } else {
                     alert('Er ging iets mis. Probeer het opnieuw.');
                     submitBtn.disabled = false;

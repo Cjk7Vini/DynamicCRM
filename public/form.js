@@ -185,9 +185,9 @@
         return;
       }
       
-      // Genereer unieke event_id voor deduplicatie tussen pixel en CAPI
+      // eventId voor de fetch genereren zodat server het ontvangt voor CAPI deduplicatie
       const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-
+      
       const data = {
         volledige_naam: form.volledige_naam.value.trim(),
         emailadres:     email,
@@ -226,8 +226,12 @@
           });
         }
         
-        // Redirect to thank you page met event_id voor pixel deduplicatie
-        window.location.href = `/thankyou.html?s=${code}&eid=${encodeURIComponent(eventId)}`;
+        // Redirect to thank you page
+        // Meta will track this as a conversion (pageview on /thankyou.html)
+        // Redirect naar thankyou met submit_token voor pixel verificatie
+        var submitToken = json.submit_token || '';
+        var leadIdRedirect = leadId ? String(leadId) : '';
+        window.location.href = `/thankyou.html?s=${code}&eid=${encodeURIComponent(eventId)}&st=${encodeURIComponent(submitToken)}&lid=${encodeURIComponent(leadIdRedirect)}`;
       }catch(err){
         msg.textContent = 'Kon niet opslaan: ' + err.message;
         msg.className = 'error';

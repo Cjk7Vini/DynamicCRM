@@ -614,10 +614,15 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
       });
     }
 
+    // Genereer submit_token — bewijs dat formulier echt is ingevuld
+    // Thankyou.html verifieert deze token zodat het Lead pixel event
+    // alleen vuurt bij echte formulierinzendingen (niet bij directe URL-toegang)
+    const submitToken = generateActionToken(inserted.id + '-submit', praktijk_code || 'dhc');
+
     if (req.is('application/x-www-form-urlencoded')) {
       return res.redirect(302, '/form.html?ok=1');
     }
-    res.status(201).json({ ok: true, lead: inserted });
+    res.status(201).json({ ok: true, lead: inserted, submit_token: submitToken });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Database insert error', details: e.message });
@@ -4181,6 +4186,23 @@ app.post('/api/contact', async (req, res) => {
   } catch (err) {
     console.error('Contact form error:', err.message);
     res.status(500).json({ error: 'Fout bij versturen' });
+  }
+});
+
+// GET /api/verify-submit — verifieert of thankyou via echt formulier is bereikt
+// Voorkomt dat Meta Lead event vuurt bij directe URL-toegang
+app.get('/api/verify-submit', async (req, res) => {
+  try {
+    const { lead_id, practice_code, token } = req.query;
+    if (!lead_id || !practice_code || !token) {
+      return res.json({ valid: false });
+    }
+    // Gebruik dezelfde fallback als bij token generatie in POST /leads
+    const effectivePracticeCode = practice_code || 'dhc';
+    const expectedToken = generateActionToken(lead_id + '-submit', effectivePracticeCode);
+    res.json({ valid: token === expectedToken });
+  } catch (e) {
+    res.json({ valid: false });
   }
 });
 app.listen(PORT, () => {
