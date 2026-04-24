@@ -4336,10 +4336,12 @@ app.get('/api/nazorg/taken', requireAuth, async (req, res) => {
     const praktijkCode = req.session.practiceCode;
     const rows = await withReadConnection(async (client) => {
       const q = praktijkCode
-        ? `SELECT nt.*, nc.praktijk_code FROM nazorg_taken nt 
+        ? `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
+           FROM nazorg_taken nt 
            JOIN nazorg_clients nc ON nc.id = nt.client_id
-           WHERE nt.status = 'open' AND nc.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`
-        : `SELECT nt.*, nc.praktijk_code FROM nazorg_taken nt 
+           WHERE nt.status = 'open' AND nt.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`
+        : `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
+           FROM nazorg_taken nt 
            JOIN nazorg_clients nc ON nc.id = nt.client_id
            WHERE nt.status = 'open' ORDER BY nt.aangemaakt_op DESC`;
       const params = praktijkCode ? [praktijkCode] : [];
@@ -4523,10 +4525,12 @@ app.post('/api/nazorg/reactie', async (req, res) => {
           )).rows;
           if (!bestaand.length) {
             await client.query(
-              `INSERT INTO nazorg_taken (client_id, client_naam, client_email, client_telefoon, omschrijving)
-               VALUES ($1,$2,$3,$4,$5)`,
-              [client_id, clientData.naam, clientData.email, clientData.telefoon||null,
-               `Score ${pijn_score >= 6 ? 'pijn: ' + pijn_score : ''} ${herstel_cijfer >= 6 ? 'herstel: ' + herstel_cijfer : ''} — Mail ${nr} — Bel terug`]
+              `INSERT INTO nazorg_taken (client_id, praktijk_code, omschrijving, type, client_naam, client_email, client_telefoon)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              [client_id, clientData.praktijk_code,
+               `Score ${pijn_score >= 6 ? 'pijn: ' + pijn_score : ''} ${herstel_cijfer >= 6 ? 'herstel: ' + herstel_cijfer : ''} - Mail ${nr} - Bel terug`.trim(),
+               'terugbelverzoek',
+               clientData.naam, clientData.email, clientData.telefoon||null]
             );
           }
         });
