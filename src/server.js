@@ -4418,9 +4418,9 @@ h1{font-size:20px;color:#0f0f12;margin-bottom:8px;}
 .sub{color:#6b7280;font-size:14px;margin-bottom:28px;line-height:1.5;}
 .vraag{margin-bottom:28px;}
 .vraag label{display:block;font-size:14px;font-weight:600;color:#0f0f12;margin-bottom:12px;}
-.schaal{display:flex;gap:6px;flex-wrap:wrap;}
+.schaal{display:flex;gap:5px;flex-wrap:nowrap;}
 .schaal input[type=radio]{display:none;}
-.schaal label{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:1.5px solid #e4e4e8;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#5a5a72;transition:all .15s;}
+.schaal label{flex:1;min-width:0;height:40px;display:flex;align-items:center;justify-content:center;border:1.5px solid #e4e4e8;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:#5a5a72;transition:all .15s;}
 .schaal input:checked+label{background:#2BB8A3;color:white;border-color:#2BB8A3;}
 textarea{width:100%;padding:10px 12px;border:1.5px solid #e4e4e8;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:80px;margin-top:8px;}
 .btn{width:100%;padding:13px;background:#2BB8A3;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;}
@@ -4430,7 +4430,7 @@ textarea{width:100%;padding:10px 12px;border:1.5px solid #e4e4e8;border-radius:8
 </style></head><body>
 <div class="card">
   <div id="formView">
-    <h1>Nazorgcheck — Mail ${nr}</h1>
+    <h1>Nazorgcheck: Mail ${nr}</h1>
     <p class="sub">Beantwoord de twee vragen hieronder. Dit duurt minder dan een minuut.</p>
     <div class="vraag">
       <label>Vraag 1: Hoe ervaart u uw herstel? (1 = volledig hersteld / 10 = klachten sterk toegenomen)</label>
@@ -4503,9 +4503,9 @@ app.post('/api/nazorg/reactie', async (req, res) => {
       // Verwijder bestaande reactie voor dit mail_nummer als die er al is
       await client.query('DELETE FROM nazorg_reacties WHERE client_id=$1 AND mail_nummer=$2', [client_id, nr]);
       await client.query(
-        `INSERT INTO nazorg_reacties (client_id, mail_nummer, herstel_cijfer, pijn_score, opmerking)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [client_id, nr, herstel_cijfer, pijn_score, opmerking||null]
+        `INSERT INTO nazorg_reacties (client_id, mail_nummer, herstel_cijfer, pijn_score, opmerking, token)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [client_id, nr, herstel_cijfer, pijn_score, opmerking||null, token]
       );
     });
 
