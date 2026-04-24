@@ -614,15 +614,10 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
       });
     }
 
-    // Genereer submit_token — bewijs dat formulier echt is ingevuld
-    // Thankyou.html verifieert deze token zodat het Lead pixel event
-    // alleen vuurt bij echte formulierinzendingen (niet bij directe URL-toegang)
-    const submitToken = generateActionToken(inserted.id + '-submit', praktijk_code || 'dhc');
-
     if (req.is('application/x-www-form-urlencoded')) {
       return res.redirect(302, '/form.html?ok=1');
     }
-    res.status(201).json({ ok: true, lead: inserted, submit_token: submitToken });
+    res.status(201).json({ ok: true, lead: inserted });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Database insert error', details: e.message });
@@ -4189,22 +4184,427 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
-// GET /api/verify-submit — verifieert of thankyou via echt formulier is bereikt
-// Voorkomt dat Meta Lead event vuurt bij directe URL-toegang
-app.get('/api/verify-submit', async (req, res) => {
+// ============================================================
+// NAZORG PORTAAL — ENDPOINTS + EMAIL FLOWS
+// ============================================================
+
+// SQL om uit te voeren in Neon (eenmalig):
+// CREATE TABLE IF NOT EXISTS nazorg_clients (
+//   id SERIAL PRIMARY KEY,
+//   praktijk_code VARCHAR(20) NOT NULL,
+//   naam VARCHAR(200) NOT NULL,
+//   email VARCHAR(200) NOT NULL,
+//   telefoon VARCHAR(50),
+//   behandelaar VARCHAR(200),
+//   laatste_behandeling DATE NOT NULL,
+//   status VARCHAR(20) DEFAULT 'actief',
+//   aangemaakt_op TIMESTAMPTZ DEFAULT NOW()
+// );
+// CREATE TABLE IF NOT EXISTS nazorg_emails (
+//   id SERIAL PRIMARY KEY,
+//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   mail_nummer INTEGER NOT NULL,
+//   gepland_op TIMESTAMPTZ NOT NULL,
+//   verstuurd BOOLEAN DEFAULT FALSE,
+//   verstuurd_op TIMESTAMPTZ
+// );
+// CREATE TABLE IF NOT EXISTS nazorg_reacties (
+//   id SERIAL PRIMARY KEY,
+//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   mail_nummer INTEGER NOT NULL,
+//   herstel_cijfer INTEGER,
+//   pijn_score INTEGER,
+//   opmerking TEXT,
+//   ingevuld_op TIMESTAMPTZ DEFAULT NOW()
+// );
+// CREATE TABLE IF NOT EXISTS nazorg_taken (
+//   id SERIAL PRIMARY KEY,
+//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   client_naam VARCHAR(200),
+//   client_email VARCHAR(200),
+//   client_telefoon VARCHAR(50),
+//   omschrijving TEXT,
+//   status VARCHAR(20) DEFAULT 'open',
+//   aangemaakt_op TIMESTAMPTZ DEFAULT NOW()
+// );
+
+// Helpers
+function nazorgMailSubject(nr) {
+  if (nr === 1) return 'Hoe gaat het met uw herstel na de behandeling?';
+  if (nr === 2) return '6 weken na uw behandeling: een korte tussencheck';
+  return '12 weken na uw behandeling: laatste nazorgcheck';
+}
+
+function nazorgMailBody(nr, naam, praktijkNaam, behandelaar, token, baseUrl) {
+  const voornaam = naam.split(' ')[0];
+  const handtekening = `Met vriendelijke groet,<br>${behandelaar ? `<strong>${behandelaar}</strong><br>` : ''}${praktijkNaam}`;
+  const reactieLink = `${baseUrl}/api/nazorg/reactie?token=${token}&nr=${nr}`;
+
+  const intro = nr === 1
+    ? `Het is inmiddels 2 weken geleden sinds uw laatste behandeling bij ${praktijkNaam}. Wij nemen op dit moment graag kort contact met u op om te volgen hoe het met uw herstel gaat.<br><br>Door uw voortgang te monitoren kunnen wij eventuele klachten tijdig signaleren en u waar nodig snel verder helpen.<br><br>Wij vragen u om via onderstaande link twee korte vragen te beantwoorden. Dit kost slechts één minuut.`
+    : nr === 2
+    ? `Het is inmiddels 6 weken geleden sinds uw laatste behandeling. Wij blijven uw herstel volgen om te beoordelen of uw klachten stabiel blijven of mogelijk terugkeren.<br><br>Met deze korte check krijgen wij inzicht in uw huidige situatie en kunnen wij indien nodig tijdig actie ondernemen.<br><br>Wilt u daarom onderstaande twee vragen beantwoorden?`
+    : `Het is inmiddels 12 weken geleden sinds uw laatste behandeling bij ons in de praktijk. Met dit bericht ontvangt u de laatste nazorgcheck van uw behandeltraject.<br><br>Met deze evaluatie willen wij beoordelen hoe uw herstel zich op de langere termijn heeft ontwikkeld en of u nog klachten ervaart.<br><br>Wilt u nog één keer kort onderstaande vragen beantwoorden?`;
+
+  const slot = nr === 1
+    ? 'Wanneer u een score van 6 of hoger aangeeft, nemen wij contact met u op om te bespreken of een afspraak wenselijk is.'
+    : nr === 2
+    ? 'Bij een score van 6 of hoger ontvangen wij automatisch een melding en nemen wij contact met u op.'
+    : 'Wanneer u een score van 6 of hoger aangeeft, nemen wij contact met u op om samen te kijken of een nieuwe afspraak wenselijk is.';
+
+  const outro = nr === 3
+    ? 'Dank u wel voor uw reactie en het vertrouwen in onze praktijk.'
+    : 'Alvast bedankt voor uw reactie.';
+
+  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#1A1D21;padding:24px 40px;"><span style="color:white;font-size:15px;font-weight:600;">${praktijkNaam}</span></td></tr>
+<tr><td style="padding:36px 40px;">
+<p style="margin:0 0 20px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${voornaam},</p>
+<p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.7;">${intro}</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 24px;border-left:4px solid #2BB8A3;"><tr><td style="padding:18px 24px;">
+<p style="margin:0 0 12px;font-size:14px;color:#3A3D40;line-height:1.6;"><strong>Vraag 1:</strong> Hoe ervaart u op dit moment uw herstel en eventuele klachten?<br><span style="color:#6b7280;font-size:13px;">(1 = volledig hersteld, geen klachten / 10 = klachten zijn sterk toegenomen)</span></p>
+<p style="margin:0;font-size:14px;color:#3A3D40;line-height:1.6;"><strong>Vraag 2:</strong> Hoe beoordeelt u uw huidige pijn op een schaal van 1 tot en met 10?<br><span style="color:#6b7280;font-size:13px;">(1 = geen pijn / 10 = ondraaglijke pijn)</span></p>
+</td></tr></table>
+<div style="text-align:center;margin:0 0 24px;">
+<a href="${reactieLink}" style="display:inline-block;background:#2BB8A3;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;">Beantwoord de vragen</a>
+</div>
+<p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">${slot}</p>
+<p style="margin:0 0 32px;font-size:15px;color:#3A3D40;">${outro}</p>
+<p style="margin:0;font-size:15px;color:#3A3D40;line-height:1.8;">${handtekening}</p>
+</td></tr>
+<tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
+<p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Copyright © Dynamic Health Consultancy</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+// GET /api/nazorg/clienten
+app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
   try {
-    const { lead_id, practice_code, token } = req.query;
-    if (!lead_id || !practice_code || !token) {
-      return res.json({ valid: false });
+    const praktijkCode = req.session.practiceCode;
+    const rows = await withReadConnection(async (client) => {
+      const q = praktijkCode
+        ? `SELECT nc.*, 
+             COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
+             COUNT(DISTINCT nr.id) AS reacties,
+             COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
+           FROM nazorg_clients nc
+           LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
+           LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
+           LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
+           WHERE nc.praktijk_code = $1
+           GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`
+        : `SELECT nc.*,
+             COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
+             COUNT(DISTINCT nr.id) AS reacties,
+             COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
+           FROM nazorg_clients nc
+           LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
+           LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
+           LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
+           GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`;
+      const params = praktijkCode ? [praktijkCode] : [];
+      return (await client.query(q, params)).rows;
+    });
+    res.json({ success: true, clienten: rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /api/nazorg/client/:id
+app.get('/api/nazorg/client/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await withReadConnection(async (client) => {
+      const c = (await client.query('SELECT * FROM nazorg_clients WHERE id=$1', [id])).rows[0];
+      if (!c) return null;
+      const emails = (await client.query('SELECT * FROM nazorg_emails WHERE client_id=$1 ORDER BY mail_nummer', [id])).rows;
+      const reacties = (await client.query('SELECT * FROM nazorg_reacties WHERE client_id=$1 ORDER BY mail_nummer', [id])).rows;
+      const taken = (await client.query('SELECT * FROM nazorg_taken WHERE client_id=$1 ORDER BY aangemaakt_op DESC', [id])).rows;
+      return { client: c, emails, reacties, taken };
+    });
+    if (!data) return res.status(404).json({ success: false, error: 'Niet gevonden' });
+    res.json({ success: true, ...data });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /api/nazorg/taken
+app.get('/api/nazorg/taken', requireAuth, async (req, res) => {
+  try {
+    const praktijkCode = req.session.practiceCode;
+    const rows = await withReadConnection(async (client) => {
+      const q = praktijkCode
+        ? `SELECT nt.*, nc.praktijk_code FROM nazorg_taken nt 
+           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           WHERE nt.status = 'open' AND nc.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`
+        : `SELECT nt.*, nc.praktijk_code FROM nazorg_taken nt 
+           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           WHERE nt.status = 'open' ORDER BY nt.aangemaakt_op DESC`;
+      const params = praktijkCode ? [praktijkCode] : [];
+      return (await client.query(q, params)).rows;
+    });
+    res.json({ success: true, taken: rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// PATCH /api/nazorg/taak/:id
+app.patch('/api/nazorg/taak/:id', requireAuth, async (req, res) => {
+  try {
+    await withWriteConnection(async (client) => {
+      await client.query('UPDATE nazorg_taken SET status=$1 WHERE id=$2', ['afgehandeld', req.params.id]);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// DELETE /api/nazorg/client/:id
+app.delete('/api/nazorg/client/:id', requireAuth, async (req, res) => {
+  try {
+    await withWriteConnection(async (client) => {
+      await client.query('DELETE FROM nazorg_clients WHERE id=$1', [req.params.id]);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// POST /api/nazorg/start — start klantenreis
+app.post('/api/nazorg/start', requireAuth, async (req, res) => {
+  try {
+    const { naam, email, telefoon, behandelaar, laatste_behandeling, praktijk_code } = req.body;
+    if (!naam || !email || !laatste_behandeling) {
+      return res.status(400).json({ success: false, error: 'Naam, e-mail en datum zijn verplicht' });
     }
-    // Gebruik dezelfde fallback als bij token generatie in POST /leads
-    const effectivePracticeCode = practice_code || 'dhc';
-    const expectedToken = generateActionToken(lead_id + '-submit', effectivePracticeCode);
-    res.json({ valid: token === expectedToken });
+    const praktijkCode = praktijk_code || req.session.practiceCode;
+    if (!praktijkCode) return res.status(400).json({ success: false, error: 'Praktijkcode ontbreekt' });
+
+    const baseDate = new Date(laatste_behandeling);
+
+    const mail1 = new Date(baseDate); mail1.setDate(mail1.getDate() + 14);
+    const mail2 = new Date(baseDate); mail2.setDate(mail2.getDate() + 56);  // 8 weken
+    const mail3 = new Date(baseDate); mail3.setDate(mail3.getDate() + 90);  // 3 maanden
+
+    const clientId = await withWriteConnection(async (client) => {
+      const r = await client.query(
+        `INSERT INTO nazorg_clients (praktijk_code, naam, email, telefoon, behandelaar, laatste_behandeling)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [praktijkCode, naam, email, telefoon||null, behandelaar||null, laatste_behandeling]
+      );
+      const id = r.rows[0].id;
+      await client.query(
+        `INSERT INTO nazorg_emails (client_id, mail_nummer, gepland_op) VALUES ($1,1,$2),($1,2,$3),($1,3,$4)`,
+        [id, mail1.toISOString(), mail2.toISOString(), mail3.toISOString()]
+      );
+      return id;
+    });
+
+    res.json({ success: true, client_id: clientId });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /api/nazorg/reactie?token=...&nr=... — reactieformulier
+app.get('/api/nazorg/reactie', async (req, res) => {
+  const { token, nr } = req.query;
+  if (!token || !nr) return res.status(400).send('Ongeldige link.');
+  res.send(`<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Nazorgcheck</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:#f4f4f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:white;border-radius:12px;padding:40px;max-width:500px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}
+h1{font-size:20px;color:#0f0f12;margin-bottom:8px;}
+.sub{color:#6b7280;font-size:14px;margin-bottom:28px;line-height:1.5;}
+.vraag{margin-bottom:28px;}
+.vraag label{display:block;font-size:14px;font-weight:600;color:#0f0f12;margin-bottom:12px;}
+.schaal{display:flex;gap:6px;flex-wrap:wrap;}
+.schaal input[type=radio]{display:none;}
+.schaal label{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:1.5px solid #e4e4e8;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#5a5a72;transition:all .15s;}
+.schaal input:checked+label{background:#2BB8A3;color:white;border-color:#2BB8A3;}
+textarea{width:100%;padding:10px 12px;border:1.5px solid #e4e4e8;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:80px;margin-top:8px;}
+.btn{width:100%;padding:13px;background:#2BB8A3;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;}
+.btn:disabled{opacity:.5;}
+#bedankt{display:none;text-align:center;}
+.check{width:64px;height:64px;background:#e6f6ec;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:30px;}
+</style></head><body>
+<div class="card">
+  <div id="formView">
+    <h1>Nazorgcheck — Mail ${nr}</h1>
+    <p class="sub">Beantwoord de twee vragen hieronder. Dit duurt minder dan een minuut.</p>
+    <div class="vraag">
+      <label>Vraag 1: Hoe ervaart u uw herstel? (1 = volledig hersteld / 10 = klachten sterk toegenomen)</label>
+      <div class="schaal">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<input type="radio" name="herstel" id="h${n}" value="${n}"><label for="h${n}">${n}</label>`).join('')}</div>
+    </div>
+    <div class="vraag">
+      <label>Vraag 2: Hoe beoordeelt u uw pijn? (1 = geen pijn / 10 = ondraaglijke pijn)</label>
+      <div class="schaal">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<input type="radio" name="pijn" id="p${n}" value="${n}"><label for="p${n}">${n}</label>`).join('')}</div>
+    </div>
+    <div class="vraag">
+      <label>Opmerking (optioneel)</label>
+      <textarea id="opmerking" placeholder="Eventuele toelichting..."></textarea>
+    </div>
+    <button class="btn" onclick="verstuur()">Verstuur antwoord</button>
+    <p id="err" style="color:#e5334a;font-size:13px;margin-top:10px;"></p>
+  </div>
+  <div id="bedankt">
+    <div class="check">✓</div>
+    <h1 style="margin-bottom:10px;">Bedankt voor uw reactie!</h1>
+    <p style="color:#6b7280;font-size:14px;line-height:1.6;">Uw antwoorden zijn ontvangen. Indien nodig nemen wij contact met u op.</p>
+  </div>
+</div>
+<script>
+async function verstuur() {
+  const herstel = document.querySelector('input[name=herstel]:checked')?.value;
+  const pijn = document.querySelector('input[name=pijn]:checked')?.value;
+  const opmerking = document.getElementById('opmerking').value.trim();
+  if (!herstel || !pijn) { document.getElementById('err').textContent = 'Beantwoord beide vragen.'; return; }
+  const res = await fetch('/api/nazorg/reactie', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token: '${token}', nr: ${nr}, herstel_cijfer: +herstel, pijn_score: +pijn, opmerking })
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('bedankt').style.display = 'block';
+  } else {
+    document.getElementById('err').textContent = data.error || 'Er is een fout opgetreden.';
+  }
+}
+</script></body></html>`);
+});
+
+// POST /api/nazorg/reactie — sla reactie op
+app.post('/api/nazorg/reactie', async (req, res) => {
+  try {
+    const { token, nr, herstel_cijfer, pijn_score, opmerking } = req.body;
+    if (!token || !nr || herstel_cijfer == null || pijn_score == null) {
+      return res.status(400).json({ success: false, error: 'Ongeldige data' });
+    }
+
+    // Verifieer token en vind client
+    const client_id = await withReadConnection(async (client) => {
+      // Token is HMAC van client_id+nr — zoek alle clients en verifieer
+      const emails = (await client.query(
+        `SELECT ne.client_id FROM nazorg_emails ne WHERE ne.mail_nummer = $1`, [nr]
+      )).rows;
+      for (const row of emails) {
+        const expectedToken = generateActionToken(row.client_id + '-nazorg-' + nr, 'dhc-nazorg');
+        if (token === expectedToken) return row.client_id;
+      }
+      return null;
+    });
+
+    if (!client_id) return res.status(400).json({ success: false, error: 'Ongeldige of verlopen link' });
+
+    // Sla reactie op
+    await withWriteConnection(async (client) => {
+      // Verwijder bestaande reactie voor dit mail_nummer als die er al is
+      await client.query('DELETE FROM nazorg_reacties WHERE client_id=$1 AND mail_nummer=$2', [client_id, nr]);
+      await client.query(
+        `INSERT INTO nazorg_reacties (client_id, mail_nummer, herstel_cijfer, pijn_score, opmerking)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [client_id, nr, herstel_cijfer, pijn_score, opmerking||null]
+      );
+    });
+
+    // Als score >= 6 op pijn of herstel >= 6 → maak taak aan
+    if (pijn_score >= 6 || herstel_cijfer >= 6) {
+      const clientData = await withReadConnection(async (client) => {
+        return (await client.query('SELECT * FROM nazorg_clients WHERE id=$1', [client_id])).rows[0];
+      });
+      if (clientData) {
+        await withWriteConnection(async (client) => {
+          // Check of er al een open taak is voor dit mail_nummer
+          const bestaand = (await client.query(
+            `SELECT id FROM nazorg_taken WHERE client_id=$1 AND omschrijving LIKE $2 AND status='open'`,
+            [client_id, `%Mail ${nr}%`]
+          )).rows;
+          if (!bestaand.length) {
+            await client.query(
+              `INSERT INTO nazorg_taken (client_id, client_naam, client_email, client_telefoon, omschrijving)
+               VALUES ($1,$2,$3,$4,$5)`,
+              [client_id, clientData.naam, clientData.email, clientData.telefoon||null,
+               `Score ${pijn_score >= 6 ? 'pijn: ' + pijn_score : ''} ${herstel_cijfer >= 6 ? 'herstel: ' + herstel_cijfer : ''} — Mail ${nr} — Bel terug`]
+            );
+          }
+        });
+      }
+    }
+
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /api/check-nazorg — cron: stuur geplande nazorg emails
+app.get('/api/check-nazorg', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && req.headers['x-cron-secret'] !== cronSecret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const now = new Date();
+    const teVersturen = await withReadConnection(async (client) => {
+      return (await client.query(
+        `SELECT ne.id, ne.client_id, ne.mail_nummer, nc.naam, nc.email, nc.behandelaar, nc.praktijk_code,
+                p.naam as praktijk_naam, p.email_to
+         FROM nazorg_emails ne
+         JOIN nazorg_clients nc ON nc.id = ne.client_id
+         LEFT JOIN praktijken p ON p.code = nc.praktijk_code
+         WHERE ne.verstuurd = FALSE AND ne.gepland_op <= $1 AND nc.status = 'actief'`,
+        [now.toISOString()]
+      )).rows;
+    });
+
+    let verstuurd = 0;
+    const baseUrl = 'https://dynamic-health-consultancy.nl';
+
+    for (const mail of teVersturen) {
+      try {
+        const token = generateActionToken(mail.client_id + '-nazorg-' + mail.mail_nummer, 'dhc-nazorg');
+        const praktijkNaam = mail.praktijk_naam || mail.praktijk_code || 'Uw fysiotherapiepraktijk';
+        const subject = nazorgMailSubject(mail.mail_nummer);
+        const html = nazorgMailBody(mail.mail_nummer, mail.naam, praktijkNaam, mail.behandelaar, token, baseUrl);
+
+        await sendMailResilient({
+          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          to: mail.email,
+          subject,
+          html
+        });
+
+        await withWriteConnection(async (client) => {
+          await client.query(
+            'UPDATE nazorg_emails SET verstuurd=TRUE, verstuurd_op=$1 WHERE id=$2',
+            [now.toISOString(), mail.id]
+          );
+        });
+
+        // Als mail 3 verstuurd: zet client op voltooid
+        if (mail.mail_nummer === 3) {
+          await withWriteConnection(async (client) => {
+            await client.query('UPDATE nazorg_clients SET status=$1 WHERE id=$2', ['voltooid', mail.client_id]);
+          });
+        }
+
+        verstuurd++;
+        console.log(`✅ Nazorg mail ${mail.mail_nummer} verstuurd aan ${mail.email}`);
+      } catch (mailErr) {
+        console.error(`❌ Nazorg mail fout voor ${mail.email}:`, mailErr.message);
+      }
+    }
+
+    res.json({ success: true, verstuurd, gepland: teVersturen.length });
   } catch (e) {
-    res.json({ valid: false });
+    console.error('Nazorg cron fout:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// ============================================================
+// EINDE NAZORG PORTAAL
+// ============================================================
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });

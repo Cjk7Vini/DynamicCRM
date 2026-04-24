@@ -241,7 +241,6 @@
     let currentUser = null;
     let allClienten = [];
 
-    // ── Auth ─────────────────────────────────────────────────────────────
     async function init() {
       try {
         const res = await fetch('/api/auth/me', { credentials:'include' });
@@ -256,7 +255,6 @@
       } catch { window.location.href = '/login.html'; }
     }
 
-    // ── Tabs ─────────────────────────────────────────────────────────────
     function showTab(name) {
       ['clienten','nieuw','taken'].forEach(t => {
         document.getElementById('tab-'+t).style.display = t===name ? 'block' : 'none';
@@ -267,7 +265,6 @@
       if (name === 'taken') loadTaken();
     }
 
-    // ── KPIs ─────────────────────────────────────────────────────────────
     function updateKPIs(clienten, taken) {
       const actief    = clienten.filter(c => c.status === 'actief').length;
       const voltooid  = clienten.filter(c => c.status === 'voltooid').length;
@@ -279,7 +276,6 @@
       document.getElementById('kpiReacties').textContent = reacties;
     }
 
-    // ── Cliënten laden ────────────────────────────────────────────────────
     async function loadClienten() {
       try {
         const res = await fetch('/api/nazorg/clienten', { credentials:'include' });
@@ -341,7 +337,6 @@
       el.innerHTML = html;
     }
 
-    // ── Taken laden ───────────────────────────────────────────────────────
     async function loadTaken() {
       try {
         const res = await fetch('/api/nazorg/taken', { credentials:'include' });
@@ -376,7 +371,6 @@
       } catch (e) { alert('Fout bij afhandelen.'); }
     }
 
-    // ── Klantenreis starten ───────────────────────────────────────────────
     async function startKlantenreis() {
       const naam      = document.getElementById('fNaam').value.trim();
       const email     = document.getElementById('fEmail').value.trim();
@@ -419,7 +413,6 @@
       btn.disabled = false; btn.textContent = 'Start klantenreis';
     }
 
-    // ── Detail modal ──────────────────────────────────────────────────────
     async function openDetail(id) {
       document.getElementById('clientModal').classList.add('open');
       document.getElementById('modalContent').innerHTML = '<div class="empty">Laden...</div>';
@@ -500,13 +493,11 @@
 
     function closeModal() { document.getElementById('clientModal').classList.remove('open'); }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
     function formatDate(d) {
       if (!d) return '—';
       return new Date(d).toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' });
     }
 
-    // ── Init ──────────────────────────────────────────────────────────────
     init();
   </script>
 </body>
