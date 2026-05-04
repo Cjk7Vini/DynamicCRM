@@ -15,7 +15,7 @@
     .header-div { width: 1px; height: 24px; background: rgba(255,255,255,0.2); }
     .header-title { color: #fff; font-size: 14px; font-weight: 600; }
 
-    .main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+    .main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 80px; }
 
     .sec { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
     .sec-head { background: #111827; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
@@ -29,64 +29,51 @@
     .fld input, .fld select { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 9px; font-size: 14px; font-family: 'Poppins', sans-serif; color: #111827; background: #f9fafb; outline: none; transition: border-color 0.15s; }
     .fld input:focus, .fld select:focus { border-color: #111827; background: #fff; }
 
-    /* FTE invoer box */
-    .fte-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; }
-    .fte-box-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
-    .fte-box-sub { font-size: 11px; color: #9ca3af; margin-bottom: 14px; }
-    .fte-row { display: flex; align-items: center; gap: 10px; }
-    .fte-row input { width: 90px; padding: 9px 12px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 16px; font-weight: 600; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
-    .fte-row input:focus { border-color: #111827; }
-    .fte-label { font-size: 13px; color: #6b7280; }
-    .fte-calc { font-size: 12px; font-weight: 600; color: #059669; margin-top: 8px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+    .kpi-card { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; text-align: center; }
+    .kpi-lbl { font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    .kpi-val { font-size: 20px; font-weight: 700; color: #111827; }
+    .kpi-sub { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+    .kpi-card.blue { background: #eff6ff; border-color: #bfdbfe; }
+    .kpi-card.blue .kpi-val { color: #1e40af; }
+    .kpi-card.green { background: #ecfdf5; border-color: #a7f3d0; }
+    .kpi-card.green .kpi-val { color: #065f46; }
+    .kpi-card.orange { background: #fffbeb; border-color: #fcd34d; }
+    .kpi-card.orange .kpi-val { color: #92400e; }
+    .kpi-card.red { background: #fef2f2; border-color: #fecaca; }
+    .kpi-card.red .kpi-val { color: #991b1b; }
 
-    .invoer-box { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; }
-    .invoer-box-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
-    .invoer-box-sub { font-size: 11px; color: #9ca3af; margin-bottom: 14px; }
-    .invoer-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .invoer-row:last-child { margin-bottom: 0; }
-    .invoer-row input { width: 80px; padding: 8px 10px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-weight: 500; font-family: 'Poppins', sans-serif; background: #fff; color: #111827; outline: none; }
-    .invoer-row input:focus { border-color: #111827; }
-    .invoer-lbl { font-size: 12px; color: #6b7280; }
-    .invoer-unit { font-size: 11px; color: #9ca3af; }
+    .info-box { background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 12px; color: #92400e; line-height: 1.7; }
+    .info-box strong { font-weight: 600; color: #78350f; }
 
-    /* Forecast */
-    .forecast-box { background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 18px 22px; }
-    .forecast-box h3 { font-size: 11px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 14px; }
-    .fc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .fc-item { text-align: center; }
-    .fc-lbl { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
-    .fc-val { font-size: 20px; font-weight: 700; color: #1e40af; }
-    .fc-sub { font-size: 10px; color: #9ca3af; }
-    .fc-inputs { display: flex; gap: 20px; margin-bottom: 16px; flex-wrap: wrap; }
-    .fc-input-item { display: flex; align-items: center; gap: 8px; }
-    .fc-input-item label { font-size: 12px; color: #374151; font-weight: 500; white-space: nowrap; }
-    .fc-input-item input { width: 70px; padding: 7px 10px; text-align: center; border: 1.5px solid #bfdbfe; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: 'Poppins', sans-serif; background: #fff; color: #1e40af; outline: none; }
-    .fc-input-item input:focus { border-color: #1e40af; }
-    .fc-input-item span { font-size: 11px; color: #9ca3af; }
-
-    /* Medewerker tabel */
-    .mw-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .mw-table th { background: #f3f4f6; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 10px; text-align: right; border-bottom: 1.5px solid #e5e7eb; white-space: nowrap; }
+    .mw-table-wrap { overflow-x: auto; }
+    .mw-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 980px; }
+    .mw-table th { background: #f3f4f6; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 7px; border-bottom: 1.5px solid #e5e7eb; text-align: center; white-space: nowrap; }
     .mw-table th:first-child { text-align: left; }
-    .mw-table th:nth-child(2) { text-align: center; }
-    .mw-table td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; text-align: right; }
-    .mw-table td:first-child { text-align: left; font-weight: 500; color: #374151; }
-    .mw-table td:nth-child(2) { text-align: center; }
-    .mw-table tr:last-child td { border-bottom: none; font-weight: 700; background: #f9fafb; }
-    .mw-name { width: 100%; padding: 6px 8px; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
-    .mw-name:focus { border-color: #111827; }
-    .mw-fte { width: 60px; padding: 6px 6px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
-    .mw-fte:focus { border-color: #111827; }
-    .mw-input { width: 72px; padding: 6px 6px; text-align: right; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-weight: 500; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
-    .mw-input:focus { border-color: #111827; }
-    .mw-val { font-size: 13px; color: #374151; font-weight: 500; }
-    .mw-pct { font-size: 12px; color: #374151; }
-    .mw-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; display: inline-block; }
-    .mw-badge.g { background: #ecfdf5; color: #065f46; }
-    .mw-badge.o { background: #fffbeb; color: #92400e; }
-    .mw-badge.r { background: #fef2f2; color: #991b1b; }
+    .mw-table th.inv { background: #eff6ff; color: #1e40af; border-bottom-color: #bfdbfe; }
+    .mw-table th.aut { background: #f0fdf4; color: #166534; border-bottom-color: #bbf7d0; }
+    .mw-table td { padding: 7px 7px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; text-align: center; color: #374151; font-size: 12px; }
+    .mw-table td:first-child { text-align: left; }
+    .mw-table tr.totaal-row td { font-weight: 700; background: #f9fafb; border-top: 2px solid #e5e7eb; }
 
-    .agenda-note { font-size: 12px; color: #6b7280; margin-top: 14px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px; }
+    .mw-name { width: 130px; padding: 5px 8px; border: 1.5px solid #e5e7eb; border-radius: 7px; font-size: 12px; font-family: 'Poppins', sans-serif; color: #111827; background: #fff; outline: none; }
+    .mw-name:focus { border-color: #111827; }
+    .mw-num { width: 64px; padding: 5px 5px; text-align: center; border: 1.5px solid #bfdbfe; border-radius: 7px; font-size: 12px; font-weight: 600; font-family: 'Poppins', sans-serif; color: #1e40af; background: #fff; outline: none; }
+    .mw-num:focus { border-color: #1e40af; }
+    .aut-val { color: #166534; font-weight: 500; }
+
+    .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; display: inline-block; white-space: nowrap; }
+    .badge.g { background: #ecfdf5; color: #065f46; }
+    .badge.o { background: #fffbeb; color: #92400e; }
+    .badge.r { background: #fef2f2; color: #991b1b; }
+
+    .mw-controls { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #f3f4f6; }
+    .mw-controls span { font-size: 13px; color: #6b7280; font-weight: 500; }
+    .mw-controls input { width: 70px; padding: 7px 10px; text-align: center; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: 'Poppins', sans-serif; outline: none; }
+
+    .legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6b7280; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
     .opslaan-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .opslaan-info { font-size: 13px; color: #6b7280; line-height: 1.7; }
@@ -100,7 +87,7 @@
 
     @media (max-width: 700px) {
       .grid3 { grid-template-columns: 1fr; }
-      .fc-grid { grid-template-columns: 1fr 1fr; }
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -121,7 +108,7 @@
       <div class="grid3">
         <div class="fld">
           <label>Maand</label>
-          <select id="maand">
+          <select id="maand" onchange="herbereken()">
             <option>Januari</option><option>Februari</option><option>Maart</option>
             <option>April</option><option>Mei</option><option>Juni</option>
             <option>Juli</option><option>Augustus</option><option>September</option>
@@ -130,7 +117,7 @@
         </div>
         <div class="fld">
           <label>Jaar</label>
-          <input type="number" id="jaar" value="2026" min="2020" max="2040">
+          <input type="number" id="jaar" value="2026" min="2020" max="2040" oninput="herbereken()">
         </div>
         <div class="fld">
           <label>Praktijkcode</label>
@@ -140,121 +127,126 @@
     </div>
   </div>
 
-  <!-- FTE + FORECAST INVOER -->
+  <!-- TOELICHTING -->
+  <div class="info-box">
+    <strong>Hoe werkt de calculator?</strong>
+    Vul per fysiotherapeut de uren per week in, plus het aantal nieuwe intakes (code 1864) en reguliere behandelingen (code 1000, excl. intake).
+    Een nieuwe intake duurt 60 minuten: 30 min code 1864 + 30 min code 1000. Het 1000-deel bij intakes wordt automatisch meegerekend.
+    Capaciteit per maand is gebaseerd op het theoretisch kader: 1 FTE (40u/week) = 277,97 contactmomenten per maand.
+  </div>
+
+  <!-- TOTAAL KPIs -->
   <div class="sec">
-    <div class="sec-head"><h2>Praktijk instellingen</h2><span class="sec-badge">Forecast berekening</span></div>
+    <div class="sec-head"><h2>Totaaloverzicht praktijk</h2><span class="sec-badge" id="mw-badge">0 medewerkers</span></div>
     <div class="sec-body">
-      <div class="grid3" style="margin-bottom:18px;">
-
-        <!-- FTE -->
-        <div class="fte-box">
-          <div class="fte-box-title">Aantal FTE</div>
-          <div class="fte-box-sub">Decimalen toegestaan (bv. 5.8)</div>
-          <div class="fte-row">
-            <input type="number" id="fte" value="0" min="0" max="50" step="0.1" oninput="herbereken()">
-            <span class="fte-label">FTE in dienst</span>
-          </div>
-          <div class="fte-calc" id="fte-calc">Vul FTE in om te beginnen</div>
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-lbl">Totaal FTE</div>
+          <div class="kpi-val" id="kpi-fte">0</div>
+          <div class="kpi-sub">voltijdsequivalent</div>
         </div>
-
-        <!-- Behandelkamers -->
-        <div class="invoer-box">
-          <div class="invoer-box-title">Behandelkamers</div>
-          <div class="invoer-box-sub">Voor forecast berekening</div>
-          <div class="invoer-row">
-            <input type="number" id="kamers" value="1" min="1" max="30" oninput="herbereken()">
-            <span class="invoer-lbl">kamers</span>
-          </div>
-          <div style="margin-top:10px;font-size:11px;color:#6b7280;">
-            Uren werkweek: <strong>36u</strong> (vast) &nbsp;|&nbsp; Weken/jaar: <strong>44</strong> (vast)
-          </div>
+        <div class="kpi-card blue">
+          <div class="kpi-lbl">Capaciteit maand</div>
+          <div class="kpi-val" id="kpi-cap">0</div>
+          <div class="kpi-sub">contactmomenten</div>
         </div>
-
-        <!-- Vaste waarden info -->
-        <div class="invoer-box">
-          <div class="invoer-box-title">Behandelduur</div>
-          <div class="invoer-box-sub">Vaste waarden</div>
-          <div style="font-size:13px;color:#374151;line-height:2;">
-            <div>Normale behandeling: <strong>30 min</strong></div>
-            <div>Nieuwe patient: <strong>60 min</strong> (2 slots)</div>
-            <div style="margin-top:8px;font-size:11px;color:#9ca3af;">Capaciteit = behandelingen + nieuwe patienten</div>
-          </div>
+        <div class="kpi-card" id="kpi-prod-card">
+          <div class="kpi-lbl">Productiviteit</div>
+          <div class="kpi-val" id="kpi-prod">0%</div>
+          <div class="kpi-sub">vs maandcapaciteit</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Totale belasting</div>
+          <div class="kpi-val" id="kpi-bel">0</div>
+          <div class="kpi-sub">contactmomenten</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Intake % productie</div>
+          <div class="kpi-val" id="kpi-ipct">0%</div>
+          <div class="kpi-sub">code 1864 / totaal</div>
         </div>
       </div>
-
-      <!-- Forecast resultaat -->
-      <div class="forecast-box">
-        <h3>Forecast (36u/week, 44 weken, 30 min/behandeling)</h3>
-        <div class="fc-grid">
-          <div class="fc-item">
-            <div class="fc-lbl">Behandelingen / week</div>
-            <div class="fc-val" id="fc-pw">0</div>
-            <div class="fc-sub">totaal praktijk</div>
-          </div>
-          <div class="fc-item">
-            <div class="fc-lbl">Behandelingen / maand</div>
-            <div class="fc-val" id="fc-pm">0</div>
-            <div class="fc-sub">maandbasis</div>
-          </div>
-          <div class="fc-item">
-            <div class="fc-lbl">Zittingen / jaar</div>
-            <div class="fc-val" id="fc-pj">0</div>
-            <div class="fc-sub">jaarbasis</div>
-          </div>
-          <div class="fc-item">
-            <div class="fc-lbl">Realisatie deze maand</div>
-            <div class="fc-val" id="fc-real">0%</div>
-            <div class="fc-sub">van maandbasis</div>
-          </div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-lbl">Nieuwe intakes</div>
+          <div class="kpi-val" id="kpi-ni">0</div>
+          <div class="kpi-sub">code 1864</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Reguliere beh.</div>
+          <div class="kpi-val" id="kpi-reg">0</div>
+          <div class="kpi-sub">code 1000 excl. intake</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Auto 1000 bij intake</div>
+          <div class="kpi-val" id="kpi-auto">0</div>
+          <div class="kpi-sub">automatisch berekend</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-lbl">Onbenutte capaciteit</div>
+          <div class="kpi-val" id="kpi-onb">0</div>
+          <div class="kpi-sub">contactmomenten</div>
+        </div>
+        <div class="kpi-card orange">
+          <div class="kpi-lbl">Overcapaciteit</div>
+          <div class="kpi-val" id="kpi-ov">0</div>
+          <div class="kpi-sub">contactmomenten</div>
         </div>
       </div>
-
-      <div class="agenda-note" id="agenda-note">Vul het aantal FTE in om te beginnen.</div>
     </div>
   </div>
 
-  <!-- INVOER PER MEDEWERKER -->
+  <!-- INVULSCHEMA MEDEWERKERS -->
   <div class="sec">
     <div class="sec-head">
-      <h2>Overzicht medewerkers</h2>
-      <span class="sec-badge" id="mw-badge">0 medewerkers</span>
+      <h2>Invulschema per fysiotherapeut</h2>
+      <span class="sec-badge">Kolommen A t/m G</span>
     </div>
-    <div class="sec-body" style="padding:0;">
-      <div style="overflow-x:auto;">
+    <div class="sec-body">
+      <div class="mw-table-wrap">
         <table class="mw-table">
           <thead>
             <tr>
-              <th style="min-width:130px;">Naam</th>
-              <th>FTE</th>
-              <th>Behandelingen</th>
-              <th>Nieuwe cliënten</th>
-              <th>Verhouding nieuw/totaal</th>
-              <th>Verlofdagen</th>
-              <th>Ziekdagen</th>
-              <th>Overig uren</th>
-              <th>Totaal afwezig</th>
-              <th>Capaciteits%</th>
-              <th>Target vs Actual</th>
+              <th>A. Fysiotherapeut</th>
+              <th class="inv">B. Uren/week</th>
+              <th class="aut">C. FTE</th>
+              <th class="aut">D. Capaciteit/mnd</th>
+              <th class="inv">E. Nieuwe intakes (code 1864)</th>
+              <th class="inv">F. Reguliere beh. (code 1000, excl. intake)</th>
+              <th class="aut">G. Auto 1000 bij intake</th>
+              <th class="aut">Totale belasting</th>
+              <th class="aut">Intake %</th>
+              <th class="aut">Productiviteit</th>
+              <th class="aut">Onbenut</th>
+              <th class="aut">Overcap.</th>
+              <th class="aut">Signaal</th>
             </tr>
           </thead>
           <tbody id="mw-tbody"></tbody>
         </table>
+      </div>
+      <div class="legend">
+        <span style="font-size:11px;color:#6b7280;font-weight:600;">Legende:</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#93c5fd;"></span>Blauw = in te vullen door praktijk</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#6ee7b7;"></span>Groen = automatisch berekend</span>
+      </div>
+      <div class="mw-controls">
+        <span>Aantal fysiotherapeuten:</span>
+        <input type="number" id="n-mw" value="3" min="1" max="20" oninput="bouwTabel()">
       </div>
     </div>
   </div>
 
   <!-- OPSLAAN -->
   <div class="sec">
-    <div class="sec-head"><h2>Opslaan en versturen</h2></div>
+    <div class="sec-head"><h2>Rapport opslaan</h2></div>
     <div class="sec-body">
       <div class="opslaan-bar">
         <div class="opslaan-info">
-          Rapport wordt opgeslagen en verstuurd naar<br>
-          <strong>lars@dynamic-health-consultancy.nl</strong>
+          Sla het rapport op voor de geselecteerde maand en praktijk.<br>
+          <strong>Vereist:</strong> praktijkcode en minimaal 1 fysiotherapeut met uren ingevuld.
         </div>
-        <button class="btn-opslaan" id="btn-opslaan" onclick="opslaan()">
-          Rapport opslaan en versturen
-        </button>
+        <button class="btn-opslaan" id="btn-opslaan" onclick="opslaan()">Rapport opslaan en versturen</button>
       </div>
       <div class="feedback" id="feedback"></div>
     </div>
@@ -263,215 +255,216 @@
 </main>
 
 <script>
-  var MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
-  var nu = new Date();
-  document.getElementById('maand').value = MAANDEN[nu.getMonth()];
-  document.getElementById('jaar').value  = nu.getFullYear();
+  // Instellingen conform Excel tabblad "Instellingen"
+  var UPW_FT   = 40;      // uren per week voor 1 FTE
+  var WPJ      = 52;      // weken per jaar
+  var DWPW     = 5;       // werkdagen per week
+  var BDUUR    = 30;      // minuten per contactmoment
+  var VERZUIM  = 0.052;   // 5,2% verzuim
+  var VERLOF   = 25;      // verlofdagen
+  var SCHOOL   = 5;       // scholingsdagen
+  var FEEST    = 8;       // feestdagen
 
-  // Vaste waarden (conform Excel Lars)
-  var UREN_WERKWEEK  = 36;   // vast
-  var WEKEN_JAAR     = 44;   // vast
-  var MIN_NORMAAL    = 30;   // normale behandeling = 30 min = 1 slot
-  // Nieuwe patient = 60 min = 2 slots (wordt verrekend in capaciteitsberekening)
+  var BRUTO    = UPW_FT * WPJ;                       // 2080 uur
+  var UPD      = UPW_FT / DWPW;                      // 8 uur per dag
+  var CORRECT  = (BRUTO * VERZUIM) + ((VERLOF + SCHOOL + FEEST) * UPD); // 412.16
+  var NETTO    = BRUTO - CORRECT;                     // 1667.84
+  var CM_JAAR  = NETTO / (BDUUR / 60);               // 3335.68 contactmomenten/jaar
+  var CM_MAAND = CM_JAAR / 12;                       // 277.97 per maand per 1 FTE
+  var IF       = 2;                                   // intake factor: 60min / 30min
 
-  function nv(id)  { return parseFloat(document.getElementById(id)?.value) || 0; }
-  function el(id)  { return document.getElementById(id); }
-  function set(id, v) { var e = el(id); if (e) e.textContent = v; }
-  function fmt(n)  { return n.toLocaleString('nl-NL'); }
+  function el(id) { return document.getElementById(id); }
+  function fmt(n) { return Math.round(n * 10) / 10; }
+  function pct(n) { return Math.round(n * 1000) / 10 + '%'; }
 
-  function kleurBadge(val) {
-    if (val >= 85) return 'g';
-    if (val >= 70) return 'o';
+  function capMnd(upw) { return (upw / UPW_FT) * CM_MAAND; }
+  function fteMnd(upw) { return Math.round((upw / UPW_FT) * 100) / 100; }
+
+  function sigCls(prod) {
+    if (prod >= 0.95) return 'g';
+    if (prod >= 0.80) return 'o';
     return 'r';
   }
-
-  // Forecast formule:
-  // beh_per_week = FTE * (36u * 60 / 30min) = FTE * 72
-  // maandbasis   = beh_per_week * 4 weken
-  // jaarbasis    = beh_per_week * 44 weken
-  function berekenForecast(fte) {
-    if (!fte) return { pw: 0, pm: 0, pj: 0 };
-    var behPW = fte * (UREN_WERKWEEK * 60 / MIN_NORMAAL); // bv. 1 FTE * 72 = 72
-    var pm    = Math.round(behPW * 4);                    // bv. 72 * 4 = 288 per maand
-    var pj    = Math.round(behPW * WEKEN_JAAR);           // bv. 72 * 44 = 3168 per jaar
-    return { pw: Math.round(behPW), pm: pm, pj: pj };
+  function sigTxt(prod) {
+    if (prod >= 0.95) return 'Rond capaciteit';
+    if (prod >= 0.80) return 'Rond capaciteit';
+    return 'Onder capaciteit';
   }
 
-  var aantalMW = -1;
+  var aantalMW = 0;
 
-  function bouwTabel(n) {
-    aantalMW = n;
+  function bouwTabel() {
+    var n = Math.min(20, Math.max(1, parseInt(el('n-mw').value) || 1));
+    el('n-mw').value = n;
+
+    // Bewaar bestaande waarden
+    var bew = {};
+    for (var i = 1; i <= aantalMW; i++) {
+      bew[i] = {
+        nm:  el('nm-'+i)?.value  || '',
+        upw: el('upw-'+i)?.value || '40',
+        ni:  el('ni-'+i)?.value  || '0',
+        reg: el('reg-'+i)?.value || '0'
+      };
+    }
+
     var tbody = el('mw-tbody');
     tbody.innerHTML = '';
+
     for (var i = 1; i <= n; i++) {
+      var b = bew[i] || { nm: '', upw: '40', ni: '0', reg: '0' };
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><input class="mw-name" type="text" id="nm-'+i+'" placeholder="Medewerker '+i+'" oninput="herbereken()"></td>' +
-        '<td><input class="mw-fte" type="number" id="mw-fte-'+i+'" value="1" min="0.1" max="2" step="0.1" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="beh-'+i+'" min="0" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="ni-'+i+'"  min="0" placeholder="0" oninput="herbereken()"></td>' +
-        '<td class="mw-pct" id="vhd-'+i+'">0%</td>' +
-        '<td><input class="mw-input" type="number" id="vld-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="zkd-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td><input class="mw-input" type="number" id="ovu-'+i+'" min="0" step="0.5" placeholder="0" oninput="herbereken()"></td>' +
-        '<td class="mw-val" id="taf-'+i+'">0</td>' +
-        '<td><span class="mw-badge r" id="cap-'+i+'">0%</span></td>' +
-        '<td><span class="mw-badge r" id="tva-'+i+'">0%</span></td>';
+        '<td><input class="mw-name" type="text" id="nm-'+i+'" placeholder="Fysiotherapeut '+i+'" value="'+b.nm+'" oninput="herbereken()"></td>' +
+        '<td><input class="mw-num" type="number" id="upw-'+i+'" value="'+b.upw+'" min="4" max="40" step="0.5" oninput="herbereken()"></td>' +
+        '<td class="aut-val" id="fte-'+i+'">-</td>' +
+        '<td class="aut-val" id="cap-'+i+'">-</td>' +
+        '<td><input class="mw-num" type="number" id="ni-'+i+'" value="'+b.ni+'" min="0" oninput="herbereken()"></td>' +
+        '<td><input class="mw-num" type="number" id="reg-'+i+'" value="'+b.reg+'" min="0" oninput="herbereken()"></td>' +
+        '<td class="aut-val" id="auto-'+i+'">-</td>' +
+        '<td id="bel-'+i+'">-</td>' +
+        '<td id="ipct-'+i+'">-</td>' +
+        '<td id="prod-'+i+'">-</td>' +
+        '<td id="onb-'+i+'">-</td>' +
+        '<td id="ov-'+i+'">-</td>' +
+        '<td id="sig-'+i+'">-</td>';
       tbody.appendChild(tr);
     }
+
     // Totaalrij
-    var totRow = document.createElement('tr');
-    totRow.id = 'totrow';
-    totRow.innerHTML =
+    var tr = document.createElement('tr');
+    tr.className = 'totaal-row';
+    tr.innerHTML =
       '<td>Totaal</td>' +
-      '<td class="mw-val" id="tot-fte">0</td>' +
-      '<td class="mw-val" id="tot-beh">0</td>' +
-      '<td class="mw-val" id="tot-ni">0</td>' +
-      '<td class="mw-pct" id="tot-vhd">0%</td>' +
-      '<td class="mw-val" id="tot-vld">0</td>' +
-      '<td class="mw-val" id="tot-zkd">0</td>' +
-      '<td class="mw-val" id="tot-ovu">0</td>' +
-      '<td class="mw-val" id="tot-taf">0</td>' +
-      '<td></td><td></td>';
-    tbody.appendChild(totRow);
+      '<td id="tot-upw">-</td>' +
+      '<td id="tot-fte">-</td>' +
+      '<td id="tot-cap">-</td>' +
+      '<td id="tot-ni">-</td>' +
+      '<td id="tot-reg">-</td>' +
+      '<td id="tot-auto">-</td>' +
+      '<td id="tot-bel">-</td>' +
+      '<td id="tot-ipct">-</td>' +
+      '<td id="tot-prod">-</td>' +
+      '<td id="tot-onb">-</td>' +
+      '<td id="tot-ov">-</td>' +
+      '<td></td>';
+    tbody.appendChild(tr);
+
+    aantalMW = n;
     herbereken();
   }
 
   function herbereken() {
-    var fte    = nv('fte');
-    var kamers = nv('kamers') || 1;
-    var n      = Math.round(fte); // aantal medewerker rijen
+    var n = aantalMW;
+    if (!n) return;
 
-    var fc = berekenForecast(fte);
-    set('fc-pw',  fmt(fc.pw));
-    set('fc-pm',  fmt(fc.pm));
-    set('fc-pj',  fmt(fc.pj));
-
-    // FTE info
-    var fteCal = el('fte-calc');
-    if (fte > 0) {
-      var geheel = Math.floor(fte);
-      var rest   = Math.round((fte - geheel) * 10) / 10;
-      var txt    = geheel + ' voltijds';
-      if (rest > 0) txt += ' + 1 parttime (' + Math.round(rest * 100) + '%)';
-      fteCal.textContent = txt + ' | ' + n + ' medewerkers in tabel';
-    } else {
-      fteCal.textContent = 'Vul FTE in om te beginnen';
-    }
-
-    el('agenda-note').textContent = fte > 0
-      ? fte + ' FTE | beh/week: ' + fmt(fc.pw) + ' | maandbasis: ' + fmt(fc.pm) + ' | jaarbasis: ' + fmt(fc.pj)
-      : 'Vul het aantal FTE in om te beginnen.';
-
-    el('mw-badge').textContent = n > 0 ? n + ' medewerkers' : '0 medewerkers';
-
-    if (n !== aantalMW) { bouwTabel(n); return; }
-
-    var totBeh = 0, totNi = 0, totVld = 0, totZkd = 0, totOvu = 0, totFte = 0, totSlots = 0;
+    var tUpw=0, tFte=0, tCap=0, tNi=0, tReg=0, tAuto=0, tBel=0, tOnb=0, tOv=0;
 
     for (var i = 1; i <= n; i++) {
-      var mwFte = parseFloat(el('mw-fte-'+i)?.value) || 1;
-      var beh   = parseFloat(el('beh-'+i)?.value) || 0;
-      var ni    = parseFloat(el('ni-'+i)?.value)  || 0;
-      var vld   = parseFloat(el('vld-'+i)?.value) || 0;
-      var zkd   = parseFloat(el('zkd-'+i)?.value) || 0;
-      var ovu   = parseFloat(el('ovu-'+i)?.value) || 0;
+      var upw  = parseFloat(el('upw-'+i)?.value) || 0;
+      var ni   = parseFloat(el('ni-'+i)?.value)  || 0;
+      var reg  = parseFloat(el('reg-'+i)?.value) || 0;
 
-      // Verhouding nieuw/totaal
-      var vhd = beh > 0 ? Math.round((ni / beh) * 1000) / 10 : 0;
+      var fte  = fteMnd(upw);
+      var cap  = capMnd(upw);
+      var auto = ni;                  // G: auto 1000 bij intake = zelfde als ni
+      var bel  = ni * IF + reg;       // totale belasting = intakes x2 + regulier
+      var prod = cap > 0 ? bel / cap : 0;
+      var onb  = Math.max(0, fmt(cap - bel));
+      var ov   = Math.max(0, fmt(bel - cap));
+      var ipct = bel > 0 ? pct(ni / bel) : '0%';
 
-      // Totaal afwezig
-      var taf = vld + zkd + ovu;
+      el('fte-'+i).textContent  = fte;
+      el('cap-'+i).textContent  = fmt(cap);
+      el('auto-'+i).textContent = auto;
+      el('bel-'+i).textContent  = fmt(bel);
+      el('ipct-'+i).textContent = ipct;
+      el('onb-'+i).textContent  = onb;
+      el('ov-'+i).textContent   = ov;
+      el('prod-'+i).innerHTML   = '<span class="badge '+sigCls(prod)+'">'+pct(prod)+'</span>';
+      el('sig-'+i).innerHTML    = '<span class="badge '+sigCls(prod)+'">'+sigTxt(prod)+'</span>';
 
-      // Effectieve slots = normale beh (1 slot elk) + nieuwe patienten (2 slots elk)
-      // = (beh - ni) * 1 + ni * 2 = beh + ni
-      var effectieveSlots = beh + ni;
-
-      // Capaciteitsberekening = effectieve slots / maandbasis totaal
-      var cap = fc.pm > 0 ? Math.round((effectieveSlots / fc.pm) * 1000) / 10 : 0;
-
-      // Target vs Actual = cap - 100%
-      var tva = Math.round((cap - 100) * 10) / 10;
-
-      set('vhd-'+i, vhd + '%');
-      set('taf-'+i, taf);
-
-      var capEl = el('cap-'+i);
-      if (capEl) { capEl.textContent = cap + '%'; capEl.className = 'mw-badge ' + kleurBadge(cap); }
-
-      var tvaEl = el('tva-'+i);
-      if (tvaEl) {
-        tvaEl.textContent = (tva >= 0 ? '+' : '') + tva + '%';
-        tvaEl.className = 'mw-badge ' + (tva >= 0 ? 'g' : (tva >= -15 ? 'o' : 'r'));
-      }
-
-      totBeh  += beh;
-      totNi   += ni;
-      totVld  += vld;
-      totZkd  += zkd;
-      totOvu  += ovu;
-      totFte  += mwFte;
-      totSlots += effectieveSlots;
+      tUpw += upw; tFte += fte; tCap += cap; tNi += ni;
+      tReg += reg; tAuto += auto; tBel += bel; tOnb += onb; tOv += ov;
     }
 
-    var totVhd = totBeh > 0 ? Math.round((totNi / totBeh) * 1000) / 10 : 0;
-    var totTaf = totVld + totZkd + totOvu;
+    var tProd = tCap > 0 ? tBel / tCap : 0;
+    var tIpct = tBel > 0 ? pct(tNi / tBel) : '0%';
 
-    set('tot-fte', Math.round(totFte * 10) / 10);
-    set('tot-beh', fmt(totBeh));
-    set('tot-ni',  fmt(totNi));
-    set('tot-vhd', totVhd + '%');
-    set('tot-vld', totVld);
-    set('tot-zkd', totZkd);
-    set('tot-ovu', totOvu);
-    set('tot-taf', totTaf);
+    el('tot-upw').textContent  = fmt(tUpw);
+    el('tot-fte').textContent  = fmt(tFte);
+    el('tot-cap').textContent  = fmt(tCap);
+    el('tot-ni').textContent   = fmt(tNi);
+    el('tot-reg').textContent  = fmt(tReg);
+    el('tot-auto').textContent = fmt(tAuto);
+    el('tot-bel').textContent  = fmt(tBel);
+    el('tot-ipct').textContent = tIpct;
+    el('tot-onb').textContent  = fmt(tOnb);
+    el('tot-ov').textContent   = fmt(tOv);
+    el('tot-prod').innerHTML   = '<span class="badge '+sigCls(tProd)+'">'+pct(tProd)+'</span>';
 
-    // Realisatie op basis van effectieve slots (incl. nieuwe patienten weging)
-    var fcReal = fc.pm > 0 ? Math.round((totSlots / fc.pm) * 1000) / 10 : 0;
-    set('fc-real', fcReal + '%');
+    // KPI blokken
+    el('kpi-fte').textContent  = fmt(tFte);
+    el('kpi-cap').textContent  = fmt(tCap);
+    el('kpi-ni').textContent   = fmt(tNi);
+    el('kpi-reg').textContent  = fmt(tReg);
+    el('kpi-auto').textContent = fmt(tAuto);
+    el('kpi-bel').textContent  = fmt(tBel);
+    el('kpi-ipct').textContent = tIpct;
+    el('kpi-onb').textContent  = fmt(tOnb);
+    el('kpi-ov').textContent   = fmt(tOv);
+    el('kpi-prod').textContent = pct(tProd);
+
+    var cls = sigCls(tProd);
+    el('kpi-prod-card').className = 'kpi-card ' + (cls === 'g' ? 'green' : cls === 'o' ? 'orange' : 'red');
+    el('mw-badge').textContent = n + ' medewerker' + (n !== 1 ? 's' : '');
   }
 
   async function opslaan() {
     var btn  = el('btn-opslaan');
     var fb   = el('feedback');
     var code = el('code')?.value.trim();
-    var fte  = nv('fte');
-    var n    = Math.round(fte);
 
     if (!code) {
       fb.className = 'feedback err'; fb.style.display = 'block';
       fb.textContent = 'Vul een praktijkcode in voordat je het rapport verstuurt.';
       return;
     }
-    if (fte === 0) {
+
+    var heeftData = false;
+    for (var i = 1; i <= aantalMW; i++) {
+      if ((parseFloat(el('upw-'+i)?.value) || 0) > 0) { heeftData = true; break; }
+    }
+    if (!heeftData) {
       fb.className = 'feedback err'; fb.style.display = 'block';
-      fb.textContent = 'Vul het aantal FTE in.';
+      fb.textContent = 'Vul bij minimaal 1 fysiotherapeut het aantal uren per week in.';
       return;
     }
 
-    btn.disabled = true;
-    btn.textContent = 'Bezig met versturen...';
+    btn.disabled = true; btn.textContent = 'Bezig met versturen...';
     fb.style.display = 'none';
 
-    var fc = berekenForecast(fte);
-    var medewerkers = [];
+    var mws = [], tCap=0, tBel=0, tNi=0, tFte=0;
 
-    for (var i = 1; i <= n; i++) {
-      var mwBeh = parseFloat(el('beh-'+i)?.value) || 0;
-      var mwNi    = parseFloat(el('ni-'+i)?.value) || 0;
-      var mwSlots = mwBeh + mwNi; // effectieve slots: normale(1x) + nieuw(2x)
-      medewerkers.push({
-        nr:       i,
-        naam:     el('nm-'+i)?.value.trim() || ('Medewerker ' + i),
-        fte:      parseFloat(el('mw-fte-'+i)?.value) || 1,
-        beh:      mwBeh,
-        nieuw:    mwNi,
-        verlof:   parseFloat(el('vld-'+i)?.value) || 0,
-        ziekte:   parseFloat(el('zkd-'+i)?.value) || 0,
-        overig:   parseFloat(el('ovu-'+i)?.value) || 0,
-        effectieveSlots: mwSlots,
-        cap:      fc.pm > 0 ? Math.round((mwSlots / fc.pm) * 1000) / 10 : 0
+    for (var i = 1; i <= aantalMW; i++) {
+      var upw = parseFloat(el('upw-'+i)?.value) || 0;
+      if (!upw) continue;
+      var ni  = parseFloat(el('ni-'+i)?.value)  || 0;
+      var reg = parseFloat(el('reg-'+i)?.value) || 0;
+      var fte = fteMnd(upw);
+      var cap = capMnd(upw);
+      var bel = ni * IF + reg;
+
+      mws.push({
+        nr: i, naam: el('nm-'+i)?.value.trim() || ('Fysiotherapeut ' + i),
+        urenPerWeek: upw, fte: fte,
+        capaciteit: fmt(cap), nieuwIntakes: ni,
+        regulierBeh: reg, auto1000: ni,
+        belasting: fmt(bel),
+        productiviteit: cap > 0 ? Math.round((bel / cap) * 1000) / 10 : 0
       });
+
+      tCap += cap; tBel += bel; tNi += ni; tFte += fte;
     }
 
     try {
@@ -479,14 +472,18 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          maand:        el('maand').value,
-          jaar:         parseInt(el('jaar').value),
+          maand: el('maand').value,
+          jaar: parseInt(el('jaar').value),
           praktijkCode: code,
-          fte:          fte,
-          minNormaal:   30,
-          minNieuw:     60,
-          forecast:     fc,
-          medewerkers:  medewerkers
+          fte: fmt(tFte),
+          minNormaal: BDUUR,
+          minNieuw: BDUUR * IF,
+          forecast: {
+            pm: fmt(tCap),
+            belasting: fmt(tBel),
+            productiviteit: tCap > 0 ? Math.round((tBel / tCap) * 1000) / 10 : 0
+          },
+          medewerkers: mws
         })
       });
       var data = await res.json();
@@ -507,8 +504,7 @@
     btn.textContent = 'Rapport opslaan en versturen';
   }
 
-  // Init
-  herbereken();
+  bouwTabel();
 </script>
 </body>
 </html>
