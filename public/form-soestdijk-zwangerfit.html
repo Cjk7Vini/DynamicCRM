@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZwangerFit - Fysiotherapie Soestdijk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #f8a4c8 0%, #c084fc 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            max-width: 600px;
+            width: 100%;
+            padding: 50px;
+        }
+
+        .form-header { text-align: center; margin-bottom: 32px; }
+
+        .practice-badge {
+            background: #fdf2f8;
+            color: #9333ea;
+            padding: 8px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 18px;
+            font-weight: 600;
+            font-size: 14px;
+            border: 1px solid #e9d5ff;
+        }
+
+        h1 {
+            color: #7c3aed;
+            font-size: 26px;
+            margin-bottom: 12px;
+            line-height: 1.35;
+        }
+
+        .form-subtitle {
+            color: #e11d48;
+            font-size: 15px;
+            font-weight: 600;
+            background: #fff1f2;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-top: 4px;
+        }
+
+        .benefits-list {
+            background: #fdf4ff;
+            border-radius: 12px;
+            padding: 20px 22px;
+            margin: 24px 0;
+            border-left: 4px solid #c084fc;
+        }
+
+        .benefits-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #7c3aed;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .benefit-item:last-child { margin-bottom: 0; }
+
+        .green-check {
+            color: #7c3aed;
+            font-weight: bold;
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .benefits-note {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e9d5ff;
+            font-size: 13px;
+            color: #7c3aed;
+            font-weight: 600;
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: 600;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .required { color: #e74c3c; }
+
+        input, select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 9px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            color: #111;
+            background: #fafafa;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #c084fc;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.15);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+            font-weight: normal;
+        }
+
+        .submit-button {
+            background: linear-gradient(135deg, #9333ea 0%, #c084fc 100%);
+            color: white;
+            padding: 16px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(147, 51, 234, 0.35);
+            font-family: inherit;
+        }
+
+        .submit-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(147, 51, 234, 0.45);
+        }
+
+        .submit-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 16px;
+            color: #9ca3af;
+            font-size: 12px;
+            gap: 6px;
+        }
+
+        #msg {
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            text-align: center;
+            display: none;
+        }
+        #msg.success { background: #4CAF50; color: white; display: block; }
+        #msg.error   { background: #f44336; color: white; display: block; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .success-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: slideUp 0.4s ease;
+        }
+
+        .success-icon {
+            width: 76px; height: 76px;
+            background: linear-gradient(135deg, #9333ea 0%, #c084fc 100%);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 24px rgba(147, 51, 234, 0.3);
+        }
+        .success-icon svg {
+            width: 44px; height: 44px;
+            stroke: white; stroke-width: 3;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+
+        .success-modal h2 { color: #7c3aed; font-size: 26px; margin-bottom: 14px; }
+        .success-modal p  { color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 8px; }
+        .practice-name-highlight { color: #9333ea; font-weight: 700; }
+
+        .success-modal .close-button {
+            background: linear-gradient(135deg, #9333ea 0%, #c084fc 100%);
+            color: white; border: none;
+            padding: 12px 32px; border-radius: 50px;
+            font-size: 15px; font-weight: 600;
+            cursor: pointer; margin-top: 22px;
+            transition: all 0.3s ease; font-family: inherit;
+        }
+        .success-modal .close-button:hover { transform: translateY(-2px); }
+        .auto-close-note { color: #999; font-size: 13px; margin-top: 12px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            .form-container { padding: 30px 22px; }
+            h1 { font-size: 22px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+    <div class="form-container">
+
+        <div class="form-header">
+            <div class="practice-badge">Fysiotherapie Soestdijk</div>
+            <h1>Blijf fit en sterk tijdens je zwangerschap met ZwangerFit bij Fysiotherapie Soestdijk</h1>
+            <p class="form-subtitle">Slechts 10 plekken beschikbaar. Meld je aan en we nemen binnen 1 werkdag contact met je op!</p>
+        </div>
+
+        <div class="benefits-list">
+            <div class="benefits-title">In 10 weken werk je aan:</div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Behoud van conditie en kracht</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Minder kans op rug-, bekken- en nekpijn</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Lagere kans op zwangerschapsdiabetes</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Betere voorbereiding op de bevalling en sneller herstel daarna</span>
+            </div>
+            <div class="benefits-note">
+                Ideaal om te starten in je 2e of 3e trimester van je zwangerschap
+            </div>
+        </div>
+
+        <div id="msg"></div>
+
+        <form id="leadForm">
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="S7F2MW">
+
+            <div class="form-group">
+                <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+            </div>
+
+            <div class="form-group">
+                <label for="emailadres">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
+            </div>
+
+            <div class="form-group">
+                <label for="doel">In welk trimester zit je? <span class="required">*</span></label>
+                <select id="doel" name="doel" required>
+                    <option value="">Maak een keuze</option>
+                    <option value="1e trimester (0-12 weken)">1e trimester (0-12 weken)</option>
+                    <option value="2e trimester (12-24 weken)">2e trimester (12-24 weken)</option>
+                    <option value="3e trimester (24-36 weken)">3e trimester (24-36 weken)</option>
+                </select>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                <label for="toestemming" class="checkbox-label">
+                    Ik ga akkoord met de privacyverklaring en geef toestemming om contact met mij op te nemen voor meer informatie over ZwangerFit. <span class="required">*</span>
+                </label>
+            </div>
+
+            <button type="submit" class="submit-button" id="submitButton">
+                Ja, ik doe mee met ZwangerFit! &#8594;
+            </button>
+
+            <div class="security-note">
+                Je gegevens worden veilig verwerkt en nooit gedeeld met derden
+            </div>
+        </form>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="successModal">
+        <div class="success-modal">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52"><polyline points="14 27 22 35 38 19"/></svg>
+            </div>
+            <h2>Gegevens succesvol verstuurd!</h2>
+            <p>Je aanmelding voor ZwangerFit is ontvangen door</p>
+            <p class="practice-name-highlight" id="modalPracticeName">Fysiotherapie Soestdijk</p>
+            <p style="margin-top:16px;">We nemen binnen 1 werkdag contact met je op.</p>
+            <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
+            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+        </div>
+    </div>
+
+    <script>
+        var PRACTICE_CODE = 'S7F2MW';
+        var countdownTimer;
+
+        function showSuccessModal(practiceName) {
+            document.getElementById('modalPracticeName').textContent = practiceName || 'Fysiotherapie Soestdijk';
+            document.getElementById('successModal').classList.add('active');
+            var s = 10;
+            countdownTimer = setInterval(function() {
+                s--;
+                document.getElementById('countdown').textContent = s;
+                if (s <= 0) closeSuccessModal();
+            }, 1000);
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').classList.remove('active');
+            if (countdownTimer) clearInterval(countdownTimer);
+            document.getElementById('leadForm').reset();
+            document.getElementById('praktijk_code').value = PRACTICE_CODE;
+        }
+
+        document.getElementById('leadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            var btn = document.getElementById('submitButton');
+            btn.disabled = true;
+            btn.textContent = 'Bezig met versturen...';
+
+            var email     = document.getElementById('emailadres').value.trim();
+            var telefoon  = document.getElementById('telefoon').value.trim();
+            var naam      = document.getElementById('volledige_naam').value.trim();
+            var doel      = document.getElementById('doel').value;
+            var consent   = document.getElementById('toestemming').checked;
+
+            if (!naam || !email || !telefoon || !doel || !consent) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Vul alle verplichte velden in.';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Ja, ik doe mee met ZwangerFit! \u2192';
+                return;
+            }
+
+            var phoneDigits = telefoon.replace(/\D/g, '');
+            if (phoneDigits.length < 10) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers).';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Ja, ik doe mee met ZwangerFit! \u2192';
+                return;
+            }
+
+            // Genereer event_id voor Meta deduplicatie
+            var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            var data = {
+                praktijk_code:   PRACTICE_CODE,
+                volledige_naam:  naam,
+                emailadres:      email,
+                telefoon:        phoneDigits,
+                doel:            doel,
+                bron:            'ZwangerFit',
+                toestemming:     true,
+                meta_event_id:   eventId,
+                event_source_url: window.location.href
+            };
+
+            try {
+                var res  = await fetch('/leads', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                var json = await res.json().catch(function() { return {}; });
+
+                if (res.ok) {
+                    var submitToken  = json.submit_token || '';
+                    var leadId       = json.lead && json.lead.id ? json.lead.id : '';
+                    window.location.href = '/thankyou.html?s=' + PRACTICE_CODE +
+                        '&eid=' + encodeURIComponent(eventId) +
+                        '&st='  + encodeURIComponent(submitToken) +
+                        '&lid=' + encodeURIComponent(leadId);
+                } else {
+                    document.getElementById('msg').className = 'error';
+                    document.getElementById('msg').textContent = json.error || 'Er is iets misgegaan. Probeer het opnieuw.';
+                    document.getElementById('msg').style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Ja, ik doe mee met ZwangerFit! \u2192';
+                }
+            } catch (err) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Geen verbinding. Controleer je internet en probeer opnieuw.';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Ja, ik doe mee met ZwangerFit! \u2192';
+            }
+        });
+    </script>
+
+    <!-- Copyright -->
+    <footer style="text-align:center;padding:20px;font-size:12px;color:rgba(255,255,255,0.7);">
+        Copyright &copy; Dynamic Health Consultancy
+    </footer>
+</body>
+</html>
