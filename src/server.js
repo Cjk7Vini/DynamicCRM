@@ -3966,6 +3966,18 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
       return res.status(400).json({ error: 'Maand, jaar en medewerkerdata zijn verplicht' });
     }
 
+    // Haal praktijk email op voor management rapportage
+    let praktijkEmail = null;
+    let praktijkNaam = praktijkCode || 'Praktijk';
+    if (praktijkCode) {
+      try {
+        const pr = await withReadConnection(async (client) => {
+          return (await client.query('SELECT naam, email_to FROM praktijken WHERE code=$1', [praktijkCode])).rows[0];
+        });
+        if (pr) { praktijkEmail = pr.email_to; praktijkNaam = pr.naam; }
+      } catch(e) {}
+    }
+
     const aantalFtN = Number(aantalFt) || 0;
     const aantalPtN = Number(aantalPt) || 0;
     const ptUrenN   = Number(ptUrenPerMaand) || 72;
@@ -4033,6 +4045,98 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
         contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       }]
     });
+
+    // Stuur management rapportage naar praktijk zelf
+    if (praktijkEmail) {
+      const mwRijen = medewerkers.map(m => {
+        const prod = m.productiviteit || 0;
+        const kleur = prod > 105 ? '#dc2626' : prod >= 95 ? '#16a34a' : prod >= 80 ? '#d97706' : '#dc2626';
+        const signaal = prod > 105 ? 'Boven capaciteit' : prod >= 95 ? 'Rond capaciteit' : prod >= 80 ? 'Rond capaciteit' : 'Onder capaciteit';
+        return `<tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:8px 10px;font-weight:500;color:#111827;">${m.naam || '-'}</td>
+          <td style="padding:8px 10px;text-align:center;">${m.urenPerWeek || '-'}</td>
+          <td style="padding:8px 10px;text-align:center;">${m.capaciteit || '-'}</td>
+          <td style="padding:8px 10px;text-align:center;">${m.ni || m.nieuwIntakes || 0}</td>
+          <td style="padding:8px 10px;text-align:center;">${m.reg || m.regulierBeh || 0}</td>
+          <td style="padding:8px 10px;text-align:center;">${m.beh || m.belasting || 0}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:${kleur};">${prod}%</td>
+          <td style="padding:8px 10px;text-align:center;"><span style="background:${prod > 105 ? '#fef2f2' : prod >= 95 ? '#ecfdf5' : prod >= 80 ? '#fffbeb' : '#fef2f2'};color:${kleur};padding:3px 8px;border-radius:5px;font-size:12px;font-weight:600;">${signaal}</span></td>
+        </tr>`;
+      }).join('');
+
+      const totBehTot = medewerkers.reduce((s,m) => s + (Number(m.beh || m.belasting) || 0), 0);
+      const totCapTot = medewerkers.reduce((s,m) => s + (Number(m.capaciteit) || 0), 0);
+      const totProd   = totCapTot > 0 ? Math.round((totBehTot / totCapTot) * 1000) / 10 : 0;
+      const totNi     = medewerkers.reduce((s,m) => s + (Number(m.ni || m.nieuwIntakes) || 0), 0);
+
+      try {
+        await sendMailResilient({
+          from: SMTP.from,
+          to: praktijkEmail,
+          subject: `Bezettingsgraad rapport ${maand} ${jaar} - ${praktijkNaam}`,
+          html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background:#111827;padding:22px 32px;">
+  <span style="color:white;font-size:16px;font-weight:700;">Dynamic Health Consultancy</span>
+  <span style="color:#9ca3af;font-size:13px;margin-left:12px;">Bezettingsgraad Rapport</span>
+</td></tr>
+<tr><td style="padding:28px 32px;">
+  <h2 style="margin:0 0 6px;font-size:20px;color:#111827;">${maand} ${jaar}</h2>
+  <p style="margin:0 0 24px;color:#6b7280;font-size:14px;">${praktijkNaam}</p>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;margin-bottom:24px;">
+    <tr>
+      <td style="padding:16px 20px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Totaal FTE</div>
+        <div style="font-size:22px;font-weight:700;color:#111827;">${Math.round((Number(aantalFt)||0) * 10)/10}</div>
+      </td>
+      <td style="padding:16px 20px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Nieuwe intakes</div>
+        <div style="font-size:22px;font-weight:700;color:#111827;">${totNi}</div>
+      </td>
+      <td style="padding:16px 20px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Totale belasting</div>
+        <div style="font-size:22px;font-weight:700;color:#111827;">${totBehTot}</div>
+      </td>
+      <td style="padding:16px 20px;text-align:center;">
+        <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Productiviteit</div>
+        <div style="font-size:22px;font-weight:700;color:${totProd >= 95 ? '#16a34a' : totProd >= 80 ? '#d97706' : '#dc2626'};">${totProd}%</div>
+      </td>
+    </tr>
+  </table>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="background:#f3f4f6;">
+        <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;">Fysiotherapeut</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Uren/wk</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Capaciteit</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Intakes</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Regulier</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Belasting</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Productiviteit</th>
+        <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;">Signaal</th>
+      </tr>
+    </thead>
+    <tbody>${mwRijen}</tbody>
+  </table>
+
+  <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;line-height:1.6;">
+    Een intake telt als 2 contactmomenten (code 1864 + code 1000). Rapport #${opgeslagen.id}.
+  </p>
+</td></tr>
+<tr><td style="background:#f4f4f6;padding:16px 32px;border-top:1px solid #e4e4e8;">
+  <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Copyright &copy; Dynamic Health Consultancy</p>
+</td></tr>
+</table></td></tr></table></body></html>`
+        });
+        console.log(`✅ Management rapport verstuurd naar ${praktijkEmail}`);
+      } catch(mailErr) {
+        console.warn('Management rapport mail mislukt:', mailErr.message);
+      }
+    }
 
     res.json({ success: true, id: opgeslagen.id, bericht: `Rapport opgeslagen en verstuurd naar lars@dynamic-health-consultancy.nl` });
 

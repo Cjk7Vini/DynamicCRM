@@ -132,7 +132,7 @@
     <strong>Hoe werkt de calculator?</strong>
     Vul per fysiotherapeut de uren per week in, plus het aantal nieuwe intakes (code 1864) en reguliere behandelingen (code 1000, excl. intake).
     Een nieuwe intake duurt 60 minuten: 30 min code 1864 + 30 min code 1000. Het 1000-deel bij intakes wordt automatisch meegerekend.
-    Capaciteit per maand is gebaseerd op het theoretisch kader: 1 FTE (40u/week) = 277,97 contactmomenten per maand.
+    Capaciteit per maand is gebaseerd op het theoretisch kader: 1 FTE (40u/week) = 278 contactmomenten per maand.
   </div>
 
   <!-- TOTAAL KPIs -->
@@ -207,13 +207,13 @@
         <table class="mw-table">
           <thead>
             <tr>
-              <th>A. Fysiotherapeut</th>
-              <th class="inv">B. Uren/week</th>
-              <th class="aut">C. FTE</th>
-              <th class="aut">D. Capaciteit/mnd</th>
-              <th class="inv">E. Nieuwe intakes (code 1864)</th>
-              <th class="inv">F. Reguliere beh. (code 1000, excl. intake)</th>
-              <th class="aut">G. Auto 1000 bij intake</th>
+              <th>Fysiotherapeut</th>
+              <th class="inv">Uren/week</th>
+              <th class="aut">FTE</th>
+              <th class="aut">Capaciteit/mnd</th>
+              <th class="inv">Nieuwe intakes (1864)</th>
+              <th class="inv">Reguliere beh. (1000)</th>
+              <th class="aut">Auto 1000</th>
               <th class="aut">Totale belasting</th>
               <th class="aut">Intake %</th>
               <th class="aut">Productiviteit</th>
@@ -274,18 +274,20 @@
   var IF       = 2;                                   // intake factor: 60min / 30min
 
   function el(id) { return document.getElementById(id); }
-  function fmt(n) { return Math.round(n * 10) / 10; }
+  function fmt(n) { return Math.round(n); }
   function pct(n) { return Math.round(n * 1000) / 10 + '%'; }
 
   function capMnd(upw) { return (upw / UPW_FT) * CM_MAAND; }
   function fteMnd(upw) { return Math.round((upw / UPW_FT) * 100) / 100; }
 
   function sigCls(prod) {
+    if (prod > 1.05) return 'r';
     if (prod >= 0.95) return 'g';
     if (prod >= 0.80) return 'o';
     return 'r';
   }
   function sigTxt(prod) {
+    if (prod > 1.05) return 'Boven capaciteit';
     if (prod >= 0.95) return 'Rond capaciteit';
     if (prod >= 0.80) return 'Rond capaciteit';
     return 'Onder capaciteit';
@@ -475,15 +477,20 @@
           maand: el('maand').value,
           jaar: parseInt(el('jaar').value),
           praktijkCode: code,
-          fte: fmt(tFte),
-          minNormaal: BDUUR,
-          minNieuw: BDUUR * IF,
-          forecast: {
-            pm: fmt(tCap),
-            belasting: fmt(tBel),
-            productiviteit: tCap > 0 ? Math.round((tBel / tCap) * 1000) / 10 : 0
-          },
-          medewerkers: mws
+          aantalFt: Math.round(tFte),
+          aantalPt: 0,
+          ptUrenPerMaand: 0,
+          aantalKamers: mws.length,
+          medewerkers: mws.map(function(m) { return {
+            naam: m.naam,
+            beh: m.belasting,
+            ni: m.nieuwIntakes,
+            reg: m.regulierBeh,
+            fte: m.fte,
+            urenPerWeek: m.urenPerWeek,
+            capaciteit: m.capaciteit,
+            productiviteit: m.productiviteit
+          }; })
         })
       });
       var data = await res.json();
