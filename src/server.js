@@ -144,6 +144,21 @@ app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 const metaService = new MetaService(withReadConnection, withWriteConnection);
 const eclubService = new EclubService(withReadConnection, withWriteConnection);
 
+// Redirect landing.html direct naar juist formulier per praktijkcode
+// Zodat QR codes op flyers direct het formulier tonen zonder landingspagina
+app.get('/landing.html', (req, res) => {
+  const s = (req.query.s || '').toUpperCase();
+  const formMap = {
+    'FF42F5': '/form-scholten-active.html',
+    'T6PV9A': '/form-vitaal-fysiotherapie.html',
+    '952A92': '/form-gezond-vitaal-krommenie.html',
+    'S7F2MW': '/form.html',
+  };
+  const target = formMap[s];
+  if (target) return res.redirect(301, `${target}?s=${req.query.s}`);
+  return res.redirect(301, req.query.s ? `/form.html?s=${req.query.s}` : '/');
+});
+
 // ✅ FIX: Serve index.html as homepage (removed landing.html redirect)
 // Root route now serves index.html by default via express.static
 // app.get('/', (req, res) => {
