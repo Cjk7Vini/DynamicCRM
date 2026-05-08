@@ -369,13 +369,16 @@
           : '<span class="badge badge-gray">Gestopt</span>';
 
         const mailDots = [1,2,3].map(n => {
-          const cls = n <= reacties ? 'reacted' : n <= mails ? 'sent' : '';
+          // Alleen groen/blauw als de mail daadwerkelijk verstuurd is
+          const isVerstuurd = n <= mails;
+          const heeftReactie = n <= reacties;
+          const cls = isVerstuurd ? (heeftReactie ? 'reacted' : 'sent') : '';
           return `<div class="mail-dot ${cls}" title="Mail ${n}">${n}</div>`;
         }).join('');
 
         html += `<tr>
           <td><div style="font-weight:500;">${c.naam}</div>
-            ${openTaken > 0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;">⚡ ${openTaken} open taak</div>` : ''}
+            ${openTaken > 0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;font-weight:500;">${openTaken} open taak</div>` : ''}
           </td>
           <td style="color:var(--text-2);">${c.email}</td>
           <td style="color:var(--text-2);">${formatDate(c.laatste_behandeling)}</td>
