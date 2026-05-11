@@ -22,9 +22,12 @@ class MetaService {
   }
 
   // Fetch campaign insights from Meta API
+  // FIX: ophalen op adset-niveau en aggregeren naar campagne+datum
+  // Reden: level:'campaign' geeft bij meerdere adsets per campagne alleen 1 adset terug
+  // waardoor spend exact 1/3 toont bij 3 adsets (bewezen: Soestdijk, Scholten)
   async fetchCampaignInsights(adAccountId, accessToken, dateFrom, dateTo) {
     try {
-      console.log(`📊 Fetching Meta insights for account ${adAccountId}...`);
+      console.log(`📊 Fetching Meta insights for account ${adAccountId} at adset level...`);
       
       const response = await axios.get(
         `${this.baseUrl}/act_${adAccountId}/insights`,
@@ -34,6 +37,8 @@ class MetaService {
             fields: [
               'campaign_id',
               'campaign_name',
+              'adset_id',
+              'adset_name',
               'impressions',
               'reach',
               'frequency',
@@ -51,20 +56,89 @@ class MetaService {
               'video_p75_watched_actions',
               'video_p100_watched_actions'
             ].join(','),
-            level: 'campaign',
+            level: 'adset',
             time_range: JSON.stringify({
               since: dateFrom,
               until: dateTo
             }),
             time_increment: 1,
-            limit: 100
+            limit: 500
           },
           timeout: 30000
         }
       );
 
-      console.log(`✅ Found ${response.data.data?.length || 0} campaigns`);
-      return response.data.data || [];
+      const adsetData = response.data.data || [];
+      console.log(`✅ Found ${adsetData.length} adsets, aggregating to campaign level...`);
+
+      // Aggregeer adsets terug naar campagne+datum combinaties
+      const campaignMap = new Map();
+
+      for (const adset of adsetData) {
+        const key = `${adset.campaign_id}_${adset.date_start}`;
+
+        if (!campaignMap.has(key)) {
+          campaignMap.set(key, {
+            campaign_id: adset.campaign_id,
+            campaign_name: adset.campaign_name,
+            date_start: adset.date_start,
+            date_stop: adset.date_stop,
+            impressions: 0,
+            reach: 0,
+            clicks: 0,
+            unique_clicks: 0,
+            spend: 0,
+            ctr: 0,
+            unique_ctr: 0,
+            cpc: 0,
+            cpm: 0,
+            frequency: 0,
+            actions: [],
+            cost_per_action_type: [],
+            video_p25_watched_actions: [],
+            video_p50_watched_actions: [],
+            video_p75_watched_actions: [],
+            video_p100_watched_actions: [],
+            _adset_count: 0
+          });
+        }
+
+        const camp = campaignMap.get(key);
+        camp._adset_count++;
+        camp.impressions   += parseInt(adset.impressions || 0);
+        camp.reach         += parseInt(adset.reach || 0);
+        camp.clicks        += parseInt(adset.clicks || 0);
+        camp.unique_clicks += parseInt(adset.unique_clicks || 0);
+        camp.spend         += parseFloat(adset.spend || 0);
+        camp.ctr           += parseFloat(adset.ctr || 0);
+        camp.unique_ctr    += parseFloat(adset.unique_ctr || 0);
+        camp.cpc           += parseFloat(adset.cpc || 0);
+        camp.cpm           += parseFloat(adset.cpm || 0);
+        camp.frequency     += parseFloat(adset.frequency || 0);
+
+        // Actions samenvoegen
+        if (adset.actions) camp.actions.push(...adset.actions);
+        if (adset.cost_per_action_type) camp.cost_per_action_type.push(...adset.cost_per_action_type);
+        if (adset.video_p25_watched_actions) camp.video_p25_watched_actions.push(...adset.video_p25_watched_actions);
+        if (adset.video_p50_watched_actions) camp.video_p50_watched_actions.push(...adset.video_p50_watched_actions);
+        if (adset.video_p75_watched_actions) camp.video_p75_watched_actions.push(...adset.video_p75_watched_actions);
+        if (adset.video_p100_watched_actions) camp.video_p100_watched_actions.push(...adset.video_p100_watched_actions);
+      }
+
+      // Gemiddelden berekenen voor ratio-metrics (ctr, cpc, cpm, frequency)
+      for (const camp of campaignMap.values()) {
+        const n = camp._adset_count || 1;
+        camp.ctr        = camp.ctr / n;
+        camp.unique_ctr = camp.unique_ctr / n;
+        camp.cpc        = camp.cpc / n;
+        camp.cpm        = camp.cpm / n;
+        camp.frequency  = camp.frequency / n;
+        delete camp._adset_count;
+      }
+
+      const aggregated = Array.from(campaignMap.values());
+      console.log(`✅ Aggregated to ${aggregated.length} campaign/day entries`);
+      return aggregated;
       
     } catch (error) {
       console.error('❌ Meta API error:', error.response?.data || error.message);
