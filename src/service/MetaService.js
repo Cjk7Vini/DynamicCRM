@@ -138,6 +138,39 @@ class MetaService {
 
       const aggregated = Array.from(campaignMap.values());
       console.log(`✅ Aggregated to ${aggregated.length} campaign/day entries`);
+
+      // ============================================================
+      // TIJDELIJKE TEST LOG — alleen voor Soestdijk vergelijking
+      // NA DE TEST: dit blok verwijderen
+      // ============================================================
+      try {
+        const campaignLevelResponse = await axios.get(
+          `${this.baseUrl}/act_${adAccountId}/insights`,
+          {
+            params: {
+              access_token: accessToken,
+              fields: 'campaign_id,campaign_name,actions,cost_per_action_type,spend',
+              level: 'campaign',
+              time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
+              time_increment: 1,
+              limit: 500
+            },
+            timeout: 30000
+          }
+        );
+        const campaignData = campaignLevelResponse.data.data || [];
+        console.log(`🧪 [TEST] Campaign-level entries: ${campaignData.length}`);
+        for (const c of campaignData) {
+          if (c.campaign_name && c.campaign_name.toLowerCase().includes('soestdijk')) {
+            console.log(`🧪 [TEST] ${c.campaign_name} | ${c.date_start} | spend: ${c.spend}`);
+            console.log(`🧪 [TEST] actions: ${JSON.stringify(c.actions || [])}`);
+          }
+        }
+      } catch (testErr) {
+        console.warn(`⚠️ [TEST] Campaign-level log mislukt: ${testErr.message}`);
+      }
+      // ============================================================
+
       return aggregated;
       
     } catch (error) {
