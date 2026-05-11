@@ -22,12 +22,12 @@ class MetaService {
   }
 
   // Fetch campaign insights from Meta API
-  // FIX: ophalen op adset-niveau en aggregeren naar campagne+datum
-  // Reden: level:'campaign' geeft bij meerdere adsets per campagne alleen 1 adset terug
-  // waardoor spend exact 1/3 toont bij 3 adsets (bewezen: Soestdijk, Scholten)
+  // DEFINITIEVE FIX: twee calls
+  // Call 1: level=adset → spend/clicks/impressions (optellen = correct)
+  // Call 2: level=campaign → actions/conversies (Meta dedupliceert zelf = correct)
   async fetchCampaignInsights(adAccountId, accessToken, dateFrom, dateTo) {
     try {
-      console.log(`📊 Fetching Meta insights for account ${adAccountId} at adset level...`);
+      console.log(`📊 Fetching Meta insights for account ${adAccountId}...`);
       
       const response = await axios.get(
         `${this.baseUrl}/act_${adAccountId}/insights`,
@@ -116,9 +116,7 @@ class MetaService {
         camp.cpm           += parseFloat(adset.cpm || 0);
         camp.frequency     += parseFloat(adset.frequency || 0);
 
-        // Actions samenvoegen
-        if (adset.actions) camp.actions.push(...adset.actions);
-        if (adset.cost_per_action_type) camp.cost_per_action_type.push(...adset.cost_per_action_type);
+        // Alleen video metrics optellen — actions komen uit call 2
         if (adset.video_p25_watched_actions) camp.video_p25_watched_actions.push(...adset.video_p25_watched_actions);
         if (adset.video_p50_watched_actions) camp.video_p50_watched_actions.push(...adset.video_p50_watched_actions);
         if (adset.video_p75_watched_actions) camp.video_p75_watched_actions.push(...adset.video_p75_watched_actions);
@@ -137,41 +135,39 @@ class MetaService {
       }
 
       const aggregated = Array.from(campaignMap.values());
-      console.log(`✅ Aggregated to ${aggregated.length} campaign/day entries`);
+      console.log(`✅ Aggregated to ${aggregated.length} campaign/day entries (spend correct)`);
 
-      // ============================================================
-      // TIJDELIJKE TEST LOG — alleen voor Soestdijk vergelijking
-      // NA DE TEST: dit blok verwijderen
-      // ============================================================
-      try {
-        const campaignLevelResponse = await axios.get(
-          `${this.baseUrl}/act_${adAccountId}/insights`,
-          {
-            params: {
-              access_token: accessToken,
-              fields: 'campaign_id,campaign_name,actions,cost_per_action_type,spend',
-              level: 'campaign',
-              time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
-              time_increment: 1,
-              limit: 500
-            },
-            timeout: 30000
-          }
-        );
-        const campaignData = campaignLevelResponse.data.data || [];
-        console.log(`🧪 [TEST] Campaign-level entries: ${campaignData.length}`);
-        for (const c of campaignData) {
-          if (c.campaign_name && c.campaign_name.toLowerCase().includes('soestdijk')) {
-            console.log(`🧪 [TEST] ${c.campaign_name} | ${c.date_start} | spend: ${c.spend}`);
-            console.log(`🧪 [TEST] actions: ${JSON.stringify(c.actions || [])}`);
-          }
+      // === CALL 2: Campaign-level voor conversies (Meta dedupliceert zelf) ===
+      const campaignResponse = await axios.get(
+        `${this.baseUrl}/act_${adAccountId}/insights`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'campaign_id,campaign_name,actions,cost_per_action_type',
+            level: 'campaign',
+            time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
+            time_increment: 1,
+            limit: 500
+          },
+          timeout: 30000
         }
-      } catch (testErr) {
-        console.warn(`⚠️ [TEST] Campaign-level log mislukt: ${testErr.message}`);
-      }
-      // ============================================================
+      );
 
-      return aggregated;
+      const campaignData = campaignResponse.data.data || [];
+      console.log(`✅ Got ${campaignData.length} campaign-level entries for conversions`);
+
+      // Koppel campaign-level actions aan adset-aggregatie op campaign_id + datum
+      for (const c of campaignData) {
+        const key = `${c.campaign_id}_${c.date_start}`;
+        if (campaignMap.has(key)) {
+          campaignMap.get(key).actions = c.actions || [];
+          campaignMap.get(key).cost_per_action_type = c.cost_per_action_type || [];
+        }
+      }
+
+      const final = Array.from(campaignMap.values());
+      console.log(`✅ Final: ${final.length} entries with correct spend + deduplicated conversions`);
+      return final;
       
     } catch (error) {
       console.error('❌ Meta API error:', error.response?.data || error.message);
@@ -213,17 +209,29 @@ class MetaService {
   }
 
   // Parse conversions from Meta's actions array
-  // Only count offsite_conversion.fb_pixel_lead — the Lead pixel event
-  // fired by our forms on submit. We exclude offsite_conversion.custom.*,
-  // onsite_conversion.*, and fb_pixel_custom because those are too broad
-  // and count PageViews, clicks, and other non-lead events.
-  parseConversions(actions) {
+  // Gebruikt de custom conversion ID die per praktijk is ingesteld in Meta Ads Manager
+  // Fallback op offsite_conversion.fb_pixel_lead en lead als geen ID beschikbaar
+  parseConversions(actions, conversionId = null) {
     if (!actions || !Array.isArray(actions)) return 0;
 
-    const conversionActions = actions.filter(a =>
-      a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      a.action_type === 'lead'
-    );
+    const conversionActions = actions.filter(a => {
+      if (conversionId) {
+        // Gebruik de specifieke custom conversion ID van deze praktijk
+        return a.action_type === `offsite_conversion.custom.${conversionId}` ||
+               a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+               a.action_type === 'lead';
+      }
+      // Fallback zonder ID
+      return a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+             a.action_type === 'lead';
+    });
+
+    // Vermijd dubbeltelling: custom conversion EN pixel lead kunnen beide aanwezig zijn
+    // Gebruik custom conversion ID als primaire bron, anders pixel lead
+    if (conversionId) {
+      const customConv = actions.find(a => a.action_type === `offsite_conversion.custom.${conversionId}`);
+      if (customConv) return parseInt(customConv.value) || 0;
+    }
 
     return conversionActions.reduce((sum, action) => {
       return sum + (parseInt(action.value) || 0);
@@ -237,16 +245,20 @@ class MetaService {
     return parseInt(pageViewAction?.value || 0);
   }
 
-  // Parse cost per conversion — matches parseConversions filter exactly
-  parseCostPerConversion(costPerActionType) {
+  // Parse cost per conversion — gebruikt dezelfde ID als parseConversions
+  parseCostPerConversion(costPerActionType, conversionId = null) {
     if (!costPerActionType || !Array.isArray(costPerActionType)) return 0;
 
-    const conversionCosts = costPerActionType.filter(c =>
+    if (conversionId) {
+      const customCost = costPerActionType.find(c => c.action_type === `offsite_conversion.custom.${conversionId}`);
+      if (customCost) return parseFloat(customCost.value) || 0;
+    }
+
+    const fallback = costPerActionType.find(c =>
       c.action_type === 'offsite_conversion.fb_pixel_lead' ||
       c.action_type === 'lead'
     );
-
-    return conversionCosts.length > 0 ? parseFloat(conversionCosts[0].value) || 0 : 0;
+    return fallback ? parseFloat(fallback.value) || 0 : 0;
   }
 
   // Parse video views at a given percentage threshold from actions array
@@ -267,12 +279,13 @@ class MetaService {
       // Get campaign name filter for this practice
       const practiceResult = await this.readConn(async (client) => {
         return await client.query(
-          'SELECT meta_campaign_name FROM praktijken WHERE code = $1',
+          'SELECT meta_campaign_name, meta_conversion_id FROM praktijken WHERE code = $1',
           [practiceCode]
         );
       });
 
       const campaignNameFilter = practiceResult.rows[0]?.meta_campaign_name || null;
+      const conversionId = practiceResult.rows[0]?.meta_conversion_id || null;
 
       if (!campaignNameFilter) {
         console.log(`⚠️ No campaign name configured for ${practiceCode}, skipping sync`);
@@ -308,8 +321,8 @@ class MetaService {
 
       for (const campaign of insights) {
         try {
-          const conversions = this.parseConversions(campaign.actions);
-          const costPerConversion = this.parseCostPerConversion(campaign.cost_per_action_type);
+          const conversions = this.parseConversions(campaign.actions, conversionId);
+          const costPerConversion = this.parseCostPerConversion(campaign.cost_per_action_type, conversionId);
           const pageViews = this.parsePageViews(campaign.actions);
           const videoP25 = this.parseVideoViews(campaign.video_p25_watched_actions);
           const videoP50 = this.parseVideoViews(campaign.video_p50_watched_actions);
