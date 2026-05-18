@@ -450,16 +450,19 @@ async function doOverlayLogin() {
       document.getElementById('userEmailDisplay').textContent = em.length > 28 ? em.slice(0,28)+'...' : em;
       document.getElementById('userRoleTxt').textContent = 'Administrator';
       hideLoginOverlay();
-      loadUsers();
     } else {
       err.textContent = data.error || 'Onjuiste inloggegevens.';
       err.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Inloggen';
     }
-  } catch {
-    err.textContent = 'Netwerkfout. Probeer opnieuw.';
+  } catch(e) {
+    err.textContent = 'Inloggen mislukt: ' + e.message;
     err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Inloggen';
+  }
+  // Laad users buiten try/catch
+  if (document.getElementById('loginOverlay').style.display === 'none') {
+    loadUsers();
   }
 }
 
