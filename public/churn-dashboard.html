@@ -2589,7 +2589,9 @@
 
                 const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
                 const prognose = (prognoseData.success && prognoseData.data && prognoseData.data.length > 0) ? prognoseData.data : [];
-                const history = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
+                // Filter maanden met 0 leden eruit voor cleaner grafiek
+                const allHistory = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
+                const history = allHistory.filter(d => d.subscribed > 0);
 
                 // Als beide leeg zijn — toon lege grafiek
                 if (prognose.length === 0 && history.length === 0) {
