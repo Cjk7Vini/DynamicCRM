@@ -3180,7 +3180,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { search } = req.query;
     const users = await withReadConnection(async (client) => {
-      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date,
+      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date, u.licenties,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active,
                p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
@@ -3242,6 +3242,29 @@ app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
     await withWriteConnection(async (client) => { await client.query("DELETE FROM public.users WHERE id=$1 AND role!='admin'", [req.params.id]); });
     res.json({ success: true });
   } catch (error) { console.error('Delete user error:', error); res.status(500).json({ error: 'Fout bij verwijderen gebruiker' }); }
+});
+
+// PATCH /api/admin/users/:id/calculator — toggle calculator licentie
+app.patch('/api/admin/users/:id/calculator', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { calculator } = req.body;
+    const userId = req.params.id;
+    await withWriteConnection(async (client) => {
+      if (calculator) {
+        await client.query(
+          `UPDATE public.users SET licenties = array_append(licenties, 'calculator') WHERE id=$1 AND NOT 'calculator' = ANY(licenties)`,
+          [userId]
+        );
+      } else {
+        await client.query(
+          `UPDATE public.users SET licenties = array_remove(licenties, 'calculator') WHERE id=$1`,
+          [userId]
+        );
+      }
+    });
+    res.json({ success: true });
+  } catch (error) { console.error('Calculator toggle error:', error); res.status(500).json({ error: 'Fout bij aanpassen calculator licentie' }); }
 });
 
 // GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
