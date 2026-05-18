@@ -437,9 +437,27 @@
       <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy">
       <span class="header-brand-name">Dynamic Health Consultancy</span>
     </div>
-    <div class="header-user" id="headerUser">
-      <span class="header-user-name">Ingelogd als <span id="headerUserName"></span></span>
-      <button class="btn-logout" onclick="logout()">Uitloggen</button>
+    <div class="header-user" id="headerUser" style="position:relative;">
+      <button onclick="togglePortaalMenu()" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.9);font-size:13px;transition:background 0.2s;" id="portaalMenuBtn">
+        <div style="width:26px;height:26px;border-radius:50%;background:#333399;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;" id="headerAvatar">?</div>
+        <span id="headerUserName">—</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div id="portaalMenu" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:260px;background:white;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;overflow:hidden;">
+        <!-- Profiel info -->
+        <div style="padding:16px;border-bottom:1px solid #f3f4f6;">
+          <div style="font-size:13px;font-weight:600;color:#111827;" id="menuEmail">—</div>
+          <div style="font-size:12px;color:#9ca3af;margin-top:3px;" id="menuPraktijkCode"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;" id="menuLicenties"></div>
+        </div>
+        <!-- Acties -->
+        <div style="padding:6px 0;">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;color:#374151;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'" onclick="logout()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span style="color:#dc2626;">Uitloggen</span>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -480,18 +498,7 @@
       <!-- Dynamisch ingevuld via JS -->
     </div>
 
-    <!-- Profiel -->
-    <div class="portaal-section-title">Mijn account</div>
-    <div class="profiel-card">
-      <div class="profiel-avatar" id="profielAvatar">?</div>
-      <div class="profiel-info">
-        <h3 id="profielNaam">—</h3>
-        <p id="profielEmail">—</p>
-      </div>
-      <div class="profiel-licenties" id="profielLicenties">
-        <!-- Dynamisch ingevuld -->
-      </div>
-    </div>
+
 
   </div>
 
@@ -699,39 +706,51 @@
         grid.appendChild(tile);
       });
 
-      // Profiel
-      const naam = user.naam || user.email;
-      document.getElementById('profielAvatar').textContent = naam.charAt(0).toUpperCase();
-      document.getElementById('profielNaam').textContent = naam;
-      document.getElementById('profielEmail').textContent = user.email;
+      // Header dropdown menu vullen
+      const email = user.email || '';
+      document.getElementById('headerAvatar').textContent = email.charAt(0).toUpperCase();
+      document.getElementById('headerUserName').textContent = email;
+      document.getElementById('menuEmail').textContent = email;
 
-      // Licentie tags
-      const tagsEl = document.getElementById('profielLicenties');
-      tagsEl.innerHTML = '';
-      if (isAdmin) {
-        const tag = document.createElement('span');
-        tag.className = 'licentie-tag actief';
-        tag.textContent = 'Admin';
-        tagsEl.appendChild(tag);
+      // Praktijkcode tonen
+      const praktijkEl = document.getElementById('menuPraktijkCode');
+      if (user.practice_code) {
+        praktijkEl.textContent = 'Praktijkcode: ' + user.practice_code;
+      } else if (isAdmin) {
+        praktijkEl.textContent = 'Beheerdersaccount';
       }
-      licenties.forEach(l => {
+
+      // Licentie tags in menu
+      const menuLic = document.getElementById('menuLicenties');
+      menuLic.innerHTML = '';
+      const allLicenties = isAdmin ? ['Admin', ...licenties.map(l => LICENTIE_LABELS[l] || l)] : licenties.map(l => LICENTIE_LABELS[l] || l);
+      if (allLicenties.length === 0) allLicenties.push('Geen licenties');
+      allLicenties.forEach(l => {
         const tag = document.createElement('span');
         tag.className = 'licentie-tag actief';
-        tag.textContent = LICENTIE_LABELS[l] || l;
-        tagsEl.appendChild(tag);
+        tag.textContent = l;
+        menuLic.appendChild(tag);
       });
-      if (!isAdmin && licenties.length === 0) {
-        const tag = document.createElement('span');
-        tag.className = 'licentie-tag';
-        tag.textContent = 'Geen licenties';
-        tagsEl.appendChild(tag);
-      }
     }
 
     // ===== ENTER KEY =====
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
         doLogin();
+      }
+    });
+
+    // ===== PORTAAL MENU =====
+    function togglePortaalMenu() {
+      const menu = document.getElementById('portaalMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    document.addEventListener('click', function(e) {
+      const wrap = document.getElementById('headerUser');
+      const menu = document.getElementById('portaalMenu');
+      if (wrap && menu && !wrap.contains(e.target)) {
+        menu.style.display = 'none';
       }
     });
 
