@@ -3267,6 +3267,20 @@ app.patch('/api/admin/users/:id/calculator', requireAuth, async (req, res) => {
   } catch (error) { console.error('Calculator toggle error:', error); res.status(500).json({ error: 'Fout bij aanpassen calculator licentie' }); }
 });
 
+// GET /api/prognose/:practiceCode
+app.get('/api/prognose/:practiceCode', requireAuth, async (req, res) => {
+  try {
+    const { practiceCode } = req.params;
+    const rows = await withReadConnection(async (client) => {
+      return (await client.query(
+        `SELECT jaar, maand, doel_leden FROM prognose WHERE praktijk_code = $1 ORDER BY jaar, maand`,
+        [practiceCode]
+      )).rows;
+    });
+    res.json({ success: true, data: rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
 app.get('/api/auth/nazorg-check', requireAuth, async (req, res) => {
   try {

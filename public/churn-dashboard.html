@@ -2566,101 +2566,106 @@
                 const practice = document.getElementById('practiceFilter')?.value
                     || (currentUser && getPracticeCode()) || null;
 
-                // Zonder praktijk: lege grafiek tonen
+                const ctx = document.getElementById('churnForecastChart');
+                if (churnForecastChart) churnForecastChart.destroy();
+
                 if (!practice) {
-                    const ctx = document.getElementById('churnForecastChart');
-                    if (churnForecastChart) churnForecastChart.destroy();
                     churnForecastChart = new Chart(ctx, {
-                        type: 'line',
+                        type: 'bar',
                         data: { labels: [], datasets: [] },
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                     return;
                 }
 
-                const res = await fetch(`/api/eclub/history/${practice}`, { credentials: 'include' });
-                const data = await res.json();
+                // Haal eClub history en prognose parallel op
+                const [eclubRes, prognoseRes] = await Promise.all([
+                    fetch(`/api/eclub/history/${practice}`, { credentials: 'include' }),
+                    fetch(`/api/prognose/${practice}`, { credentials: 'include' })
+                ]);
 
-                const ctx = document.getElementById('churnForecastChart');
-                if (churnForecastChart) churnForecastChart.destroy();
+                const eclubData = await eclubRes.json();
+                const prognoseData = await prognoseRes.json();
 
-                if (!data.success || !data.data || data.data.length === 0) {
-                    // Fallback naar oude endpoint als geen eclub data
-                    const fallback = await fetch('/api/churn-forecast', { credentials: 'include' });
-                    const fallbackData = await fallback.json();
-                    if (fallbackData.success) {
-                        const allData = [...(fallbackData.historical || []), ...(fallbackData.forecast || [])];
-                        churnForecastChart = new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: allData.map(d => d.month),
-                                datasets: [
-                                    { label: 'Total Members', data: allData.map(d => d.total_members),
-                                      borderColor: '#06c', backgroundColor: 'rgba(0,102,204,0.1)', borderWidth: 2, tension: 0.4 },
-                                    { label: 'Churned Members', data: allData.map(d => d.churned_members),
-                                      borderColor: '#ff3b30', backgroundColor: 'rgba(255,59,48,0.1)', borderWidth: 2, tension: 0.4 }
-                                ]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false,
-                                plugins: { legend: { display: true, position: 'bottom' } },
-                                scales: { y: { beginAtZero: true } } }
-                        });
-                    }
-                    return;
+                // Bouw maand labels op basis van prognose (altijd beschikbaar)
+                const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+                const prognose = (prognoseData.success && prognoseData.data) ? prognoseData.data : [];
+
+                // Bouw lookup voor eClub data op periodestring (YYYY-MM)
+                const eclubLookup = {};
+                if (eclubData.success && eclubData.data) {
+                    eclubData.data.forEach(d => {
+                        // periode formaat: "2026-01" of "jan 2026"
+                        const key = d.periode;
+                        eclubLookup[key] = d.subscribed;
+                    });
                 }
 
-                // Echte eClub data
-                const history = data.data;
+                // Gebruik prognose als basis voor labels
+                const labels = prognose.map(p => `${maandNamen[p.maand - 1]} ${p.jaar}`);
+                const prognoseValues = prognose.map(p => p.doel_leden);
+
+                // Match eClub actual data op maand/jaar
+                const actualValues = prognose.map(p => {
+                    const key = `${p.jaar}-${String(p.maand).padStart(2,'0')}`;
+                    // Probeer ook andere formaten
+                    const keyAlt = `${maandNamen[p.maand - 1]} ${p.jaar}`;
+                    return eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
+                });
 
                 churnForecastChart = new Chart(ctx, {
-                    type: 'line',
+                    type: 'bar',
                     data: {
-                        labels: history.map(d => d.periode),
+                        labels,
                         datasets: [
                             {
-                                label: 'Actieve leden',
-                                data: history.map(d => d.subscribed),
-                                borderColor: '#06c',
-                                backgroundColor: 'rgba(0,102,204,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4,
-                                fill: true
+                                label: 'Actieve leden (werkelijk)',
+                                data: actualValues,
+                                backgroundColor: 'rgba(51,153,204,0.7)',
+                                borderColor: '#3399CC',
+                                borderWidth: 1,
+                                order: 2
                             },
                             {
-                                label: 'Gestopt',
-                                data: history.map(d => d.expiring),
-                                borderColor: '#ff3b30',
-                                backgroundColor: 'rgba(255,59,48,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Nieuw',
-                                data: history.map(d => d.new),
-                                borderColor: '#10b981',
-                                backgroundColor: 'rgba(16,185,129,0.1)',
-                                borderWidth: 2,
-                                tension: 0.4
+                                label: 'Prognose',
+                                data: prognoseValues,
+                                type: 'line',
+                                borderColor: '#99CC33',
+                                backgroundColor: 'transparent',
+                                borderWidth: 2.5,
+                                borderDash: [5, 4],
+                                pointBackgroundColor: '#99CC33',
+                                pointRadius: 3,
+                                tension: 0.3,
+                                order: 1
                             }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
                         plugins: {
                             legend: { display: true, position: 'bottom' },
                             tooltip: {
                                 callbacks: {
                                     afterBody: (items) => {
-                                        const idx = items[0]?.dataIndex;
-                                        if (idx === undefined) return;
-                                        const d = history[idx];
-                                        return [`Retentie: ${d.retentie_pct}%`, `Churn: ${d.churn_pct}%`];
+                                        const actual = items.find(i => i.dataset.label.includes('werkelijk'))?.parsed?.y;
+                                        const forecast = items.find(i => i.dataset.label === 'Prognose')?.parsed?.y;
+                                        if (actual != null && forecast != null) {
+                                            const diff = actual - forecast;
+                                            const pct = ((diff / forecast) * 100).toFixed(1);
+                                            return [diff >= 0 ? `+${diff} boven prognose (${pct}%)` : `${diff} onder prognose (${pct}%)`];
+                                        }
+                                        return [];
                                     }
                                 }
                             }
                         },
-                        scales: { y: { beginAtZero: false } }
+                        scales: {
+                            y: { beginAtZero: false, title: { display: true, text: 'Aantal leden' } },
+                            x: { ticks: { maxRotation: 45 } }
+                        }
                     }
                 });
 
