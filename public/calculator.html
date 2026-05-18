@@ -59,6 +59,46 @@
     .topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
     .topbar-title { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; letter-spacing: 0.1px; }
 
+    /* User dropdown */
+    .user-dropdown-wrap { position: relative; }
+    .user-dropdown-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 6px 12px; cursor: pointer;
+      font-family: inherit; color: rgba(255,255,255,0.9); font-size: 13px;
+      transition: background 0.2s;
+    }
+    .user-dropdown-btn:hover { background: rgba(255,255,255,0.14); }
+    .user-avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #1d4ed8; color: white;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .user-dropdown-menu {
+      display: none; position: absolute; top: calc(100% + 8px); right: 0;
+      width: 220px; background: white; border: 1px solid #e5e7eb;
+      border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+      z-index: 300; overflow: hidden;
+    }
+    .user-dropdown-menu.open { display: block; }
+    .dd-section {
+      font-size: 10px; font-weight: 700; color: #9ca3af;
+      letter-spacing: 0.6px; text-transform: uppercase;
+      padding: 10px 14px 4px;
+    }
+    .dd-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; font-size: 13px; color: #374151;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .dd-item:hover { background: #f9fafb; }
+    .dd-item svg { width: 14px; height: 14px; flex-shrink: 0; color: #9ca3af; }
+    .dd-item.danger { color: #dc2626; }
+    .dd-item.danger svg { color: #dc2626; }
+    .dd-item.danger:hover { background: #fef2f2; }
+    .dd-sep { height: 1px; background: #f3f4f6; margin: 4px 0; }
+
     /* Layout */
     .layout { display: flex; gap: 0; max-width: 1320px; margin: 0 auto; padding: 28px 24px 80px; gap: 20px; align-items: flex-start; }
 
@@ -289,16 +329,31 @@
 </head>
 <body>
 
-<header class="topbar" style="display:flex;align-items:center;justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:0;">
+<header class="topbar" style="justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:16px;">
     <img class="topbar-logo" src="/images/dynamic-logo-2.png" onerror="this.style.display='none'" alt="">
     <div class="topbar-sep"></div>
     <span class="topbar-title">Bezettingsgraad Calculator</span>
   </div>
-  <a href="/portaal.html" style="display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);font-size:13px;font-family:inherit;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    Portaal
-  </a>
+  <div class="user-dropdown-wrap" id="userDropdownWrap" style="display:none;">
+    <button class="user-dropdown-btn" onclick="toggleDropdown()">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span id="userEmailLabel">—</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;opacity:0.7;"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="user-dropdown-menu" id="userDropdownMenu">
+      <div class="dd-section">Account</div>
+      <div class="dd-item" onclick="window.location.href='/portaal.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Portaal
+      </div>
+      <div class="dd-sep"></div>
+      <div class="dd-item danger" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Uitloggen
+      </div>
+    </div>
+  </div>
 </header>
 
 <div class="layout">
@@ -628,6 +683,49 @@
   }
 
   bouwTabel();
+
+  // ===== AUTH CHECK =====
+  (async function() {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      const data = await res.json();
+      if (!data.success || !data.user) {
+        window.location.href = '/portaal.html';
+        return;
+      }
+      const user = data.user;
+      const isAdmin = user.role === 'admin';
+      const licenties = user.licenties || [];
+      const heeftToegang = isAdmin || licenties.includes('calculator');
+      if (!heeftToegang) {
+        window.location.href = '/portaal.html';
+        return;
+      }
+      // Toon dropdown
+      const email = user.email || '';
+      document.getElementById('userEmailLabel').textContent = email;
+      document.getElementById('userAvatar').textContent = email.charAt(0).toUpperCase();
+      document.getElementById('userDropdownWrap').style.display = 'block';
+    } catch(e) {
+      window.location.href = '/portaal.html';
+    }
+  })();
+
+  function toggleDropdown() {
+    document.getElementById('userDropdownMenu').classList.toggle('open');
+  }
+
+  document.addEventListener('click', function(e) {
+    const wrap = document.getElementById('userDropdownWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('userDropdownMenu').classList.remove('open');
+    }
+  });
+
+  async function doLogout() {
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch(e) {}
+    window.location.href = '/portaal.html';
+  }
 </script>
 </body>
 </html>

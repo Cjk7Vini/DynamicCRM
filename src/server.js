@@ -3241,7 +3241,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const user = await withReadConnection(async (client) => {
       const result = await client.query(
-        'SELECT id, email, role, practice_code, organisation_codes FROM public.users WHERE id = $1',
+        'SELECT id, email, role, practice_code, organisation_codes, licenties FROM public.users WHERE id = $1',
         [req.session.userId]
       );
       return result.rows[0];
@@ -3258,7 +3258,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
         email: user.email,
         role: user.role,
         practice_code: user.practice_code,
-        organisation_codes: user.organisation_codes || null
+        organisation_codes: user.organisation_codes || null,
+        licenties: user.licenties || []
       }
     });
   } catch (error) {
