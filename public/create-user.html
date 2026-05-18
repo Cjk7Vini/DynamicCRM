@@ -404,7 +404,7 @@ async function checkAdmin() {
     const email = data.user.email || '';
     document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
     document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
-    document.getElementById('userRoleTxt').textContent = 'Administrator';
+    // userRoleTxt niet aanwezig in deze pagina
     document.getElementById('loginOverlay').style.display = 'none';
   } catch {
     document.getElementById('loginOverlay').style.display = 'flex';
@@ -436,7 +436,7 @@ async function doOverlayLogin() {
       const email = data.user.email || '';
       document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
       document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
-      document.getElementById('userRoleTxt').textContent = 'Administrator';
+      // userRoleTxt niet aanwezig in deze pagina
       document.getElementById('loginOverlay').style.display = 'none';
       loadUsers();
     } else {
