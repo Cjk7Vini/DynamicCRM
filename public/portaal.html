@@ -601,7 +601,10 @@
         const data = await res.json();
 
         if (data.success && data.user) {
-          currentUser = data.user;
+          // Haal volledige user data op inclusief licenties
+          const meRes = await fetch('/api/auth/me');
+          const meData = await meRes.json();
+          currentUser = meData.success ? meData.user : data.user;
           showPortaal();
         } else {
           showError(data.error || 'Onjuist e-mailadres of wachtwoord.');
