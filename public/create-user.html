@@ -444,8 +444,12 @@ async function doOverlayLogin() {
         btn.disabled = false; btn.textContent = 'Inloggen';
         return;
       }
+      // Vul header direct zonder nieuwe auth check
+      const em = data.user.email || '';
+      document.getElementById('userInitials').textContent = em.slice(0,2).toUpperCase();
+      document.getElementById('userEmailDisplay').textContent = em.length > 28 ? em.slice(0,28)+'...' : em;
+      document.getElementById('userRoleTxt').textContent = 'Administrator';
       hideLoginOverlay();
-      checkAdmin();
       loadUsers();
     } else {
       err.textContent = data.error || 'Onjuiste inloggegevens.';
