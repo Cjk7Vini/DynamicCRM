@@ -4465,9 +4465,22 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
 app.get('/api/nazorg/client/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const praktijkCode = req.session.practiceCode;
+    const role = req.session.role;
+    const organisationCodes = role === 'organisation'
+      ? (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean)
+      : [];
+
     const data = await withReadConnection(async (client) => {
       const c = (await client.query('SELECT * FROM nazorg_clients WHERE id=$1', [id])).rows[0];
       if (!c) return null;
+
+      // Toegangscheck
+      if (role !== 'admin') {
+        if (praktijkCode && c.praktijk_code !== praktijkCode) return null;
+        if (role === 'organisation' && !organisationCodes.includes(c.praktijk_code)) return null;
+      }
+
       const emails = (await client.query('SELECT * FROM nazorg_emails WHERE client_id=$1 ORDER BY mail_nummer', [id])).rows;
       const reacties = (await client.query('SELECT * FROM nazorg_reacties WHERE client_id=$1 ORDER BY mail_nummer', [id])).rows;
       const taken = (await client.query('SELECT * FROM nazorg_taken WHERE client_id=$1 ORDER BY aangemaakt_op DESC', [id])).rows;
@@ -4482,18 +4495,33 @@ app.get('/api/nazorg/client/:id', requireAuth, async (req, res) => {
 app.get('/api/nazorg/taken', requireAuth, async (req, res) => {
   try {
     const praktijkCode = req.session.practiceCode;
+    const role = req.session.role;
+    const organisationCodes = role === 'organisation'
+      ? (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean)
+      : [];
+
     const rows = await withReadConnection(async (client) => {
-      const q = praktijkCode
-        ? `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
+      if (praktijkCode) {
+        const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
            FROM nazorg_taken nt 
            JOIN nazorg_clients nc ON nc.id = nt.client_id
-           WHERE nt.status = 'open' AND nt.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`
-        : `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
+           WHERE nt.status = 'open' AND nt.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`;
+        return (await client.query(q, [praktijkCode])).rows;
+      } else if (role === 'organisation' && organisationCodes.length > 0) {
+        const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
+           FROM nazorg_taken nt 
+           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           WHERE nt.status = 'open' AND nt.praktijk_code = ANY($1) ORDER BY nt.aangemaakt_op DESC`;
+        return (await client.query(q, [organisationCodes])).rows;
+      } else if (role === 'admin') {
+        const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
            FROM nazorg_taken nt 
            JOIN nazorg_clients nc ON nc.id = nt.client_id
            WHERE nt.status = 'open' ORDER BY nt.aangemaakt_op DESC`;
-      const params = praktijkCode ? [praktijkCode] : [];
-      return (await client.query(q, params)).rows;
+        return (await client.query(q)).rows;
+      } else {
+        return [];
+      }
     });
     res.json({ success: true, taken: rows });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
