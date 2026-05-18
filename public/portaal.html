@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DHC Portaal — Dynamic Health Consultancy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --dark: #111827;
+      --dark2: #1f2937;
+      --teal: #3399CC;
+      --teal-light: #5bb8e8;
+      --blue: #333399;
+      --green: #99CC33;
+      --green-dark: #7aaa1f;
+      --surface: #ffffff;
+      --surface2: #f8fafc;
+      --border: #e5e7eb;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --text-light: #9ca3af;
+      --locked: #d1d5db;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface2);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: var(--dark);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-brand img {
+      height: 36px;
+      width: auto;
+    }
+
+    .header-brand-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      color: #ffffff;
+      letter-spacing: 0.3px;
+    }
+
+    .header-user {
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-user.visible { display: flex; }
+
+    .header-user-name {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .header-user-name span {
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    .btn-logout {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #d1d5db;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      background: rgba(255,255,255,0.14);
+      color: #ffffff;
+    }
+
+    /* ===== LOGIN SCREEN ===== */
+    #loginScreen {
+      min-height: calc(100vh - 64px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 420px;
+      animation: fadeUp 0.4s ease-out;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 6px;
+    }
+
+    .login-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 36px;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 7px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+      background: var(--surface);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(51,153,204,0.12);
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--dark);
+      color: #ffffff;
+      border: none;
+      padding: 13px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-login:hover { background: #1f2937; }
+    .btn-login:active { transform: scale(0.99); }
+    .btn-login:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    .login-error {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 14px;
+    }
+
+    .login-error.visible { display: block; }
+
+    /* ===== PORTAAL SCREEN ===== */
+    #portaalScreen {
+      display: none;
+      padding: 48px 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+      animation: fadeUp 0.4s ease-out;
+    }
+
+    #portaalScreen.visible { display: block; }
+
+    .portaal-welcome {
+      margin-bottom: 40px;
+    }
+
+    .portaal-welcome h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 6px;
+    }
+
+    .portaal-welcome p {
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .portaal-section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-light);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      margin-top: 40px;
+    }
+
+    .portaal-section-title:first-of-type { margin-top: 0; }
+
+    /* ===== APP TILES ===== */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .tile {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      cursor: pointer;
+      transition: all 0.22s;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      display: block;
+    }
+
+    .tile::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--tile-color, var(--teal));
+      transform: scaleX(0);
+      transition: transform 0.22s;
+      transform-origin: left;
+    }
+
+    .tile:hover:not(.tile-locked) {
+      border-color: var(--tile-color, var(--teal));
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      transform: translateY(-2px);
+    }
+
+    .tile:hover:not(.tile-locked)::before {
+      transform: scaleX(1);
+    }
+
+    .tile-locked {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .tile-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--tile-bg, rgba(51,153,204,0.1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .tile-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--tile-color, var(--teal));
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .tile-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 6px;
+    }
+
+    .tile-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .tile-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--tile-color, var(--teal));
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    .tile-badge-locked {
+      background: var(--locked);
+      color: #6b7280;
+    }
+
+    /* Dashboard tile */
+    .tile-dashboard { --tile-color: #3399CC; --tile-bg: rgba(51,153,204,0.08); }
+    /* Nazorg tile */
+    .tile-nazorg { --tile-color: #99CC33; --tile-bg: rgba(153,204,51,0.08); }
+    /* Calculator tile */
+    .tile-calculator { --tile-color: #333399; --tile-bg: rgba(51,51,153,0.08); }
+    /* E-learning tile */
+    .tile-elearning { --tile-color: #f59e0b; --tile-bg: rgba(245,158,11,0.08); }
+    /* Prognose tile */
+    .tile-prognose { --tile-color: #10b981; --tile-bg: rgba(16,185,129,0.08); }
+
+    /* ===== PROFIEL SECTIE ===== */
+    .profiel-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .profiel-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .profiel-info h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 3px;
+    }
+
+    .profiel-info p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .profiel-licenties {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .licentie-tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .licentie-tag.actief {
+      background: rgba(153,204,51,0.1);
+      border-color: rgba(153,204,51,0.3);
+      color: #4a7a0f;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 640px) {
+      .header { padding: 0 20px; }
+      #portaalScreen { padding: 32px 20px; }
+      .login-card { padding: 36px 28px; }
+      .tiles-grid { grid-template-columns: 1fr; }
+      .profiel-card { flex-direction: column; align-items: flex-start; }
+      .profiel-licenties { margin-left: 0; justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <img src="images/dynamic-logo-2.png" alt="Dynamic Health Consultancy">
+      <span class="header-brand-name">Dynamic Health Consultancy</span>
+    </div>
+    <div class="header-user" id="headerUser">
+      <span class="header-user-name">Ingelogd als <span id="headerUserName"></span></span>
+      <button class="btn-logout" onclick="logout()">Uitloggen</button>
+    </div>
+  </header>
+
+  <!-- LOGIN SCHERM -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <h1 class="login-title">Welkom terug</h1>
+      <p class="login-subtitle">Log in om toegang te krijgen tot het DHC portaal</p>
+
+      <div class="form-group">
+        <label for="emailInput">E-mailadres</label>
+        <input type="email" id="emailInput" placeholder="jouw@email.nl" autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label for="passwordInput">Wachtwoord</label>
+        <input type="password" id="passwordInput" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn-login" id="loginBtn" onclick="doLogin()">Inloggen</button>
+
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- PORTAAL SCHERM -->
+  <div id="portaalScreen">
+
+    <!-- Welkom -->
+    <div class="portaal-welcome">
+      <h1 id="welcomeTitle">Goedemorgen</h1>
+      <p id="welcomeSubtitle">Selecteer een applicatie om mee aan de slag te gaan.</p>
+    </div>
+
+    <!-- Applicaties -->
+    <div class="portaal-section-title">Applicaties</div>
+    <div class="tiles-grid" id="tilesGrid">
+      <!-- Dynamisch ingevuld via JS -->
+    </div>
+
+    <!-- Profiel -->
+    <div class="portaal-section-title">Mijn account</div>
+    <div class="profiel-card">
+      <div class="profiel-avatar" id="profielAvatar">?</div>
+      <div class="profiel-info">
+        <h3 id="profielNaam">—</h3>
+        <p id="profielEmail">—</p>
+      </div>
+      <div class="profiel-licenties" id="profielLicenties">
+        <!-- Dynamisch ingevuld -->
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ===== CONFIGURATIE =====
+    const APPS = [
+      {
+        id: 'dashboard',
+        naam: 'CRM Dashboard',
+        desc: 'Leads, afspraken, eClub data en marketing performance per praktijk.',
+        url: '/churn-dashboard.html',
+        icon: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+        klasse: 'tile-dashboard',
+        licentie: 'dashboard'
+      },
+      {
+        id: 'nazorg',
+        naam: 'Nazorg Portaal',
+        desc: 'Nazorgtrajecten, taken en communicatie met praktijkleden.',
+        url: '/nazorg-portaal.html',
+        icon: `<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+        klasse: 'tile-nazorg',
+        licentie: 'nazorg'
+      },
+      {
+        id: 'calculator',
+        naam: 'ROI Calculator',
+        desc: 'Bereken de return on investment van DHC diensten voor praktijken.',
+        url: '/calculator.html',
+        icon: `<svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>`,
+        klasse: 'tile-calculator',
+        licentie: 'calculator'
+      },
+      {
+        id: 'elearning',
+        naam: 'E-learning',
+        desc: 'Trainingen, modules en certificaten voor medewerkers en praktijken.',
+        url: '/elearning.html',
+        icon: `<svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`,
+        klasse: 'tile-elearning',
+        licentie: null // altijd toegankelijk bij elke licentie
+      },
+      {
+        id: 'prognose',
+        naam: 'Prognose Tool',
+        desc: 'Stel maandelijkse doelen in per praktijk via Excel upload.',
+        url: '/prognose.html',
+        icon: `<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+        klasse: 'tile-prognose',
+        licentie: 'admin' // alleen admin
+      }
+    ];
+
+    const LICENTIE_LABELS = {
+      dashboard: 'Dashboard',
+      nazorg: 'Nazorg',
+      calculator: 'Calculator'
+    };
+
+    let currentUser = null;
+
+    // ===== SESSIE CHECK =====
+    async function checkSession() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.success && data.user) {
+          currentUser = data.user;
+          showPortaal();
+        } else {
+          showLogin();
+        }
+      } catch(e) {
+        showLogin();
+      }
+    }
+
+    // ===== LOGIN =====
+    async function doLogin() {
+      const email = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const btn = document.getElementById('loginBtn');
+      const errorEl = document.getElementById('loginError');
+
+      if (!email || !password) {
+        showError('Vul je e-mailadres en wachtwoord in.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Inloggen...';
+      errorEl.classList.remove('visible');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (data.success && data.user) {
+          currentUser = data.user;
+          showPortaal();
+        } else {
+          showError(data.error || 'Onjuist e-mailadres of wachtwoord.');
+          btn.disabled = false;
+          btn.textContent = 'Inloggen';
+        }
+      } catch(e) {
+        showError('Kan geen verbinding maken. Probeer het opnieuw.');
+        btn.disabled = false;
+        btn.textContent = 'Inloggen';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('loginError');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    // ===== LOGOUT =====
+    async function logout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch(e) {}
+      currentUser = null;
+      showLogin();
+    }
+
+    // ===== SCHERMEN =====
+    function showLogin() {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('portaalScreen').classList.remove('visible');
+      document.getElementById('headerUser').classList.remove('visible');
+      document.getElementById('emailInput').focus();
+    }
+
+    function showPortaal() {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('portaalScreen').classList.add('visible');
+      document.getElementById('headerUser').classList.add('visible');
+
+      renderPortaal();
+    }
+
+    // ===== PORTAAL RENDEREN =====
+    function renderPortaal() {
+      const user = currentUser;
+      const licenties = user.licenties || [];
+      const isAdmin = user.role === 'admin';
+      const heeftLicentie = licenties.length > 0;
+
+      // Header
+      document.getElementById('headerUserName').textContent = user.naam || user.email;
+
+      // Welkom
+      const uur = new Date().getHours();
+      const groet = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond';
+      document.getElementById('welcomeTitle').textContent = `${groet}, ${(user.naam || user.email).split(' ')[0]}`;
+      document.getElementById('welcomeSubtitle').textContent = 'Selecteer een applicatie om mee aan de slag te gaan.';
+
+      // Tiles
+      const grid = document.getElementById('tilesGrid');
+      grid.innerHTML = '';
+
+      APPS.forEach(app => {
+        // Bepaal toegang
+        let toegang = false;
+        if (app.licentie === null) {
+          // E-learning: toegankelijk bij elke licentie
+          toegang = heeftLicentie || isAdmin;
+        } else if (app.licentie === 'admin') {
+          // Prognose: alleen admin
+          toegang = isAdmin;
+        } else {
+          // Normale licentie check
+          toegang = isAdmin || licenties.includes(app.licentie);
+        }
+
+        // Verberg prognose en e-learning als ze nog niet bestaan (coming soon)
+        const comingSoon = ['elearning', 'prognose'].includes(app.id);
+
+        const tile = document.createElement(toegang && !comingSoon ? 'a' : 'div');
+        tile.className = `tile ${app.klasse} ${(!toegang || comingSoon) ? 'tile-locked' : ''}`;
+        if (toegang && !comingSoon) {
+          tile.href = app.url;
+        }
+
+        let badge = '';
+        if (comingSoon) {
+          badge = `<span class="tile-badge tile-badge-locked">Binnenkort</span>`;
+        } else if (!toegang) {
+          badge = `<span class="tile-badge tile-badge-locked">Geen licentie</span>`;
+        }
+
+        tile.innerHTML = `
+          ${badge}
+          <div class="tile-icon">${app.icon}</div>
+          <div class="tile-name">${app.naam}</div>
+          <div class="tile-desc">${app.desc}</div>
+        `;
+
+        grid.appendChild(tile);
+      });
+
+      // Profiel
+      const naam = user.naam || user.email;
+      document.getElementById('profielAvatar').textContent = naam.charAt(0).toUpperCase();
+      document.getElementById('profielNaam').textContent = naam;
+      document.getElementById('profielEmail').textContent = user.email;
+
+      // Licentie tags
+      const tagsEl = document.getElementById('profielLicenties');
+      tagsEl.innerHTML = '';
+      if (isAdmin) {
+        const tag = document.createElement('span');
+        tag.className = 'licentie-tag actief';
+        tag.textContent = 'Admin';
+        tagsEl.appendChild(tag);
+      }
+      licenties.forEach(l => {
+        const tag = document.createElement('span');
+        tag.className = 'licentie-tag actief';
+        tag.textContent = LICENTIE_LABELS[l] || l;
+        tagsEl.appendChild(tag);
+      });
+      if (!isAdmin && licenties.length === 0) {
+        const tag = document.createElement('span');
+        tag.className = 'licentie-tag';
+        tag.textContent = 'Geen licenties';
+        tagsEl.appendChild(tag);
+      }
+    }
+
+    // ===== ENTER KEY =====
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
+        doLogin();
+      }
+    });
+
+    // ===== INIT =====
+    checkSession();
+  </script>
+
+</body>
+</html>
