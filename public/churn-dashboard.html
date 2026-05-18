@@ -2587,18 +2587,47 @@
                 const eclubData = await eclubRes.json();
                 const prognoseData = await prognoseRes.json();
 
-                // Bouw maand labels op basis van prognose (altijd beschikbaar)
                 const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
-                const prognose = (prognoseData.success && prognoseData.data) ? prognoseData.data : [];
+                const prognose = (prognoseData.success && prognoseData.data && prognoseData.data.length > 0) ? prognoseData.data : [];
+                const history = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
 
-                // Bouw lookup voor eClub data op periodestring (YYYY-MM)
-                const eclubLookup = {};
-                if (eclubData.success && eclubData.data) {
-                    eclubData.data.forEach(d => {
-                        // periode formaat: "2026-01" of "jan 2026"
-                        const key = d.periode;
-                        eclubLookup[key] = d.subscribed;
+                // Als beide leeg zijn — toon lege grafiek
+                if (prognose.length === 0 && history.length === 0) {
+                    churnForecastChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } } }
                     });
+                    return;
+                }
+
+                // Bouw lookup voor eClub data
+                const eclubLookup = {};
+                history.forEach(d => {
+                    const key = d.periode;
+                    eclubLookup[key] = d.subscribed;
+                });
+
+                // Als geen prognose maar wel eClub data — toon alleen balken
+                if (prognose.length === 0) {
+                    churnForecastChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: history.map(d => d.periode),
+                            datasets: [{
+                                label: 'Actieve leden (werkelijk)',
+                                data: history.map(d => d.subscribed),
+                                backgroundColor: 'rgba(51,153,204,0.7)',
+                                borderColor: '#3399CC',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: true, position: 'bottom' } },
+                            scales: { y: { beginAtZero: false } } }
+                    });
+                    return;
                 }
 
                 // Gebruik prognose als basis voor labels
@@ -2608,7 +2637,6 @@
                 // Match eClub actual data op maand/jaar
                 const actualValues = prognose.map(p => {
                     const key = `${p.jaar}-${String(p.maand).padStart(2,'0')}`;
-                    // Probeer ook andere formaten
                     const keyAlt = `${maandNamen[p.maand - 1]} ${p.jaar}`;
                     return eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
                 });
