@@ -2578,14 +2578,17 @@
                     return;
                 }
 
-                // Haal eClub history en prognose parallel op
-                const [eclubRes, prognoseRes] = await Promise.all([
+                // Haal eClub history, prognose en handmatig ledenaantal parallel op
+                const [eclubRes, prognoseRes, ledenRes] = await Promise.all([
                     fetch(`/api/eclub/history/${practice}`, { credentials: 'include' }),
-                    fetch(`/api/prognose/${practice}`, { credentials: 'include' })
+                    fetch(`/api/prognose/${practice}`, { credentials: 'include' }),
+                    fetch(`/api/praktijk-leden/${practice}`, { credentials: 'include' })
                 ]);
 
                 const eclubData = await eclubRes.json();
                 const prognoseData = await prognoseRes.json();
+                const ledenData = await ledenRes.json().catch(() => ({}));
+                const ledenHandmatig = ledenData.leden_handmatig || null;
 
                 const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
                 const prognose = (prognoseData.success && prognoseData.data && prognoseData.data.length > 0) ? prognoseData.data : [];
@@ -2637,11 +2640,19 @@
                 const prognoseValues = prognose.map(p => p.doel_leden);
 
                 // Match eClub actual data op maand/jaar
+                // Gebruik leden_handmatig als fallback als geen eClub data
                 const actualValues = prognose.map(p => {
                     const key = `${p.jaar}-${String(p.maand).padStart(2,'0')}`;
                     const keyAlt = `${maandNamen[p.maand - 1]} ${p.jaar}`;
                     return eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
                 });
+                // Als geen eClub data maar wel handmatig ledenaantal — gebruik als startpunt voor eerste maand
+                if (history.length === 0 && ledenHandmatig && actualValues.every(v => v === null)) {
+                    // Zet handmatig ledenaantal als huidig punt (huidige maand)
+                    const nu = new Date();
+                    const idx = prognose.findIndex(p => p.jaar === nu.getFullYear() && p.maand === nu.getMonth() + 1);
+                    if (idx >= 0) actualValues[idx] = ledenHandmatig;
+                }
 
                 churnForecastChart = new Chart(ctx, {
                     type: 'bar',

@@ -3314,6 +3314,34 @@ app.post('/api/prognose', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// GET /api/praktijk-leden/:code — huidig handmatig ledenaantal
+app.get('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
+  try {
+    const row = await withReadConnection(async (client) => {
+      return (await client.query(
+        'SELECT leden_handmatig FROM praktijken WHERE code = $1',
+        [req.params.code]
+      )).rows[0];
+    });
+    res.json({ success: true, leden_handmatig: row?.leden_handmatig || null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// PATCH /api/praktijk-leden/:code — sla handmatig ledenaantal op
+app.patch('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { leden_handmatig } = req.body;
+    await withWriteConnection(async (client) => {
+      await client.query(
+        'UPDATE praktijken SET leden_handmatig = $1 WHERE code = $2',
+        [leden_handmatig, req.params.code]
+      );
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
 app.get('/api/auth/nazorg-check', requireAuth, async (req, res) => {
   try {

@@ -546,6 +546,11 @@
             <option value="2027">2027</option>
             <option value="2028">2028</option>
           </select>
+          <div style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 12px;">
+            <span style="font-size:12px;color:#9ca3af;white-space:nowrap;">Huidig ledenaantal:</span>
+            <input type="number" id="ledenHandmatigInput" placeholder="—" style="width:80px;border:none;background:transparent;font-size:13px;font-family:inherit;outline:none;text-align:right;">
+            <button onclick="slaLedenOp()" style="padding:4px 10px;background:#111827;color:white;border:none;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;">Opslaan</button>
+          </div>
         </div>
         <!-- Tabel -->
         <div id="prognoseInhoud">
@@ -965,14 +970,24 @@
 
       if (!code) {
         inhoud.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Selecteer een praktijk om de prognose te bekijken.</div>';
+        document.getElementById('ledenHandmatigInput').value = '';
         return;
       }
 
       inhoud.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Laden...</div>';
 
       try {
-        const res = await fetch('/api/prognose/' + code, { credentials: 'include' });
-        const data = await res.json();
+        // Laad prognose en huidig ledenaantal parallel
+        const [prognoseRes, ledenRes] = await Promise.all([
+          fetch('/api/prognose/' + code, { credentials: 'include' }),
+          fetch('/api/praktijk-leden/' + code, { credentials: 'include' })
+        ]);
+        const data = await prognoseRes.json();
+        const ledenData = await ledenRes.json();
+
+        // Vul huidig ledenaantal in
+        const ledenInput = document.getElementById('ledenHandmatigInput');
+        ledenInput.value = ledenData.leden_handmatig || '';
 
         // Filter op geselecteerd jaar
         const rijen = (data.data || []).filter(r => String(r.jaar) === String(jaar));
@@ -1031,6 +1046,34 @@
       fb.style.display = 'block';
       fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
       fb.textContent = succes + ' maanden opgeslagen.';
+    }
+
+    async function slaLedenOp() {
+      const code = document.getElementById('prognosePraktijkSelect').value;
+      const val = parseInt(document.getElementById('ledenHandmatigInput').value);
+      const fb = document.getElementById('prognoseFeedback');
+      if (!code || isNaN(val)) return;
+      try {
+        const res = await fetch('/api/praktijk-leden/' + code, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ leden_handmatig: val })
+        });
+        const data = await res.json();
+        fb.style.display = 'block';
+        if (data.success) {
+          fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+          fb.textContent = 'Ledenaantal opgeslagen: ' + val + ' leden';
+        } else {
+          fb.style.background = '#fef2f2'; fb.style.color = '#dc2626';
+          fb.textContent = data.error || 'Fout bij opslaan';
+        }
+      } catch(e) {
+        fb.style.display = 'block';
+        fb.style.background = '#fef2f2'; fb.style.color = '#dc2626';
+        fb.textContent = 'Netwerkfout: ' + e.message;
+      }
     }
 
     async function _opslaanPrognose(code, jaar, maand, doel, stil = false) {
