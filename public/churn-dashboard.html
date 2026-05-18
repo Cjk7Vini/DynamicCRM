@@ -2072,7 +2072,7 @@
             try {
                 const res = await fetch('/api/auth/me', { credentials: 'include' });
                 if (!res.ok) {
-                    window.location.href = '/login.html';
+                    window.location.href = '/portaal.html';
                     return false;
                 }
                 const data = await res.json();
@@ -2081,7 +2081,7 @@
                 return true;
             } catch (err) {
                 console.error('Auth check failed:', err);
-                window.location.href = '/login.html';
+                window.location.href = '/portaal.html';
                 return false;
             }
         }
@@ -2193,7 +2193,7 @@
             } catch (err) {
                 console.error('Logout failed:', err);
             }
-            window.location.href = '/login.html';
+            window.location.href = '/portaal.html';
         }
 
         // Password change modal functions
@@ -3456,7 +3456,7 @@
 
             // Redirect with message
             alert('Je bent uitgelogd wegens inactiviteit.');
-            window.location.href = '/login.html';
+            window.location.href = '/portaal.html';
         }
 
         // ============================================

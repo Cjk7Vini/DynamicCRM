@@ -3853,7 +3853,7 @@ app.get('/nazorg-portaal.html', requireAuth, async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Nazorg portaal auth error:', err);
-    res.redirect('/login.html');
+    res.redirect('/portaal.html');
   }
 });
 
