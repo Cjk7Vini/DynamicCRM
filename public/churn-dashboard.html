@@ -1263,8 +1263,8 @@
         <div class="card">
             <div class="card-header">
                 <div>
-                    <div class="card-title">Churn Forecast</div>
-                    <div class="card-subtitle">Ledenverloop per maand (eClub)</div>
+                    <div class="card-title">Ledengroei: Forecast vs Actueel</div>
+                    <div class="card-subtitle">Prognose (lijn) vs werkelijk aantal leden (balken)</div>
                 </div>
             </div>
             <div class="card-body">
@@ -2596,14 +2596,35 @@
                 const allHistory = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
                 const history = allHistory.filter(d => d.subscribed > 0);
 
-                // Als beide leeg zijn — toon lege grafiek
+                // Als beide leeg zijn maar wel handmatig ledenaantal — toon dat
                 if (prognose.length === 0 && history.length === 0) {
-                    churnForecastChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: { labels: [], datasets: [] },
-                        options: { responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } } }
-                    });
+                    if (ledenHandmatig) {
+                        const nu = new Date();
+                        const maandLabel = `${maandNamen[nu.getMonth()]} ${nu.getFullYear()}`;
+                        churnForecastChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: [maandLabel],
+                                datasets: [{
+                                    label: 'Actieve leden (werkelijk)',
+                                    data: [ledenHandmatig],
+                                    backgroundColor: 'rgba(51,153,204,0.7)',
+                                    borderColor: '#3399CC',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: true, position: 'bottom' } },
+                                scales: { y: { beginAtZero: false } } }
+                        });
+                    } else {
+                        churnForecastChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: { labels: [], datasets: [] },
+                            options: { responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: false } } }
+                        });
+                    }
                     return;
                 }
 
