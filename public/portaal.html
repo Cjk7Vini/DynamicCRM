@@ -523,6 +523,40 @@
     </div>
   </div>
 
+  <!-- PROGNOSE MODAL -->
+  <div id="prognoseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:20px;width:100%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="padding:24px 28px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#111827;">Prognose Tool</div>
+          <div style="font-size:13px;color:#9ca3af;margin-top:2px;">Maandelijkse ledengroei doelstellingen per praktijk</div>
+        </div>
+        <button onclick="sluitPrognoseModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:24px 28px;">
+        <!-- Praktijk selector -->
+        <div style="margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <select id="prognosePraktijkSelect" onchange="laadPrognose()" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;min-width:220px;">
+            <option value="">-- Selecteer praktijk --</option>
+          </select>
+          <select id="prognoseJaarSelect" onchange="laadPrognose()" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;">
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+        </div>
+        <!-- Tabel -->
+        <div id="prognoseInhoud">
+          <div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Selecteer een praktijk om de prognose te bekijken.</div>
+        </div>
+        <!-- Feedback -->
+        <div id="prognoseFeedback" style="display:none;margin-top:16px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ===== CONFIGURATIE =====
     const APPS = [
@@ -566,7 +600,7 @@
         id: 'prognose',
         naam: 'Prognose Tool',
         desc: 'Stel maandelijkse doelen in per praktijk via Excel upload.',
-        url: '/prognose.html',
+        url: null,
         icon: `<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
         klasse: 'tile-prognose',
         licentie: 'admin' // alleen admin
@@ -712,11 +746,19 @@
           toegang = isAdmin || licenties.includes(app.licentie);
         }
 
-        const comingSoon = ['elearning', 'prognose'].includes(app.id);
+        const comingSoon = ['elearning'].includes(app.id);
         const isLicentieTile = app.id === 'licenties';
+        const isPrognoseTile = app.id === 'prognose';
 
         let tile;
-        if (isLicentieTile) {
+        if (isPrognoseTile) {
+          tile = document.createElement('div');
+          tile.className = `tile ${app.klasse} ${!isAdmin ? 'tile-locked' : ''}`;
+          if (isAdmin) {
+            tile.onclick = openPrognoseModal;
+            tile.style.cursor = 'pointer';
+          }
+        } else if (isLicentieTile) {
           tile = document.createElement('div');
           tile.className = `tile ${app.klasse}`;
           tile.onclick = openLicentieModal;
@@ -874,6 +916,151 @@
         fb.style.display = 'block';
         fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
         fb.textContent = 'Netwerkfout: ' + e.message;
+      }
+    }
+
+    // ===== PROGNOSE MODAL =====
+    const MAAND_NAMEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+
+    async function openPrognoseModal() {
+      const modal = document.getElementById('prognoseModal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      // Laad praktijken in dropdown
+      try {
+        const res = await fetch('/api/admin/praktijken', { credentials: 'include' });
+        const data = await res.json();
+        const sel = document.getElementById('prognosePraktijkSelect');
+        sel.innerHTML = '<option value="">-- Selecteer praktijk --</option>';
+        if (data.success && data.praktijken) {
+          data.praktijken.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.code;
+            opt.textContent = p.naam + ' (' + p.code + ')';
+            sel.appendChild(opt);
+          });
+        }
+      } catch(e) {
+        console.error('Praktijken laden mislukt:', e);
+      }
+    }
+
+    function sluitPrognoseModal() {
+      document.getElementById('prognoseModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function(e) {
+      const modal = document.getElementById('prognoseModal');
+      if (modal && e.target === modal) sluitPrognoseModal();
+    });
+
+    async function laadPrognose() {
+      const code = document.getElementById('prognosePraktijkSelect').value;
+      const jaar = document.getElementById('prognoseJaarSelect').value;
+      const inhoud = document.getElementById('prognoseInhoud');
+      const fb = document.getElementById('prognoseFeedback');
+      fb.style.display = 'none';
+
+      if (!code) {
+        inhoud.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Selecteer een praktijk om de prognose te bekijken.</div>';
+        return;
+      }
+
+      inhoud.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Laden...</div>';
+
+      try {
+        const res = await fetch('/api/prognose/' + code, { credentials: 'include' });
+        const data = await res.json();
+
+        // Filter op geselecteerd jaar
+        const rijen = (data.data || []).filter(r => String(r.jaar) === String(jaar));
+
+        // Bouw tabel op voor alle 12 maanden
+        let html = '<table style="width:100%;border-collapse:collapse;">';
+        html += '<thead><tr>';
+        html += '<th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Maand</th>';
+        html += '<th style="text-align:right;padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Doel (leden)</th>';
+        html += '<th style="text-align:right;padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Actie</th>';
+        html += '</tr></thead><tbody>';
+
+        for (let m = 1; m <= 12; m++) {
+          const rij = rijen.find(r => r.maand === m);
+          const waarde = rij ? rij.doel_leden : '';
+          html += `<tr id="prognose-row-${m}" style="border-bottom:1px solid #f9fafb;">
+            <td style="padding:10px 12px;font-size:14px;color:#374151;">${MAAND_NAMEN[m-1]}</td>
+            <td style="padding:10px 12px;text-align:right;">
+              <input type="number" id="prognose-input-${m}" value="${waarde}" placeholder="—"
+                style="width:90px;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;text-align:right;outline:none;"
+                onfocus="this.style.borderColor='#333399'" onblur="this.style.borderColor='#e5e7eb'">
+            </td>
+            <td style="padding:10px 12px;text-align:right;">
+              <button onclick="slaPrognoseOp('${code}',${jaar},${m})" style="padding:5px 12px;background:#111827;color:white;border:none;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;">Opslaan</button>
+            </td>
+          </tr>`;
+        }
+
+        html += '</tbody></table>';
+        html += `<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="slaAllePrognoseOp('${code}',${jaar})" style="padding:9px 18px;background:#333399;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">Alle wijzigingen opslaan</button>
+        </div>`;
+
+        inhoud.innerHTML = html;
+      } catch(e) {
+        inhoud.innerHTML = '<div style="color:#dc2626;font-size:13px;">Fout bij laden: ' + e.message + '</div>';
+      }
+    }
+
+    async function slaPrognoseOp(code, jaar, maand) {
+      const val = parseInt(document.getElementById('prognose-input-' + maand).value);
+      if (isNaN(val)) return;
+      await _opslaanPrognose(code, jaar, maand, val);
+    }
+
+    async function slaAllePrognoseOp(code, jaar) {
+      const fb = document.getElementById('prognoseFeedback');
+      let succes = 0;
+      for (let m = 1; m <= 12; m++) {
+        const val = parseInt(document.getElementById('prognose-input-' + m)?.value);
+        if (!isNaN(val) && val > 0) {
+          const ok = await _opslaanPrognose(code, jaar, m, val, true);
+          if (ok) succes++;
+        }
+      }
+      fb.style.display = 'block';
+      fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+      fb.textContent = succes + ' maanden opgeslagen.';
+    }
+
+    async function _opslaanPrognose(code, jaar, maand, doel, stil = false) {
+      const fb = document.getElementById('prognoseFeedback');
+      try {
+        const res = await fetch('/api/prognose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ praktijk_code: code, jaar, maand, doel_leden: doel })
+        });
+        const data = await res.json();
+        if (!stil) {
+          fb.style.display = 'block';
+          if (data.success) {
+            fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+            fb.textContent = MAAND_NAMEN[maand-1] + ' ' + jaar + ' opgeslagen: ' + doel + ' leden';
+          } else {
+            fb.style.background = '#fef2f2'; fb.style.color = '#dc2626';
+            fb.textContent = data.error || 'Fout bij opslaan';
+          }
+        }
+        return data.success;
+      } catch(e) {
+        if (!stil) {
+          fb.style.display = 'block';
+          fb.style.background = '#fef2f2'; fb.style.color = '#dc2626';
+          fb.textContent = 'Netwerkfout: ' + e.message;
+        }
+        return false;
       }
     }
 

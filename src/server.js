@@ -3281,6 +3281,39 @@ app.get('/api/prognose/:practiceCode', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// GET /api/admin/praktijken — lijst voor prognose tool
+app.get('/api/admin/praktijken', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const rows = await withReadConnection(async (client) => {
+      return (await client.query(
+        `SELECT code, naam FROM praktijken WHERE actief = TRUE ORDER BY naam`
+      )).rows;
+    });
+    res.json({ success: true, praktijken: rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// POST /api/prognose — opslaan of updaten van een prognose regel
+app.post('/api/prognose', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { praktijk_code, jaar, maand, doel_leden } = req.body;
+    if (!praktijk_code || !jaar || !maand || doel_leden === undefined) {
+      return res.status(400).json({ error: 'Ontbrekende velden' });
+    }
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `INSERT INTO prognose (praktijk_code, jaar, maand, doel_leden)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (praktijk_code, jaar, maand) DO UPDATE SET doel_leden = EXCLUDED.doel_leden`,
+        [praktijk_code, jaar, maand, doel_leden]
+      );
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
 app.get('/api/auth/nazorg-check', requireAuth, async (req, res) => {
   try {
