@@ -177,10 +177,22 @@
             <img src="images/Gezond-Vitaal-Petrol-krommenie.png" alt="Gezond & Vitaal Krommenie">
         </div>
         
-        <h1>Meld je aan voor meer informatie</h1>
-        <p class="subtitle">Vul onderstaand formulier in en we nemen zo snel mogelijk contact met je op.</p>
+        <h1>Plan jouw gratis gezondheidscheck bij Gezond &amp; Vitaal Krommenie</h1>
+        <p class="subtitle">Vul het formulier in en we nemen binnen 1 werkdag contact op om jouw check in te plannen!</p>
 
-        <form id="leadForm" action="/leads" method="POST">
+        <div style="margin-bottom:24px;display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:var(--petrol);font-weight:700;">✓</span> Gratis en vrijblijvend
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:var(--petrol);font-weight:700;">✓</span> We meten jouw kracht, mobiliteit, balans en conditie
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:var(--petrol);font-weight:700;">✓</span> Je krijgt persoonlijk advies om jouw doelen te bereiken
+    </div>
+</div>
+
+<form id="leadForm" action="/leads" method="POST">
             <input type="hidden" id="praktijk_code" name="praktijk_code" value="952A92">
 
             <div class="form-group">
@@ -214,8 +226,9 @@
                 </label>
             </div>
 
-            <button type="submit" class="submit-btn">Verstuur aanvraag</button>
+            <button type="submit" class="submit-btn" id="submitBtn">Plan mijn gratis gezondheidscheck</button>
         </form>
+
     </div>
 
     <!-- Footer -->
