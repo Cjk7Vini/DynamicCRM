@@ -110,7 +110,10 @@ app.use(morgan('dev'));
 
 // Session middleware for authentication (TEMPORARY: MemoryStore for development)
 // Session middleware with PostgreSQL store
-const PgStore = pgSession(session);
+// Favicon — voorkom 404 in browser
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+
 
 app.use(session({
   store: new PgStore({
