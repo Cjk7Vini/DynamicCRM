@@ -131,18 +131,20 @@
     .badge-purple { background: var(--purple-bg); color: var(--purple-text); }
     .badge-gray { background: var(--gray-bg); color: var(--gray-text); border: 1px solid var(--border); }
 
-    /* Action menu */
-    .action-wrap { position: relative; }
-    .btn-acties { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap; }
-    .btn-acties:hover { background: var(--gray-bg); }
-    .action-menu { display: none; position: absolute; right: 0; top: calc(100% + 4px); background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.1); min-width: 210px; z-index: 100; overflow: hidden; }
-    .action-menu.open { display: block; }
-    .action-section { padding: 8px 14px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); }
-    .action-item { padding: 9px 14px; font-size: 13px; color: var(--text-1); cursor: pointer; transition: background .1s; }
-    .action-item:hover { background: var(--gray-bg); }
-    .action-item.danger { color: var(--red); }
-    .action-item.danger:hover { background: var(--red-bg); }
-    .action-divider { height: 1px; background: var(--border-light); margin: 4px 0; }
+    /* Inline action panel */
+    .action-wrap { }
+    .btn-expand { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap; transition: all .15s; }
+    .btn-expand:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .btn-expand.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .inline-actions { display: none; background: #f8f9fb; border-top: 1px solid var(--border-light); padding: 16px 20px; }
+    .inline-actions.open { display: block; }
+    .action-group { margin-bottom: 14px; }
+    .action-group-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin-bottom: 8px; }
+    .action-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn-action { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: white; color: var(--text-1); font-size: 12px; font-family: inherit; cursor: pointer; transition: all .15s; }
+    .btn-action:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .btn-action.danger { color: var(--red); border-color: #fecaca; }
+    .btn-action.danger:hover { background: var(--red-bg); border-color: var(--red); }
     #backdrop { display: none; position: fixed; inset: 0; z-index: 90; }
 
 
@@ -651,29 +653,41 @@ function renderUsers(users) {
         ${nzBadge}
       </div>
       <div class="action-wrap">
-        <button class="btn-acties" onclick="toggleMenu('menu-${u.id}', event)">Acties ↓</button>
-        <div class="action-menu" id="menu-${u.id}">
-          ${u.practice_code ? `
-            <div class="action-section">Dashboard licentie</div>
-            <div class="action-item" onclick="userAction(${u.id},'extend_12m')">Verlengen 12 maanden</div>
-            <div class="action-item" onclick="userAction(${u.id},'extend_24m')">Verlengen 24 maanden</div>
-            <div class="action-item" onclick="userAction(${u.id},'unlimited')">Onbeperkt instellen</div>
-            <div class="action-item" onclick="userAction(${u.id},'reactivate')">Heractiveren</div>
-            <div class="action-item danger" onclick="userAction(${u.id},'stop')">Stopzetten</div>
-            <div class="action-divider"></div>
-            <div class="action-section">Nazorg portaal</div>
-            <div class="action-item" onclick="userAction(${u.id},'nazorg_enable')">Activeren 12 maanden</div>
-            <div class="action-item" onclick="userAction(${u.id},'nazorg_enable_24m')">Activeren 24 maanden</div>
-            <div class="action-item" onclick="userAction(${u.id},'nazorg_unlimited')">Onbeperkt instellen</div>
-            <div class="action-item danger" onclick="userAction(${u.id},'nazorg_disable')">Deactiveren</div>
-            <div class="action-divider"></div>
-          ` : ''}
-          <div class="action-section">Account</div>
+        <button class="btn-expand" id="btn-${u.id}" onclick="toggleInlineActions(${u.id}, event)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          Beheren
+        </button>
+      </div>
+    </div>
+    <div class="inline-actions" id="actions-${u.id}">
+      ${u.practice_code ? `
+      <div class="action-group">
+        <div class="action-group-title">Dashboard licentie</div>
+        <div class="action-btns">
+          <button class="btn-action" onclick="userAction(${u.id},'extend_12m')">+12 maanden</button>
+          <button class="btn-action" onclick="userAction(${u.id},'extend_24m')">+24 maanden</button>
+          <button class="btn-action" onclick="userAction(${u.id},'unlimited')">Onbeperkt</button>
+          <button class="btn-action" onclick="userAction(${u.id},'reactivate')">Heractiveren</button>
+          <button class="btn-action danger" onclick="userAction(${u.id},'stop')">Stopzetten</button>
+        </div>
+      </div>
+      <div class="action-group">
+        <div class="action-group-title">Nazorg portaal</div>
+        <div class="action-btns">
+          <button class="btn-action" onclick="userAction(${u.id},'nazorg_enable')">Activeren 12m</button>
+          <button class="btn-action" onclick="userAction(${u.id},'nazorg_enable_24m')">Activeren 24m</button>
+          <button class="btn-action" onclick="userAction(${u.id},'nazorg_unlimited')">Onbeperkt</button>
+          <button class="btn-action danger" onclick="userAction(${u.id},'nazorg_disable')">Deactiveren</button>
+        </div>
+      </div>` : ''}
+      <div class="action-group">
+        <div class="action-group-title">Account</div>
+        <div class="action-btns">
           ${isBanned
-            ? `<div class="action-item" onclick="userAction(${u.id},'unban')">Verbanning opheffen</div>`
-            : `<div class="action-item danger" onclick="userAction(${u.id},'ban')">Verbannen</div>`
+            ? `<button class="btn-action" onclick="userAction(${u.id},'unban')">Verbanning opheffen</button>`
+            : `<button class="btn-action danger" onclick="userAction(${u.id},'ban')">Verbannen</button>`
           }
-          <div class="action-item danger" onclick="userAction(${u.id},'delete')">Verwijderen</div>
+          <button class="btn-action danger" onclick="userAction(${u.id},'delete')">Verwijderen</button>
         </div>
       </div>
     </div>
@@ -774,8 +788,12 @@ function toggleMenu(id, event) {
 }
 
 function closeAllMenus() {
-  document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
-  document.getElementById('backdrop').style.display = 'none';
+  document.querySelectorAll('.inline-actions.open').forEach(p => {
+    p.classList.remove('open');
+    const otherId = p.id.replace('actions-', '');
+    const otherBtn = document.getElementById('btn-' + otherId);
+    if (otherBtn) otherBtn.classList.remove('active');
+  });
 }
 
 checkAdmin();
