@@ -351,6 +351,27 @@
   </div>
 </div>
 
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:#f4f5f7;z-index:1000;display:flex;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:16px;padding:40px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,0.12);">
+    <div style="text-align:center;margin-bottom:28px;">
+      <img src="images/dynamic-logo-2.png" style="height:40px;margin-bottom:16px;" alt="">
+      <div style="font-size:20px;font-weight:700;color:#111827;">Gebruikersbeheer</div>
+      <div style="font-size:13px;color:#9ca3af;margin-top:4px;">Log in om door te gaan</div>
+    </div>
+    <div id="loginErr" style="display:none;background:#fee2e2;color:#7f1d1d;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;"></div>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-bottom:5px;">E-mailadres</label>
+      <input type="email" id="loginEmail" placeholder="admin@dynamic-health-consultancy.nl" style="width:100%;padding:10px 12px;border:1.5px solid #e2e4e9;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')doOverlayLogin()">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-bottom:5px;">Wachtwoord</label>
+      <input type="password" id="loginPwd" placeholder="••••••••" style="width:100%;padding:10px 12px;border:1.5px solid #e2e4e9;border-radius:8px;font-size:14px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')doOverlayLogin()">
+    </div>
+    <button onclick="doOverlayLogin()" id="loginOverlayBtn" style="width:100%;padding:12px;background:#333399;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">Inloggen</button>
+  </div>
+</div>
+
 <!-- MODAL: Gebruiker beheren -->
 <div class="modal-overlay" id="userModal" onclick="handleModalClick(event)">
   <div class="modal" id="modalBox">
@@ -375,16 +396,67 @@
 async function checkAdmin() {
   try {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (!res.ok) { window.location.href = '/login.html'; return; }
     const data = await res.json();
-    if (!data.user) { window.location.href = '/login.html'; return; }
-    if (data.user.role !== 'admin') { alert('Alleen admins hebben toegang.'); window.location.href = '/churn-dashboard.html'; return; }
+    if (!res.ok || !data.user) { showLoginOverlay(); return; }
+    if (data.user.role !== 'admin') { showLoginOverlay('Alleen admins hebben toegang tot deze pagina.'); return; }
+    hideLoginOverlay();
     const email = data.user.email || '';
-    const initials = email.slice(0,2).toUpperCase();
-    document.getElementById('userInitials').textContent = initials;
+    document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
     document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
     document.getElementById('userRoleTxt').textContent = 'Administrator';
-  } catch { window.location.href = '/login.html'; }
+  } catch { showLoginOverlay(); }
+}
+
+function showLoginOverlay(msg) {
+  const overlay = document.getElementById('loginOverlay');
+  overlay.style.display = 'flex';
+  if (msg) {
+    const err = document.getElementById('loginErr');
+    err.textContent = msg;
+    err.style.display = 'block';
+  }
+}
+
+function hideLoginOverlay() {
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+
+async function doOverlayLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd = document.getElementById('loginPwd').value;
+  const btn = document.getElementById('loginOverlayBtn');
+  const err = document.getElementById('loginErr');
+  if (!email || !pwd) { err.textContent = 'Vul je e-mailadres en wachtwoord in.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Inloggen...';
+  err.style.display = 'none';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (data.success && data.user) {
+      if (data.user.role !== 'admin') {
+        err.textContent = 'Alleen admins hebben toegang.';
+        err.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Inloggen';
+        return;
+      }
+      hideLoginOverlay();
+      checkAdmin();
+      loadUsers();
+    } else {
+      err.textContent = data.error || 'Onjuiste inloggegevens.';
+      err.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Inloggen';
+    }
+  } catch {
+    err.textContent = 'Netwerkfout. Probeer opnieuw.';
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Inloggen';
+  }
 }
 
 function toggleUserMenu() {
@@ -398,7 +470,7 @@ async function doLogout() {
   try {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   } catch {}
-  window.location.href = '/login.html';
+  window.location.href = '/portaal.html';
 }
 
 document.addEventListener('click', function(e) {
