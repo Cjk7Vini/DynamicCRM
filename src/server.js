@@ -4409,9 +4409,15 @@ function nazorgMailBody(nr, naam, praktijkNaam, behandelaar, token, baseUrl) {
 app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
   try {
     const praktijkCode = req.session.practiceCode;
+    const role = req.session.role;
+    const organisationCodes = role === 'organisation' 
+      ? (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean)
+      : [];
+
     const rows = await withReadConnection(async (client) => {
-      const q = praktijkCode
-        ? `SELECT nc.*, 
+      if (praktijkCode) {
+        // Practice gebruiker — filter op eigen praktijkcode
+        const q = `SELECT nc.*, 
              COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
              COUNT(DISTINCT nr.id) AS reacties,
              COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
@@ -4420,8 +4426,24 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
            LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
            LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
            WHERE nc.praktijk_code = $1
-           GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`
-        : `SELECT nc.*,
+           GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`;
+        return (await client.query(q, [praktijkCode])).rows;
+      } else if (role === 'organisation' && organisationCodes.length > 0) {
+        // Organisatie gebruiker — filter op gekoppelde praktijkcodes
+        const q = `SELECT nc.*, 
+             COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
+             COUNT(DISTINCT nr.id) AS reacties,
+             COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
+           FROM nazorg_clients nc
+           LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
+           LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
+           LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
+           WHERE nc.praktijk_code = ANY($1)
+           GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`;
+        return (await client.query(q, [organisationCodes])).rows;
+      } else if (role === 'admin') {
+        // Admin — alle cliënten
+        const q = `SELECT nc.*,
              COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
              COUNT(DISTINCT nr.id) AS reacties,
              COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
@@ -4430,8 +4452,10 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
            LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
            LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
            GROUP BY nc.id ORDER BY nc.aangemaakt_op DESC`;
-      const params = praktijkCode ? [praktijkCode] : [];
-      return (await client.query(q, params)).rows;
+        return (await client.query(q)).rows;
+      } else {
+        return [];
+      }
     });
     res.json({ success: true, clienten: rows });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
