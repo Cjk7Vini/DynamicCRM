@@ -397,72 +397,59 @@ async function checkAdmin() {
   try {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
     const data = await res.json();
-    if (!res.ok || !data.user) { showLoginOverlay(); return; }
-    if (data.user.role !== 'admin') { showLoginOverlay('Alleen admins hebben toegang tot deze pagina.'); return; }
-    hideLoginOverlay();
+    if (!res.ok || !data.user || data.user.role !== 'admin') {
+      document.getElementById('loginOverlay').style.display = 'flex';
+      return;
+    }
     const email = data.user.email || '';
     document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
     document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
     document.getElementById('userRoleTxt').textContent = 'Administrator';
-  } catch { showLoginOverlay(); }
-}
-
-function showLoginOverlay(msg) {
-  const overlay = document.getElementById('loginOverlay');
-  overlay.style.display = 'flex';
-  if (msg) {
-    const err = document.getElementById('loginErr');
-    err.textContent = msg;
-    err.style.display = 'block';
+    document.getElementById('loginOverlay').style.display = 'none';
+  } catch {
+    document.getElementById('loginOverlay').style.display = 'flex';
   }
 }
 
-function hideLoginOverlay() {
-  document.getElementById('loginOverlay').style.display = 'none';
-}
-
 async function doOverlayLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
+  const emailVal = document.getElementById('loginEmail').value.trim();
   const pwd = document.getElementById('loginPwd').value;
   const btn = document.getElementById('loginOverlayBtn');
   const err = document.getElementById('loginErr');
-  if (!email || !pwd) { err.textContent = 'Vul je e-mailadres en wachtwoord in.'; err.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Inloggen...';
   err.style.display = 'none';
+  if (!emailVal || !pwd) {
+    err.textContent = 'Vul je gegevens in.';
+    err.style.display = 'block';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Inloggen...';
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password: pwd })
+      body: JSON.stringify({ email: emailVal, password: pwd })
     });
     const data = await res.json();
-    if (data.success && data.user) {
-      if (data.user.role !== 'admin') {
-        err.textContent = 'Alleen admins hebben toegang.';
-        err.style.display = 'block';
-        btn.disabled = false; btn.textContent = 'Inloggen';
-        return;
-      }
-      // Vul header direct zonder nieuwe auth check
-      const em = data.user.email || '';
-      document.getElementById('userInitials').textContent = em.slice(0,2).toUpperCase();
-      document.getElementById('userEmailDisplay').textContent = em.length > 28 ? em.slice(0,28)+'...' : em;
+    if (data.success && data.user && data.user.role === 'admin') {
+      const email = data.user.email || '';
+      document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
+      document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
       document.getElementById('userRoleTxt').textContent = 'Administrator';
-      hideLoginOverlay();
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadUsers();
     } else {
-      err.textContent = data.error || 'Onjuiste inloggegevens.';
+      err.textContent = data.error || 'Onjuiste inloggegevens of geen admin toegang.';
       err.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Inloggen';
+      btn.disabled = false;
+      btn.textContent = 'Inloggen';
     }
   } catch(e) {
-    err.textContent = 'Inloggen mislukt: ' + e.message;
+    err.textContent = 'Verbindingsfout: ' + e.message;
     err.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Inloggen';
-  }
-  // Laad users buiten try/catch
-  if (document.getElementById('loginOverlay').style.display === 'none') {
-    loadUsers();
+    btn.disabled = false;
+    btn.textContent = 'Inloggen';
   }
 }
 
