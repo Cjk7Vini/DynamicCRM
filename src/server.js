@@ -3046,7 +3046,7 @@ ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Naz
 app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, organisationCodes, orgLicenseType } = req.body;
+    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, calculatorEnabled, organisationCodes, orgLicenseType } = req.body;
     if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
     if (!['admin', 'practice', 'organisation'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
     if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
@@ -3141,6 +3141,19 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
       }
     } catch (mailErr) { console.warn('Welkomstmail mislukt:', mailErr.message); }
     res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, practice_code: newUser.practice_code, organisation_codes: newUser.organisation_codes }, license: { type: finalLicenseType || orgLicenseType, start: licenseStart, end: licenseEnd } });
+
+    // Update licenties array voor portaal toegang
+    const licentiesArr = [];
+    if (role === 'practice' || role === 'organisation') {
+      licentiesArr.push('dashboard');
+      if (nazorgEnabled) licentiesArr.push('nazorg');
+      if (calculatorEnabled) licentiesArr.push('calculator');
+    }
+    if (licentiesArr.length > 0) {
+      await withWriteConnection(async (client) => {
+        await client.query('UPDATE public.users SET licenties = $1 WHERE id = $2', [licentiesArr, newUser.id]);
+      }).catch(e => console.warn('Licenties array update mislukt:', e.message));
+    }
   } catch (error) { console.error('Create user licensed error:', error); res.status(500).json({ error: 'Fout bij aanmaken gebruiker' }); }
 });
 

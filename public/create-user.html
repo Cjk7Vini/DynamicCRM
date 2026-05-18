@@ -181,6 +181,10 @@
     </button>
     <div class="user-dropdown-menu" id="userDropdown">
       <div class="dd-section">Navigatie</div>
+      <a href="/portaal.html" class="dd-item">
+        <svg style="width:15px;height:15px;flex-shrink:0;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Portaal
+      </a>
       <a href="/churn-dashboard.html" class="dd-item">
         <svg style="width:15px;height:15px;flex-shrink:0;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         Dashboard
@@ -287,6 +291,15 @@
                   <option value="unlimited">Onbeperkt</option>
                 </select>
                 <div class="toggle" id="nazorgToggle" onclick="toggleNazorg()"></div>
+              </div>
+            </div>
+            <div class="lic-row">
+              <div class="lic-left">
+                <div class="lic-dot off" id="calculatorDot"></div>
+                <div class="lic-label" id="calculatorLabel" style="color:var(--text-3)">Calculator</div>
+              </div>
+              <div class="lic-right">
+                <div class="toggle" id="calculatorToggle" onclick="toggleCalculator()"></div>
               </div>
             </div>
           </div>
@@ -529,7 +542,7 @@ async function createUser() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType, organisationCodes, orgLicenseType })
+      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType, calculatorEnabled: document.getElementById('calculatorToggle')?.classList.contains('on') || false, organisationCodes, orgLicenseType })
     });
     const data = await res.json();
     if (res.ok && data.success) {
