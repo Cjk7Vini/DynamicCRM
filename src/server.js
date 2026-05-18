@@ -2701,8 +2701,15 @@ app.post('/api/auth/login', async (req, res) => {
     req.session.userId = user.id;
     req.session.email = user.email;
     req.session.role = user.role;
-    req.session.practiceCode = user.practice_code;
     req.session.organisationCodes = user.organisation_codes || null;
+
+    // Voor organisatie accounts: gebruik de eerste praktijkcode als standaard
+    if (user.role === 'organisation' && user.organisation_codes) {
+      const firstCode = user.organisation_codes.split(',').map(c => c.trim()).filter(Boolean)[0];
+      req.session.practiceCode = firstCode || null;
+    } else {
+      req.session.practiceCode = user.practice_code;
+    }
     
     // Force session save before responding
     req.session.save((err) => {

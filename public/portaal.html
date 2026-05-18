@@ -352,6 +352,7 @@
     .tile-elearning { --tile-color: #f59e0b; --tile-bg: rgba(245,158,11,0.08); }
     /* Prognose tile */
     .tile-prognose { --tile-color: #10b981; --tile-bg: rgba(16,185,129,0.08); }
+    .tile-licenties { --tile-color: #6366f1; --tile-bg: rgba(99,102,241,0.08); }
 
     /* ===== PROFIEL SECTIE ===== */
     .profiel-card {
@@ -502,6 +503,26 @@
 
   </div>
 
+  <!-- LICENTIE MODAL -->
+  <div id="licentieModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="padding:28px 32px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#111827;">Licenties & Instellingen</div>
+          <div style="font-size:13px;color:#9ca3af;margin-top:2px;">Overzicht van actieve en beschikbare licenties</div>
+        </div>
+        <button onclick="sluitLicentieModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:28px 32px;">
+        <div id="licentieModalContent">
+          <div style="color:#9ca3af;font-size:13px;">Laden...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ===== CONFIGURATIE =====
     const APPS = [
@@ -549,6 +570,15 @@
         icon: `<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
         klasse: 'tile-prognose',
         licentie: 'admin' // alleen admin
+      },
+      {
+        id: 'licenties',
+        naam: 'Licenties & Instellingen',
+        desc: 'Bekijk actieve licenties en vraag nieuwe aan via Dynamic Health Consultancy.',
+        url: null,
+        icon: `<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+        klasse: 'tile-licenties',
+        licentie: 'any' // altijd zichtbaar
       }
     ];
 
@@ -672,31 +702,38 @@
       APPS.forEach(app => {
         // Bepaal toegang
         let toegang = false;
-        if (app.licentie === null) {
-          // E-learning: toegankelijk bij elke licentie
+        if (app.licentie === 'any') {
+          toegang = true;
+        } else if (app.licentie === null) {
           toegang = heeftLicentie || isAdmin;
         } else if (app.licentie === 'admin') {
-          // Prognose: alleen admin
           toegang = isAdmin;
         } else {
-          // Normale licentie check
           toegang = isAdmin || licenties.includes(app.licentie);
         }
 
-        // Verberg prognose en e-learning als ze nog niet bestaan (coming soon)
         const comingSoon = ['elearning', 'prognose'].includes(app.id);
+        const isLicentieTile = app.id === 'licenties';
 
-        const tile = document.createElement(toegang && !comingSoon ? 'a' : 'div');
-        tile.className = `tile ${app.klasse} ${(!toegang || comingSoon) ? 'tile-locked' : ''}`;
-        if (toegang && !comingSoon) {
-          tile.href = app.url;
+        let tile;
+        if (isLicentieTile) {
+          tile = document.createElement('div');
+          tile.className = `tile ${app.klasse}`;
+          tile.onclick = openLicentieModal;
+          tile.style.cursor = 'pointer';
+        } else {
+          tile = document.createElement(toegang && !comingSoon ? 'a' : 'div');
+          tile.className = `tile ${app.klasse} ${(!toegang || comingSoon) ? 'tile-locked' : ''}`;
+          if (toegang && !comingSoon) tile.href = app.url;
         }
 
         let badge = '';
-        if (comingSoon) {
-          badge = `<span class="tile-badge tile-badge-locked">Binnenkort</span>`;
-        } else if (!toegang) {
-          badge = `<span class="tile-badge tile-badge-locked">Geen licentie</span>`;
+        if (!isLicentieTile) {
+          if (comingSoon) {
+            badge = `<span class="tile-badge tile-badge-locked">Binnenkort</span>`;
+          } else if (!toegang) {
+            badge = `<span class="tile-badge tile-badge-locked">Geen licentie</span>`;
+          }
         }
 
         tile.innerHTML = `
@@ -742,6 +779,103 @@
         doLogin();
       }
     });
+
+    // ===== LICENTIE MODAL =====
+    async function openLicentieModal() {
+      const modal = document.getElementById('licentieModal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      document.getElementById('licentieModalContent').innerHTML = '<div style="color:#9ca3af;font-size:13px;">Laden...</div>';
+
+      try {
+        const res = await fetch('/api/mijn-profiel', { credentials: 'include' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        const p = data.profiel;
+        const now = new Date();
+        const fmtDatum = d => d ? new Date(d).toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' }) : null;
+        const isActief = (actief, eind) => actief && (!eind || new Date(eind) > now);
+
+        const licenties = [
+          { type: 'dashboard', naam: 'Dashboard licentie', actief: isActief(p.license_active, p.license_end_date), eind: fmtDatum(p.license_end_date), omschrijving: 'Toegang tot CRM dashboard, leads, afspraken en rapportages' },
+          { type: 'nazorg', naam: 'Nazorg portaal licentie', actief: p.nazorg_enabled, eind: fmtDatum(p.nazorg_license_end_date), omschrijving: 'Toegang tot het nazorg portaal voor patienten' },
+          { type: 'calculator', naam: 'Calculator licentie', actief: false, eind: null, omschrijving: 'Bezettingsgraad calculator voor praktijkmanagement' }
+        ];
+
+        const inactief = p.role !== 'admin' ? licenties.filter(l => !l.actief) : [];
+
+        let html = '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">';
+        licenties.forEach(l => {
+          html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f8fafc;border-radius:12px;border:1px solid ${l.actief ? '#a7f3d0' : '#e5e7eb'};">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:${l.actief ? '#059669' : '#d1d5db'};flex-shrink:0;"></div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#111827;">${l.naam}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">${l.omschrijving}</div>
+                ${l.actief && l.eind ? `<div style="font-size:11px;color:#059669;margin-top:3px;">Geldig tot ${l.eind}</div>` : ''}
+              </div>
+            </div>
+            <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:${l.actief ? '#ecfdf5' : '#f3f4f6'};color:${l.actief ? '#065f46' : '#6b7280'};">${l.actief ? 'Actief' : 'Niet actief'}</span>
+          </div>`;
+        });
+        html += '</div>';
+
+        if (inactief.length > 0) {
+          html += `<div style="border-top:1px solid #f3f4f6;padding-top:20px;">
+            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#111827;margin-bottom:4px;">Licentie aanvragen</div>
+            <div style="font-size:13px;color:#9ca3af;margin-bottom:16px;">Vraag een licentie aan via Dynamic Health Consultancy</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+              ${inactief.map(l => `<button onclick="vraagLicentieAanPortaal('${l.type}','${l.naam}')" style="display:flex;align-items:center;gap:10px;padding:11px 16px;background:#111827;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                ${l.naam} aanvragen
+              </button>`).join('')}
+            </div>
+            <textarea id="licentieBerichtPortaal" rows="3" placeholder="Bericht (optioneel)..." style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;resize:vertical;outline:none;"></textarea>
+            <div id="licentieFeedbackPortaal" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;"></div>
+          </div>`;
+        }
+
+        document.getElementById('licentieModalContent').innerHTML = html;
+      } catch(e) {
+        document.getElementById('licentieModalContent').innerHTML = `<div style="color:#dc2626;font-size:13px;">Fout bij laden: ${e.message}</div>`;
+      }
+    }
+
+    function sluitLicentieModal() {
+      document.getElementById('licentieModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function(e) {
+      const modal = document.getElementById('licentieModal');
+      if (modal && e.target === modal) sluitLicentieModal();
+    });
+
+    async function vraagLicentieAanPortaal(type, naam) {
+      const bericht = document.getElementById('licentieBerichtPortaal')?.value.trim() || '';
+      const fb = document.getElementById('licentieFeedbackPortaal');
+      try {
+        const res = await fetch('/api/licentie-aanvraag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ licentie_type: type, bericht })
+        });
+        const data = await res.json();
+        fb.style.display = 'block';
+        if (data.success) {
+          fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+          fb.textContent = data.bericht || 'Aanvraag verstuurd! We nemen contact met je op.';
+        } else {
+          fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+          fb.textContent = data.error || 'Er is iets misgegaan.';
+        }
+      } catch(e) {
+        fb.style.display = 'block';
+        fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
+        fb.textContent = 'Netwerkfout: ' + e.message;
+      }
+    }
 
     // ===== PORTAAL MENU =====
     function togglePortaalMenu() {
