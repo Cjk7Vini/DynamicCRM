@@ -3285,12 +3285,19 @@ app.get('/api/mijn-profiel', requireAuth, async (req, res) => {
     const data = await withReadConnection(async (client) => {
       const r = await client.query(`
         SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.role_label,
+               u.organisation_codes,
                p.naam as praktijk_naam, p.locatie,
                p.license_type, p.license_start_date, p.license_end_date, p.actief as license_active,
                p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
                p.contact_naam, p.contact_telefoon
         FROM public.users u
-        LEFT JOIN public.praktijken p ON u.practice_code = p.code
+        LEFT JOIN public.praktijken p ON COALESCE(
+          u.practice_code,
+          CASE WHEN u.role = 'organisation' 
+            THEN TRIM(SPLIT_PART(u.organisation_codes, ',', 1))
+            ELSE NULL 
+          END
+        ) = p.code
         WHERE u.id = $1
       `, [req.session.userId]);
       return r.rows[0];
