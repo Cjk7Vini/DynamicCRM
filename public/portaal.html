@@ -429,6 +429,7 @@
       .profiel-licenties { margin-left: 0; justify-content: flex-start; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -523,6 +524,24 @@
     </div>
   </div>
 
+  <!-- PRESTATIE DASHBOARD MODAL (voor praktijken) -->
+  <div id="prestatieModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:20px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="padding:24px 28px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#111827;">Mijn Prestaties</div>
+          <div style="font-size:13px;color:#9ca3af;margin-top:2px;">Bezettingsgraad en medewerker prestaties over tijd</div>
+        </div>
+        <button onclick="sluitPrestatieModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:24px 28px;" id="prestatieInhoud">
+        <div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Laden...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- PROGNOSE MODAL -->
   <div id="prognoseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px;">
     <div style="background:white;border-radius:20px;width:100%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
@@ -603,12 +622,12 @@
       },
       {
         id: 'prognose',
-        naam: 'Prognose Tool',
-        desc: 'Stel maandelijkse doelen in per praktijk via Excel upload.',
+        naam: 'Mijn Prestaties',
+        desc: 'Bekijk bezettingsgraad over tijd en medewerker prestaties.',
         url: null,
         icon: `<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
         klasse: 'tile-prognose',
-        licentie: 'admin' // alleen admin
+        licentie: 'dashboard' // iedereen met dashboard licentie
       },
       {
         id: 'licenties',
@@ -758,10 +777,12 @@
         let tile;
         if (isPrognoseTile) {
           tile = document.createElement('div');
-          tile.className = `tile ${app.klasse} ${!isAdmin ? 'tile-locked' : ''}`;
+          tile.className = `tile ${app.klasse}`;
+          tile.style.cursor = 'pointer';
           if (isAdmin) {
             tile.onclick = openPrognoseModal;
-            tile.style.cursor = 'pointer';
+          } else {
+            tile.onclick = openPrestatieDashboard;
           }
         } else if (isLicentieTile) {
           tile = document.createElement('div');
@@ -923,6 +944,165 @@
         fb.textContent = 'Netwerkfout: ' + e.message;
       }
     }
+
+    // ===== PRESTATIE DASHBOARD (voor praktijken) =====
+    async function openPrestatieDashboard() {
+      const modal = document.getElementById('prestatieModal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      const inhoud = document.getElementById('prestatieInhoud');
+      inhoud.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:40px;">Laden...</div>';
+
+      try {
+        const code = currentUser.practice_code || currentUser.practiceCode;
+        if (!code) {
+          inhoud.innerHTML = '<div style="color:#dc2626;font-size:13px;">Geen praktijkcode gevonden.</div>';
+          return;
+        }
+
+        const res = await fetch('/api/bezetting/resultaten/' + code, { credentials: 'include' });
+        const data = await res.json();
+
+        if (!data.success || !data.maanden || data.maanden.length === 0) {
+          inhoud.innerHTML = `<div style="text-align:center;padding:40px;">
+            <div style="font-size:40px;margin-bottom:16px;">📊</div>
+            <div style="font-size:16px;font-weight:600;color:#111827;margin-bottom:8px;">Nog geen data beschikbaar</div>
+            <div style="font-size:13px;color:#9ca3af;">Vul de bezettingsgraad calculator in om je prestaties te bekijken.</div>
+          </div>`;
+          return;
+        }
+
+        const maanden = data.maanden;
+        const laatste = maanden[maanden.length - 1];
+
+        // Bepaal kleur op basis van bezetting
+        function bezettingKleur(pct) {
+          if (pct > 105) return '#ef4444';
+          if (pct >= 90) return '#22c55e';
+          if (pct >= 75) return '#f59e0b';
+          return '#ef4444';
+        }
+        function bezettingLabel(pct) {
+          if (pct > 105) return 'Boven capaciteit';
+          if (pct >= 90) return 'Rond capaciteit';
+          if (pct >= 75) return 'Onderbenut';
+          return 'Onder capaciteit';
+        }
+
+        let html = '';
+
+        // KPI kaartjes
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px;">
+          <div style="background:#f8fafc;border-radius:12px;padding:16px;border:1px solid #e5e7eb;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-bottom:6px;">Laatste meting</div>
+            <div style="font-size:22px;font-weight:800;color:${bezettingKleur(laatste.bezetting)};">${laatste.bezetting}%</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:3px;">${bezettingLabel(laatste.bezetting)}</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:12px;padding:16px;border:1px solid #e5e7eb;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-bottom:6px;">Periode</div>
+            <div style="font-size:16px;font-weight:700;color:#111827;">${laatste.label}</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:3px;">${maanden.length} meting(en) totaal</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:12px;padding:16px;border:1px solid #e5e7eb;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-bottom:6px;">Trend</div>
+            ${maanden.length >= 2 ? `
+              <div style="font-size:22px;font-weight:800;color:${maanden[maanden.length-1].bezetting >= maanden[maanden.length-2].bezetting ? '#22c55e' : '#ef4444'};">
+                ${maanden[maanden.length-1].bezetting >= maanden[maanden.length-2].bezetting ? '↑' : '↓'}
+                ${Math.abs(maanden[maanden.length-1].bezetting - maanden[maanden.length-2].bezetting).toFixed(1)}%
+              </div>
+              <div style="font-size:12px;color:#6b7280;margin-top:3px;">t.o.v. vorige meting</div>
+            ` : '<div style="font-size:13px;color:#9ca3af;">Meer data nodig</div>'}
+          </div>
+        </div>`;
+
+        // Grafiek canvas
+        html += `<div style="margin-bottom:24px;">
+          <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#111827;margin-bottom:12px;">Bezettingsgraad over tijd</div>
+          <canvas id="prestatieChart" height="200"></canvas>
+        </div>`;
+
+        // Medewerker prestaties
+        if (data.topMedewerkers.length > 0 || data.onderMedewerkers.length > 0) {
+          html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
+
+          if (data.topMedewerkers.length > 0) {
+            html += `<div>
+              <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">✅ Goed presterend</div>
+              ${data.topMedewerkers.map(m => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin-bottom:6px;border:1px solid #bbf7d0;">
+                  <span style="font-size:13px;color:#374151;">${m.naam}</span>
+                  <span style="font-size:13px;font-weight:700;color:#16a34a;">${m.productiviteit}%</span>
+                </div>`).join('')}
+            </div>`;
+          }
+
+          if (data.onderMedewerkers.length > 0) {
+            html += `<div>
+              <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">⚠️ Aandacht nodig</div>
+              ${data.onderMedewerkers.map(m => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:8px;margin-bottom:6px;border:1px solid #fecaca;">
+                  <span style="font-size:13px;color:#374151;">${m.naam}</span>
+                  <span style="font-size:13px;font-weight:700;color:#dc2626;">${m.productiviteit}%</span>
+                </div>`).join('')}
+            </div>`;
+          }
+
+          html += `</div>`;
+        }
+
+        inhoud.innerHTML = html;
+
+        // Bouw grafiek
+        const ctx = document.getElementById('prestatieChart');
+        if (ctx && window.Chart) {
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: maanden.map(m => m.label),
+              datasets: [{
+                label: 'Bezettingsgraad %',
+                data: maanden.map(m => m.bezetting),
+                borderColor: '#333399',
+                backgroundColor: 'rgba(51,51,153,0.08)',
+                borderWidth: 2.5,
+                pointBackgroundColor: maanden.map(m => bezettingKleur(m.bezetting)),
+                pointRadius: 5,
+                tension: 0.3,
+                fill: true
+              }, {
+                label: 'Streefwaarde (90%)',
+                data: maanden.map(() => 90),
+                borderColor: '#22c55e',
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                pointRadius: 0,
+                fill: false
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: true, position: 'bottom' } },
+              scales: {
+                y: { min: 0, max: 130, ticks: { callback: v => v + '%' } }
+              }
+            }
+          });
+        }
+
+      } catch(e) {
+        document.getElementById('prestatieInhoud').innerHTML = `<div style="color:#dc2626;font-size:13px;">Fout bij laden: ${e.message}</div>`;
+      }
+    }
+
+    function sluitPrestatieModal() {
+      document.getElementById('prestatieModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function(e) {
+      if (e.target === document.getElementById('prestatieModal')) sluitPrestatieModal();
+    });
 
     // ===== PROGNOSE MODAL =====
     const MAAND_NAMEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];

@@ -4315,6 +4315,64 @@ app.get('/api/bezetting/lijst', async (req, res) => {
   }
 });
 
+// GET /api/bezetting/resultaten/:praktijkCode — historische bezettingsresultaten voor praktijk
+app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res) => {
+  try {
+    const { praktijkCode } = req.params;
+    // Zorg dat praktijk alleen eigen data ziet
+    const role = req.session.role;
+    const sessionCode = req.session.practiceCode;
+    if (role !== 'admin' && sessionCode !== praktijkCode) {
+      return res.status(403).json({ error: 'Geen toegang' });
+    }
+    const rows = await withReadConnection(async (client) => {
+      return (await client.query(
+        `SELECT maand, jaar, medewerkers_data, aangemaakt_op
+         FROM bezettingsgraad_rapporten
+         WHERE praktijk_code = $1
+         ORDER BY jaar ASC, 
+           CASE maand
+             WHEN 'januari' THEN 1 WHEN 'februari' THEN 2 WHEN 'maart' THEN 3
+             WHEN 'april' THEN 4 WHEN 'mei' THEN 5 WHEN 'juni' THEN 6
+             WHEN 'juli' THEN 7 WHEN 'augustus' THEN 8 WHEN 'september' THEN 9
+             WHEN 'oktober' THEN 10 WHEN 'november' THEN 11 WHEN 'december' THEN 12
+             ELSE 0 END ASC`,
+        [praktijkCode]
+      )).rows;
+    });
+
+    // Verwerk data — totale bezettingsgraad per maand + medewerker prestaties
+    const maanden = rows.map(r => {
+      const mws = r.medewerkers_data?.medewerkers || [];
+      const totCap = mws.reduce((s, m) => s + (Number(m.capaciteit) || 0), 0);
+      const totBel = mws.reduce((s, m) => s + (Number(m.belasting) || 0), 0);
+      const bezetting = totCap > 0 ? Math.round((totBel / totCap) * 1000) / 10 : 0;
+      return {
+        label: `${r.maand} ${r.jaar}`,
+        bezetting,
+        medewerkers: mws.map(m => ({
+          naam: m.naam,
+          productiviteit: Number(m.productiviteit) || 0
+        }))
+      };
+    });
+
+    // Laatste rapport — medewerker prestaties
+    let topMedewerkers = [];
+    let onderMedewerkers = [];
+    if (rows.length > 0) {
+      const laatste = rows[rows.length - 1];
+      const mws = (laatste.medewerkers_data?.medewerkers || [])
+        .map(m => ({ naam: m.naam, productiviteit: Number(m.productiviteit) || 0 }))
+        .sort((a, b) => b.productiviteit - a.productiviteit);
+      topMedewerkers = mws.filter(m => m.productiviteit >= 90).slice(0, 5);
+      onderMedewerkers = mws.filter(m => m.productiviteit < 75).slice(0, 5);
+    }
+
+    res.json({ success: true, maanden, topMedewerkers, onderMedewerkers });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // ─── Publieke statistieken voor cap-it.eu en DHC website ───────────────────
 // Geen auth vereist — geen praktijknamen, alleen geaggregeerde cijfers
 app.get('/api/public/stats', async (_req, res) => {
