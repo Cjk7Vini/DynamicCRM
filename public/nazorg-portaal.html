@@ -301,13 +301,15 @@
         const data = await res.json();
         currentUser = data.user;
 
-        // Check nazorg licentie — admin altijd toegang, anderen via licenties array
+        // Check nazorg licentie via dedicated endpoint (echte bron = praktijken tabel)
         const isAdmin = currentUser.role === 'admin';
-        const licenties = currentUser.licenties || [];
-        const heeftNazorg = isAdmin || licenties.includes('nazorg');
-        if (!heeftNazorg) {
-          window.location.href = '/portaal.html';
-          return;
+        if (!isAdmin) {
+          const nazorgCheck = await fetch('/api/auth/nazorg-check', { credentials: 'include' });
+          const nazorgData = await nazorgCheck.json();
+          if (!nazorgData.allowed) {
+            window.location.href = '/portaal.html';
+            return;
+          }
         }
 
         // Vul topbar

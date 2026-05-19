@@ -3221,13 +3221,17 @@ app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
         } else if (action === 'nazorg_enable') {
           const nEnd = new Date(); nEnd.setMonth(nEnd.getMonth() + 12);
           await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='12m', nazorg_license_end_date=$1 WHERE code=$2`, [nEnd, user.practice_code]); });
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.users SET licenties = array_append(licenties, 'nazorg') WHERE id=$1 AND NOT 'nazorg' = ANY(licenties)`, [id]); });
         } else if (action === 'nazorg_enable_24m') {
           const nEnd = new Date(); nEnd.setMonth(nEnd.getMonth() + 24);
           await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='24m', nazorg_license_end_date=$1 WHERE code=$2`, [nEnd, user.practice_code]); });
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.users SET licenties = array_append(licenties, 'nazorg') WHERE id=$1 AND NOT 'nazorg' = ANY(licenties)`, [id]); });
         } else if (action === 'nazorg_unlimited') {
           await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=TRUE, nazorg_license_type='unlimited', nazorg_license_end_date=NULL WHERE code=$1`, [user.practice_code]); });
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.users SET licenties = array_append(licenties, 'nazorg') WHERE id=$1 AND NOT 'nazorg' = ANY(licenties)`, [id]); });
         } else if (action === 'nazorg_disable') {
           await withWriteConnection(async (c) => { await c.query(`UPDATE public.praktijken SET nazorg_enabled=FALSE WHERE code=$1`, [user.practice_code]); });
+          await withWriteConnection(async (c) => { await c.query(`UPDATE public.users SET licenties = array_remove(licenties, 'nazorg') WHERE id=$1`, [id]); });
         }
       }
     }
