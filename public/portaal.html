@@ -807,7 +807,7 @@
         tile.innerHTML = `
           ${badge}
           <div class="tile-icon">${app.icon}</div>
-          <div class="tile-name">${app.naam}</div>
+          <div class="tile-name">${app.id === 'prognose' ? (isAdmin ? 'Prognose Tool' : 'Mijn Prestaties') : app.naam}</div>
           <div class="tile-desc">${app.desc}</div>
         `;
 

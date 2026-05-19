@@ -2667,12 +2667,14 @@
                     const keyAlt = `${maandNamen[p.maand - 1]} ${p.jaar}`;
                     return eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
                 });
-                // Als geen eClub data maar wel handmatig ledenaantal — gebruik als startpunt voor eerste maand
-                if (history.length === 0 && ledenHandmatig && actualValues.every(v => v === null)) {
-                    // Zet handmatig ledenaantal als huidig punt (huidige maand)
+                // Gebruik handmatig ledenaantal voor huidige maand als geen eClub data
+                if (ledenHandmatig) {
                     const nu = new Date();
                     const idx = prognose.findIndex(p => p.jaar === nu.getFullYear() && p.maand === nu.getMonth() + 1);
-                    if (idx >= 0) actualValues[idx] = ledenHandmatig;
+                    // Zet handmatig als er geen eClub waarde is (null of 0)
+                    if (idx >= 0 && !actualValues[idx]) {
+                        actualValues[idx] = ledenHandmatig;
+                    }
                 }
 
                 churnForecastChart = new Chart(ctx, {
