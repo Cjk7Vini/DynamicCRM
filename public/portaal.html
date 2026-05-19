@@ -526,7 +526,7 @@
 
   <!-- PRESTATIE DASHBOARD MODAL (voor praktijken) -->
   <div id="prestatieModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:white;border-radius:20px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+    <div style="background:white;border-radius:20px;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
       <div style="padding:24px 28px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1;">
         <div>
           <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#111827;">Mijn Prestaties</div>
@@ -1018,7 +1018,7 @@
         // Grafiek canvas
         html += `<div style="margin-bottom:24px;">
           <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#111827;margin-bottom:12px;">Bezettingsgraad over tijd</div>
-          <canvas id="prestatieChart" height="200"></canvas>
+          <div style="height:200px;position:relative;"><canvas id="prestatieChart"></canvas></div>
         </div>`;
 
         // Medewerker prestaties
@@ -1082,9 +1082,10 @@
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { legend: { display: true, position: 'bottom' } },
+              plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
               scales: {
-                y: { min: 0, max: 130, ticks: { callback: v => v + '%' } }
+                y: { min: 0, max: 130, ticks: { callback: v => v + '%', font: { size: 11 } } },
+                x: { ticks: { font: { size: 11 } } }
               }
             }
           });
