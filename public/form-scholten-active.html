@@ -327,33 +327,45 @@
     </div>
 
     <div class="hero-block">
-        <h1>Actief bewegen,<br>persoonlijk presteren</h1>
-        <p class="tagline">Scholten Active</p>
+        <h1>Plan hier jouw gratis adviesgesprek bij Scholten Active!</h1>
+        <p class="tagline">Binnen 1 werkdag nemen we contact op om een afspraak in te plannen.</p>
         <div class="benefits">
             <div class="benefit-item">
                 <div class="benefit-icon">
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <span>Persoonlijk beweegplan op maat</span>
+                <span>Gratis en vrijblijvende kennismaking</span>
             </div>
             <div class="benefit-item">
                 <div class="benefit-icon">
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <span>Gratis rondleiding/intake</span>
+                <span>Persoonlijk advies over jouw huidige fitheid en doelen</span>
             </div>
             <div class="benefit-item">
                 <div class="benefit-icon">
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <span>Informatie over tijden en tarieven</span>
+                <span>Ontdek hoe Scholten Active bij jou past</span>
             </div>
         </div>
     </div>
 
     <div id="msg"></div>
 
-    <form id="leadForm">
+    <div style="margin-bottom:24px;display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:#1a5276;font-weight:700;">✓</span> Gratis en vrijblijvende kennismaking
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:#1a5276;font-weight:700;">✓</span> Persoonlijk advies over jouw huidige fitheid en doelen
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#555;">
+        <span style="color:#1a5276;font-weight:700;">✓</span> Ontdek hoe Scholten Active bij jou past
+    </div>
+</div>
+
+<form id="leadForm">
         <input type="hidden" id="praktijk_code" name="praktijk_code" value="FF42F5">
 
         <div class="form-group">
@@ -372,14 +384,13 @@
         </div>
 
         <div class="form-group">
-            <label for="doel">Wat is je doel?</label>
+            <label for="doel">Wat is je voornaamste doel? <span class="required">*</span></label>
             <select id="doel" name="doel">
-                <option value="">Selecteer...</option>
-                <option value="Afvallen">Afvallen</option>
-                <option value="Fitter worden">Fitter worden</option>
-                <option value="Spieren vergroten">Spieren vergroten</option>
-                <option value="Klachten voorkomen">Klachten voorkomen</option>
-                <option value="Sportprestaties verbeteren">Sportprestaties verbeteren</option>
+                <option value="">Selecteer je doel</option>
+                <option value="Fitter en actiever worden">Fitter en actiever worden</option>
+                <option value="Klachten voorkomen of verminderen">Klachten voorkomen of verminderen</option>
+                <option value="Sterker worden">Sterker worden</option>
+                <option value="Anders">Anders</option>
             </select>
         </div>
 
@@ -402,7 +413,7 @@
         </div>
 
         <button type="submit" class="submit-btn" id="submitBtn">
-            Verstuur mijn aanmelding
+            Plan mijn gratis adviesgesprek
         </button>
 
         <p class="security-note">Je gegevens worden veilig verwerkt en nooit gedeeld met derden</p>
