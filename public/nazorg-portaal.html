@@ -162,10 +162,6 @@
             <svg style="width:14px;height:14px;flex-shrink:0;color:#9090a8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Instellingen
           </div>
-          <div class="dd-item" onclick="window.location.href='/portaal.html'">
-            <svg style="width:14px;height:14px;flex-shrink:0;color:#9090a8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Portaal
-          </div>
           <div class="dd-sep"></div>
           <div class="dd-item danger" onclick="doLogout()">
             <svg style="width:14px;height:14px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -297,19 +293,29 @@
     async function init() {
       try {
         const res = await fetch('/api/auth/me', { credentials:'include' });
-        if (!res.ok) { window.location.href = '/login.html'; return; }
+        if (!res.ok) { window.location.href = '/portaal.html'; return; }
         const data = await res.json();
         currentUser = data.user;
+
+        // Check nazorg licentie — admin altijd toegang, anderen via licenties array
+        const isAdmin = currentUser.role === 'admin';
+        const licenties = currentUser.licenties || [];
+        const heeftNazorg = isAdmin || licenties.includes('nazorg');
+        if (!heeftNazorg) {
+          window.location.href = '/portaal.html';
+          return;
+        }
+
         // Vul topbar
         const initials = (currentUser.email||'?').slice(0,2).toUpperCase();
         document.getElementById('userInitials').textContent = initials;
         document.getElementById('userEmailTxt').textContent = currentUser.email || '';
-        if (currentUser.role === 'admin') {
+        if (isAdmin) {
           document.getElementById('praktijkGroep').style.display = 'block';
         }
         loadClienten();
         loadTaken();
-      } catch { window.location.href = '/login.html'; }
+      } catch { window.location.href = '/portaal.html'; }
     }
 
     function showTab(name) {
