@@ -3318,28 +3318,31 @@ app.post('/api/prognose', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// GET /api/praktijk-leden/:code — huidig handmatig ledenaantal
+// GET /api/praktijk-leden/:code — ledenaantal per maand ophalen
 app.get('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
   try {
-    const row = await withReadConnection(async (client) => {
+    const rows = await withReadConnection(async (client) => {
       return (await client.query(
-        'SELECT leden_handmatig FROM praktijken WHERE code = $1',
+        'SELECT jaar, maand, leden FROM leden_historie WHERE praktijk_code = $1 ORDER BY jaar, maand',
         [req.params.code]
-      )).rows[0];
+      )).rows;
     });
-    res.json({ success: true, leden_handmatig: row?.leden_handmatig || null });
+    res.json({ success: true, historie: rows });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// PATCH /api/praktijk-leden/:code — sla handmatig ledenaantal op
-app.patch('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
+// POST /api/praktijk-leden/:code — sla ledenaantal op per maand
+app.post('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-    const { leden_handmatig } = req.body;
+    const { jaar, maand, leden } = req.body;
+    if (!jaar || !maand || leden === undefined) return res.status(400).json({ error: 'Ontbrekende velden' });
     await withWriteConnection(async (client) => {
       await client.query(
-        'UPDATE praktijken SET leden_handmatig = $1 WHERE code = $2',
-        [leden_handmatig, req.params.code]
+        `INSERT INTO leden_historie (praktijk_code, jaar, maand, leden)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (praktijk_code, jaar, maand) DO UPDATE SET leden = EXCLUDED.leden`,
+        [req.params.code, jaar, maand, leden]
       );
     });
     res.json({ success: true });

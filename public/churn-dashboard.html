@@ -2591,7 +2591,13 @@
                 const eclubData = await eclubRes.json();
                 const prognoseData = await prognoseRes.json();
                 const ledenData = await ledenRes.json().catch(() => ({}));
-                const ledenHandmatig = ledenData.leden_handmatig || null;
+                // Bouw lookup voor leden_historie per maand
+                const ledenHistorieLookup = {};
+                if (ledenData.success && ledenData.historie) {
+                    ledenData.historie.forEach(r => {
+                        ledenHistorieLookup[`${r.jaar}-${r.maand}`] = r.leden;
+                    });
+                }
 
                 const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
                 const prognose = (prognoseData.success && prognoseData.data && prognoseData.data.length > 0) ? prognoseData.data : [];
@@ -2638,15 +2644,23 @@
                     eclubLookup[key] = d.subscribed;
                 });
 
-                // Als geen prognose maar wel eClub data — toon alleen balken
+                // Als geen prognose maar wel eClub of leden_historie data
                 if (prognose.length === 0) {
+                    const ledenKeys = Object.keys(ledenHistorieLookup).sort();
+                    const ledenLabels = ledenKeys.map(k => {
+                        const [j, m] = k.split('-');
+                        return `${maandNamen[parseInt(m)-1]} ${j}`;
+                    });
+                    const ledenValues = ledenKeys.map(k => ledenHistorieLookup[k]);
+                    const labels = history.length > 0 ? history.map(d => d.periode) : ledenLabels;
+                    const values = history.length > 0 ? history.map(d => d.subscribed) : ledenValues;
                     churnForecastChart = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: history.map(d => d.periode),
+                            labels,
                             datasets: [{
                                 label: 'Actieve leden (werkelijk)',
-                                data: history.map(d => d.subscribed),
+                                data: values,
                                 backgroundColor: 'rgba(51,153,204,0.7)',
                                 borderColor: '#3399CC',
                                 borderWidth: 1
