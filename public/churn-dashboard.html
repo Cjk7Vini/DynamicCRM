@@ -2605,33 +2605,24 @@
                 const allHistory = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
                 const history = allHistory.filter(d => d.subscribed > 0);
 
-                // Als beide leeg zijn maar wel handmatig ledenaantal — toon dat
+                // Als beide leeg zijn — check leden_historie
                 if (prognose.length === 0 && history.length === 0) {
-                    if (ledenHandmatig) {
+                    const ledenKeys = Object.keys(ledenHistorieLookup).sort();
+                    if (ledenKeys.length > 0) {
                         const nu = new Date();
-                        const maandLabel = `${maandNamen[nu.getMonth()]} ${nu.getFullYear()}`;
+                        const maandNamenArr = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+                        const labels = ledenKeys.map(k => { const [j,m] = k.split('-'); return `${maandNamenArr[parseInt(m)-1]} ${j}`; });
+                        const values = ledenKeys.map(k => ledenHistorieLookup[k]);
                         churnForecastChart = new Chart(ctx, {
                             type: 'bar',
-                            data: {
-                                labels: [maandLabel],
-                                datasets: [{
-                                    label: 'Actieve leden (werkelijk)',
-                                    data: [ledenHandmatig],
-                                    backgroundColor: 'rgba(51,153,204,0.7)',
-                                    borderColor: '#3399CC',
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false,
-                                plugins: { legend: { display: true, position: 'bottom' } },
-                                scales: { y: { beginAtZero: false } } }
+                            data: { labels, datasets: [{ label: 'Actieve leden (werkelijk)', data: values, backgroundColor: 'rgba(51,153,204,0.7)', borderColor: '#3399CC', borderWidth: 1 }] },
+                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } }, scales: { y: { beginAtZero: false, grace: '10%' } } }
                         });
                     } else {
                         churnForecastChart = new Chart(ctx, {
                             type: 'bar',
                             data: { labels: [], datasets: [] },
-                            options: { responsive: true, maintainAspectRatio: false,
-                                plugins: { legend: { display: false } } }
+                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
                     }
                     return;
@@ -2682,17 +2673,11 @@
                 const actualValues = prognose.map(p => {
                     const key = `${p.jaar}-${String(p.maand).padStart(2,'0')}`;
                     const keyAlt = `${maandNamen[p.maand - 1]} ${p.jaar}`;
-                    return eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
+                    // eClub heeft prioriteit, daarna leden_historie handmatig
+                    const eclubVal = eclubLookup[key] ?? eclubLookup[keyAlt] ?? null;
+                    if (eclubVal) return eclubVal;
+                    return ledenHistorieLookup[`${p.jaar}-${p.maand}`] || null;
                 });
-                // Gebruik handmatig ledenaantal voor huidige maand als geen eClub data
-                if (ledenHandmatig) {
-                    const nu = new Date();
-                    const idx = prognose.findIndex(p => p.jaar === nu.getFullYear() && p.maand === nu.getMonth() + 1);
-                    // Zet handmatig als er geen eClub waarde is (null of 0)
-                    if (idx >= 0 && !actualValues[idx]) {
-                        actualValues[idx] = ledenHandmatig;
-                    }
-                }
 
                 churnForecastChart = new Chart(ctx, {
                     type: 'bar',
