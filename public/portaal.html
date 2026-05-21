@@ -1186,6 +1186,7 @@
           html += '<th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Doel</th>';
           html += '<th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Werkelijk</th>';
           html += '<th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;border-bottom:1px solid #f3f4f6;">Verschil</th>';
+          html += '<th style="padding:8px 12px;border-bottom:1px solid #f3f4f6;"></th>';
           html += '</tr></thead><tbody>';
 
           rijen.forEach(r => {
@@ -1197,6 +1198,7 @@
               <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${r.doel_leden}</td>
               <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${werkelijk !== null ? werkelijk : '—'}</td>
               <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:600;color:${kleur};">${verschil !== null ? (verschil >= 0 ? '+' : '') + verschil : '—'}</td>
+              <td style="padding:8px 12px;text-align:right;"><button onclick="verwijderMaand('${code}',${jaar},${r.maand})" style="padding:3px 8px;background:none;border:1px solid #fecaca;border-radius:5px;font-size:11px;color:#dc2626;cursor:pointer;">✕</button></td>
             </tr>`;
           });
 
@@ -1233,23 +1235,37 @@
 
     async function slaInvoerOp(code, jaar) {
       const maand = parseInt(document.getElementById('invoer-maand').value);
-      const doel = parseInt(document.getElementById('invoer-prognose').value);
-      const leden = parseInt(document.getElementById('invoer-leden').value);
+      const doelRaw = document.getElementById('invoer-prognose').value.trim();
+      const ledenRaw = document.getElementById('invoer-leden').value.trim();
+      const doel = doelRaw !== '' ? parseInt(doelRaw) : null;
+      const leden = ledenRaw !== '' ? parseInt(ledenRaw) : null;
       const fb = document.getElementById('prognoseFeedback');
       fb.style.display = 'none';
       let ok1 = true, ok2 = true;
-      if (!isNaN(doel) && doel > 0) ok1 = await _opslaanPrognose(code, jaar, maand, doel, true);
-      if (!isNaN(leden) && leden > 0) ok2 = await _opslaanLeden(code, jaar, maand, leden, true);
-      if (ok1 || ok2) {
+      if (doel !== null && !isNaN(doel)) ok1 = await _opslaanPrognose(code, jaar, maand, doel, true);
+      if (leden !== null && !isNaN(leden)) ok2 = await _opslaanLeden(code, jaar, maand, leden, true);
+      fb.style.display = 'block';
+      fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
+      fb.textContent = MAAND_NAMEN[maand-1] + ' ' + jaar + ' opgeslagen.';
+      setTimeout(() => laadPrognose(), 500);
+    }
+
+    async function verwijderMaand(code, jaar, maand) {
+      if (!confirm(`${MAAND_NAMEN[maand-1]} ${jaar} verwijderen?`)) return;
+      const fb = document.getElementById('prognoseFeedback');
+      try {
+        await Promise.all([
+          fetch('/api/prognose/verwijder', { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({praktijk_code: code, jaar, maand}) }),
+          fetch('/api/praktijk-leden/verwijder', { method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({praktijk_code: code, jaar, maand}) })
+        ]);
         fb.style.display = 'block';
         fb.style.background = '#ecfdf5'; fb.style.color = '#065f46';
-        fb.textContent = MAAND_NAMEN[maand-1] + ' ' + jaar + ' opgeslagen.';
-        // Herlaad de tabel
+        fb.textContent = MAAND_NAMEN[maand-1] + ' ' + jaar + ' verwijderd.';
         setTimeout(() => laadPrognose(), 500);
-      } else {
+      } catch(e) {
         fb.style.display = 'block';
         fb.style.background = '#fef2f2'; fb.style.color = '#dc2626';
-        fb.textContent = 'Fout bij opslaan.';
+        fb.textContent = 'Fout bij verwijderen.';
       }
     }
 

@@ -3349,6 +3349,30 @@ app.post('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// POST /api/prognose/verwijder
+app.post('/api/prognose/verwijder', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { praktijk_code, jaar, maand } = req.body;
+    await withWriteConnection(async (client) => {
+      await client.query('DELETE FROM prognose WHERE praktijk_code=$1 AND jaar=$2 AND maand=$3', [praktijk_code, jaar, maand]);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// POST /api/praktijk-leden/verwijder
+app.post('/api/praktijk-leden/verwijder', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    const { praktijk_code, jaar, maand } = req.body;
+    await withWriteConnection(async (client) => {
+      await client.query('DELETE FROM leden_historie WHERE praktijk_code=$1 AND jaar=$2 AND maand=$3', [praktijk_code, jaar, maand]);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // GET /api/auth/nazorg-check - Check of user nazorg licentie heeft
 app.get('/api/auth/nazorg-check', requireAuth, async (req, res) => {
   try {
