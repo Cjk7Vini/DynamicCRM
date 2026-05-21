@@ -520,7 +520,7 @@
 
   function el(id) { return document.getElementById(id); }
   function fmt(n) { return Math.round(n); }
-  function pct(n) { return Math.round(n * 10) / 10 + '%'; }
+  function pct(n) { return Math.round(n * 1000) / 10 + '%'; }
   function capMnd(upw) { return (upw / UPW_FT) * CM_MAAND; }
   function fteMnd(upw) { return Math.round((upw / UPW_FT) * 100) / 100; }
 

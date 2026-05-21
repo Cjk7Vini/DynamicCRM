@@ -2567,7 +2567,10 @@
                     || (currentUser && getPracticeCode()) || null;
 
                 const ctx = document.getElementById('churnForecastChart');
-                if (churnForecastChart) churnForecastChart.destroy();
+                // Destroy bestaande chart via Chart.getChart om canvas conflict te voorkomen
+                const existingChart = Chart.getChart('churnForecastChart');
+                if (existingChart) existingChart.destroy();
+                churnForecastChart = null;
 
                 if (!practice) {
                     churnForecastChart = new Chart(ctx, {
