@@ -4527,7 +4527,7 @@ app.post('/api/contact', async (req, res) => {
 // ============================================================
 
 // SQL om uit te voeren in Neon (eenmalig):
-// CREATE TABLE IF NOT EXISTS nazorg_clients (
+// CREATE TABLE IF NOT EXISTS nazorg_clienten (
 //   id SERIAL PRIMARY KEY,
 //   praktijk_code VARCHAR(20) NOT NULL,
 //   naam VARCHAR(200) NOT NULL,
@@ -4540,7 +4540,7 @@ app.post('/api/contact', async (req, res) => {
 // );
 // CREATE TABLE IF NOT EXISTS nazorg_emails (
 //   id SERIAL PRIMARY KEY,
-//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   client_id INTEGER REFERENCES nazorg_clienten(id) ON DELETE CASCADE,
 //   mail_nummer INTEGER NOT NULL,
 //   gepland_op TIMESTAMPTZ NOT NULL,
 //   verstuurd BOOLEAN DEFAULT FALSE,
@@ -4548,7 +4548,7 @@ app.post('/api/contact', async (req, res) => {
 // );
 // CREATE TABLE IF NOT EXISTS nazorg_reacties (
 //   id SERIAL PRIMARY KEY,
-//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   client_id INTEGER REFERENCES nazorg_clienten(id) ON DELETE CASCADE,
 //   mail_nummer INTEGER NOT NULL,
 //   herstel_cijfer INTEGER,
 //   pijn_score INTEGER,
@@ -4557,7 +4557,7 @@ app.post('/api/contact', async (req, res) => {
 // );
 // CREATE TABLE IF NOT EXISTS nazorg_taken (
 //   id SERIAL PRIMARY KEY,
-//   client_id INTEGER REFERENCES nazorg_clients(id) ON DELETE CASCADE,
+//   client_id INTEGER REFERENCES nazorg_clienten(id) ON DELETE CASCADE,
 //   client_naam VARCHAR(200),
 //   client_email VARCHAR(200),
 //   client_telefoon VARCHAR(50),
@@ -4635,7 +4635,7 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
              COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
              COUNT(DISTINCT nr.id) AS reacties,
              COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
-           FROM nazorg_clients nc
+           FROM nazorg_clienten nc
            LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
            LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
            LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
@@ -4648,7 +4648,7 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
              COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
              COUNT(DISTINCT nr.id) AS reacties,
              COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
-           FROM nazorg_clients nc
+           FROM nazorg_clienten nc
            LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
            LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
            LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
@@ -4661,7 +4661,7 @@ app.get('/api/nazorg/clienten', requireAuth, async (req, res) => {
              COUNT(DISTINCT ne.id) FILTER (WHERE ne.verstuurd) AS mails_verstuurd,
              COUNT(DISTINCT nr.id) AS reacties,
              COUNT(DISTINCT nt.id) FILTER (WHERE nt.status = 'open') AS open_taken
-           FROM nazorg_clients nc
+           FROM nazorg_clienten nc
            LEFT JOIN nazorg_emails ne ON ne.client_id = nc.id
            LEFT JOIN nazorg_reacties nr ON nr.client_id = nc.id
            LEFT JOIN nazorg_taken nt ON nt.client_id = nc.id
@@ -4686,7 +4686,7 @@ app.get('/api/nazorg/client/:id', requireAuth, async (req, res) => {
       : [];
 
     const data = await withReadConnection(async (client) => {
-      const c = (await client.query('SELECT * FROM nazorg_clients WHERE id=$1', [id])).rows[0];
+      const c = (await client.query('SELECT * FROM nazorg_clienten WHERE id=$1', [id])).rows[0];
       if (!c) return null;
 
       // Toegangscheck
@@ -4718,19 +4718,19 @@ app.get('/api/nazorg/taken', requireAuth, async (req, res) => {
       if (praktijkCode) {
         const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
            FROM nazorg_taken nt 
-           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           JOIN nazorg_clienten nc ON nc.id = nt.client_id
            WHERE nt.status = 'open' AND nt.praktijk_code = $1 ORDER BY nt.aangemaakt_op DESC`;
         return (await client.query(q, [praktijkCode])).rows;
       } else if (role === 'organisation' && organisationCodes.length > 0) {
         const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
            FROM nazorg_taken nt 
-           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           JOIN nazorg_clienten nc ON nc.id = nt.client_id
            WHERE nt.status = 'open' AND nt.praktijk_code = ANY($1) ORDER BY nt.aangemaakt_op DESC`;
         return (await client.query(q, [organisationCodes])).rows;
       } else if (role === 'admin') {
         const q = `SELECT nt.*, nc.naam as client_naam, nc.email as client_email, nc.telefoon as client_telefoon
            FROM nazorg_taken nt 
-           JOIN nazorg_clients nc ON nc.id = nt.client_id
+           JOIN nazorg_clienten nc ON nc.id = nt.client_id
            WHERE nt.status = 'open' ORDER BY nt.aangemaakt_op DESC`;
         return (await client.query(q)).rows;
       } else {
@@ -4755,7 +4755,7 @@ app.patch('/api/nazorg/taak/:id', requireAuth, async (req, res) => {
 app.delete('/api/nazorg/client/:id', requireAuth, async (req, res) => {
   try {
     await withWriteConnection(async (client) => {
-      await client.query('DELETE FROM nazorg_clients WHERE id=$1', [req.params.id]);
+      await client.query('DELETE FROM nazorg_clienten WHERE id=$1', [req.params.id]);
     });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -4779,7 +4779,7 @@ app.post('/api/nazorg/start', requireAuth, async (req, res) => {
 
     const clientId = await withWriteConnection(async (client) => {
       const r = await client.query(
-        `INSERT INTO nazorg_clients (praktijk_code, naam, email, telefoon, behandelaar, laatste_behandeling)
+        `INSERT INTO nazorg_clienten (praktijk_code, naam, email, telefoon, behandelaar, laatste_behandeling)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
         [praktijkCode, naam, email, telefoon||null, behandelaar||null, laatste_behandeling]
       );
@@ -4904,7 +4904,7 @@ app.post('/api/nazorg/reactie', async (req, res) => {
     // Als score >= 6 op pijn of herstel >= 6 → maak taak aan
     if (pijn_score >= 6 || herstel_cijfer >= 6) {
       const clientData = await withReadConnection(async (client) => {
-        return (await client.query('SELECT * FROM nazorg_clients WHERE id=$1', [client_id])).rows[0];
+        return (await client.query('SELECT * FROM nazorg_clienten WHERE id=$1', [client_id])).rows[0];
       });
       if (clientData) {
         await withWriteConnection(async (client) => {
@@ -4944,7 +4944,7 @@ app.get('/api/check-nazorg', async (req, res) => {
         `SELECT ne.id, ne.client_id, ne.mail_nummer, nc.naam, nc.email, nc.behandelaar, nc.praktijk_code,
                 p.naam as praktijk_naam, p.email_to
          FROM nazorg_emails ne
-         JOIN nazorg_clients nc ON nc.id = ne.client_id
+         JOIN nazorg_clienten nc ON nc.id = ne.client_id
          LEFT JOIN praktijken p ON p.code = nc.praktijk_code
          WHERE ne.verstuurd = FALSE AND ne.gepland_op <= $1 AND nc.status = 'actief'`,
         [now.toISOString()]
@@ -4978,7 +4978,7 @@ app.get('/api/check-nazorg', async (req, res) => {
         // Als mail 3 verstuurd: zet client op voltooid
         if (mail.mail_nummer === 3) {
           await withWriteConnection(async (client) => {
-            await client.query('UPDATE nazorg_clients SET status=$1 WHERE id=$2', ['voltooid', mail.client_id]);
+            await client.query('UPDATE nazorg_clienten SET status=$1 WHERE id=$2', ['voltooid', mail.client_id]);
           });
         }
 
