@@ -5108,7 +5108,7 @@
             const pogingHistory = pogingen.map(p => `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9f9fb;border-radius:6px;margin-bottom:6px;font-size:13px;">
                     <span>Poging ${p.poging_nummer} - ${p.uitkomst === 'geen_gehoor' ? 'Geen gehoor' : p.uitkomst === 'ingesproken' ? 'Ingesproken' : 'Verkeerd moment'}</span>
-                    <span style="color:#9090a8;font-size:12px;">${fmtDt(p.aangemaakt_op)}</span>
+                    <span style="color:#9090a8;font-size:12px;">${fmtDt(p.aangemaakt_op)}${p.volgende_belpoging ? ' &rarr; volgende: ' + fmtDt(p.volgende_belpoging) : ''}</span>
                 </div>`).join('');
 
             const modalHtml = `
