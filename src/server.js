@@ -42,6 +42,14 @@ function formatAms(ts) {
 }
 
 /** Action-token helpers (basic) */
+function maandenVoorLicentie(type) {
+  if (type === '3m') return 3;
+  if (type === '6m') return 6;
+  if (type === '12m') return 12;
+  if (type === '24m') return 24;
+  return 12;
+}
+
 function generateActionToken(leadId, practiceCode) {
   const secret = process.env.ACTION_TOKEN_SECRET || 'your-secret-key-change-this';
   const data = `${leadId}-${practiceCode}`;
@@ -3000,6 +3008,8 @@ function formatDateNL(date) {
 }
 
 function licenseLabel(type) {
+  if (type === '3m') return '3 maanden';
+  if (type === '6m') return '6 maanden';
   if (type === '12m') return '12 maanden';
   if (type === '24m') return '24 maanden';
   if (type === 'unlimited') return 'Onbeperkt';
@@ -3070,7 +3080,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
       licenseStart = new Date();
       if (finalLicenseType !== 'unlimited') {
         licenseEnd = new Date();
-        licenseEnd.setMonth(licenseEnd.getMonth() + (finalLicenseType === '12m' ? 12 : 24));
+        licenseEnd.setMonth(licenseEnd.getMonth() + maandenVoorLicentie(finalLicenseType));
       }
     }
     const newUser = await withWriteConnection(async (client) => {
@@ -3083,7 +3093,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
           role === 'organisation' ? (organisationCodes || null) : null,
           role === 'organisation' ? (orgLicenseType || '12m') : null,
           role === 'organisation' && orgLicenseType && orgLicenseType !== 'unlimited'
-            ? new Date(new Date().setMonth(new Date().getMonth() + (orgLicenseType === '12m' ? 12 : 24)))
+            ? new Date(new Date().setMonth(new Date().getMonth() + maandenVoorLicentie(orgLicenseType)))
             : null
         ]
       );
