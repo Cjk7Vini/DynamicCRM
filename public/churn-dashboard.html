@@ -993,6 +993,10 @@
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Afspraken</div>
+        <div class="sidebar-item" onclick="showDashboardSection('belpogingen', this)">
+            <svg style="width:16px;height:16px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8a16 16 0 006.91 6.91l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            Belpogingen
+        </div>
         <div class="sidebar-item" onclick="showDashboardSection('afspraken', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -1587,6 +1591,51 @@
 </div><!-- einde dash-dashboard -->
 
 <!-- ── AFSPRAKEN SECTIE ───────────────────────────────────────────── -->
+<div class="dash-section" id="dash-belpogingen" style="display:none;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+        <div class="insight-card ic-highlight">
+            <div class="insight-label">Actieve belpogingen</div>
+            <div class="insight-value" id="bpActief">-</div>
+            <div class="insight-sub">Leads in behandeling</div>
+        </div>
+        <div class="insight-card ic-red">
+            <div class="insight-label">Nu bellen</div>
+            <div class="insight-value" id="bpNuBellen">-</div>
+            <div class="insight-sub">Herinnering verlopen</div>
+        </div>
+        <div class="insight-card">
+            <div class="insight-label">Ingepland</div>
+            <div class="insight-value" id="bpIngepland">-</div>
+            <div class="insight-sub">Toekomstige belpoging</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Belpogingen overzicht</div>
+                <div class="card-subtitle">Leads waarbij telefonisch contact is geprobeerd</div>
+            </div>
+        </div>
+        <table class="table" id="bpTable">
+            <thead>
+                <tr>
+                    <th>Lead</th>
+                    <th>Telefoon</th>
+                    <th>Pogingen</th>
+                    <th>Laatste poging</th>
+                    <th>Volgende belpoging</th>
+                    <th>Status</th>
+                    <th>Actie</th>
+                </tr>
+            </thead>
+            <tbody id="bpTableBody">
+                <tr><td colspan="7" style="text-align:center;color:#9090a8;padding:32px;">Laden...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <div class="dash-section" id="dash-afspraken">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
         <div class="insight-card ic-highlight">
@@ -3802,6 +3851,7 @@
             const activeSection = document.querySelector('.dash-section.active');
             if (!activeSection || activeSection.id === 'dash-dashboard') return;
             const name = activeSection.id.replace('dash-', '');
+            if (name === 'belpogingen') { loadBelpogingen(); }
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
             else if (name === 'seizoen') { loadSeizoenData(); }
             else if (name === 'kwaliteit') { loadLeadKwaliteit(); }
@@ -3823,11 +3873,12 @@
                 else el.classList.add('active-sub');
             }
 
-            const titles = { dashboard: 'Analytics', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
+            const titles = { dashboard: 'Analytics', belpogingen: 'Belpogingen', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
             if (name === 'dashboard') applyFilters();
+            if (name === 'belpogingen') { loadBelpogingen(); }
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
             if (name === 'seizoen') { loadSeizoenData(); }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
@@ -4991,6 +5042,172 @@
                 dot.className = 'status-dot amber';
             }
         };
+
+
+        // ===== BELPOGINGEN =====
+        let _bpData = [];
+
+        async function loadBelpogingen() {
+            try {
+                const pc = getPracticeCode();
+                const res = await fetch(`/api/belpogingen${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) return;
+                _bpData = data.belpogingen || [];
+
+                const nu = new Date();
+                let nuBellen = 0, ingepland = 0;
+                _bpData.forEach(b => {
+                    if (b.volgende_belpoging && new Date(b.volgende_belpoging) <= nu) nuBellen++;
+                    else if (b.volgende_belpoging && new Date(b.volgende_belpoging) > nu) ingepland++;
+                });
+
+                document.getElementById('bpActief').textContent = _bpData.length;
+                document.getElementById('bpNuBellen').textContent = nuBellen;
+                document.getElementById('bpIngepland').textContent = ingepland;
+
+                const tbody = document.getElementById('bpTableBody');
+                if (_bpData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9090a8;padding:32px;">Geen actieve belpogingen</td></tr>';
+                    return;
+                }
+
+                const fmtDt = (dt) => dt ? new Date(dt).toLocaleDateString('nl-NL', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '-';
+
+                tbody.innerHTML = _bpData.map(b => {
+                    const volgend = b.volgende_belpoging ? new Date(b.volgende_belpoging) : null;
+                    const isVerlopen = volgend && volgend <= nu;
+                    const statusBadge = isVerlopen
+                        ? '<span style="background:#FCEBEB;color:#A32D2D;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">Nu bellen</span>'
+                        : volgend
+                        ? '<span style="background:#E6F1FB;color:#185FA5;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">Ingepland</span>'
+                        : '<span style="background:#F1EFE8;color:#5F5E5A;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">Geen reminder</span>';
+                    const pogingBadge = `<span style="background:#FAEEDA;color:#854F0B;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">${b.aantal_pogingen} poging${b.aantal_pogingen > 1 ? 'en' : ''}</span>`;
+
+                    return `<tr>
+                        <td><strong>${b.volledige_naam}</strong></td>
+                        <td>${b.telefoon || '-'}</td>
+                        <td>${pogingBadge}</td>
+                        <td style="font-size:13px;color:#5F5E5A;">${fmtDt(b.laatste_poging)}</td>
+                        <td style="font-size:13px;color:${isVerlopen ? '#A32D2D' : '#3A3D40'};">${fmtDt(b.volgende_belpoging)}</td>
+                        <td>${statusBadge}</td>
+                        <td><button class="btn btn-sm btn-ghost" onclick="openBpModal(${b.id})">Beheren</button></td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                console.error('Belpogingen laden mislukt:', e);
+            }
+        }
+
+        function openBpModal(leadId) {
+            const b = _bpData.find(x => x.id === leadId);
+            if (!b) return;
+            const pogingen = b.pogingen || [];
+            const fmtDt = (dt) => dt ? new Date(dt).toLocaleDateString('nl-NL', {day:'numeric',month:'long',year:'numeric'}) + ' om ' + new Date(dt).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) : '-';
+
+            const pogingHistory = pogingen.map(p => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9f9fb;border-radius:6px;margin-bottom:6px;font-size:13px;">
+                    <span>Poging ${p.poging_nummer} - ${p.uitkomst === 'geen_gehoor' ? 'Geen gehoor' : p.uitkomst === 'ingesproken' ? 'Ingesproken' : 'Verkeerd moment'}</span>
+                    <span style="color:#9090a8;font-size:12px;">${fmtDt(p.aangemaakt_op)}</span>
+                </div>`).join('');
+
+            const modalHtml = `
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:600;">${b.volledige_naam}</div>
+                        <div style="font-size:13px;color:#9090a8;margin-top:2px;">${b.telefoon || '-'}</div>
+                    </div>
+                    <span style="background:#FAEEDA;color:#854F0B;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">${b.aantal_pogingen} poging${b.aantal_pogingen > 1 ? 'en' : ''}</span>
+                </div>
+                <hr style="border:none;border-top:1px solid #f0f0f2;margin:0 0 16px;">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Pogingen</div>
+                ${pogingHistory || '<div style="font-size:13px;color:#9090a8;padding:8px 0;">Geen pogingen geregistreerd</div>'}
+                <hr style="border:none;border-top:1px solid #f0f0f2;margin:16px 0;">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Nieuwe poging registreren</div>
+                <select id="bpUitkomst" style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;margin-bottom:12px;">
+                    <option value="geen_gehoor">Geen gehoor</option>
+                    <option value="ingesproken">Ingesproken</option>
+                    <option value="verkeerd_moment">Verkeerd moment</option>
+                </select>
+                <hr style="border:none;border-top:1px solid #f0f0f2;margin:12px 0;">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Notitie</div>
+                <textarea id="bpNotitie" rows="2" placeholder="Bijv. belt terug na 14:00..." style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;resize:none;margin-bottom:14px;box-sizing:border-box;">${b.notitie || ''}</textarea>
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Volgende belpoging inplannen</div>
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <input type="date" id="bpDatum" style="flex:1;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;">
+                    <input type="time" id="bpTijd" style="padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="slaaBpOp(${b.id})">Poging registreren</button>
+                    <button class="btn" style="background:#FCEBEB;color:#A32D2D;border:1px solid #F7C1C1;" onclick="bpGeenInteresse(${b.id})">Geen interesse</button>
+                    ${parseInt(b.aantal_pogingen) >= 3 ? `<button class="btn" style="color:#9090a8;border-color:#e4e4e8;" onclick="bpVerwijder(${b.id})">Verwijderen</button>` : ''}
+                </div>`;
+
+            openGenericModal('Belpoging beheren', modalHtml);
+        }
+
+        function openGenericModal(title, bodyHtml) {
+            let modal = document.getElementById('genericBpModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'genericBpModal';
+                modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;padding:20px;';
+                modal.innerHTML = '<div style="background:white;border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.15);"><div style="padding:20px 24px;border-bottom:1px solid #f0f0f2;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1;"><div style="font-size:16px;font-weight:600;" id="genericBpTitle"></div><button onclick="sluitBpModal()" style="background:none;border:none;cursor:pointer;color:#9090a8;font-size:20px;line-height:1;padding:0 4px;">&#x2715;</button></div><div style="padding:20px 24px;" id="genericBpBody"></div></div>';
+                modal.addEventListener('click', (e) => { if (e.target === modal) sluitBpModal(); });
+                document.body.appendChild(modal);
+            }
+            document.getElementById('genericBpTitle').textContent = title;
+            document.getElementById('genericBpBody').innerHTML = bodyHtml;
+            modal.style.display = 'flex';
+        }
+
+        function sluitBpModal() {
+            const modal = document.getElementById('genericBpModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function slaaBpOp(leadId) {
+            const uitkomst = document.getElementById('bpUitkomst').value;
+            const notitie = document.getElementById('bpNotitie').value.trim();
+            const datum = document.getElementById('bpDatum').value;
+            const tijd = document.getElementById('bpTijd').value;
+            const volgende = datum ? new Date(datum + 'T' + (tijd || '09:00')).toISOString() : null;
+
+            try {
+                const r = await fetch('/api/belpoging', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ lead_id: leadId, uitkomst, notitie, volgende_belpoging: volgende })
+                });
+                const d = await r.json();
+                if (d.success) { sluitBpModal(); loadBelpogingen(); }
+                else alert('Fout bij opslaan: ' + d.error);
+            } catch(e) { alert('Fout: ' + e.message); }
+        }
+
+        async function bpGeenInteresse(leadId) {
+            if (!confirm('Lead markeren als geen interesse? De lead verdwijnt uit de belpoging kolom.')) return;
+            try {
+                await fetch('/api/leads/' + leadId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ funnel_stage: 'lost', status: 'Geen interesse' })
+                });
+                sluitBpModal();
+                loadBelpogingen();
+            } catch(e) { alert('Fout: ' + e.message); }
+        }
+
+        async function bpVerwijder(leadId) {
+            if (!confirm('Lead permanent verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
+            try {
+                await fetch('/api/leads/' + leadId, { method: 'DELETE', credentials: 'include' });
+                sluitBpModal();
+                loadBelpogingen();
+            } catch(e) { alert('Fout: ' + e.message); }
+        }
 
     </script>
 </body>

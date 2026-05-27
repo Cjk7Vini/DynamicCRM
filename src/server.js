@@ -563,13 +563,17 @@ app.post('/leads', async (req, res) => {
                 </td></tr>
               </table>
               <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr>
-                <td align="center" style="padding:0 8px;">
+                <td align="center" style="padding:0 6px;">
                   <a href="${baseUrl}/${practice.code === '458D05' ? 'appointment-form-kerngezond.html' : 'appointment-form.html'}?lead_id=${inserted.id}&practice_code=${practice.code}&token=${actionToken}"
-                     style="display:inline-block;background:#166534;color:#e6f6ec;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Afspraak inplannen</a>
+                     style="display:inline-block;background:#166534;color:#e6f6ec;padding:13px 22px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Afspraak inplannen</a>
                 </td>
-                <td align="center" style="padding:0 8px;">
+                <td align="center" style="padding:0 6px;">
+                  <a href="${baseUrl}/api/belpoging-registreer?lead_id=${inserted.id}&practice_code=${practice.code}&token=${generateActionToken(inserted.id + '-belpoging', practice.code)}"
+                     style="display:inline-block;background:#333399;color:#ffffff;padding:13px 22px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Belpoging registreren</a>
+                </td>
+                <td align="center" style="padding:0 6px;">
                   <a href="${baseUrl}/api/geen-interesse?lead_id=${inserted.id}&practice_code=${practice.code}&token=${generateActionToken(inserted.id + '-geen-interesse', practice.code)}"
-                     style="display:inline-block;background:#f4f4f6;color:#374151;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;border:1px solid #d1d5db;">Geen interesse</a>
+                     style="display:inline-block;background:#f4f4f6;color:#374151;padding:13px 22px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;border:1px solid #d1d5db;">Geen interesse</a>
                 </td>
               </tr></table>
               <p style="margin:0;font-size:13px;color:#9090a8;">Ontvangen op ${formatAms(inserted.aangemaakt_op)}</p>
@@ -4995,6 +4999,300 @@ app.get('/api/check-nazorg', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// PATCH /api/leads/:id — update lead status/funnel vanuit dashboard
+app.patch('/api/leads/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { funnel_stage, status } = req.body;
+    const practiceCode = req.session.practiceCode;
+    const role = req.session.role;
+    await withWriteConnection(async (client) => {
+      const q = role === 'admin'
+        ? 'UPDATE public.leads SET funnel_stage=$1, status=$2 WHERE id=$3'
+        : 'UPDATE public.leads SET funnel_stage=$1, status=$2 WHERE id=$3 AND praktijk_code=$4';
+      const params = role === 'admin' ? [funnel_stage, status, id] : [funnel_stage, status, id, practiceCode];
+      await client.query(q, params);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// DELETE /api/leads/:id — verwijder lead vanuit dashboard
+app.delete('/api/leads/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const practiceCode = req.session.practiceCode;
+    const role = req.session.role;
+    await withWriteConnection(async (client) => {
+      const q = role === 'admin'
+        ? 'DELETE FROM public.leads WHERE id=$1'
+        : 'DELETE FROM public.leads WHERE id=$1 AND praktijk_code=$2';
+      const params = role === 'admin' ? [id] : [id, practiceCode];
+      await client.query(q, params);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ==================== BELPOGINGEN ====================
+
+// POST /api/belpoging — registreer een belpoging vanuit email link
+app.get('/api/belpoging-registreer', async (req, res) => {
+  try {
+    const { lead_id, practice_code, token } = req.query;
+    if (!lead_id || !practice_code || !token) return res.status(400).send('Ongeldige parameters');
+
+    const expectedToken = generateActionToken(lead_id + '-belpoging', practice_code);
+    if (token !== expectedToken) return res.status(401).send('Ongeldige token');
+
+    const lead = await withReadConnection(async (client) => {
+      return (await client.query('SELECT * FROM public.leads WHERE id=$1 AND praktijk_code=$2', [lead_id, practice_code])).rows[0];
+    });
+    if (!lead) return res.status(404).send('Lead niet gevonden');
+
+    // Tel bestaande belpogingen
+    const existing = await withReadConnection(async (client) => {
+      return (await client.query('SELECT COUNT(*) as cnt FROM belpogingen WHERE lead_id=$1', [lead_id])).rows[0];
+    });
+    const pogingNummer = parseInt(existing.cnt) + 1;
+
+    // Registreer belpoging
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `INSERT INTO belpogingen (lead_id, praktijk_code, poging_nummer, uitkomst, aangemaakt_op)
+         VALUES ($1, $2, $3, 'geen_gehoor', NOW())`,
+        [lead_id, practice_code, pogingNummer]
+      );
+      // Update lead funnel stage naar benaderd als nog niet
+      await client.query(
+        `UPDATE public.leads SET funnel_stage = 'intent', status = 'Benaderd', contacted_at = NOW()
+         WHERE id = $1 AND (funnel_stage = 'awareness' OR funnel_stage IS NULL)`,
+        [lead_id]
+      );
+    });
+
+    console.log(`[BELPOGING] Poging ${pogingNummer} geregistreerd voor lead ${lead_id}`);
+
+    res.send(`<!DOCTYPE html>
+      <html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f4f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}
+      .card{background:white;border-radius:12px;padding:40px;max-width:460px;text-align:center;}
+      h1{font-size:20px;color:#1A1D21;margin:0 0 12px;}
+      p{font-size:15px;color:#5F5E5A;line-height:1.7;margin:0 0 20px;}
+      .btn{display:inline-block;background:#333399;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;}</style></head>
+      <body><div class="card">
+        <div style="width:48px;height:48px;background:#e8f5e9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h1>Belpoging geregistreerd</h1>
+        <p>Poging ${pogingNummer} voor <strong>${lead.volledige_naam}</strong> is opgeslagen. U kunt de lead beheren via het dashboard.</p>
+        <a href="https://dynamic-health-consultancy.nl/portaal.html" class="btn">Ga naar portaal</a>
+        <p style="margin-top:16px;font-size:13px;color:#9090a8;">U wordt na 20 seconden automatisch doorgestuurd.</p>
+      </div>
+      <script>setTimeout(()=>window.location.href='https://dynamic-health-consultancy.nl/portaal.html',20000);</script>
+      </body></html>`);
+  } catch (error) {
+    console.error('Belpoging registreer error:', error);
+    res.status(500).send('Er is een fout opgetreden.');
+  }
+});
+
+// GET /api/belpogingen — lijst voor dashboard
+app.get('/api/belpogingen', requireAuth, async (req, res) => {
+  try {
+    const practiceCode = req.query.practice || req.session.practiceCode;
+    const role = req.session.role;
+
+    const rows = await withReadConnection(async (client) => {
+      let q = `
+        SELECT
+          l.id, l.volledige_naam, l.telefoon, l.emailadres, l.funnel_stage,
+          l.praktijk_code,
+          COUNT(b.id) as aantal_pogingen,
+          MAX(b.aangemaakt_op) as laatste_poging,
+          MAX(b.volgende_belpoging) as volgende_belpoging,
+          MAX(b.notitie) as notitie,
+          json_agg(json_build_object(
+            'id', b.id,
+            'poging_nummer', b.poging_nummer,
+            'uitkomst', b.uitkomst,
+            'notitie', b.notitie,
+            'aangemaakt_op', b.aangemaakt_op,
+            'volgende_belpoging', b.volgende_belpoging
+          ) ORDER BY b.poging_nummer) as pogingen
+        FROM belpogingen b
+        JOIN public.leads l ON l.id = b.lead_id
+        WHERE l.funnel_stage NOT IN ('won', 'lost')`;
+
+      const params = [];
+      if (role !== 'admin' && practiceCode) {
+        params.push(practiceCode);
+        q += ` AND l.praktijk_code = $${params.length}`;
+      }
+
+      q += ` GROUP BY l.id, l.volledige_naam, l.telefoon, l.emailadres, l.funnel_stage, l.praktijk_code
+             ORDER BY MAX(b.volgende_belpoging) ASC NULLS LAST, MAX(b.aangemaakt_op) DESC`;
+
+      return (await client.query(q, params)).rows;
+    });
+
+    res.json({ success: true, belpogingen: rows });
+  } catch (e) {
+    console.error('Belpogingen error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/belpoging — nieuwe poging registreren vanuit dashboard
+app.post('/api/belpoging', requireAuth, async (req, res) => {
+  try {
+    const { lead_id, uitkomst, notitie, volgende_belpoging } = req.body;
+    if (!lead_id) return res.status(400).json({ error: 'lead_id ontbreekt' });
+
+    const existing = await withReadConnection(async (client) => {
+      return (await client.query('SELECT COUNT(*) as cnt FROM belpogingen WHERE lead_id=$1', [lead_id])).rows[0];
+    });
+    const pogingNummer = parseInt(existing.cnt) + 1;
+
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `INSERT INTO belpogingen (lead_id, praktijk_code, poging_nummer, uitkomst, notitie, volgende_belpoging, aangemaakt_op)
+         VALUES ($1, (SELECT praktijk_code FROM leads WHERE id=$1), $2, $3, $4, $5, NOW())`,
+        [lead_id, pogingNummer, uitkomst || 'geen_gehoor', notitie || null, volgende_belpoging || null]
+      );
+      await client.query(
+        `UPDATE public.leads SET funnel_stage = 'intent', status = 'Benaderd', contacted_at = COALESCE(contacted_at, NOW()) WHERE id = $1`,
+        [lead_id]
+      );
+    });
+
+    res.json({ success: true, poging_nummer: pogingNummer });
+  } catch (e) {
+    console.error('Belpoging post error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// PATCH /api/belpoging/:leadId — reminder datum instellen + notitie opslaan
+app.patch('/api/belpoging/:leadId', requireAuth, async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { volgende_belpoging, notitie } = req.body;
+
+    await withWriteConnection(async (client) => {
+      await client.query(
+        `UPDATE belpogingen SET volgende_belpoging=$1, notitie=$2, reminder_verstuurd=FALSE
+         WHERE lead_id=$3 AND id = (SELECT id FROM belpogingen WHERE lead_id=$3 ORDER BY aangemaakt_op DESC LIMIT 1)`,
+        [volgende_belpoging || null, notitie || null, leadId]
+      );
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Belpoging patch error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/check-belpogingen — EasyCron: stuur reminder email naar praktijk
+app.get('/api/check-belpogingen', async (req, res) => {
+  try {
+    console.log('Checking belpoging reminders...');
+
+    const rows = await withReadConnection(async (client) => {
+      return (await client.query(`
+        SELECT DISTINCT ON (b.lead_id)
+          b.lead_id, b.notitie, b.volgende_belpoging, b.poging_nummer,
+          l.volledige_naam, l.telefoon, l.emailadres,
+          p.naam as praktijk_naam, p.email_to as praktijk_email
+        FROM belpogingen b
+        JOIN public.leads l ON l.id = b.lead_id
+        JOIN public.praktijken p ON p.code = l.praktijk_code
+        WHERE b.volgende_belpoging IS NOT NULL
+          AND b.volgende_belpoging <= NOW()
+          AND b.reminder_verstuurd = FALSE
+          AND l.funnel_stage NOT IN ('won', 'lost')
+        ORDER BY b.lead_id, b.aangemaakt_op DESC
+      `)).rows;
+    });
+
+    console.log(`${rows.length} belpoging reminders te versturen`);
+
+    let sent = 0;
+    for (const r of rows) {
+      try {
+        const formatDt = (dt) => {
+          if (!dt) return 'Niet bekend';
+          const d = new Date(dt);
+          return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) + ' om ' + d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const html = `<!DOCTYPE html>
+          <html><head><meta charset="utf-8"></head>
+          <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;"><tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+            <tr><td style="background:#1A1D21;padding:24px 40px;">
+              <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;">
+              <span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
+            </td></tr>
+            <tr><td style="padding:36px 40px;">
+              <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Dit is een herinnering om <strong>${r.volledige_naam}</strong> te bellen. Dit is belpoging <strong>${r.poging_nummer + 1}</strong>.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 24px;">
+                <tr><td style="padding:20px 24px;">
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${r.volledige_naam}</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Telefoonnummer:</strong> ${r.telefoon || 'Niet opgegeven'}</p>
+                  <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Ingepland voor:</strong> ${formatDt(r.volgende_belpoging)}</p>
+                  ${r.notitie ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Notitie:</strong> ${r.notitie}</p>` : ''}
+                </td></tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr>
+                <td align="center">
+                  <a href="https://dynamic-health-consultancy.nl/portaal.html"
+                     style="display:inline-block;background:#333399;color:#ffffff;padding:13px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Ga naar dashboard</a>
+                </td>
+              </tr></table>
+              <p style="margin:0;font-size:13px;color:#9090a8;">Dynamic Health Consultancy</p>
+            </td></tr>
+            <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+              <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+            </td></tr>
+          </table>
+          </td></tr></table>
+          </body></html>`;
+
+        await sendMailResilient({
+          from: SMTP.from,
+          to: r.praktijk_email,
+          subject: `Belpoging herinnering: ${r.volledige_naam}`,
+          text: `Herinnering: bel ${r.volledige_naam} (${r.telefoon || 'geen telefoon'}). Ingepland voor: ${formatDt(r.volgende_belpoging)}. ${r.notitie ? 'Notitie: ' + r.notitie : ''}`,
+          html
+        });
+
+        await withWriteConnection(async (client) => {
+          await client.query(
+            `UPDATE belpogingen SET reminder_verstuurd = TRUE WHERE lead_id=$1 AND volgende_belpoging=$2`,
+            [r.lead_id, r.volgende_belpoging]
+          );
+        });
+
+        sent++;
+        console.log(`Belpoging reminder verstuurd voor lead ${r.lead_id}`);
+      } catch (mailErr) {
+        console.warn('Belpoging mail error:', mailErr?.message);
+      }
+    }
+
+    res.json({ success: true, processed: rows.length, sent });
+  } catch (e) {
+    console.error('Check belpogingen error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+
 
 // ============================================================
 // EINDE NAZORG PORTAAL
