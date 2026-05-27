@@ -4391,7 +4391,13 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
     });
 
     // Verwerk data — totale bezettingsgraad per maand + medewerker prestaties
-    const maanden = rows.map(r => {
+    // Filter lege rapporten zonder productiviteit data
+    const geldigeRows = rows.filter(r => {
+      const mws = r.medewerkers_data?.medewerkers || [];
+      return mws.length > 0 && mws.some(m => Number(m.productiviteit) > 0);
+    });
+
+    const maanden = geldigeRows.map(r => {
       const mws = r.medewerkers_data?.medewerkers || [];
       const totCap = mws.reduce((s, m) => s + (Number(m.capaciteit) || 0), 0);
       const totBel = mws.reduce((s, m) => s + (Number(m.belasting) || 0), 0);
@@ -4409,10 +4415,15 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
     // Laatste rapport — medewerker prestaties
     let topMedewerkers = [];
     let onderMedewerkers = [];
-    if (rows.length > 0) {
-      const laatste = rows[rows.length - 1];
+    if (geldigeRows.length > 0) {
+      const laatste = geldigeRows[geldigeRows.length - 1];
       const mws = (laatste.medewerkers_data?.medewerkers || [])
-        .map(m => ({ naam: m.naam, productiviteit: Number(m.productiviteit) || 0 }))
+        .map(m => {
+          const rawProd = Number(m.productiviteit) || 0;
+          // Productiviteit kan decimaal zijn (0.9) of percentage (90) — normaliseer naar percentage
+          const prod = rawProd <= 1.5 ? Math.round(rawProd * 1000) / 10 : Math.round(rawProd * 10) / 10;
+          return { naam: m.naam, productiviteit: prod };
+        })
         .sort((a, b) => b.productiviteit - a.productiviteit);
       topMedewerkers = mws.filter(m => m.productiviteit >= 90).slice(0, 5);
       onderMedewerkers = mws.filter(m => m.productiviteit < 75).slice(0, 5);
@@ -5122,6 +5133,11 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
     const practiceCode = req.query.practice || req.session.practiceCode;
     const role = req.session.role;
 
+    // Niet-admins zonder praktijkcode krijgen lege lijst
+    if (role !== 'admin' && !practiceCode) {
+      return res.json({ success: true, belpogingen: [] });
+    }
+
     const rows = await withReadConnection(async (client) => {
       let q = `
         SELECT
@@ -5144,7 +5160,7 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
         WHERE l.funnel_stage NOT IN ('won', 'lost')`;
 
       const params = [];
-      if (role !== 'admin' && practiceCode) {
+      if (role !== 'admin') {
         params.push(practiceCode);
         q += ` AND l.praktijk_code = $${params.length}`;
       }
