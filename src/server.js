@@ -5249,7 +5249,7 @@ app.get('/api/check-belpogingen', async (req, res) => {
             </td></tr>
             <tr><td style="padding:36px 40px;">
               <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Dit is een herinnering om <strong>${r.volledige_naam}</strong> te bellen. Dit is belpoging <strong>${r.poging_nummer + 1}</strong>.</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Dit is een herinnering om <strong>${r.volledige_naam}</strong> te bellen. Dit was belpoging <strong>${r.poging_nummer}</strong>.</p>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 24px;">
                 <tr><td style="padding:20px 24px;">
                   <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${r.volledige_naam}</p>
