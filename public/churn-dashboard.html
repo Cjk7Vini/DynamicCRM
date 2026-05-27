@@ -1591,7 +1591,7 @@
 </div><!-- einde dash-dashboard -->
 
 <!-- ── AFSPRAKEN SECTIE ───────────────────────────────────────────── -->
-<div class="dash-section" id="dash-belpogingen" style="display:none;">
+<div class="dash-section" id="dash-belpogingen">
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
         <div class="insight-card ic-highlight">
             <div class="insight-label">Actieve belpogingen</div>
@@ -5091,7 +5091,7 @@
                         <td style="font-size:13px;color:#5F5E5A;">${fmtDt(b.laatste_poging)}</td>
                         <td style="font-size:13px;color:${isVerlopen ? '#A32D2D' : '#3A3D40'};">${fmtDt(b.volgende_belpoging)}</td>
                         <td>${statusBadge}</td>
-                        <td><button class="btn btn-sm btn-ghost" onclick="openBpModal(${b.id})">Beheren</button></td>
+                        <td><button class="btn btn-sm btn-ghost" onclick="openBpModal('${b.id}')">Beheren</button></td>
                     </tr>`;
                 }).join('');
             } catch(e) {
@@ -5100,7 +5100,7 @@
         }
 
         function openBpModal(leadId) {
-            const b = _bpData.find(x => x.id === leadId);
+            const b = _bpData.find(x => String(x.id) === String(leadId));
             if (!b) return;
             const pogingen = b.pogingen || [];
             const fmtDt = (dt) => dt ? new Date(dt).toLocaleDateString('nl-NL', {day:'numeric',month:'long',year:'numeric'}) + ' om ' + new Date(dt).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) : '-';
@@ -5138,9 +5138,9 @@
                     <input type="time" id="bpTijd" style="padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;">
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="slaaBpOp(${b.id})">Poging registreren</button>
-                    <button class="btn" style="background:#FCEBEB;color:#A32D2D;border:1px solid #F7C1C1;" onclick="bpGeenInteresse(${b.id})">Geen interesse</button>
-                    ${parseInt(b.aantal_pogingen) >= 3 ? `<button class="btn" style="color:#9090a8;border-color:#e4e4e8;" onclick="bpVerwijder(${b.id})">Verwijderen</button>` : ''}
+                    <button class="btn btn-primary" onclick="slaaBpOp('${b.id}')">Poging registreren</button>
+                    <button class="btn" style="background:#FCEBEB;color:#A32D2D;border:1px solid #F7C1C1;" onclick="bpGeenInteresse('${b.id}')">Geen interesse</button>
+                    ${parseInt(b.aantal_pogingen) >= 3 ? `<button class="btn" style="color:#9090a8;border-color:#e4e4e8;" onclick="bpVerwijder('${b.id}')">Verwijderen</button>` : ''}
                 </div>`;
 
             openGenericModal('Belpoging beheren', modalHtml);
