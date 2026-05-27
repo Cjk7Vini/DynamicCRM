@@ -5202,8 +5202,8 @@ app.get('/api/check-belpogingen', async (req, res) => {
 
     const rows = await withReadConnection(async (client) => {
       return (await client.query(`
-        SELECT DISTINCT ON (b.lead_id)
-          b.lead_id, b.notitie, b.volgende_belpoging, b.poging_nummer,
+        SELECT
+          b.id as belpoging_id, b.lead_id, b.notitie, b.volgende_belpoging, b.poging_nummer,
           l.volledige_naam, l.telefoon, l.emailadres,
           p.naam as praktijk_naam, p.email_to as praktijk_email
         FROM belpogingen b
@@ -5213,7 +5213,7 @@ app.get('/api/check-belpogingen', async (req, res) => {
           AND b.volgende_belpoging <= NOW()
           AND b.reminder_verstuurd = FALSE
           AND l.funnel_stage NOT IN ('won', 'lost')
-        ORDER BY b.lead_id, b.aangemaakt_op DESC
+        ORDER BY b.volgende_belpoging ASC
       `)).rows;
     });
 
@@ -5273,8 +5273,8 @@ app.get('/api/check-belpogingen', async (req, res) => {
 
         await withWriteConnection(async (client) => {
           await client.query(
-            `UPDATE belpogingen SET reminder_verstuurd = TRUE WHERE lead_id=$1 AND volgende_belpoging=$2`,
-            [r.lead_id, r.volgende_belpoging]
+            `UPDATE belpogingen SET reminder_verstuurd = TRUE WHERE id=$1`,
+            [r.belpoging_id]
           );
         });
 
