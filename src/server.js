@@ -3025,13 +3025,16 @@ async function sendWelcomeEmail({ email, praktijkNaam, password, licenseType, li
 <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:40px 0;"><tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-<tr><td style="background:#1A1D21;padding:24px 40px;"><span style="color:white;font-size:15px;font-weight:600;">Dynamic Health Consultancy</span></td></tr>
+<tr><td style="background:#1A1D21;padding:24px 40px;display:flex;align-items:center;gap:12px;">
+  <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;">
+  <span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
+</td></tr>
 <tr><td style="padding:40px;">
 <p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Beste ${praktijkNaam},</p>
-<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je account voor het Dynamic Health dashboard is aangemaakt. Hieronder vind je je inloggegevens.</p>
+<p style="margin:0 0 24px;font-size:16px;color:#3A3D40;line-height:1.6;">Je account voor het Dynamic Health portaal is aangemaakt. Hieronder vind je je inloggegevens.</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;"><tr><td style="padding:24px;">
 <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Inloggegevens</p>
-<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Dashboard:</strong> <a href="https://dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">dynamic-health-consultancy.nl</a></p>
+<p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Website:</strong> <a href="https://www.dynamic-health-consultancy.nl" style="color:#2BB8A3;text-decoration:none;">www.dynamic-health-consultancy.nl</a></p>
 <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Gebruikersnaam:</strong> ${email}</p>
 <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijdelijk wachtwoord:</strong> <span style="font-family:monospace;background:#e8e8ed;padding:2px 8px;border-radius:4px;">${password}</span></p>
 </td></tr></table>
@@ -3041,18 +3044,23 @@ async function sendWelcomeEmail({ email, praktijkNaam, password, licenseType, li
 ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Nazorg portaal:</strong> Inbegrepen</p>` : ''}
 <p style="margin:8px 0 0;font-size:14px;color:#9090a8;">${licenseText}</p>
 </td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;"><tr>
+<td align="center">
+  <a href="https://www.dynamic-health-consultancy.nl" style="display:inline-block;background:#333399;color:#ffffff;padding:13px 32px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Ga naar website</a>
+</td>
+</tr></table>
 <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">We raden je aan je wachtwoord na de eerste inlog te wijzigen via de accountinstellingen.</p>
 <p style="margin:32px 0 0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
 </td></tr>
-<tr><td style="background:#f4f4f6;padding:20px 40px;border-top:1px solid #e4e4e8;">
-<p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+<tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+<p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Copyright &copy; Dynamic Health Consultancy</p>
 </td></tr></table></td></tr></table></body></html>`;
   return sendMailResilient({
     from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
     to: email,
     subject: 'Welkom bij Dynamic Health | je account is aangemaakt',
     html,
-    text: `Beste ${praktijkNaam},\n\nJe account is aangemaakt.\n\nDashboard: https://dynamic-health-consultancy.nl\nGebruikersnaam: ${email}\nTijdelijk wachtwoord: ${password}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
+    text: `Beste ${praktijkNaam},\n\nJe account is aangemaakt.\n\nWebsite: https://www.dynamic-health-consultancy.nl\nGebruikersnaam: ${email}\nTijdelijk wachtwoord: ${password}\n\nMet vriendelijke groet,\nDynamic Health Consultancy`
   });
 }
 
