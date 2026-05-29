@@ -3955,7 +3955,7 @@
                     <td>${tijd}</td>
                     <td>${type}</td>
                     <td><span class="badge ${cls}">${label}</span></td>
-                    <td>${l.funnel_stage === 'intent' && !l.outcome_sent ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openUitkomstVoorLead(${l.id},'${(l.volledige_naam||'').replace(/'/g,\"\\'\")}','${l.emailadres||''}','${l.telefoon||''}')">Uitkomst</button>` : ''}</td>
+                    <td>${l.funnel_stage === 'intent' && !l.outcome_sent ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openUitkomstVoorLead(${l.id})">Uitkomst</button>` : ''}</td>
                 </tr>`;
             }).join('');
         }
@@ -4030,24 +4030,28 @@
             }
         }
 
-        function openUitkomstVoorLead(leadId, naam, email, tel) {
-            // Open modal direct met lead info — geen dropdown nodig
+        function openUitkomstVoorLead(leadId) {
+            // Zoek lead data op uit bestaande leads array
+            const lead = (window.apptData || apptData || []).find(l => l.id == leadId);
+            const naam = lead ? lead.volledige_naam : 'Lead #' + leadId;
+            const email = lead ? lead.emailadres : '';
+            const tel = lead ? lead.telefoon : '';
+
             openApptModal(null);
             switchApptTab('uitkomst');
             uitkomstLeadId = leadId;
 
-            // Verberg dropdown, toon lead info
-            const uitkomstDrop = document.getElementById('uitkomstLeadDropdown');
-            if (uitkomstDrop) uitkomstDrop.closest('div')?.previousElementSibling && (uitkomstDrop.closest('div').style.display = 'none');
-
-            // Toon naam direct
+            // Toon lead info direct
             const info = document.getElementById('apptModalLeadInfo');
             if (info) {
                 info.style.display = 'block';
-                document.getElementById('apptModalLeadName').textContent = naam || 'Lead #' + leadId;
+                document.getElementById('apptModalLeadName').textContent = naam;
                 document.getElementById('apptModalLeadMeta').textContent = [email, tel].filter(Boolean).join(', ');
             }
-            document.getElementById('apptModalTitle').textContent = 'Uitkomst registreren voor ' + (naam || 'lead');
+            // Verberg dropdown
+            const uitkomstDrop = document.getElementById('uitkomstLeadDropdown');
+            if (uitkomstDrop) uitkomstDrop.parentElement.style.display = 'none';
+            document.getElementById('apptModalTitle').textContent = 'Uitkomst registreren voor ' + naam;
         }
 
         async function verwijderLeadVanuitModal() {
