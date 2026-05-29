@@ -4037,20 +4037,15 @@
             const email = lead ? lead.emailadres : '';
             const tel = lead ? lead.telefoon : '';
 
-            openApptModal(null);
+            // Open modal met lead info direct — beide tabs
+            openApptModal(leadId, naam, email, tel);
             switchApptTab('uitkomst');
             uitkomstLeadId = leadId;
 
-            // Toon lead info direct
-            const info = document.getElementById('apptModalLeadInfo');
-            if (info) {
-                info.style.display = 'block';
-                document.getElementById('apptModalLeadName').textContent = naam;
-                document.getElementById('apptModalLeadMeta').textContent = [email, tel].filter(Boolean).join(', ');
-            }
-            // Verberg dropdown
+            // Verberg uitkomst dropdown ook
             const uitkomstDrop = document.getElementById('uitkomstLeadDropdown');
             if (uitkomstDrop) uitkomstDrop.parentElement.style.display = 'none';
+
             document.getElementById('apptModalTitle').textContent = 'Uitkomst registreren voor ' + naam;
         }
 
