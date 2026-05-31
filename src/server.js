@@ -158,6 +158,15 @@ const postLimiter = rateLimit({
 });
 app.use(['/leads', '/events', '/api/training-results'], postLimiter);
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minuten
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Te veel pogingen, probeer het over 15 minuten opnieuw.' }
+});
+app.use(['/api/auth/login', '/api/auth/request-password-reset', '/api/auth/change-password'], authLimiter);
+
 // Initialize MetaService with connection wrappers
 const metaService = new MetaService(withReadConnection, withWriteConnection);
 const eclubService = new EclubService(withReadConnection, withWriteConnection);
@@ -3196,6 +3205,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
 
 // Keep old endpoint for backward compat
 app.post('/api/admin/create-user', requireAuth, async (req, res) => {
+  if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
   req.body.licenseType = req.body.licenseType || '12m';
   req.body.nazorgEnabled = false;
   // Forward to licensed endpoint logic inline
@@ -3312,6 +3322,13 @@ app.patch('/api/admin/users/:id/calculator', requireAuth, async (req, res) => {
 app.get('/api/prognose/:practiceCode', requireAuth, async (req, res) => {
   try {
     const { practiceCode } = req.params;
+    const role = req.session.role;
+    if (role !== 'admin') {
+      const allowed = role === 'practice' ? req.session.practiceCode :
+        (req.session.organisationCodes || '').split(',').map(c => c.trim());
+      const ok = role === 'practice' ? allowed === practiceCode : allowed.includes(practiceCode);
+      if (!ok) return res.status(403).json({ error: 'Geen toegang' });
+    }
     const rows = await withReadConnection(async (client) => {
       return (await client.query(
         `SELECT jaar, maand, doel_leden FROM prognose WHERE praktijk_code = $1 ORDER BY jaar, maand`,
@@ -3358,10 +3375,18 @@ app.post('/api/prognose', requireAuth, async (req, res) => {
 // GET /api/praktijk-leden/:code — ledenaantal per maand ophalen
 app.get('/api/praktijk-leden/:code', requireAuth, async (req, res) => {
   try {
+    const code = req.params.code;
+    const role = req.session.role;
+    if (role !== 'admin') {
+      const allowed = role === 'practice' ? req.session.practiceCode :
+        (req.session.organisationCodes || '').split(',').map(c => c.trim());
+      const ok = role === 'practice' ? allowed === code : allowed.includes(code);
+      if (!ok) return res.status(403).json({ error: 'Geen toegang' });
+    }
     const rows = await withReadConnection(async (client) => {
       return (await client.query(
         'SELECT jaar, maand, leden FROM leden_historie WHERE praktijk_code = $1 ORDER BY jaar, maand',
-        [req.params.code]
+        [code]
       )).rows;
     });
     res.json({ success: true, historie: rows });
