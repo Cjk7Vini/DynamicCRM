@@ -85,7 +85,7 @@ function makeTransport({ port, secure }) {
     connectionTimeout: 5000,
     greetingTimeout: 5000,
     socketTimeout: 10000,
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
   });
 }
 
@@ -117,7 +117,10 @@ app.use(
   })
 );
 
-app.use(cors());
+app.use(cors({
+  origin: ['https://dynamic-health-consultancy.nl', 'https://dynamiccrm.onrender.com'],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
@@ -131,6 +134,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 
 app.use(session({
+  name: 'dhc.sid',
   store: new PgStore({
     conString: process.env.PG_WRITE_URL,
     tableName: 'session',
@@ -400,7 +404,7 @@ app.get('/api/leads', requireAdmin, async (_req, res) => {
     res.json(rows);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Database error', details: e.message });
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -666,7 +670,7 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
     res.status(201).json({ ok: true, lead: inserted });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Database insert error', details: e.message });
+    res.status(500).json({ error: 'Database insert error' });
   }
 });
 
@@ -685,7 +689,7 @@ app.post('/testmail', requireAdmin, async (req, res) => {
     res.json({ ok: true, messageId: info?.messageId });
   } catch (err) {
     console.error('TESTMAIL failed:', err?.message);
-    res.status(500).json({ error: 'TESTMAIL failed', details: err?.message });
+    res.status(500).json({ error: 'TESTMAIL failed' });
   }
 });
 
@@ -1360,7 +1364,7 @@ app.post('/api/training-results', requireAuth, async (req, res) => {
     console.error('POST /api/training-results error:', e);
     res.status(500).json({ 
       error: 'Database insert error', 
-      details: e.message 
+
     });
   }
 });
@@ -1433,7 +1437,7 @@ app.get('/api/training-results', requireAdmin, async (req, res) => {
     console.error('GET /api/training-results error:', e);
     res.status(500).json({ 
       error: 'Database error', 
-      details: e.message 
+
     });
   }
 });
@@ -1476,7 +1480,7 @@ app.get('/api/training-results/:id', requireAdmin, async (req, res) => {
     console.error('GET /api/training-results/:id error:', e);
     res.status(500).json({ 
       error: 'Database error', 
-      details: e.message 
+
     });
   }
 });
@@ -2725,14 +2729,18 @@ app.post('/api/auth/login', async (req, res) => {
     });
     
     if (!user) {
+      console.warn(`[AUTH] Mislukte login - onbekend account: ${email} IP: ${req.ip}`);
       return res.status(401).json({ error: 'Onjuiste inloggegevens' });
     }
-    
+
     const validPassword = await bcrypt.compare(password, user.password_hash);
-    
+
     if (!validPassword) {
+      console.warn(`[AUTH] Mislukte login - verkeerd wachtwoord: ${email} IP: ${req.ip}`);
       return res.status(401).json({ error: 'Onjuiste inloggegevens' });
     }
+
+    console.log(`[AUTH] Ingelogd: ${email} rol=${user.role} IP: ${req.ip}`);
     
     req.session.userId = user.id;
     req.session.email = user.email;
@@ -2783,7 +2791,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) console.error('Logout error:', err);
-    res.clearCookie('connect.sid');
+    res.clearCookie('dhc.sid');
     res.json({ success: true });
   });
 });
@@ -2840,7 +2848,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     }
     
     // Hash new password
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
     
     // Update password
     await withWriteConnection(async (client) => {
@@ -2892,16 +2900,17 @@ app.post('/api/auth/request-password-reset', async (req, res) => {
     
     // Generate reset token (valid for 1 hour)
     const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
     const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    
-    // Save token to database
+
+    // Sla alleen de hash op — plaintext token gaat alleen per email
     await withWriteConnection(async (client) => {
       await client.query(
         'UPDATE public.users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3',
-        [resetToken, resetTokenExpiry, user.id]
+        [resetTokenHash, resetTokenExpiry, user.id]
       );
     });
-    
+
     // Send reset email
     const resetUrl = `https://dynamic-health-consultancy.nl/reset-password.html?token=${resetToken}`;
     
@@ -2980,11 +2989,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
       });
     }
     
-    // Find user by token
+    // Hash de ontvangen token en zoek de hash op in de DB
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const user = await withReadConnection(async (client) => {
       const result = await client.query(
         'SELECT id, email, reset_token_expiry FROM public.users WHERE reset_token = $1',
-        [token]
+        [tokenHash]
       );
       return result.rows[0];
     });
@@ -2999,7 +3009,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     }
     
     // Hash new password
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
     
     // Update password and clear reset token
     await withWriteConnection(async (client) => {
@@ -3105,7 +3115,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
       return r.rows[0];
     });
     if (existing) return res.status(400).json({ error: 'Dit e-mailadres bestaat al' });
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
     let licenseStart = null, licenseEnd = null, finalLicenseType = null;
     if (role === 'practice') {
       finalLicenseType = licenseType || '12m';
@@ -3211,7 +3221,7 @@ app.post('/api/admin/create-user', requireAuth, async (req, res) => {
   // Forward to licensed endpoint logic inline
   const { email, password, role, practiceCode } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email en wachtwoord verplicht' });
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   try {
     const r = await withWriteConnection(async (client) => {
       return (await client.query(`INSERT INTO public.users (email, password_hash, role, practice_code, created_at) VALUES ($1,$2,$3,$4,NOW()) RETURNING id,email,role,practice_code`,
