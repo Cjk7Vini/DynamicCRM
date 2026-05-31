@@ -1309,7 +1309,7 @@
                     <div class="forecast-card">
                         <div class="forecast-label">Verwacht</div>
                         <div class="forecast-value" id="forecastExpected">—</div>
-                        <div class="forecast-sub">Op basis van likelihood</div>
+                        <div class="forecast-sub">8 leads/mnd × 1 mnd</div>
                     </div>
                     <div class="forecast-card">
                         <div class="forecast-label">Actueel</div>
@@ -3203,28 +3203,45 @@
             try {
                 const res = await fetch('/api/pipeline-metrics' + buildQueryString(), { credentials: 'include' });
                 const data = await res.json();
-                
+
                 if (!data.success) return;
-                
-                const expected = data.expected_conversions || 0;
-                const actual = data.won_deals || 0;
-                const gap = actual - expected;
-                const gapPercent = expected > 0 ? ((gap / expected) * 100).toFixed(1) : 0;
-                
+
+                // Bereken verwacht op basis van datumfilter: 8 leads per maand
+                const LEADS_PER_MAAND = 8;
+                const dateFromVal = document.getElementById('dateFrom').value;
+                const dateToVal   = document.getElementById('dateTo').value;
+
+                let aantalMaanden = 1;
+                if (dateFromVal && dateToVal) {
+                    const van = new Date(dateFromVal);
+                    const tot = new Date(dateToVal);
+                    const maanden = (tot.getFullYear() - van.getFullYear()) * 12 + (tot.getMonth() - van.getMonth()) + 1;
+                    aantalMaanden = Math.max(1, maanden);
+                }
+
+                const expected = aantalMaanden * LEADS_PER_MAAND;
+                const actual   = data.won_deals || 0;
+                const gap      = actual - expected;
+                const gapPercent = ((gap / expected) * 100).toFixed(1);
+
                 document.getElementById('forecastExpected').textContent = expected;
-                document.getElementById('forecastActual').textContent = actual;
-                document.getElementById('gapValue').textContent = 
+                document.getElementById('forecastActual').textContent   = actual;
+                document.getElementById('gapValue').textContent =
                     `${gap >= 0 ? '+' : ''}${gap} (${gapPercent}%)`;
-                
+
+                // Label bijwerken naar juiste omschrijving
+                const subEl = document.querySelector('#forecastExpected')?.closest('.forecast-card')?.querySelector('.forecast-sub');
+                if (subEl) subEl.textContent = `${LEADS_PER_MAAND} leads/mnd × ${aantalMaanden} mnd`;
+
                 const gapDesc = document.getElementById('gapDescription');
                 if (gap >= 0) {
-                    gapDesc.textContent = 'Boven forecast - excellent performance';
+                    gapDesc.textContent = 'Boven target - excellent performance';
                     gapDesc.style.color = '#10b981';
                 } else if (gap > -3) {
-                    gapDesc.textContent = 'Licht onder forecast - nog bij te halen';
+                    gapDesc.textContent = 'Licht onder target - nog bij te halen';
                     gapDesc.style.color = '#f59e0b';
                 } else {
-                    gapDesc.textContent = 'Onder forecast - actie vereist';
+                    gapDesc.textContent = 'Onder target - actie vereist';
                     gapDesc.style.color = '#ef4444';
                 }
             } catch (error) {
