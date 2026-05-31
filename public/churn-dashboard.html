@@ -1160,7 +1160,7 @@
 
                 <div class="dropdown-divider"></div>
                 <div class="dropdown-section-label">Sync</div>
-                <div class="dropdown-item" onclick="syncMetaData(); closeUserMenu()">
+                <div class="dropdown-item" onclick="syncMetaData(this); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
                     Sync Meta
                 </div>
@@ -1406,7 +1406,7 @@
                 <div class="card-title">Meta Marketing Performance</div>
                 <div class="card-subtitle" id="metaLastSync">Laatste sync: —</div>
             </div>
-            <button class="btn btn-sync" onclick="syncMetaData()">Sync Nu</button>
+            <button class="btn btn-sync" onclick="syncMetaData(this)">Sync Nu</button>
         </div>
         <div class="card-body">
             <div class="metrics-grid" id="metaMetricsGrid">
@@ -3380,17 +3380,56 @@
                 return;
             }
 
-            const btn = document.querySelector('.meta-sync-btn[onclick="syncEclub()"]');
-            if (btn) { btn.disabled = true; btn.textContent = 'Laden...'; }
+            const syncBtn = document.getElementById('btnEclubSync');
+            const syncBtnText = document.getElementById('syncButtonText');
+            const metaSyncBtn = document.querySelector('.meta-sync-btn[onclick="syncEclub()"]');
+            const statusEl = document.getElementById('syncStatus');
+
+            [syncBtn, metaSyncBtn].forEach(b => { if (b) b.disabled = true; });
+            if (syncBtnText) syncBtnText.textContent = 'Bezig...';
+            if (metaSyncBtn) metaSyncBtn.textContent = 'Bezig...';
+            if (statusEl) { statusEl.style.display = 'none'; }
 
             try {
+                // Stap 1: haal eClub KPI data op
                 await loadEclubData();
-                if (btn) btn.textContent = 'Vernieuwd ✓';
-                setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; } }, 2000);
+
+                // Stap 2: sync eClub leden naar leads tabel
+                const syncRes = await fetch(`/api/eclub/sync-leden/${practice}`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const syncData = await syncRes.json();
+
+                if (syncData.success) {
+                    const msg = syncData.updated > 0
+                        ? `${syncData.updated} lead(s) als lid gemarkeerd`
+                        : 'Geen nieuwe leden gevonden';
+                    if (statusEl) {
+                        statusEl.style.display = 'block';
+                        statusEl.style.color = '#10b981';
+                        statusEl.textContent = msg;
+                    }
+                    if (syncBtnText) syncBtnText.textContent = 'Vernieuwd ✓';
+                    if (metaSyncBtn) metaSyncBtn.textContent = 'Vernieuwd ✓';
+                    setTimeout(() => {
+                        if (syncBtnText) syncBtnText.textContent = 'Sync leden';
+                        if (metaSyncBtn) metaSyncBtn.textContent = 'Sync Nu';
+                    }, 3000);
+                } else {
+                    throw new Error(syncData.error || 'Sync mislukt');
+                }
             } catch (error) {
                 console.error('Eclub sync error:', error);
-                alert('Fout bij laden: ' + error.message);
-                if (btn) { btn.disabled = false; btn.textContent = 'Sync Nu'; }
+                if (statusEl) {
+                    statusEl.style.display = 'block';
+                    statusEl.style.color = '#ef4444';
+                    statusEl.textContent = 'Sync mislukt';
+                }
+                if (syncBtnText) syncBtnText.textContent = 'Sync leden';
+                if (metaSyncBtn) metaSyncBtn.textContent = 'Sync Nu';
+            } finally {
+                [syncBtn, metaSyncBtn].forEach(b => { if (b) b.disabled = false; });
             }
         }
 
@@ -3773,20 +3812,19 @@
         }
 
         // Manual sync Meta data
-        async function syncMetaData() {
-            const practiceCode = currentUser.role === 'admin' 
-                ? document.getElementById('practiceFilter').value 
+        async function syncMetaData(triggerBtn) {
+            const practiceCode = currentUser.role === 'admin'
+                ? document.getElementById('practiceFilter').value
                 : getPracticeCode();
-                
+
             if (!practiceCode) {
                 alert('Selecteer eerst een praktijk');
                 return;
             }
-            
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '⏳ Syncing...';
+
+            const btn = triggerBtn || document.querySelector('.btn-sync[onclick*="syncMetaData"], .btn.btn-sync');
+            const originalText = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Syncing...'; }
             
             try {
                 const res = await fetch(`/api/meta/sync/${practiceCode}`, { 
@@ -3804,8 +3842,7 @@
                 console.error('Sync error:', error);
                 alert('Sync mislukt: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
+                if (btn) { btn.disabled = false; btn.textContent = originalText; }
             }
         }
 
@@ -5044,17 +5081,17 @@
                     ['Periode', `${jaar}-${String(maandTot).padStart(2,'0')}`],
                     [],
                     ['KPI', 'Waarde'],
-                    ['Actieve leden',                d.active_members || 0],
-                    ['Nieuwe leden',                 d.new_members || 0],
-                    ['Gestopte leden',               d.churned_members || 0],
-                    ['Bevroren leden',               d.frozen_members || 0],
-                    ['Totaal bezoeken',              d.total_visits || 0],
-                    ['Gem. bezoeken per lid',        d.avg_visits_per_member || 0],
-                    ['Gem. duur lidmaatschap (mnd)', d.avg_membership_months || 0],
-                    ['Maandomzet excl. BTW (EUR)',   parseFloat(d.total_monthly_revenue || 0).toFixed(2)],
-                    ['Omzet per lid (EUR)',           parseFloat(d.revenue_per_member || 0).toFixed(2)],
-                    ['Retentie %',                   d.retention_pct || '0%'],
-                    ['Churn %',                      d.churn_pct || '0%'],
+                    ['Actieve leden',                d.leden_actief || 0],
+                    ['Nieuwe leden',                 d.leden_gestart || 0],
+                    ['Gestopte leden',               d.leden_gestopt || 0],
+                    ['Bevroren leden',               d.leden_bevroren || 0],
+                    ['Totaal bezoeken',              d.totaal_bezoeken || 0],
+                    ['Gem. bezoeken per lid',        d.gem_bezoeken_lid || 0],
+                    ['Gem. duur lidmaatschap (mnd)', d.gem_duur_lidmaatschap_maanden || 0],
+                    ['Maandomzet excl. BTW (EUR)',   parseFloat(d.omzet_excl_btw || 0).toFixed(2)],
+                    ['Omzet per lid (EUR)',           parseFloat(d.omzet_per_lid || 0).toFixed(2)],
+                    ['Retentie %',                   d.retentie_pct ? d.retentie_pct + '%' : '0%'],
+                    ['Churn %',                      d.churn_pct ? d.churn_pct + '%' : '0%'],
                 ]);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'eClub KPIs');
