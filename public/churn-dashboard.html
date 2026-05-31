@@ -2111,6 +2111,11 @@
 </div>
 
     <script>
+        function escHtml(str) {
+            if (str == null) return '-';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
         // User session state
         let currentUser = null;
         
@@ -2380,17 +2385,16 @@
                 
                 data.leads.forEach(lead => {
                     html += '<tr style="border-bottom: 1px solid #e5e5e5;">';
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.volledige_naam || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.emailadres || '-'}</td>`;
-                    html += `<td style="padding: 12px; font-size: 14px;">${lead.telefoon || '-'}</td>`;
-                    
+                    html += `<td style="padding: 12px; font-size: 14px;">${escHtml(lead.volledige_naam)}</td>`;
+                    html += `<td style="padding: 12px; font-size: 14px;">${escHtml(lead.emailadres)}</td>`;
+                    html += `<td style="padding: 12px; font-size: 14px;">${escHtml(lead.telefoon)}</td>`;
+
                     // Timestamp binnenkomst
                     const ts = lead.aangemaakt_op ? new Date(lead.aangemaakt_op).toLocaleString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
                     html += `<td style="padding: 12px; font-size: 13px; color: #86868b;">${ts}</td>`;
-                    
+
                     // Bron
-                    const bron = lead.bron || '-';
-                    html += `<td style="padding: 12px; font-size: 13px; color: #86868b;">${bron}</td>`;
+                    html += `<td style="padding: 12px; font-size: 13px; color: #86868b;">${escHtml(lead.bron)}</td>`;
                     
                     if (stage === 'intent') {
                         const appointmentDate = lead.appointment_date || lead.afspraak_datum;
@@ -2409,7 +2413,7 @@
                     }
                     
                     if (stage === 'lost') {
-                        html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${lead.status || 'Niet Geïnteresseerd'}</span></td>`;
+                        html += `<td style="padding: 12px; font-size: 14px;"><span class="badge-lost" style="padding: 4px 8px; border-radius: 4px; background: #ef4444; color: white; font-size: 12px;">${escHtml(lead.status) || 'Niet Ge&iuml;nteresseerd'}</span></td>`;
                     }
 
                     if (stage === 'won') {
@@ -3248,10 +3252,10 @@
                 data.leads.forEach(lead => {
                     html += `
                         <div class="hot-lead-item">
-                            <div class="hot-lead-name">${lead.volledige_naam}</div>
+                            <div class="hot-lead-name">${escHtml(lead.volledige_naam)}</div>
                             <div class="hot-lead-meta">
-                                <span>${lead.praktijk_naam || 'Geen praktijk'}</span>
-                                <span>${lead.funnel_stage}</span>
+                                <span>${escHtml(lead.praktijk_naam) || 'Geen praktijk'}</span>
+                                <span>${escHtml(lead.funnel_stage)}</span>
                                 <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
                                 <span>€${parseFloat(lead.expected_value || 0).toFixed(0)}</span>
                             </div>

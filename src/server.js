@@ -55,8 +55,14 @@ function generateActionToken(leadId, practiceCode) {
   const data = `${leadId}-${practiceCode}`;
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
-function validateActionToken(token) {
-  return token && token.length === 64;
+function validateActionToken(token, leadId, practiceCode) {
+  if (!token || !leadId || !practiceCode) return false;
+  const expected = generateActionToken(leadId, practiceCode);
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
 /** SMTP config base (we'll also add a 465 fallback) */
@@ -680,7 +686,7 @@ app.get('/lead-action', async (req, res) => {
     if (!action || !lead_id || !practice_code || !token) {
       return res.status(400).send('<h2>❌ Ongeldige link</h2>');
     }
-    if (!validateActionToken(token)) {
+    if (!validateActionToken(token, lead_id, practice_code)) {
       return res.status(401).send('<h2>❌ Verlopen of ongeldige token</h2>');
     }
     
@@ -698,14 +704,14 @@ app.get('/api/lead-info', async (req, res) => {
     if (!lead_id || !practice_code || !token) {
       return res.status(400).json({ error: 'Ontbrekende parameters' });
     }
-    
-    if (!validateActionToken(token)) {
+
+    if (!validateActionToken(token, lead_id, practice_code)) {
       return res.status(401).json({ error: 'Ongeldige token' });
     }
 
     const lead = await withReadConnection(async (client) => {
       const r = await client.query(
-        `SELECT volledige_naam, emailadres, telefoon 
+        `SELECT volledige_naam, emailadres, telefoon
          FROM public.leads 
          WHERE id = $1 AND praktijk_code = $2`,
         [lead_id, practice_code]
@@ -861,7 +867,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
       return res.status(400).json({ error: 'Ontbrekende velden' });
     }
 
-    if (!validateActionToken(token)) {
+    if (!validateActionToken(token, lead_id, practice_code)) {
       return res.status(401).json({ error: 'Ongeldige token' });
     }
 
@@ -1266,7 +1272,7 @@ const trainingResultSchema = Joi.object({
 });
 
 // POST /api/training-results - Sla nieuwe testresultaten op
-app.post('/api/training-results', async (req, res) => {
+app.post('/api/training-results', requireAuth, async (req, res) => {
   try {
     const { value, error } = trainingResultSchema.validate(req.body, { 
       abortEarly: false, 
@@ -1724,7 +1730,7 @@ app.get('/api/sources', async (req, res) => {
 // 🆕 APPOINTMENT REMINDER SYSTEM
 
 // Cron endpoint - called by EasyCron every 15 minutes
-app.get('/api/check-reminders', async (req, res) => {
+app.get('/api/check-reminders', requireCron, async (req, res) => {
   try {
     console.log('🔔 Checking for appointment reminders...');
     
@@ -2593,6 +2599,15 @@ app.get('/api/practices', async (req, res) => {
 // AUTHENTICATION MIDDLEWARE
 // ============================================================================
 
+function requireCron(req, res, next) {
+  const secret = process.env.CRON_SECRET;
+  const provided = req.headers['x-cron-secret'] || req.query.cron_secret;
+  if (!secret || !provided || provided !== secret) {
+    return res.status(401).json({ error: 'Ongeautoriseerde cron aanroep' });
+  }
+  next();
+}
+
 function requireAuth(req, res, next) {
   console.log('🔐 Auth check:', {
     hasSession: !!req.session,
@@ -2694,7 +2709,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     const user = await withReadConnection(async (client) => {
       const result = await client.query(
-        'SELECT * FROM public.users WHERE email = $1 AND active = TRUE',
+        'SELECT * FROM public.users WHERE email = $1 AND active = TRUE AND (banned IS NULL OR banned = FALSE)',
         [email.toLowerCase()]
       );
       return result.rows[0];
@@ -4965,7 +4980,7 @@ app.post('/api/nazorg/reactie', async (req, res) => {
 });
 
 // GET /api/check-nazorg — cron: stuur geplande nazorg emails
-app.get('/api/check-nazorg', async (req, res) => {
+app.get('/api/check-nazorg', requireCron, async (req, res) => {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && req.headers['x-cron-secret'] !== cronSecret) {
     return res.status(403).json({ error: 'Forbidden' });
@@ -5230,7 +5245,7 @@ app.patch('/api/belpoging/:leadId', requireAuth, async (req, res) => {
 });
 
 // GET /api/check-belpogingen — EasyCron: stuur reminder email naar praktijk
-app.get('/api/check-belpogingen', async (req, res) => {
+app.get('/api/check-belpogingen', requireCron, async (req, res) => {
   try {
     console.log('Checking belpoging reminders...');
 
@@ -5339,7 +5354,7 @@ app.listen(PORT, () => {
 
 // Cron endpoint: 60 minuten na afspraak → email naar praktijk met uitkomst buttons
 // Aanroepen via EasyCron: GET /api/check-outcome
-app.get('/api/check-outcome', async (req, res) => {
+app.get('/api/check-outcome', requireCron, async (req, res) => {
   try {
     console.log('📋 Checking for outcome emails...');
 
@@ -5612,7 +5627,7 @@ app.get('/api/appointment-outcome', async (req, res) => {
 
 // Cron endpoint: 48 uur na bedenktijd → follow-up herinneringsmail naar praktijk
 // Aanroepen via EasyCron: GET /api/check-followup
-app.get('/api/check-followup', async (req, res) => {
+app.get('/api/check-followup', requireCron, async (req, res) => {
   try {
     console.log('🔔 Checking for follow-up reminders...');
 
@@ -5765,7 +5780,7 @@ app.get('/api/check-followup', async (req, res) => {
 const LEAD_REMINDER_GOLIVE = new Date('2026-04-13T00:00:00+02:00');
 
 // Aanroepen via EasyCron: GET /api/check-lead-reminders
-app.get('/api/check-lead-reminders', async (req, res) => {
+app.get('/api/check-lead-reminders', requireCron, async (req, res) => {
   try {
     console.log('📬 Checking for lead reminders...');
 
