@@ -4344,7 +4344,7 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
            ORDER BY jaar ASC, maand ASC, aangemaakt_op DESC
          ) sub
          ORDER BY jaar ASC,
-           CASE maand
+           CASE LOWER(maand)
              WHEN 'januari' THEN 1 WHEN 'februari' THEN 2 WHEN 'maart' THEN 3
              WHEN 'april' THEN 4 WHEN 'mei' THEN 5 WHEN 'juni' THEN 6
              WHEN 'juli' THEN 7 WHEN 'augustus' THEN 8 WHEN 'september' THEN 9
