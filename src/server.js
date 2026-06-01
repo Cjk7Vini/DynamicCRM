@@ -4333,19 +4333,23 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
       return res.status(403).json({ error: 'Geen toegang' });
     }
     const rows = await withReadConnection(async (client) => {
-      // Per maand+jaar alleen de MEEST RECENTE rij ophalen (hoogste id)
+      // Per maand+jaar alleen de MEEST RECENTE rij ophalen via subquery
+      // DISTINCT ON vereist dat ORDER BY begint met exact dezelfde kolommen
       return (await client.query(
-        `SELECT DISTINCT ON (jaar, maand) maand, jaar, medewerkers_data, aangemaakt_op
-         FROM bezettingsgraad_rapporten
-         WHERE praktijk_code = $1
+        `SELECT maand, jaar, medewerkers_data, aangemaakt_op
+         FROM (
+           SELECT DISTINCT ON (jaar, maand) maand, jaar, medewerkers_data, aangemaakt_op
+           FROM bezettingsgraad_rapporten
+           WHERE praktijk_code = $1
+           ORDER BY jaar ASC, maand ASC, aangemaakt_op DESC
+         ) sub
          ORDER BY jaar ASC,
            CASE maand
              WHEN 'januari' THEN 1 WHEN 'februari' THEN 2 WHEN 'maart' THEN 3
              WHEN 'april' THEN 4 WHEN 'mei' THEN 5 WHEN 'juni' THEN 6
              WHEN 'juli' THEN 7 WHEN 'augustus' THEN 8 WHEN 'september' THEN 9
              WHEN 'oktober' THEN 10 WHEN 'november' THEN 11 WHEN 'december' THEN 12
-             ELSE 0 END ASC,
-           aangemaakt_op DESC`,
+             ELSE 0 END ASC`,
         [praktijkCode]
       )).rows;
     });
