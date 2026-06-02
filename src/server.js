@@ -4395,7 +4395,7 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
       productiviteit: Math.round((som / aantal) * 10) / 10
     })).sort((a, b) => b.productiviteit - a.productiviteit);
 
-    const topMedewerkers   = alleMedewerkers.filter(m => m.productiviteit >= 90);
+    const topMedewerkers   = alleMedewerkers.filter(m => m.productiviteit >= 85);
     const onderMedewerkers = alleMedewerkers.filter(m => m.productiviteit < 75);
 
     res.json({ success: true, maanden, topMedewerkers, onderMedewerkers });

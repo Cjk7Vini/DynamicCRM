@@ -526,13 +526,13 @@
 
   function sigCls(prod) {
     if (prod > 1.05) return 'r';
-    if (prod >= 0.90) return 'g';
+    if (prod >= 0.85) return 'g';
     if (prod >= 0.75) return 'o';
     return 'r';
   }
   function sigTxt(prod) {
     if (prod > 1.05) return 'Boven capaciteit';
-    if (prod >= 0.90) return 'Rond capaciteit';
+    if (prod >= 0.85) return 'Rond capaciteit';
     if (prod >= 0.75) return 'Rond capaciteit';
     return 'Onder capaciteit';
   }

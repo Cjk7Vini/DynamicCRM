@@ -974,13 +974,13 @@
         // Bepaal kleur op basis van bezetting
         function bezettingKleur(pct) {
           if (pct > 105) return '#ef4444';
-          if (pct >= 90) return '#22c55e';
+          if (pct >= 85) return '#22c55e';
           if (pct >= 75) return '#f59e0b';
           return '#ef4444';
         }
         function bezettingLabel(pct) {
           if (pct > 105) return 'Boven capaciteit';
-          if (pct >= 90) return 'Rond capaciteit';
+          if (pct >= 85) return 'Rond capaciteit';
           if (pct >= 75) return 'Onderbenut';
           return 'Onder capaciteit';
         }
@@ -1065,8 +1065,8 @@
                 tension: 0.3,
                 fill: true
               }, {
-                label: 'Streefwaarde (90%)',
-                data: maanden.map(() => 90),
+                label: 'Streefwaarde (85%)',
+                data: maanden.map(() => 85),
                 borderColor: '#22c55e',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
