@@ -105,16 +105,10 @@ class MetaService {
 
         const camp = campaignMap.get(key);
         camp._adset_count++;
-        camp.impressions   += parseInt(adset.impressions || 0);
-        camp.reach         += parseInt(adset.reach || 0);
-        camp.clicks        += parseInt(adset.clicks || 0);
-        camp.unique_clicks += parseInt(adset.unique_clicks || 0);
-        camp.spend         += parseFloat(adset.spend || 0);
-        camp.ctr           += parseFloat(adset.ctr || 0);
-        camp.unique_ctr    += parseFloat(adset.unique_ctr || 0);
-        camp.cpc           += parseFloat(adset.cpc || 0);
-        camp.cpm           += parseFloat(adset.cpm || 0);
-        camp.frequency     += parseFloat(adset.frequency || 0);
+        // Tel alleen optelbaren op — reach/unique_clicks/frequency komen uit call 2 (campaign-level)
+        camp.impressions += parseInt(adset.impressions || 0);
+        camp.clicks      += parseInt(adset.clicks || 0);
+        camp.spend       += parseFloat(adset.spend || 0);
 
         // Alleen video metrics optellen — actions komen uit call 2
         if (adset.video_p25_watched_actions) camp.video_p25_watched_actions.push(...adset.video_p25_watched_actions);
@@ -123,27 +117,27 @@ class MetaService {
         if (adset.video_p100_watched_actions) camp.video_p100_watched_actions.push(...adset.video_p100_watched_actions);
       }
 
-      // Gemiddelden berekenen voor ratio-metrics (ctr, cpc, cpm, frequency)
+      // ctr/cpc/cpm kunnen al berekend worden — alleen clicks/impressions/spend zijn nodig
+      // unique_ctr en frequency worden berekend NA call 2 (unique_clicks en reach komen daar vandaan)
       for (const camp of campaignMap.values()) {
-        const n = camp._adset_count || 1;
-        camp.ctr        = camp.ctr / n;
-        camp.unique_ctr = camp.unique_ctr / n;
-        camp.cpc        = camp.cpc / n;
-        camp.cpm        = camp.cpm / n;
-        camp.frequency  = camp.frequency / n;
+        camp.ctr = camp.impressions > 0 ? (camp.clicks / camp.impressions) * 100 : 0;
+        camp.cpc = camp.clicks > 0 ? camp.spend / camp.clicks : 0;
+        camp.cpm = camp.impressions > 0 ? (camp.spend / camp.impressions) * 1000 : 0;
         delete camp._adset_count;
       }
 
       const aggregated = Array.from(campaignMap.values());
       console.log(`✅ Aggregated to ${aggregated.length} campaign/day entries (spend correct)`);
 
-      // === CALL 2: Campaign-level voor conversies (Meta dedupliceert zelf) ===
+      // === CALL 2: Campaign-level voor conversies + unieke metrics (Meta dedupliceert zelf) ===
+      // reach, unique_clicks, frequency mogen NIET opgeteld worden over adsets —
+      // dezelfde persoon kan in meerdere adsets zitten. Campaign-level geeft de gededupliceerde waarde.
       const campaignResponse = await axios.get(
         `${this.baseUrl}/act_${adAccountId}/insights`,
         {
           params: {
             access_token: accessToken,
-            fields: 'campaign_id,campaign_name,actions,cost_per_action_type',
+            fields: 'campaign_id,campaign_name,reach,unique_clicks,frequency,actions,cost_per_action_type',
             level: 'campaign',
             time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
             time_increment: 1,
@@ -154,14 +148,21 @@ class MetaService {
       );
 
       const campaignData = campaignResponse.data.data || [];
-      console.log(`✅ Got ${campaignData.length} campaign-level entries for conversions`);
+      console.log(`✅ Got ${campaignData.length} campaign-level entries for conversions + unique metrics`);
 
-      // Koppel campaign-level actions aan adset-aggregatie op campaign_id + datum
+      // Koppel campaign-level data aan adset-aggregatie op campaign_id + datum
       for (const c of campaignData) {
         const key = `${c.campaign_id}_${c.date_start}`;
         if (campaignMap.has(key)) {
-          campaignMap.get(key).actions = c.actions || [];
-          campaignMap.get(key).cost_per_action_type = c.cost_per_action_type || [];
+          const camp = campaignMap.get(key);
+          camp.actions              = c.actions || [];
+          camp.cost_per_action_type = c.cost_per_action_type || [];
+          // Overschrijf met gededupliceerde campaign-level waarden
+          camp.reach         = parseInt(c.reach || 0);
+          camp.unique_clicks = parseInt(c.unique_clicks || 0);
+          camp.frequency     = parseFloat(c.frequency || 0);
+          // unique_ctr berekend hier, want unique_clicks komt uit campaign-level call
+          camp.unique_ctr    = camp.impressions > 0 ? (camp.unique_clicks / camp.impressions) * 100 : 0;
         }
       }
 

@@ -812,8 +812,8 @@
 
       // Header dropdown menu vullen
       const email = user.email || '';
-      document.getElementById('headerAvatar').textContent = email.charAt(0).toUpperCase();
-      document.getElementById('headerUserName').textContent = email;
+      document.getElementById('headerAvatar').textContent = (user.naam || email).charAt(0).toUpperCase();
+      document.getElementById('headerUserName').textContent = user.naam || email;
       document.getElementById('menuEmail').textContent = email;
 
       // Praktijkcode tonen
@@ -1050,6 +1050,8 @@
         // Bouw grafiek
         const ctx = document.getElementById('prestatieChart');
         if (ctx && window.Chart) {
+          const maxBezetting = Math.max(...maanden.map(m => m.bezetting), 85);
+          const yMax = Math.ceil(maxBezetting / 10) * 10 + 10;
           new Chart(ctx, {
             type: 'line',
             data: {
@@ -1079,7 +1081,7 @@
               maintainAspectRatio: false,
               plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
               scales: {
-                y: { min: 0, max: 130, ticks: { callback: v => v + '%', font: { size: 11 } } },
+                y: { min: 0, max: yMax, ticks: { callback: v => v + '%', font: { size: 11 } } },
                 x: { ticks: { font: { size: 11 } } }
               }
             }
