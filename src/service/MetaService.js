@@ -117,15 +117,12 @@ class MetaService {
         if (adset.video_p100_watched_actions) camp.video_p100_watched_actions.push(...adset.video_p100_watched_actions);
       }
 
-      // Bereken ratio-metrics uit de opgetelde ruwe cijfers (geen gemiddelde over adsets)
-      // CTR = clicks / impressions, CPC = spend / clicks, CPM = spend / impressions * 1000
+      // ctr/cpc/cpm kunnen al berekend worden — alleen clicks/impressions/spend zijn nodig
+      // unique_ctr en frequency worden berekend NA call 2 (unique_clicks en reach komen daar vandaan)
       for (const camp of campaignMap.values()) {
-        camp.ctr        = camp.impressions > 0 ? (camp.clicks / camp.impressions) * 100 : 0;
-        camp.unique_ctr = camp.impressions > 0 ? (camp.unique_clicks / camp.impressions) * 100 : 0;
-        camp.cpc        = camp.clicks > 0 ? camp.spend / camp.clicks : 0;
-        camp.cpm        = camp.impressions > 0 ? (camp.spend / camp.impressions) * 1000 : 0;
-        // frequency wordt overschreven door campaign-level call 2, maar zet alvast een fallback
-        camp.frequency  = camp.reach > 0 ? camp.impressions / camp.reach : 0;
+        camp.ctr = camp.impressions > 0 ? (camp.clicks / camp.impressions) * 100 : 0;
+        camp.cpc = camp.clicks > 0 ? camp.spend / camp.clicks : 0;
+        camp.cpm = camp.impressions > 0 ? (camp.spend / camp.impressions) * 1000 : 0;
         delete camp._adset_count;
       }
 
@@ -164,6 +161,8 @@ class MetaService {
           camp.reach         = parseInt(c.reach || 0);
           camp.unique_clicks = parseInt(c.unique_clicks || 0);
           camp.frequency     = parseFloat(c.frequency || 0);
+          // unique_ctr berekend hier, want unique_clicks komt uit campaign-level call
+          camp.unique_ctr    = camp.impressions > 0 ? (camp.unique_clicks / camp.impressions) * 100 : 0;
         }
       }
 

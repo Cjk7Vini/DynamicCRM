@@ -3540,9 +3540,7 @@
                     document.removeEventListener(event, removeWarning, true);
                 });
             };
-
-            const activityEvents = warningEvents;
-            activityEvents.forEach(event => {
+            warningEvents.forEach(event => {
                 document.addEventListener(event, removeWarning, true);
             });
         }
