@@ -4076,7 +4076,7 @@
             const email = lead ? lead.emailadres : '';
             const tel = lead ? lead.telefoon : '';
 
-            openApptModal(leadId, naam, email, tel);
+            openApptModal(leadId, naam, email, tel, true);
             uitkomstLeadId = leadId;
             switchApptTab('uitkomst');
             document.getElementById('apptModalTitle').textContent = 'Uitkomst registreren voor ' + naam;
@@ -4121,10 +4121,10 @@
 
 
         // ── MODAL OPEN/CLOSE ──────────────────────────────────────────
-        function openApptModal(leadId, naam, email, tel) {
+        function openApptModal(leadId, naam, email, tel, keepUitkomstLead) {
             apptLeadId = leadId || null;
             selectedUitkomst = null;
-            uitkomstLeadId = null;
+            if (!keepUitkomstLead) uitkomstLeadId = null;
             const info = document.getElementById('apptModalLeadInfo');
             const sel = document.getElementById('apptModalLeadSelect');
             const msg = document.getElementById('apptModalMsg');
