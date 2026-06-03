@@ -2083,12 +2083,8 @@
 
             <!-- Tab 2: Uitkomst registreren -->
             <div id="apptTabUitkomst" style="display:none;">
-                <div class="form-group">
-                    <label>Lead selecteren</label>
-                    <select id="uitkomstLeadDropdown" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;" onchange="onUitkomstLeadSelect(this.value)">
-                        <option value="">Selecteer een lead met afspraak...</option>
-                    </select>
-                </div>
+                <div id="uitkomstLeadInfo" style="display:none;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);font-size:13px;color:var(--text-1);margin-bottom:12px;font-weight:500;"></div>
+                <div id="uitkomstGeenLead" style="display:none;padding:10px 14px;background:#fef3c7;border-radius:var(--radius-sm);font-size:13px;color:#92400e;margin-bottom:12px;">Klik op "Uitkomst" bij een lead in de tabel om een uitkomst te registreren.</div>
                 <div class="form-group">
                     <label>Uitkomst</label>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;">
@@ -3976,13 +3972,6 @@
                 document.getElementById('apptConversie').textContent = conv + '%';
                 document.getElementById('apptOpenCount').textContent = noOutcome;
 
-                // Vul uitkomst dropdown
-                const metAfspraak = leads.filter(l => l.funnel_stage === 'intent' && !l.outcome_sent);
-                const uitkomstSel = document.getElementById('uitkomstLeadDropdown');
-                if (uitkomstSel) {
-                    uitkomstSel.innerHTML = '<option value="">Selecteer een lead met afspraak...</option>' +
-                        metAfspraak.map(l => `<option value="${l.id}">${l.volledige_naam || l.emailadres}</option>`).join('');
-                }
             } catch(e) {
                 document.getElementById('apptTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Fout bij laden</td></tr>';
             }
@@ -4062,29 +4051,21 @@
             document.getElementById('tabUitkomst').style.color = isAfspraak ? 'var(--text-2)' : 'white';
             document.getElementById('apptModalSaveBtn').textContent = isAfspraak ? 'Afspraak opslaan' : 'Uitkomst opslaan';
             document.getElementById('apptModalMsg').style.display = 'none';
-            if (!isAfspraak) laadUitkomstDropdown();
+            if (!isAfspraak) toonUitkomstLeadInfo();
         }
 
-        async function laadUitkomstDropdown() {
-            const pc = getActivePracticeCode();
-            const sel = document.getElementById('uitkomstLeadDropdown');
-            if (!sel) return;
-            sel.innerHTML = '<option value="">Laden...</option>';
-            try {
-                // Haal intent leads direct op via leads-by-stage
-                const url = `/api/leads-by-stage?stage=intent${pc ? '&practice=' + pc : ''}`;
-                const res = await fetch(url, { credentials: 'include' });
-                const data = await res.json();
-                const leads = data.leads || [];
-                if (!leads.length) {
-                    sel.innerHTML = '<option value="">Geen leads met afspraak</option>';
-                } else {
-                    sel.innerHTML = '<option value="">Selecteer een lead met afspraak...</option>' +
-                        leads.map(l => `<option value="${l.id}">${l.volledige_naam || l.emailadres}</option>`).join('');
-                }
-            } catch(e) {
-                sel.innerHTML = '<option value="">Fout bij laden</option>';
-                console.error('laadUitkomstDropdown error:', e);
+        function toonUitkomstLeadInfo() {
+            const infoEl = document.getElementById('uitkomstLeadInfo');
+            const geenEl = document.getElementById('uitkomstGeenLead');
+            if (uitkomstLeadId) {
+                const lead = (window.apptData || []).find(l => l.id == uitkomstLeadId);
+                const naam = lead ? (lead.volledige_naam || lead.emailadres) : 'Lead #' + uitkomstLeadId;
+                infoEl.textContent = naam;
+                infoEl.style.display = 'block';
+                geenEl.style.display = 'none';
+            } else {
+                infoEl.style.display = 'none';
+                geenEl.style.display = 'block';
             }
         }
 
@@ -4095,15 +4076,9 @@
             const email = lead ? lead.emailadres : '';
             const tel = lead ? lead.telefoon : '';
 
-            // Open modal met lead info direct — beide tabs
             openApptModal(leadId, naam, email, tel);
-            switchApptTab('uitkomst');
             uitkomstLeadId = leadId;
-
-            // Verberg uitkomst dropdown ook
-            const uitkomstDrop = document.getElementById('uitkomstLeadDropdown');
-            if (uitkomstDrop) uitkomstDrop.parentElement.style.display = 'none';
-
+            switchApptTab('uitkomst');
             document.getElementById('apptModalTitle').textContent = 'Uitkomst registreren voor ' + naam;
         }
 
@@ -4144,9 +4119,6 @@
             info.textContent = `Geselecteerd: ${labels[type]}`;
         }
 
-        function onUitkomstLeadSelect(val) {
-            uitkomstLeadId = val || null;
-        }
 
         // ── MODAL OPEN/CLOSE ──────────────────────────────────────────
         function openApptModal(leadId, naam, email, tel) {
@@ -4199,8 +4171,8 @@
 
             if (isUitkomst) {
                 // Uitkomst registreren
-                const lid = uitkomstLeadId || document.getElementById('uitkomstLeadDropdown')?.value;
-                if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
+                const lid = uitkomstLeadId;
+                if (!lid) { showApptMsg('Geen lead geselecteerd.', 'amber'); return; }
                 if (!selectedUitkomst) { showApptMsg('Selecteer een uitkomst.', 'amber'); return; }
 
                 const pc = getActivePracticeCode();
