@@ -812,8 +812,8 @@
 
       // Header dropdown menu vullen
       const email = user.email || '';
-      document.getElementById('headerAvatar').textContent = email.charAt(0).toUpperCase();
-      document.getElementById('headerUserName').textContent = email;
+      document.getElementById('headerAvatar').textContent = (user.naam || email).charAt(0).toUpperCase();
+      document.getElementById('headerUserName').textContent = user.naam || email;
       document.getElementById('menuEmail').textContent = email;
 
       // Praktijkcode tonen

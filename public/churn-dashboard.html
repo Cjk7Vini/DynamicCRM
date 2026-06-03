@@ -1008,28 +1008,11 @@
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Marketing</div>
-        <div class="sidebar-dropdown" id="marketingDropdown">
-            <div class="sidebar-item" onclick="toggleDropdown('marketingDropdown')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-                Marketing
-                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-            </div>
-            <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="showDashboardSection('dashboard',null); setTimeout(()=>{ const el=document.getElementById('metaMarketingSection'); if(el && el.style.display!=='none') el.scrollIntoView({behavior:'smooth'}); else{ const src=document.getElementById('sourceChart'); if(src) src.closest('.card').scrollIntoView({behavior:'smooth'}); }},400)">Meta performance</div>
-                <div class="sidebar-dropdown-item" onclick="showDashboardSection('dashboard',null); setTimeout(()=>{ const src=document.getElementById('sourceChart'); if(src) src.closest('.card').scrollIntoView({behavior:'smooth'}); },400)">Lead bronnen</div>
-            </div>
-        </div>
-
-        <div class="sidebar-section-label" style="margin-top:8px;">Retentie</div>
-        <div class="sidebar-item" onclick="showDashboardSection('dashboard', this); setTimeout(() => { const el = document.querySelector('.card-title') && [...document.querySelectorAll('.card-title')].find(e => e.textContent.includes('eClub')); if(el) el.closest('.card').scrollIntoView({behavior:'smooth'}); }, 100);">
+        <div class="sidebar-item" onclick="showDashboardSection('dashboard', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
-            eClub retentie
+            Dashboard
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Rapportages</div>
@@ -1945,7 +1928,20 @@
         </div>
     </div>
 
-
+    <!-- Licentie aanvragen -->
+    <div class="card" id="licentieAanvraagCard" style="display:none;margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Licentie aanvragen</div>
+                <div class="card-subtitle">Vraag een extra module aan voor jouw praktijk</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:10px;" id="licentieAanvraagButtons"></div>
+            <textarea id="licentieBericht" placeholder="Optioneel: toelichting bij je aanvraag..." style="width:100%;margin-top:12px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical;min-height:72px;box-sizing:border-box;"></textarea>
+            <div id="licentieAanvraagFeedback" style="display:none;margin-top:10px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
+        </div>
+    </div>
 
 </div>
 
@@ -3537,14 +3533,15 @@
             document.body.appendChild(warning);
 
             // Remove warning on activity
+            const warningEvents = ['mousedown', 'keypress', 'click'];
             const removeWarning = () => {
                 warning?.remove();
-                activityEvents.forEach(event => {
+                warningEvents.forEach(event => {
                     document.removeEventListener(event, removeWarning, true);
                 });
             };
 
-            const activityEvents = ['mousedown', 'keypress', 'click'];
+            const activityEvents = warningEvents;
             activityEvents.forEach(event => {
                 document.addEventListener(event, removeWarning, true);
             });
