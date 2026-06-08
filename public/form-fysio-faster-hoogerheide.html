@@ -268,21 +268,21 @@
         <!-- Header -->
         <div class="form-header">
             <img src="images/faster-nieuw_witte achtergrond.png" alt="Fysio Faster Hoogerheide" class="form-logo">
-            <h1>Meld je aan voor een gratis kennismakingsgesprek</h1>
-            <p>Zet de eerste stap naar beter bewegen en minder pijn</p>
+            <h1>Plan jouw gratis adviesgesprek bij Faster</h1>
+            <p>Zet de eerste stap naar fitter worden</p>
 
             <div class="benefits">
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
-                    Fysiotherapeutische expertise binnen handbereik
+                    Gratis en vrijblijvend
                 </div>
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
-                    Deskundige begeleiding op maat
+                    Persoonlijk advies over jouw lichaam en doelen
                 </div>
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
-                    Professionele zorg van Faster & FysioFaster
+                    Ontdek hoe Faster jou kan helpen fitter te worden
                 </div>
             </div>
         </div>
@@ -299,42 +299,25 @@
             </div>
 
             <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+            </div>
+
+            <div class="form-group">
                 <label for="emailadres">E-mailadres <span class="required">*</span></label>
                 <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
             </div>
 
             <div class="form-group">
-                <label for="telefoon">Telefoonnummer</label>
-                <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678">
-            </div>
-
-            <div class="form-group">
-                <label for="doel">Wat is je doel?</label>
+                <label for="doel">Wat is jouw voornaamste doel? <span class="required">*</span></label>
                 <div class="select-wrap">
-                    <select id="doel" name="doel">
+                    <select id="doel" name="doel" required>
                         <option value="">Selecteer een doel...</option>
-                        <option value="Pijnklachten verminderen">Pijnklachten verminderen</option>
-                        <option value="Revalidatie na blessure">Revalidatie na blessure</option>
-                        <option value="Beter bewegen">Beter bewegen</option>
-                        <option value="Fitter worden">Fitter worden</option>
-                        <option value="Preventief bewegen">Preventief bewegen</option>
-                        <option value="Anders">Anders</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="bron">Hoe heb je ons gevonden?</label>
-                <div class="select-wrap">
-                    <select id="bron" name="bron">
-                        <option value="">Selecteer een optie...</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="Facebook">Facebook</option>
-                        <option value="Google">Google</option>
-                        <option value="Vrienden/Familie">Vrienden of familie</option>
-                        <option value="Huisarts">Huisarts</option>
-                        <option value="Flyer/Poster">Flyer of poster</option>
-                        <option value="Anders">Anders</option>
+                        <option value="Fitter worden en meer energie">Fitter worden en meer energie</option>
+                        <option value="Afvallen">Afvallen</option>
+                        <option value="Gezond ouder worden">Gezond ouder worden</option>
+                        <option value="Fitter worden ondanks lichamelijke klachten">Fitter worden ondanks lichamelijke klachten</option>
+                        <option value="Anders">Anders...</option>
                     </select>
                 </div>
             </div>
@@ -372,7 +355,6 @@
             const emailadres     = document.getElementById('emailadres').value.trim();
             const telefoon       = document.getElementById('telefoon').value.trim();
             const doel           = document.getElementById('doel').value;
-            const bron           = document.getElementById('bron').value;
             const toestemming    = document.getElementById('toestemming').checked;
             const praktijk_code  = document.getElementById('praktijk_code').value;
 
@@ -382,8 +364,16 @@
                 alertBox.innerHTML = '<div class="alert alert-error">Vul je volledige naam in.</div>';
                 return;
             }
+            if (!telefoon) {
+                alertBox.innerHTML = '<div class="alert alert-error">Vul je telefoonnummer in.</div>';
+                return;
+            }
             if (!emailadres) {
                 alertBox.innerHTML = '<div class="alert alert-error">Vul je e-mailadres in.</div>';
+                return;
+            }
+            if (!doel) {
+                alertBox.innerHTML = '<div class="alert alert-error">Selecteer je voornaamste doel.</div>';
                 return;
             }
             if (!toestemming) {
@@ -403,7 +393,6 @@
                         emailadres,
                         telefoon,
                         doel,
-                        bron,
                         toestemming: toestemming ? 'true' : 'false',
                         praktijk_code
                     })
