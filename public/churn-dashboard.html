@@ -3991,7 +3991,7 @@
                     <td>${tijd}</td>
                     <td>${type}</td>
                     <td><span class="badge ${cls}">${label}</span></td>
-                    <td>${l.funnel_stage === 'intent' && !l.outcome_sent ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openUitkomstVoorLead(${l.id})">Uitkomst</button>` : ''}</td>
+                    <td>${l.funnel_stage === 'intent' ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openUitkomstVoorLead(${l.id})">Uitkomst</button>` : ''}</td>
                 </tr>`;
             }).join('');
         }
