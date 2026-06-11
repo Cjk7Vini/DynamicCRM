@@ -4935,20 +4935,18 @@ app.post('/api/nazorg/reactie', async (req, res) => {
 
 // GET /api/check-nazorg — cron: stuur geplande nazorg emails
 app.get('/api/check-nazorg', requireCron, async (req, res) => {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers['x-cron-secret'] !== cronSecret) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
   try {
     const now = new Date();
     const teVersturen = await withReadConnection(async (client) => {
+      // Vangnet: maximaal 14 dagen achterstand versturen, oudere mails overslaan
       return (await client.query(
         `SELECT ne.id, ne.client_id, ne.mail_nummer, nc.naam, nc.email, nc.behandelaar, nc.praktijk_code,
                 p.naam as praktijk_naam, p.email_to
          FROM nazorg_emails ne
          JOIN nazorg_clienten nc ON nc.id = ne.client_id
          LEFT JOIN praktijken p ON p.code = nc.praktijk_code
-         WHERE ne.verstuurd = FALSE AND ne.gepland_op <= $1 AND nc.status = 'actief'`,
+         WHERE ne.verstuurd = FALSE AND ne.gepland_op <= $1 AND nc.status = 'actief'
+           AND ne.gepland_op >= NOW() - interval '14 days'`,
         [now.toISOString()]
       )).rows;
     });
