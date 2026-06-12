@@ -118,7 +118,7 @@ app.use(
 );
 
 app.use(cors({
-  origin: ['https://dynamic-health-consultancy.nl', 'https://dynamiccrm.onrender.com'],
+  origin: ['https://dynamic-health-consultancy.nl', 'https://dynamiccrm.onrender.com', 'https://cap-it.eu', 'https://www.cap-it.eu'],
   credentials: true,
 }));
 app.use(express.json());
@@ -4404,7 +4404,7 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
 
 // ─── Publieke statistieken voor cap-it.eu en DHC website ───────────────────
 // Geen auth vereist — geen praktijknamen, alleen geaggregeerde cijfers
-app.get('/api/public/stats', async (_req, res) => {
+app.get('/api/public/stats', cors({ origin: '*' }), async (_req, res) => {
   try {
     const result = await withReadConnection(async (client) => {
       return await client.query(`
