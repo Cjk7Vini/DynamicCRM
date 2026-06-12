@@ -590,7 +590,7 @@
     async function doLogout() {
       closeUserMenu();
       await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
-      window.location.href = '/login.html';
+      window.location.href = '/portaal.html';
     }
     async function openInstellingen() {
       closeUserMenu();
