@@ -4138,7 +4138,7 @@
 
             if (isUitkomst) {
                 // Uitkomst registreren
-                const lid = uitkomstLeadId;
+                const lid = uitkomstLeadId || apptLeadId;
                 if (!lid) { showApptMsg('Geen lead geselecteerd.', 'amber'); return; }
                 if (!selectedUitkomst) { showApptMsg('Selecteer een uitkomst.', 'amber'); return; }
 
