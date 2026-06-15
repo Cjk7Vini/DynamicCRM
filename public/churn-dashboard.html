@@ -1203,7 +1203,7 @@
     <div style="font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:6px;">Sessie verloopt</div>
     <div id="idleWarningText" style="font-size:13px; color:var(--text-2); margin-bottom:12px;"></div>
     <div style="display:flex; gap:8px;">
-        <button class="btn btn-primary" onclick="onActivity()" style="flex:1;">Actief blijven</button>
+        <button class="btn btn-primary" onclick="onActivity(); hideIdleWarning()" style="flex:1;">Actief blijven</button>
         <button class="btn btn-ghost" onclick="handleIdleLogout()">Uitloggen</button>
     </div>
 </div>
@@ -2339,7 +2339,7 @@
             try {
                 const queryString = buildQueryString();
                 const url = `/api/leads-by-stage?stage=${stage}${queryString.replace('?', '&')}`;
-                const res = await fetch(url);
+                const res = await fetch(url, { credentials: 'include' });
                 const data = await res.json();
                 
                 if (!data.success || !data.leads || data.leads.length === 0) {
@@ -2588,7 +2588,7 @@
                     const sourcesRes = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
                     const sourcesData = await sourcesRes.json();
                     if (sourcesData.success && sourcesData.sources && sourcesData.sources.length > 0) {
-                        const topBron = document.getElementById('topSource');
+                        const topBron = document.getElementById('topSourceName');
                         if (topBron) topBron.textContent = sourcesData.sources[0].bron || sourcesData.sources[0].source || 'Onbekend';
                     }
 
@@ -3155,7 +3155,7 @@
                 
                 let html = '';
                 stages.forEach((stage, idx) => {
-                    const percentage = Math.max((stage.count / total * 100).toFixed(1), 5); // Min 5% for visibility
+                    const percentage = Math.max(Number((stage.count / total * 100).toFixed(1)) || 0, 5); // Min 5% for visibility
                     const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
                     // Make awareness, intent, lost and won clickable
                     const isClickable = ['awareness', 'intent', 'lost', 'won'].includes(stage.stage);
@@ -3241,7 +3241,7 @@
                 // Use buildQueryString to apply practice isolation
                 const queryString = buildQueryString();
                 const url = `/api/hot-leads?limit=5${queryString ? '&' + queryString.substring(1) : ''}`;
-                const res = await fetch(url);
+                const res = await fetch(url, { credentials: 'include' });
                 const data = await res.json();
                 
                 const container = document.getElementById('hotLeadsList');
@@ -3493,6 +3493,8 @@
             } else if (idleTime >= IDLE_TIMEOUT - WARNING_TIME) {
                 // Show warning
                 showIdleWarning(Math.floor((IDLE_TIMEOUT - idleTime) / 1000));
+            } else {
+                hideIdleWarning();
             }
 
             // Check again in 10 seconds
@@ -3501,42 +3503,16 @@
 
         function showIdleWarning(secondsLeft) {
             const minutes = Math.ceil(secondsLeft / 60);
-            
-            // Only show once
-            if (document.getElementById('idleWarning')) return;
+            const warning = document.getElementById('idleWarning');
+            const text = document.getElementById('idleWarningText');
+            if (!warning || !text) return;
+            text.textContent = `Je wordt over ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} uitgelogd wegens inactiviteit.`;
+            warning.classList.add('show');
+        }
 
-            const warning = document.createElement('div');
-            warning.id = 'idleWarning';
-            warning.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                background: #ff9800;
-                color: white;
-                padding: 16px 24px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 10000;
-                font-size: 14px;
-                max-width: 300px;
-            `;
-            warning.innerHTML = `
-                <strong>⚠️ Sessie verloopt binnenkort</strong><br>
-                Je wordt over ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} uitgelogd wegens inactiviteit.
-            `;
-            document.body.appendChild(warning);
-
-            // Remove warning on activity
-            const warningEvents = ['mousedown', 'keypress', 'click'];
-            const removeWarning = () => {
-                warning?.remove();
-                warningEvents.forEach(event => {
-                    document.removeEventListener(event, removeWarning, true);
-                });
-            };
-            warningEvents.forEach(event => {
-                document.addEventListener(event, removeWarning, true);
-            });
+        function hideIdleWarning() {
+            const warning = document.getElementById('idleWarning');
+            if (warning) warning.classList.remove('show');
         }
 
         async function handleIdleLogout() {
@@ -3567,8 +3543,9 @@
 
         // Load Meta Marketing data
         async function loadMetaMarketing() {
-            const practiceCode = currentUser.role === 'admin' 
-                ? document.getElementById('practiceFilter').value 
+            if (!currentUser) return;
+            const practiceCode = currentUser.role === 'admin'
+                ? document.getElementById('practiceFilter').value
                 : getPracticeCode();
                 
             if (!practiceCode) {
@@ -3815,6 +3792,7 @@
 
         // Manual sync Meta data
         async function syncMetaData(triggerBtn) {
+            if (!currentUser) { alert('Even wachten, gegevens worden nog geladen'); return; }
             const practiceCode = currentUser.role === 'admin'
                 ? document.getElementById('practiceFilter').value
                 : getPracticeCode();
@@ -3860,7 +3838,6 @@
         const originalApplyFilters = applyFilters;
         applyFilters = function() {
             originalApplyFilters();
-            loadEclubData();
             loadChurnForecast();
         };
 
@@ -4046,9 +4023,10 @@
         function toonUitkomstLeadInfo() {
             const infoEl = document.getElementById('uitkomstLeadInfo');
             const geenEl = document.getElementById('uitkomstGeenLead');
-            if (uitkomstLeadId) {
-                const lead = (window.apptData || []).find(l => l.id == uitkomstLeadId);
-                const naam = lead ? (lead.volledige_naam || lead.emailadres) : 'Lead #' + uitkomstLeadId;
+            const effectiefLeadId = uitkomstLeadId || apptLeadId;
+            if (effectiefLeadId) {
+                const lead = (window.apptData || []).find(l => l.id == effectiefLeadId);
+                const naam = lead ? (lead.volledige_naam || lead.emailadres) : 'Lead #' + effectiefLeadId;
                 infoEl.textContent = naam;
                 infoEl.style.display = 'block';
                 geenEl.style.display = 'none';
@@ -4553,8 +4531,8 @@
                         const eclubRes = await fetch(`/api/eclub/kpis/${code}?jaar=${jaar}&maand=${maand}`, { credentials: 'include' });
                         if (eclubRes.ok) {
                             const eclub = await eclubRes.json();
-                            actiefLeden = eclub.leden_actief ?? null;
-                            churnPct = eclub.churn_pct ?? null;
+                            actiefLeden = eclub.data?.leden_actief ?? null;
+                            churnPct = eclub.data?.churn_pct ?? null;
                         }
                     } catch(e) {}
 
@@ -4925,7 +4903,7 @@
                         const rem = l.lead_reminder2_sent
                             ? '<span class="badge badge-amber">Reminder 2</span>'
                             : '<span class="badge badge-blue">Reminder 1</span>';
-                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\'");
+                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\\'");
                         return `<tr>
                             <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
                             <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
@@ -4947,7 +4925,7 @@
                         const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day:'numeric', month:'short' });
                         const dagen = Math.floor((now - new Date(l.aangemaakt_op)) / (1000*60*60*24));
                         const dagenCls = dagen > 21 ? 'badge-red' : 'badge-amber';
-                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\'");
+                        const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\\'");
                         return `<tr>
                             <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
                             <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
@@ -5099,7 +5077,7 @@
 
         async function loadBelpogingen() {
             try {
-                const pc = getPracticeCode();
+                const pc = getActivePracticeCode();
                 const res = await fetch(`/api/belpogingen${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
                 const data = await res.json();
                 if (!data.success) return;

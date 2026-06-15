@@ -5130,6 +5130,9 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
       if (role !== 'admin') {
         params.push(practiceCode);
         q += ` AND l.praktijk_code = $${params.length}`;
+      } else if (req.query.practice) {
+        params.push(req.query.practice);
+        q += ` AND l.praktijk_code = $${params.length}`;
       }
 
       q += ` GROUP BY l.id, l.volledige_naam, l.telefoon, l.emailadres, l.funnel_stage, l.praktijk_code
