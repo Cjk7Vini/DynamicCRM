@@ -441,6 +441,8 @@
             return;
         }
 
+        var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
         var formData = {
             praktijk_code: PRACTICE_CODE,
             volledige_naam: document.getElementById('volledige_naam').value.trim(),
@@ -448,7 +450,9 @@
             telefoon: phoneDigits,
             bron: document.getElementById('bron').value || null,
             doel: document.getElementById('doel').value || null,
-            toestemming: document.getElementById('toestemming').checked
+            toestemming: document.getElementById('toestemming').checked,
+            meta_event_id: eventId,
+            event_source_url: window.location.href
         };
 
         try {
@@ -458,11 +462,18 @@
                 body: JSON.stringify(formData)
             });
 
+            var resData = await response.json().catch(function() { return {}; });
             if (response.ok) {
-                toonModal();
+                var submitToken = resData.submit_token || '';
+                var leadId = (resData.lead && resData.lead.id) ? String(resData.lead.id) : '';
+                var url = 'thankyou.html?s=' + PRACTICE_CODE +
+                    '&eid=' + encodeURIComponent(eventId) +
+                    '&st=' + encodeURIComponent(submitToken) +
+                    '&lid=' + encodeURIComponent(leadId);
+                window.location.href = url;
+                return;
             } else {
-                var error = await response.json();
-                msg.textContent = error.error || 'Er ging iets mis. Probeer het opnieuw.';
+                msg.textContent = resData.error || 'Er ging iets mis. Probeer het opnieuw.';
                 msg.className = 'error';
             }
         } catch (err) {

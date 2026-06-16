@@ -561,7 +561,12 @@
             if (response.ok) {
                 currentSubmitToken = resData.submit_token || '';
                 currentLeadId = (resData.lead && resData.lead.id) ? String(resData.lead.id) : '';
-                toonModal(eventId);
+                var url = 'thankyou.html?s=' + PRACTICE_CODE +
+                    '&eid=' + encodeURIComponent(eventId) +
+                    '&st=' + encodeURIComponent(currentSubmitToken) +
+                    '&lid=' + encodeURIComponent(currentLeadId);
+                window.location.href = url;
+                return;
             } else {
                 msg.textContent = resData.error || 'Er ging iets mis. Probeer het opnieuw.';
                 msg.className = 'error';
