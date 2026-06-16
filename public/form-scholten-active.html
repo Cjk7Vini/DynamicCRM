@@ -465,7 +465,7 @@
             volledige_naam: document.getElementById('volledige_naam').value.trim(),
             emailadres: email,
             telefoon: phoneDigits,
-            bron: document.getElementById('bron').value || null,
+            bron: document.getElementById('bron')?.value || null,
             doel: document.getElementById('doel').value || null,
             toestemming: document.getElementById('toestemming').checked,
             meta_event_id: eventId,
