@@ -298,9 +298,12 @@ async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
         .digest('hex');
     };
 
-    // Gebruik de werkelijke URL van het formulier, of fallback naar bekende URL per praktijk
-    const sourceUrl = requestInfo.eventSourceUrl ||
-      `https://dynamic-health-consultancy.nl/form.html?s=${practiceCode}`;
+    // event_source_url moet de thankyou-URL met praktijkcode zijn, zodat het
+    // server-side CAPI Lead event dezelfde custom conversie matcht als het
+    // browser-pixel Lead event (custom conversies zijn op thankyou.html?s=CODE gedefinieerd).
+    // Beide events delen event_id voor deduplicatie; door identieke URL matchen ze
+    // ongeacht welk event na dedup overblijft.
+    const sourceUrl = `https://dynamic-health-consultancy.nl/thankyou.html?s=${practiceCode}`;
 
     // Bouw event data
     const eventPayload = {
