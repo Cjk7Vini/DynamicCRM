@@ -14,14 +14,24 @@
   <!-- End Meta Pixel -->
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Praktijk-specifiek font wordt indien nodig dynamisch toegevoegd -->
 
   <style>
+    /* Standaard (neutrale) branding — wordt per praktijk overschreven via JS */
+    :root {
+      --th-primary: #111827;
+      --th-accent:  #10b981;
+      --th-bg:      #f3f4f6;
+      --th-font:    'Poppins', system-ui, sans-serif;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Poppins', system-ui, sans-serif;
-      background: #f3f4f6;
+      font-family: var(--th-font);
+      background: var(--th-bg);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -30,15 +40,33 @@
 
     .page-header {
       width: 100%;
-      background: #111827;
+      background: var(--th-primary);
       padding: 18px 24px;
       text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 64px;
     }
     .practice-header-name {
       color: #ffffff;
       font-size: 17px;
       font-weight: 700;
       letter-spacing: 0.2px;
+    }
+    .brand-logo {
+      max-height: 46px;
+      max-width: 75%;
+      background: #ffffff;
+      padding: 7px 14px;
+      border-radius: 10px;
+      object-fit: contain;
+    }
+    /* Voor witte/negatieve logo's: geen witte chip, logo direct op de donkere header */
+    .page-header.logo-on-dark .brand-logo {
+      background: transparent;
+      padding: 0;
+      max-height: 56px;
     }
 
     .main {
@@ -63,7 +91,7 @@
 
     .checkmark {
       width: 72px; height: 72px;
-      background: #10b981;
+      background: var(--th-accent);
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto 20px;
@@ -89,13 +117,13 @@
     .info-box { background: #f9fafb; border-radius: 12px; padding: 4px 16px; margin-bottom: 28px; text-align: left; }
     .info-item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #f3f4f6; }
     .info-item:last-child { border-bottom: none; }
-    .info-icon { width: 32px; height: 32px; background: #ecfdf5; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .info-icon svg { width: 16px; height: 16px; stroke: #10b981; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .info-icon { width: 32px; height: 32px; background: #f3f4f6; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .info-icon svg { width: 16px; height: 16px; stroke: var(--th-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
     .info-text { font-size: 14px; color: #374151; font-weight: 500; }
 
     .steps-title { font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 14px; text-align: left; }
     .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-    .step-num { width: 26px; height: 26px; background: #111827; color: white; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-num { width: 26px; height: 26px; background: var(--th-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .step-text { font-size: 13px; color: #6b7280; line-height: 1.6; padding-top: 3px; }
 
     .countdown { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #9ca3af; text-align: center; }
@@ -112,7 +140,8 @@
 </head>
 <body>
 
-  <header class="page-header">
+  <header class="page-header" id="pageHeader">
+    <img id="brandLogo" class="brand-logo" alt="" style="display:none">
     <span class="practice-header-name" id="headerPracticeName"></span>
   </header>
 
@@ -174,9 +203,73 @@
     var params = new URLSearchParams(window.location.search);
     var practiceCode = params.get('s') || params.get('practice') || '';
 
+    // ── Branding per praktijk ───────────────────────────────────────────
+    // Kleuren, font en logo komen overeen met het aanmeldformulier van de praktijk.
+    // logoOnDark = wit/negatief logo: zonder witte chip, direct op de gekleurde header.
+    var BRANDING = {
+      'FF42F5': { name: 'Scholten Active',                 primary: '#002F2C', accent: '#005C48', bg: '#f5f0ea', font: "'Poppins', sans-serif",      fontLink: 'Poppins:wght@400;500;600;700',   logo: '/images/scholten-active-logo.jpg', logoOnDark: false },
+      '3B4267': { name: 'BeweegLokaal West Maas en Waal',  primary: '#44798D', accent: '#5991A0', bg: '#EDF3F3', font: "'Montserrat', sans-serif",   fontLink: 'Montserrat:wght@400;500;600;700', logo: '/images/beweeglokaal-west-maas-en-waal_beweeglokaal-west-maas-en-waal-300ppi.jpg', logoOnDark: false },
+      '9F8009': { name: 'Beweegpraktijk Hilversum',        primary: '#0a1f3c', accent: '#e8a020', bg: '#f3f5f8', font: "'Poppins', sans-serif",      fontLink: 'Poppins:wght@400;500;600;700',   logo: '/images/SRH-Beweegpraktijk-V2-CMYK-blauwvak.png', logoOnDark: false },
+      '76095F': { name: 'Fysio Faster Hoogerheide',        primary: '#6B3FA0', accent: '#2AADE4', bg: '#f5f7fa', font: "'Poppins', sans-serif",      fontLink: 'Poppins:wght@400;500;600;700',   logo: '/images/faster-nieuw_witte achtergrond.png', logoOnDark: false },
+      '952A92': { name: 'Gezond & Vitaal Krommenie',       primary: '#337A7C', accent: '#5BC0CC', bg: '#F5EBE2', font: "'Poppins', sans-serif",      fontLink: 'Poppins:wght@400;600;700',       logo: '/images/Gezond-Vitaal-Petrol-krommenie.png', logoOnDark: false },
+      'T6PV9A': { name: 'Vitaal Fysiotherapie',            primary: '#20294e', accent: '#ec652a', bg: '#fcf8f3', font: "'Open Sans', sans-serif",    fontLink: 'Open+Sans:wght@400;600;700',     logo: '/images/Logo Vitaal.jpg', logoOnDark: false },
+      'S7F2MW': { name: 'Fysiotherapie Soestdijk',         primary: '#9333ea', accent: '#c084fc', bg: '#faf5ff', font: "'Poppins', sans-serif",      fontLink: 'Poppins:wght@400;500;600;700',   logo: null, logoOnDark: false },
+      '458D05': { name: 'KernGezond Lelystad',             primary: '#174E8D', accent: '#D2B599', bg: '#f3f6fa', font: "'Comfortaa', cursive",       fontLink: 'Comfortaa:wght@400;600;700',     logo: '/images/kerngezond-logo.png', logoOnDark: false },
+      'R8K5XN': { name: 'Fit & Fysio Linne',               primary: '#0000AB', accent: '#CE2FB0', bg: '#f7f4fb', font: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontLink: null, logo: '/images/logolinne.jpg', logoOnDark: false },
+      '00E6AB': { name: 'Stofberg Vandaag',                primary: '#1a1a1a', accent: '#ff6b00', bg: '#f6f6f6', font: "'Comfortaa', cursive",       fontLink: 'Comfortaa:wght@400;600;700',     logo: '/images/Stofberg Vandaag_Logo_Negatief_Wit_Digitaal.jpg', logoOnDark: true }
+    };
+
+    function applyBranding(code) {
+      var b = BRANDING[code];
+      if (!b) return null; // onbekende code -> neutrale standaardstijl behouden
+
+      var rootStyle = document.documentElement.style;
+      rootStyle.setProperty('--th-primary', b.primary);
+      rootStyle.setProperty('--th-accent', b.accent);
+      rootStyle.setProperty('--th-bg', b.bg);
+      rootStyle.setProperty('--th-font', b.font);
+
+      // Praktijk-specifiek font laden indien beschikbaar via Google Fonts
+      if (b.fontLink) {
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://fonts.googleapis.com/css2?family=' + b.fontLink + '&display=swap';
+        document.head.appendChild(link);
+      }
+
+      // Logo tonen, anders naam-tekst in de header
+      if (b.logo) {
+        var img = document.getElementById('brandLogo');
+        var nameEl = document.getElementById('headerPracticeName');
+        img.src = encodeURI(b.logo);
+        img.alt = b.name;
+        img.onerror = function() {
+          img.style.display = 'none';
+          if (nameEl) { nameEl.textContent = b.name; nameEl.style.display = ''; }
+        };
+        img.style.display = '';
+        if (nameEl) nameEl.style.display = 'none';
+        if (b.logoOnDark) document.getElementById('pageHeader').classList.add('logo-on-dark');
+      }
+
+      return b;
+    }
+
+    var branded = applyBranding(practiceCode);
+
     async function loadPracticeName() {
       var el = document.getElementById('headerPracticeName');
       if (!practiceCode) return;
+      // Naam alvast uit branding-map zetten (geen flikkering)
+      if (branded && branded.name && (!branded.logo)) {
+        el.textContent = branded.name;
+        document.title = 'Bedankt - ' + branded.name;
+      }
+      // Indien geen branding bekend: naam ophalen uit API
+      if (branded) {
+        if (branded.name) document.title = 'Bedankt - ' + branded.name;
+        return;
+      }
       try {
         var res = await fetch('/api/practice/' + practiceCode);
         var data = await res.json();
