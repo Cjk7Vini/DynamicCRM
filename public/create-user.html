@@ -232,6 +232,16 @@
               <input type="text" id="practiceCode" placeholder="S7F2MW" maxlength="10" style="text-transform:uppercase;">
             </div>
           </div>
+          <div class="form-group" id="roleLabelGroup">
+            <label>Functie-rol (rechten in dashboard)</label>
+            <select id="roleLabel">
+              <option value="Eigenaar">Eigenaar — volledige toegang</option>
+              <option value="Manager">Manager — volledige toegang</option>
+              <option value="Marketing">Marketing — geen eClub/omzet</option>
+              <option value="Medewerker">Medewerker — geen eClub, geen Meta</option>
+            </select>
+            <div class="form-help">Bepaalt wat dit account ziet. Eigenaar kan rollen van teamleden later zelf aanpassen.</div>
+          </div>
           <div id="organisatieSection" style="display:none;">
             <div class="form-group">
               <label>Aantal locaties</label>
@@ -540,6 +550,7 @@ function onRoleChange() {
   document.getElementById('licenseSection').style.display = isP ? 'block' : 'none';
   document.getElementById('organisatieSection').style.display = isO ? 'block' : 'none';
   document.getElementById('orgLicenseSection').style.display = isO ? 'block' : 'none';
+  document.getElementById('roleLabelGroup').style.display = isP ? 'block' : 'none';
   if (isO) updateLocatieVelden();
 }
 
@@ -582,6 +593,8 @@ function resetForm() {
   document.getElementById('licenseSection').style.display = 'block';
   document.getElementById('organisatieSection').style.display = 'none';
   document.getElementById('orgLicenseSection').style.display = 'none';
+  document.getElementById('roleLabelGroup').style.display = 'block';
+  document.getElementById('roleLabel').value = 'Eigenaar';
   document.getElementById('locatieVelden').innerHTML = '';
   nazorgOn = false;
   document.getElementById('nazorgToggle').classList.remove('on');
@@ -599,6 +612,7 @@ async function createUser() {
   const nazorgLicenseType = document.getElementById('nazorgLicenseType').value;
   const password = document.getElementById('password').value;
   const orgLicenseType = document.getElementById('orgLicenseType')?.value || '12m';
+  const roleLabel = document.getElementById('roleLabel')?.value || 'Eigenaar';
 
   // Haal locatiecodes op voor organisation
   let organisationCodes = null;
@@ -621,7 +635,7 @@ async function createUser() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType, calculatorEnabled: document.getElementById('calculatorToggle')?.classList.contains('on') || false, organisationCodes, orgLicenseType })
+      body: JSON.stringify({ email, password, role, practiceCode: practiceCode||null, licenseType, praktijkNaam, nazorgEnabled: nazorgOn, nazorgLicenseType, calculatorEnabled: document.getElementById('calculatorToggle')?.classList.contains('on') || false, organisationCodes, orgLicenseType, roleLabel })
     });
     const data = await res.json();
     if (res.ok && data.success) {
@@ -994,6 +1008,19 @@ function openUserModal(id) {
         <div class="toggle ${hasCalc ? 'on' : ''}" id="modalCalcToggle" onclick="toggleModalCalculator(${id}, ${hasCalc})"></div>
       </div>
     </div>`;
+
+    // Functie-rol (rechten in dashboard)
+    const curRol = u.role_label || 'Eigenaar';
+    const rolOpts = ['Eigenaar','Manager','Marketing','Medewerker']
+      .map(r => `<option value="${r}" ${curRol === r ? 'selected' : ''}>${r}</option>`).join('');
+    html += `<div class="modal-section">
+      <div class="modal-section-title">Functie-rol</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="modalRoleLabel" style="flex:1;padding:9px 11px;border:1px solid var(--border);border-radius:7px;font-size:14px;font-family:inherit;">${rolOpts}</select>
+        <button class="btn-modal-action" style="white-space:nowrap;" onclick="saveModalRoleLabel(${id})">Opslaan</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:6px;">Medewerker: geen eClub/Meta · Marketing: geen eClub · Eigenaar/Manager: alles</div>
+    </div>`;
   }
 
   // Account acties
@@ -1010,6 +1037,25 @@ function openUserModal(id) {
 
   document.getElementById('modalBody').innerHTML = html;
   document.getElementById('userModal').classList.add('open');
+}
+
+async function saveModalRoleLabel(userId) {
+  const sel = document.getElementById('modalRoleLabel');
+  if (!sel) return;
+  const role_label = sel.value;
+  try {
+    const res = await fetch('/api/admin/users/' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ role_label })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeModal();
+      loadUsers(document.getElementById('searchInput').value.trim());
+    } else { alert('Fout: ' + (data.error || 'onbekend')); }
+  } catch { alert('Netwerkfout.'); }
 }
 
 async function toggleModalCalculator(userId, currentlyOn) {

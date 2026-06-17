@@ -1124,22 +1124,22 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     Leads exporteren
                 </div>
-                <div class="dropdown-item" onclick="exportMetaData(); closeUserMenu()">
+                <div class="dropdown-item" id="menuMetaExport" onclick="exportMetaData(); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Meta data exporteren
                 </div>
-                <div class="dropdown-item" onclick="exportEclubData(); closeUserMenu()">
+                <div class="dropdown-item" id="menuEclubExport" onclick="exportEclubData(); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
                     eClub data exporteren
                 </div>
 
                 <div class="dropdown-divider"></div>
                 <div class="dropdown-section-label">Sync</div>
-                <div class="dropdown-item" onclick="syncMetaData(this); closeUserMenu()">
+                <div class="dropdown-item" id="menuMetaSync" onclick="syncMetaData(this); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
                     Sync Meta
                 </div>
-                <div class="dropdown-item" onclick="syncEclub(); closeUserMenu()">
+                <div class="dropdown-item" id="menuEclubSync" onclick="syncEclub(); closeUserMenu()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
                     Sync eClub
                 </div>
@@ -1481,7 +1481,7 @@
     </div>
 
     <!-- eClub Ledendata -->
-    <div class="card" style="margin-bottom:24px;">
+    <div class="card" id="eclubCard" style="margin-bottom:24px;">
         <div class="card-header">
             <div>
                 <div class="card-title">eClub Ledendata</div>
@@ -1935,6 +1935,25 @@
         </div>
     </div>
 
+    <!-- Teambeheer (alleen eigenaar/manager) -->
+    <div class="card" id="teambeheerCard" style="display:none;margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Teambeheer</div>
+                <div class="card-subtitle">Beheer de rollen van accounts binnen jouw praktijk</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="teambeheerFeedback" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
+            <div id="teambeheerLijst"><div style="color:var(--text-3);font-size:13px;">Laden...</div></div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:14px;line-height:1.5;">
+                Medewerker: ziet leads, afspraken, belpogingen en rapportages — geen eClub/omzet, geen Meta.<br>
+                Marketing: zoals Medewerker + Meta (incl. sync) — geen eClub/omzet.<br>
+                Manager / Eigenaar: volledige toegang. Nieuwe accounts aanmaken loopt via Dynamic Health.
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <div class="dash-section" id="dash-kwaliteit">
@@ -2158,6 +2177,42 @@
             if (currentUser.role === 'admin') {
                 const alleLocatiesItem = document.getElementById('sidebarAlleLocaties');
                 if (alleLocatiesItem) alleLocatiesItem.style.display = 'flex';
+            }
+
+            // Functie-rol rechten toepassen (eClub/Meta afschermen)
+            applyRolePermissions();
+        }
+
+        // Pas zichtbaarheid aan op basis van de functie-rol (role_label).
+        // null/leeg = volledige toegang. Geldt alleen voor praktijk-accounts.
+        function getRoleLabel() {
+            return (currentUser && currentUser.role_label) || null;
+        }
+        function canSeeEclub() {
+            const rl = getRoleLabel();
+            return !(rl === 'Medewerker' || rl === 'Marketing');
+        }
+        function canSeeMeta() {
+            return getRoleLabel() !== 'Medewerker';
+        }
+        function canManageTeam() {
+            if (!currentUser || currentUser.role !== 'practice') return false;
+            const rl = getRoleLabel() || 'Eigenaar';
+            return rl === 'Eigenaar' || rl === 'Manager';
+        }
+        function applyRolePermissions() {
+            if (!currentUser) return;
+            const hide = (id) => { const e = document.getElementById(id); if (e) e.style.display = 'none'; };
+            if (!canSeeEclub()) {
+                hide('eclubCard');
+                hide('eclubSyncSection');
+                hide('menuEclubExport');
+                hide('menuEclubSync');
+            }
+            if (!canSeeMeta()) {
+                hide('metaMarketingSection');
+                hide('menuMetaExport');
+                hide('menuMetaSync');
             }
         }
 
@@ -3328,6 +3383,7 @@
 
         async function loadEclubData() {
             try {
+                if (!canSeeEclub()) return;
                 const practice = document.getElementById('practiceFilter').value
                     || (currentUser && getPracticeCode()) || null;
                 if (!practice) return;
@@ -3375,6 +3431,7 @@
         }
 
         async function syncEclub() {
+            if (!canSeeEclub()) return;
             const practice = document.getElementById('practiceFilter').value
                 || (currentUser && getPracticeCode())
                 || null;
@@ -3544,6 +3601,7 @@
         // Load Meta Marketing data
         async function loadMetaMarketing() {
             if (!currentUser) return;
+            if (!canSeeMeta()) return;
             const practiceCode = currentUser.role === 'admin'
                 ? document.getElementById('practiceFilter').value
                 : getPracticeCode();
@@ -3793,6 +3851,7 @@
         // Manual sync Meta data
         async function syncMetaData(triggerBtn) {
             if (!currentUser) { alert('Even wachten, gegevens worden nog geladen'); return; }
+            if (!canSeeMeta()) return;
             const practiceCode = currentUser.role === 'admin'
                 ? document.getElementById('practiceFilter').value
                 : getPracticeCode();
@@ -4666,12 +4725,19 @@
                 const rolLabels = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
                 const rolSel = document.getElementById('profielRolSelect');
                 if (rolSel) {
-                    rolSel.innerHTML = rolLabels.map(r => `<option value="${r}" ${p.role_label === r ? 'selected' : ''}>${r}</option>`).join('');
+                    // Rol is uitsluitend leesbaar: wijzigen kan alleen door admin of
+                    // de eigenaar via teambeheer — niet door de gebruiker zelf.
+                    rolSel.disabled = true;
                     if (p.role === 'admin') {
-                        rolSel.disabled = true;
                         rolSel.innerHTML = '<option>Administrator</option>';
+                    } else {
+                        const huidig = p.role_label || 'Eigenaar';
+                        rolSel.innerHTML = rolLabels.map(r => `<option value="${r}" ${huidig === r ? 'selected' : ''}>${r}</option>`).join('');
                     }
                 }
+
+                // Teambeheer alleen voor eigenaar/manager
+                renderTeambeheer(p);
 
                 // Aanpasbare velden
                 // Vul velden en zet juiste modus
@@ -4797,13 +4863,12 @@
             const fb = document.getElementById('profielOpslaan');
             const contact = document.getElementById('profielContactInput')?.value.trim() || '';
             const locatie = document.getElementById('profielLocatieInput')?.value.trim() || '';
-            const rolLabel = document.getElementById('profielRolSelect')?.value || '';
             try {
                 const res = await fetch('/api/mijn-profiel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ contact_naam: contact, locatie, role_label: rolLabel })
+                    body: JSON.stringify({ contact_naam: contact, locatie })
                 });
                 const data = await res.json();
                 fb.style.display = 'block';
@@ -4820,6 +4885,90 @@
                 fb.style.background = '#fef2f2'; fb.style.color = '#991b1b';
                 fb.textContent = 'Netwerkfout: ' + e.message;
             }
+        }
+
+        let _teamData = [];
+        async function renderTeambeheer(p) {
+            const card = document.getElementById('teambeheerCard');
+            if (!card) return;
+            if (!canManageTeam()) { card.style.display = 'none'; return; }
+            card.style.display = 'block';
+            const lijst = document.getElementById('teambeheerLijst');
+            try {
+                const res = await fetch('/api/praktijk-team', { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) { lijst.innerHTML = `<div style="color:#991b1b;font-size:13px;">${data.error || 'Kon team niet laden.'}</div>`; return; }
+                _teamData = data.team || [];
+                const meId = data.currentUserId;
+                if (!_teamData.length) { lijst.innerHTML = '<div style="color:var(--text-3);font-size:13px;">Geen teamleden gevonden.</div>'; return; }
+                const rollen = ['Eigenaar','Manager','Marketing','Medewerker'];
+                lijst.innerHTML = _teamData.map(u => {
+                    const isMe = String(u.id) === String(meId);
+                    const cur = u.role_label || 'Eigenaar';
+                    const opts = rollen.map(r => `<option value="${r}" ${cur === r ? 'selected' : ''}>${r}</option>`).join('');
+                    // Email via data-attribuut + textContent achteraf — voorkomt XSS
+                    return `<div class="tm-row" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;" data-uid="${u.id}">
+                        <div style="flex:1;min-width:0;">
+                            <div class="tm-email" style="font-size:13px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isMe ? ' <span style=\"color:var(--text-3);font-weight:400;\">(jij)</span>' : ''}</div>
+                        </div>
+                        ${isMe
+                            ? `<span style="font-size:13px;color:var(--text-3);padding:0 8px;">${cur}</span>`
+                            : `<select onchange="wijzigTeamRol(${u.id}, this.value)" style="padding:7px 9px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--surface);color:var(--text-1);">${opts}</select>
+                               <button class="btn btn-ghost tm-del-btn" style="font-size:12px;color:#991b1b;border-color:#fecaca;">Verwijderen</button>`
+                        }
+                    </div>`;
+                }).join('');
+                // Email veilig invullen via textContent (XSS-safe)
+                lijst.querySelectorAll('.tm-row').forEach(row => {
+                    const uid = row.getAttribute('data-uid');
+                    const member = _teamData.find(m => String(m.id) === uid);
+                    if (!member) return;
+                    const emailEl = row.querySelector('.tm-email');
+                    if (emailEl) emailEl.prepend(document.createTextNode(member.email));
+                    const delBtn = row.querySelector('.tm-del-btn');
+                    if (delBtn) delBtn.addEventListener('click', () => verwijderTeamlid(member.id, member.email));
+                });
+            } catch(e) {
+                const div = document.createElement('div');
+                div.style.color = '#991b1b';
+                div.style.fontSize = '13px';
+                div.textContent = 'Netwerkfout: ' + e.message;
+                lijst.innerHTML = '';
+                lijst.appendChild(div);
+            }
+        }
+
+        function teamFeedback(ok, msg) {
+            const fb = document.getElementById('teambeheerFeedback');
+            if (!fb) return;
+            fb.style.display = 'block';
+            fb.style.background = ok ? '#ecfdf5' : '#fef2f2';
+            fb.style.color = ok ? '#065f46' : '#991b1b';
+            fb.textContent = msg;
+        }
+
+        async function wijzigTeamRol(id, role_label) {
+            try {
+                const res = await fetch('/api/praktijk-team/' + id + '/rol', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ role_label })
+                });
+                const data = await res.json();
+                if (data.success) teamFeedback(true, 'Rol bijgewerkt.');
+                else { teamFeedback(false, data.error || 'Fout bij wijzigen.'); loadInstellingen(); }
+            } catch(e) { teamFeedback(false, 'Netwerkfout: ' + e.message); }
+        }
+
+        async function verwijderTeamlid(id, email) {
+            if (!confirm('Account "' + email + '" definitief verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
+            try {
+                const res = await fetch('/api/praktijk-team/' + id, { method: 'DELETE', credentials: 'include' });
+                const data = await res.json();
+                if (data.success) { teamFeedback(true, 'Account verwijderd.'); loadInstellingen(); }
+                else teamFeedback(false, data.error || 'Fout bij verwijderen.');
+            } catch(e) { teamFeedback(false, 'Netwerkfout: ' + e.message); }
         }
 
         async function vraagLicentieAan(type, naam) {

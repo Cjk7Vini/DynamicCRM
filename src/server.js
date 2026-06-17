@@ -2749,6 +2749,9 @@ app.post('/api/auth/login', async (req, res) => {
     req.session.email = user.email;
     req.session.role = user.role;
     req.session.organisationCodes = user.organisation_codes || null;
+    // Functie-rol binnen een praktijk (Eigenaar/Manager/Marketing/Medewerker).
+    // null/leeg = volledige toegang (bestaande accounts en niet-praktijk rollen).
+    req.session.roleLabel = user.role_label || null;
 
     // Voor organisatie accounts: gebruik de eerste praktijkcode als standaard
     if (user.role === 'organisation' && user.organisation_codes) {
@@ -3105,9 +3108,14 @@ ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Naz
 app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
-    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, calculatorEnabled, organisationCodes, orgLicenseType } = req.body;
+    const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, calculatorEnabled, organisationCodes, orgLicenseType, roleLabel } = req.body;
     if (!email || !password || !role) return res.status(400).json({ error: 'Email, wachtwoord en rol zijn verplicht' });
     if (!['admin', 'practice', 'organisation'].includes(role)) return res.status(400).json({ error: 'Ongeldige rol' });
+    const VALID_ROLE_LABELS = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
+    // Functie-rol alleen voor praktijk-accounts; standaard Eigenaar.
+    const finalRoleLabel = role === 'practice'
+      ? (VALID_ROLE_LABELS.includes(roleLabel) ? roleLabel : 'Eigenaar')
+      : null;
     if (role === 'practice' && !practiceCode) return res.status(400).json({ error: 'Praktijkcode is verplicht' });
     if (role === 'organisation' && !req.body.organisationCodes) return res.status(400).json({ error: 'Minimaal 1 locatie is verplicht' });
     if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
@@ -3130,10 +3138,10 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
     }
     const newUser = await withWriteConnection(async (client) => {
       const r = await client.query(
-        `INSERT INTO public.users (email, password_hash, role, practice_code, organisation_codes, org_license_type, org_license_end_date, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, email, role, practice_code, organisation_codes`,
+        `INSERT INTO public.users (email, password_hash, role, role_label, practice_code, organisation_codes, org_license_type, org_license_end_date, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING id, email, role, role_label, practice_code, organisation_codes`,
         [
-          email.toLowerCase().trim(), passwordHash, role,
+          email.toLowerCase().trim(), passwordHash, role, finalRoleLabel,
           role === 'practice' ? practiceCode.toUpperCase().trim() : null,
           role === 'organisation' ? (organisationCodes || null) : null,
           role === 'organisation' ? (orgLicenseType || '12m') : null,
@@ -3240,7 +3248,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { search } = req.query;
     const users = await withReadConnection(async (client) => {
-      let q = `SELECT u.id, u.email, u.role, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date, u.licenties,
+      let q = `SELECT u.id, u.email, u.role, u.role_label, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date, u.licenties,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active,
                p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
@@ -3261,9 +3269,14 @@ app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { id } = req.params;
-    const { banned, licenseType, action } = req.body;
+    const { banned, licenseType, action, role_label } = req.body;
     if (typeof banned === 'boolean') {
       await withWriteConnection(async (client) => { await client.query('UPDATE public.users SET banned=$1 WHERE id=$2', [banned, id]); });
+    }
+    if (role_label !== undefined) {
+      const VALID = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
+      if (role_label !== null && !VALID.includes(role_label)) return res.status(400).json({ error: 'Ongeldige functie-rol' });
+      await withWriteConnection(async (client) => { await client.query('UPDATE public.users SET role_label=$1 WHERE id=$2', [role_label, id]); });
     }
     if (licenseType || action) {
       const user = await withReadConnection(async (client) => { const r = await client.query('SELECT practice_code FROM public.users WHERE id=$1', [id]); return r.rows[0]; });
@@ -3469,22 +3482,23 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const user = await withReadConnection(async (client) => {
       const result = await client.query(
-        'SELECT id, email, role, practice_code, organisation_codes, licenties FROM public.users WHERE id = $1',
+        'SELECT id, email, role, role_label, practice_code, organisation_codes, licenties FROM public.users WHERE id = $1',
         [req.session.userId]
       );
       return result.rows[0];
     });
-    
+
     if (!user) {
       return res.status(404).json({ error: 'Gebruiker niet gevonden' });
     }
-    
+
     res.json({
       success: true,
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
+        role_label: user.role_label || null,
         practice_code: user.practice_code,
         organisation_codes: user.organisation_codes || null,
         licenties: user.licenties || []
@@ -3530,7 +3544,10 @@ app.get('/api/mijn-profiel', requireAuth, async (req, res) => {
 // POST /api/mijn-profiel — profiel opslaan
 app.post('/api/mijn-profiel', requireAuth, async (req, res) => {
   try {
-    const { contact_naam, locatie, role_label } = req.body;
+    const { contact_naam, locatie } = req.body;
+    // LET OP: role_label kan NIET via dit endpoint gewijzigd worden.
+    // Een gebruiker mag zijn eigen functie-rol niet ophogen — dat gaat alleen
+    // via de admin (create-user) of de eigenaar (/api/praktijk-team).
     await withWriteConnection(async (client) => {
       // Update praktijk gegevens
       if (req.session.practiceCode) {
@@ -3539,17 +3556,109 @@ app.post('/api/mijn-profiel', requireAuth, async (req, res) => {
           [contact_naam || null, locatie || null, req.session.practiceCode]
         );
       }
-      // Update role_label op user
-      if (role_label) {
-        await client.query(
-          `UPDATE public.users SET role_label=$1 WHERE id=$2`,
-          [role_label, req.session.userId]
-        );
-      }
     });
     res.json({ success: true });
   } catch (err) {
     console.error('Profiel opslaan error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// TEAMBEHEER VOOR DE EIGENAAR
+// ============================================
+// Een eigenaar (of manager) van een praktijk kan de aan zijn praktijk gekoppelde
+// accounts inzien, hun functie-rol wijzigen en accounts verwijderen.
+// Een eigenaar kan GEEN accounts aanmaken (dat doet uitsluitend de admin).
+
+// Alleen Eigenaar/Manager van een praktijk mogen team beheren.
+async function requireTeamManager(req, res) {
+  if (req.session.role !== 'practice' || !req.session.practiceCode) {
+    res.status(403).json({ error: 'Alleen praktijk-accounts kunnen teamleden beheren' });
+    return false;
+  }
+  // null role_label = oorspronkelijk eigenaar-account → toegestaan.
+  const rl = req.session.roleLabel || 'Eigenaar';
+  if (rl !== 'Eigenaar' && rl !== 'Manager') {
+    res.status(403).json({ error: 'Alleen een eigenaar of manager kan teamleden beheren' });
+    return false;
+  }
+  return true;
+}
+
+// GET /api/praktijk-team — alle accounts gekoppeld aan de eigen praktijk
+app.get('/api/praktijk-team', requireAuth, async (req, res) => {
+  try {
+    if (!await requireTeamManager(req, res)) return;
+    const team = await withReadConnection(async (client) => {
+      const r = await client.query(
+        `SELECT id, email, role_label, created_at, last_login_at, banned
+         FROM public.users
+         WHERE role = 'practice' AND practice_code = $1
+         ORDER BY created_at ASC`,
+        [req.session.practiceCode]
+      );
+      return r.rows;
+    });
+    res.json({ success: true, team, currentUserId: req.session.userId });
+  } catch (err) {
+    console.error('Praktijk-team ophalen error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/praktijk-team/:id/rol — functie-rol van een teamlid wijzigen
+app.patch('/api/praktijk-team/:id/rol', requireAuth, async (req, res) => {
+  try {
+    if (!await requireTeamManager(req, res)) return;
+    const { id } = req.params;
+    const { role_label } = req.body;
+    const VALID = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
+    if (!VALID.includes(role_label)) return res.status(400).json({ error: 'Ongeldige functie-rol' });
+    if (String(id) === String(req.session.userId)) {
+      return res.status(400).json({ error: 'Je kunt je eigen rol niet wijzigen' });
+    }
+    // Bevestig dat het teamlid bij dezelfde praktijk hoort.
+    const target = await withReadConnection(async (client) => {
+      const r = await client.query(
+        `SELECT id FROM public.users WHERE id = $1 AND role = 'practice' AND practice_code = $2`,
+        [id, req.session.practiceCode]
+      );
+      return r.rows[0];
+    });
+    if (!target) return res.status(404).json({ error: 'Teamlid niet gevonden' });
+    await withWriteConnection(async (client) => {
+      await client.query('UPDATE public.users SET role_label=$1 WHERE id=$2', [role_label, id]);
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Teamlid rol wijzigen error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/praktijk-team/:id — een teamlid verwijderen
+app.delete('/api/praktijk-team/:id', requireAuth, async (req, res) => {
+  try {
+    if (!await requireTeamManager(req, res)) return;
+    const { id } = req.params;
+    if (String(id) === String(req.session.userId)) {
+      return res.status(400).json({ error: 'Je kunt je eigen account niet verwijderen' });
+    }
+    const target = await withReadConnection(async (client) => {
+      const r = await client.query(
+        `SELECT id FROM public.users WHERE id = $1 AND role = 'practice' AND practice_code = $2`,
+        [id, req.session.practiceCode]
+      );
+      return r.rows[0];
+    });
+    if (!target) return res.status(404).json({ error: 'Teamlid niet gevonden' });
+    await withWriteConnection(async (client) => {
+      await client.query("DELETE FROM public.users WHERE id=$1 AND practice_code=$2 AND role='practice'", [id, req.session.practiceCode]);
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Teamlid verwijderen error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -3601,11 +3710,26 @@ app.post('/api/licentie-aanvraag', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// FUNCTIE-ROL TOEGANGSCONTROLE
+// ============================================
+// Blokkeert een request als de functie-rol (role_label) in de lijst staat.
+// null/leeg role_label = volledige toegang (bestaande accounts, admin, organisatie).
+function blockRoles(...blocked) {
+  return (req, res, next) => {
+    const rl = req.session?.roleLabel || null;
+    if (rl && blocked.includes(rl)) {
+      return res.status(403).json({ error: 'Geen toegang met je huidige rol' });
+    }
+    next();
+  };
+}
+
+// ============================================
 // META MARKETING API ENDPOINTS
 // ============================================
 
 // Get Meta summary for practice
-app.get('/api/meta/summary/:practiceCode', async (req, res) => {
+app.get('/api/meta/summary/:practiceCode', requireAuth, blockRoles('Medewerker'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
     const { dateFrom, dateTo } = req.query;
@@ -3650,7 +3774,7 @@ app.get('/api/meta/summary/:practiceCode', async (req, res) => {
 });
 
 // Get campaign performance for practice
-app.get('/api/meta/campaigns/:practiceCode', async (req, res) => {
+app.get('/api/meta/campaigns/:practiceCode', requireAuth, blockRoles('Medewerker'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
     const { dateFrom, dateTo } = req.query;
@@ -3675,7 +3799,7 @@ app.get('/api/meta/campaigns/:practiceCode', async (req, res) => {
 });
 
 // Manual sync for specific practice (admin only)
-app.post('/api/meta/sync/:practiceCode', async (req, res) => {
+app.post('/api/meta/sync/:practiceCode', requireAuth, blockRoles('Medewerker'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
 
@@ -3737,7 +3861,7 @@ app.post('/api/meta/sync-all', async (req, res) => {
 // ============================================
 
 // GET /api/eclub/kpis/:practiceCode - KPI's ophalen via nieuwe endpoints
-app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
+app.get('/api/eclub/kpis/:practiceCode', requireAuth, blockRoles('Medewerker', 'Marketing'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
     const { jaar, maand } = req.query;
@@ -3766,7 +3890,7 @@ app.get('/api/eclub/kpis/:practiceCode', requireAuth, async (req, res) => {
 });
 
 // GET /api/eclub/summary/:practiceCode - Doorsturen naar KPI endpoint (backwards compat)
-app.get('/api/eclub/summary/:practiceCode', requireAuth, async (req, res) => {
+app.get('/api/eclub/summary/:practiceCode', requireAuth, blockRoles('Medewerker', 'Marketing'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
 
@@ -3817,7 +3941,7 @@ app.get('/api/eclub/test-auth', async (req, res) => {
 });
 
 // GET /api/eclub/history/:practiceCode - 12 maanden historische ledendata voor grafiek
-app.get('/api/eclub/history/:practiceCode', requireAuth, async (req, res) => {
+app.get('/api/eclub/history/:practiceCode', requireAuth, blockRoles('Medewerker', 'Marketing'), async (req, res) => {
   try {
     const { practiceCode } = req.params;
     const maanden = req.query.maanden ? parseInt(req.query.maanden) : 11;
