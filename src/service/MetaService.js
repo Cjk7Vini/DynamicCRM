@@ -215,28 +215,21 @@ class MetaService {
   parseConversions(actions, conversionId = null) {
     if (!actions || !Array.isArray(actions)) return 0;
 
-    const conversionActions = actions.filter(a => {
-      if (conversionId) {
-        // Gebruik de specifieke custom conversion ID van deze praktijk
-        return a.action_type === `offsite_conversion.custom.${conversionId}` ||
-               a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-               a.action_type === 'lead';
-      }
-      // Fallback zonder ID
-      return a.action_type === 'offsite_conversion.fb_pixel_lead' ||
-             a.action_type === 'lead';
-    });
-
-    // Vermijd dubbeltelling: custom conversion EN pixel lead kunnen beide aanwezig zijn
-    // Gebruik custom conversion ID als primaire bron, anders pixel lead
+    // GEEN dubbeltelling: fb_pixel_lead en lead zijn dezelfde conversies onder twee
+    // action_types — die mag je NOOIT optellen. Kies één bron op prioriteit:
+    // 1) custom conversion van deze praktijk, 2) pixel lead, 3) standaard lead.
     if (conversionId) {
       const customConv = actions.find(a => a.action_type === `offsite_conversion.custom.${conversionId}`);
       if (customConv) return parseInt(customConv.value) || 0;
     }
 
-    return conversionActions.reduce((sum, action) => {
-      return sum + (parseInt(action.value) || 0);
-    }, 0);
+    const pixelLead = actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_lead');
+    if (pixelLead) return parseInt(pixelLead.value) || 0;
+
+    const stdLead = actions.find(a => a.action_type === 'lead');
+    if (stdLead) return parseInt(stdLead.value) || 0;
+
+    return 0;
   }
 
   // Parse landing page views from actions array
@@ -255,11 +248,14 @@ class MetaService {
       if (customCost) return parseFloat(customCost.value) || 0;
     }
 
-    const fallback = costPerActionType.find(c =>
-      c.action_type === 'offsite_conversion.fb_pixel_lead' ||
-      c.action_type === 'lead'
-    );
-    return fallback ? parseFloat(fallback.value) || 0 : 0;
+    // Zelfde prioriteit als parseConversions: pixel lead vóór standaard lead
+    const pixelCost = costPerActionType.find(c => c.action_type === 'offsite_conversion.fb_pixel_lead');
+    if (pixelCost) return parseFloat(pixelCost.value) || 0;
+
+    const leadCost = costPerActionType.find(c => c.action_type === 'lead');
+    if (leadCost) return parseFloat(leadCost.value) || 0;
+
+    return 0;
   }
 
   // Parse video views at a given percentage threshold from actions array
@@ -322,6 +318,15 @@ class MetaService {
 
       for (const campaign of insights) {
         try {
+          // TIJDELIJKE DIAGNOSE: log de ruwe lead-gerelateerde actions zodat we
+          // zwart-op-wit zien welke action_types Meta teruggeeft en met welke waarde.
+          const leadActions = (campaign.actions || []).filter(a =>
+            a.action_type === 'lead' ||
+            a.action_type === 'offsite_conversion.fb_pixel_lead' ||
+            (a.action_type || '').startsWith('offsite_conversion.custom.')
+          );
+          console.log(`🔎 DIAG ${practiceCode} | ${campaign.campaign_name} | ${campaign.date_start} | conversionId=${conversionId || 'GEEN'} | leadActions=`, JSON.stringify(leadActions));
+
           const conversions = this.parseConversions(campaign.actions, conversionId);
           const costPerConversion = this.parseCostPerConversion(campaign.cost_per_action_type, conversionId);
           const pageViews = this.parsePageViews(campaign.actions);
