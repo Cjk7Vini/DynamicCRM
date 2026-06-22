@@ -634,7 +634,7 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
         (async () => {
           try {
             await sendMailResilient({
-              from: SMTP.from,
+              from: `"${practice.naam}" <${SMTP.from}>`,
               to: practice.email_to,
               cc: practice.email_cc || undefined,
               subject: `✅ Er is een nieuwe lead binnengekomen!`,
@@ -683,7 +683,7 @@ app.post('/testmail', requireAdmin, async (req, res) => {
     if (!to) return res.status(400).json({ error: 'Ontbrekende "to" in body' });
 
     const info = await sendMailResilient({
-      from: SMTP.from,
+      from: `"Dynamic Health Consultancy" <${SMTP.from}>`,
       to,
       subject: '✅ Testmail van DynamicCRM',
       text: 'Dit is een test om te checken dat e-mail werkt.',
@@ -1139,7 +1139,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
           }
 
           await sendMailResilient({
-            from: SMTP.from,
+            from: `"${updated.lead.praktijk_naam}" <${SMTP.from}>`,
             to: updated.lead.emailadres,
             subject: `Afspraakbevestiging bij ${updated.lead.praktijk_naam} - ${formattedDate} om ${formattedTime}`,
             html,
@@ -1191,7 +1191,7 @@ app.post('/api/confirm-appointment', async (req, res) => {
             </body></html>`;
 
           await sendMailResilient({
-            from: SMTP.from,
+            from: `"${updated.lead.praktijk_naam}" <${SMTP.from}>`,
             to: updated.lead.praktijk_email,
             subject: `Nieuwe afspraak bevestigd - ${updated.lead.volledige_naam} op ${formattedDate}`,
             html: practiceHtml,
@@ -1859,7 +1859,7 @@ app.get('/api/check-reminders', requireCron, async (req, res) => {
             </html>`;
 
           await sendMailResilient({
-            from: SMTP.from,
+            from: `"${appt.praktijk_naam}" <${SMTP.from}>`,
             to: appt.praktijk_email,
             subject: `⏰ Afspraak over 1 uur - ${appt.volledige_naam} om ${formattedTime}`,
             html: reminderHtml
@@ -2023,7 +2023,7 @@ app.get('/api/appointment-action', async (req, res) => {
           </body></html>`;
 
         await sendMailResilient({
-          from: `${appointment.praktijk_naam} <${SMTP.user}>`,
+          from: `"${appointment.praktijk_naam}" <${SMTP.user}>`,
           replyTo: appointment.praktijk_email || SMTP.from,
           to: appointment.emailadres,
           subject: `Gemiste afspraak bij ${appointment.praktijk_naam}`,
@@ -2158,7 +2158,7 @@ app.get('/api/rebook', async (req, res) => {
         </body></html>`;
 
       await sendMailResilient({
-        from: SMTP.from,
+        from: `"${practiceInfo.naam}" <${SMTP.from}>`,
         to: practiceInfo.email_to,
         subject: `🔄 Herhaal Afspraak - ${originalLead.volledige_naam} wil opnieuw langskomen`,
         html: emailHtml
@@ -2922,7 +2922,7 @@ app.post('/api/auth/request-password-reset', async (req, res) => {
     
     try {
       await sendMailResilient({
-        from: process.env.SMTP_FROM || 'noreply@dynamic-health-consultancy.nl',
+        from: `"Dynamic Health Consultancy" <${process.env.SMTP_FROM || 'noreply@dynamic-health-consultancy.nl'}>`,
         to: user.email,
         subject: 'Wachtwoord Reset - Dynamic Health Consultancy',
         html: `
@@ -3096,7 +3096,7 @@ ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Naz
 <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Copyright &copy; Dynamic Health Consultancy</p>
 </td></tr></table></td></tr></table></body></html>`;
   return sendMailResilient({
-    from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+    from: `"Dynamic Health Consultancy" <${process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl'}>`,
     to: email,
     subject: 'Welkom bij Dynamic Health | je account is aangemaakt',
     html,
@@ -3175,7 +3175,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
         const locatieLijst = (organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
         const locatieHtml = locatieLijst.map(c => `<li style="font-size:15px;color:#3A3D40;padding:4px 0;">${c}</li>`).join('');
         await sendMailResilient({
-          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          from: `"Dynamic Health Consultancy" <${process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl'}>`,
           to: email,
           subject: 'Welkom bij Dynamic Health | je organisatie account is aangemaakt',
           html: `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
@@ -3682,7 +3682,7 @@ app.post('/api/licentie-aanvraag', requireAuth, async (req, res) => {
     const licNaam = licNamen[licentie_type] || licentie_type;
 
     await sendMailResilient({
-      from: SMTP.from,
+      from: `"Dynamic Health Consultancy" <${SMTP.from}>`,
       to: 'lars@dynamic-health-consultancy.nl',
       cc: 'stephanie@dynamic-health-consultancy.nl',
       replyTo: user.email,
@@ -4392,7 +4392,7 @@ app.post('/api/bezetting/opslaan', async (req, res) => {
 
     const bestandsnaam = `Bezettingsgraad_${praktijkCode || 'praktijk'}_${maand}_${jaar}.xlsx`;
     await sendMailResilient({
-      from: SMTP.from,
+      from: `"${praktijkNaam}" <${SMTP.from}>`,
       to: 'lars@dynamic-health-consultancy.nl',
       subject: `Bezettingsgraad rapport ${maand} ${jaar}${praktijkCode ? ' - ' + praktijkCode : ''}`,
       html: `
@@ -4616,7 +4616,7 @@ app.post('/api/contact', async (req, res) => {
       return res.status(400).json({ error: 'Naam, email en bericht zijn verplicht' });
     }
     await sendMailResilient({
-      from: SMTP.from,
+      from: `"Dynamic Health Consultancy" <${SMTP.from}>`,
       to: 'admin@dynamic-health-consultancy.nl',
       replyTo: email,
       subject: `Nieuw contactbericht van ${naam}`,
@@ -5089,7 +5089,7 @@ app.get('/api/check-nazorg', requireCron, async (req, res) => {
         const html = nazorgMailBody(mail.mail_nummer, mail.naam, praktijkNaam, mail.behandelaar, token, baseUrl);
 
         await sendMailResilient({
-          from: process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl',
+          from: `"${praktijkNaam}" <${process.env.SMTP_FROM || 'info@dynamic-health-consultancy.nl'}>`,
           to: mail.email,
           subject,
           html
@@ -5395,7 +5395,7 @@ app.get('/api/check-belpogingen', requireCron, async (req, res) => {
           </body></html>`;
 
         await sendMailResilient({
-          from: SMTP.from,
+          from: `"${r.praktijk_naam}" <${SMTP.from}>`,
           to: r.praktijk_email,
           subject: `Belpoging herinnering: ${r.volledige_naam}`,
           text: `Herinnering: bel ${r.volledige_naam} (${r.telefoon || 'geen telefoon'}). Ingepland voor: ${formatDt(r.volgende_belpoging)}. ${r.notitie ? 'Notitie: ' + r.notitie : ''}`,
@@ -5557,7 +5557,7 @@ app.get('/api/check-outcome', requireCron, async (req, res) => {
             </body></html>`;
 
           await sendMailResilient({
-            from: SMTP.from,
+            from: `"${appt.praktijk_naam}" <${SMTP.from}>`,
             to: appt.praktijk_email,
             subject: `Hoe is de afspraak verlopen met ${appt.volledige_naam}?`,
             html: outcomeHtml
@@ -5829,7 +5829,7 @@ app.get('/api/check-followup', requireCron, async (req, res) => {
             </body></html>`;
 
           await sendMailResilient({
-            from: SMTP.from,
+            from: `"${lead.praktijk_naam}" <${SMTP.from}>`,
             to: lead.praktijk_email,
             subject: `Herinnering: hoe staat het met ${lead.volledige_naam}?`,
             html: followupHtml
