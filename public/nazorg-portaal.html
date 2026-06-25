@@ -513,7 +513,7 @@
           const gepland = email_row?.gepland_op;
 
           let scoreHtml = '';
-          if (reactie?.herstel_cijfer !== null && reactie?.herstel_cijfer !== undefined) {
+          if (reactie != null) {
             const hcls = reactie.herstel_cijfer >= 7 ? 'score-good' : reactie.herstel_cijfer >= 4 ? 'score-mid' : 'score-bad';
             const pcls = reactie.pijn_score <= 3 ? 'score-good' : reactie.pijn_score <= 6 ? 'score-mid' : 'score-bad';
             scoreHtml = `<div style="display:flex;align-items:center;gap:12px;margin-top:8px;font-size:12px;">
@@ -526,8 +526,8 @@
           html += `<div style="background:var(--bg);border-radius:8px;padding:12px 14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;">
               <span style="font-weight:600;font-size:13px;">Mail ${nr}</span>
-              <span class="badge ${verstuurd ? (reactie?.herstel_cijfer !== null ? 'badge-green' : 'badge-blue') : 'badge-gray'}">
-                ${verstuurd ? (reactie?.herstel_cijfer !== null ? 'Gereageerd' : 'Verstuurd') : `Gepland: ${formatDate(gepland)}`}
+              <span class="badge ${verstuurd ? (reactie != null ? 'badge-green' : 'badge-blue') : 'badge-gray'}">
+                ${verstuurd ? (reactie != null ? 'Gereageerd' : 'Verstuurd') : `Gepland: ${formatDate(gepland)}`}
               </span>
             </div>
             ${scoreHtml}
