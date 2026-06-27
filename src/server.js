@@ -2334,7 +2334,10 @@ app.get('/api/leads-by-stage', async (req, res) => {
           appointment_time,
           is_lid,
           lid_geworden_op,
-          funnel_stage
+          funnel_stage,
+          (SELECT (p.eclub_branch_id IS NOT NULL)
+             FROM public.praktijken p
+            WHERE p.code = leads.praktijk_code) AS practice_has_eclub
         FROM public.leads
         WHERE 1=1
       `;

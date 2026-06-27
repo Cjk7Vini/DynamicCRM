@@ -2474,9 +2474,18 @@
                     }
 
                     if (stage === 'won') {
-                        const lidSinds = lead.lid_geworden_op
+                        const datum = lead.lid_geworden_op
                             ? new Date(lead.lid_geworden_op).toLocaleDateString('nl-NL')
-                            : '-';
+                            : null;
+                        // (eClub) alleen tonen bij praktijken die eClub hebben
+                        // (eclub_branch_id gevuld). Praktijken zonder eClub vullen
+                        // leden handmatig in en krijgen dus geen eClub-label.
+                        let lidSinds;
+                        if (lead.practice_has_eclub) {
+                            lidSinds = datum ? `${datum} (eClub)` : '(eClub)';
+                        } else {
+                            lidSinds = datum || '-';
+                        }
                         html += `<td style="padding: 12px; font-size: 14px; color: #16a34a; font-weight: 600;">${lidSinds}</td>`;
                     }
                     
