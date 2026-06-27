@@ -451,12 +451,11 @@ export default class EclubService {
       throw new Error(`Geen eClub branchId gevonden voor praktijk ${practiceCode}`);
     }
 
-    // Haal alle leden op via gepagineerde API. De API vereist een geldige
-    // 'select'-parameter en kent geen 'select2' (gaf 400). Meerdere velden
-    // worden als herhaalde 'select'-parameter meegegeven via de URL, zodat
-    // we zowel email als membershipBeginsOn terugkrijgen.
+    // Haal alle leden op via gepagineerde API. Zonder 'select' geeft de API
+    // het volledige ledenrecord terug (incl. email en membershipBeginsOn).
+    // De response komt als { items, totalCount }; getPaginated leest 'items'.
     const alleleden = await this.apiClient.getPaginated({
-      url: `/api/members?select=email&select=membershipBeginsOn`,
+      url: `/api/members`,
       params: {
         branchId
       },
