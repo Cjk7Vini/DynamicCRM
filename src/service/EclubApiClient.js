@@ -293,7 +293,14 @@ class EclubApiClient {
 
       // Response might be array or object with data property
       const items = Array.isArray(response) ? response : (response.data || []);
-      
+
+      // TIJDELIJKE DIAGNOSE: bij lege eerste pagina, log de ruwe response-vorm
+      // zodat we zien onder welke key de eClub-API de leden teruggeeft.
+      if (skip === 0 && items.length === 0) {
+        const keys = response && typeof response === 'object' ? Object.keys(response) : null;
+        console.log(`🔎 [ECLUB-DIAG] ${url} lege eerste pagina | type=${Array.isArray(response) ? 'array' : typeof response} | keys=${JSON.stringify(keys)} | snippet=${JSON.stringify(response).slice(0, 500)}`);
+      }
+
       allItems = allItems.concat(items);
 
       // Check if there are more pages
