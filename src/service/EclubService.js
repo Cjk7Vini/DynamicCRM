@@ -451,21 +451,18 @@ export default class EclubService {
       throw new Error(`Geen eClub branchId gevonden voor praktijk ${practiceCode}`);
     }
 
-    // Haal alle leden op via gepagineerde API — email + lidmaatschapsdatum
+    // Haal alle leden op via gepagineerde API. We vragen geen specifieke
+    // velden (select) op: de API kent geen 'select2', en het volledige
+    // ledenrecord bevat al email + membershipBeginsOn die we hieronder lezen.
     const alleleden = await this.apiClient.getPaginated({
       url: `/api/members`,
       params: {
-        branchId,
-        select: 'email',
-        select2: 'membershipBeginsOn'
+        branchId
       },
       businessId: orgId || this.businessId,
       pageSize: 50
     });
 
-    // De API accepteert meerdere select params — axios gooit duplicaten weg.
-    // Alternatieve aanpak: gebruik een custom params serializer.
-    // We proberen eerst de standaard manier, anders vallen we terug op array.
     console.log(`📊 [ECLUB-LEDEN] ${alleleden.length} leden opgehaald voor branchId ${branchId}`);
 
     if (alleleden.length === 0) {
