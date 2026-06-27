@@ -1983,6 +1983,23 @@
     <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
             <div>
+                <div class="card-title">Sales funnel - conversie</div>
+                <div class="card-subtitle">Leads naar Benaderd naar Lid / Geen interesse, met conversiepercentages</div>
+            </div>
+        </div>
+        <table class="table">
+            <thead>
+                <tr><th>Fase</th><th>Aantal</th><th>% van totaal</th><th>Conversie</th></tr>
+            </thead>
+            <tbody id="kwalFunnelBody">
+                <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+            <div>
                 <div class="card-title">Afspraken zonder uitkomst</div>
                 <div class="card-subtitle">Afspraak heeft plaatsgevonden maar geen uitkomst geregistreerd</div>
             </div>
@@ -3114,10 +3131,12 @@
 
                 // Sheet 1: Funnel — gebruik .stages
                 if (funnelData.success && funnelData.stages && funnelData.stages.length > 0) {
-                    const funnelSheet = XLSX.utils.json_to_sheet(funnelData.stages.map(d => ({
-                        'Stage':        d.stage_name || d.stage,
+                    // Zelfde cumulatieve Excel-trechter als op het dashboard
+                    const fm = buildFunnelModel(funnelData.stages);
+                    const funnelSheet = XLSX.utils.json_to_sheet(fm.stages.map(d => ({
+                        'Stage':        d.name,
                         'Aantal':       d.count,
-                        'Conversie %':  d.conversion_rate ? `${d.conversion_rate}%` : '-'
+                        'Conversie %':  d.conv === null ? '100%' : `${d.conv.toFixed(1)}%`
                     })));
                     XLSX.utils.book_append_sheet(wb, funnelSheet, 'Conversie Funnel');
                 }
@@ -3173,6 +3192,36 @@
             }
         }
 
+        // Bouw de cumulatieve sales-funnel (Excel-model) uit de ruwe /api/funnel stages.
+        // Eén bron van waarheid voor de pipeline-balken, de export en de kwaliteit-tabel.
+        //   Leads          = totaal (alle leads)            -> 100%
+        //   Benaderd       = totaal - awareness             -> Benaderd / Leads
+        //   Lid            = won                            -> Lid / Benaderd
+        //   Geen interesse = lost                           -> Lost / Benaderd
+        function buildFunnelModel(stages) {
+            const cnt = {};
+            let totalLeads = 0;
+            (stages || []).forEach(s => {
+                const c = parseInt(s.count) || 0;
+                cnt[s.stage] = c;
+                totalLeads += c;
+            });
+            const awareness = cnt['awareness'] || 0;
+            const won = cnt['won'] || 0;
+            const lost = cnt['lost'] || 0;
+            const benaderd = totalLeads - awareness;
+            const pct = (num, den) => den > 0 ? (num / den * 100) : 0;
+            return {
+                totalLeads,
+                stages: [
+                    { color: 'awareness', name: 'Leads',          count: totalLeads, click: 'all_leads',    conv: null },
+                    { color: 'intent',    name: 'Benaderd',       count: benaderd,   click: 'benaderd_cum', conv: pct(benaderd, totalLeads) },
+                    { color: 'won',       name: 'Lid',            count: won,        click: 'won',          conv: pct(won, benaderd) },
+                    { color: 'lost',      name: 'Geen interesse', count: lost,       click: 'lost',         conv: pct(lost, benaderd) }
+                ]
+            };
+        }
+
         // NEW: Load Pipeline Funnel
         async function loadPipelineFunnel() {
             try {
@@ -3185,52 +3234,31 @@
                     return;
                 }
                 
-                // Define expected stages with defaults
-                const expectedStages = [
-                    { stage: 'awareness', stage_name: 'Leads', count: 0 },
-                    { stage: 'intent', stage_name: 'Benaderd', count: 0 },
-                    { stage: 'won', stage_name: 'Lid', count: 0 },
-                    { stage: 'lost', stage_name: 'Geen interesse', count: 0 }
-                ];
+                // Cumulatieve trechter (Excel-model) via gedeelde helper
+                const model = buildFunnelModel(data.stages);
+                const totalLeads = model.totalLeads;
+                const funnelStages = model.stages;
 
-                // Merge with actual data
-                const stagesMap = {};
-                data.stages.forEach(stage => {
-                    stagesMap[stage.stage] = stage;
-                });
-
-                const stages = expectedStages.map(expected => {
-                    if (stagesMap[expected.stage]) {
-                        return stagesMap[expected.stage];
-                    }
-                    return expected;
-                });
-
-                const total = Math.max(stages[0]?.count || 1, 1);
-                
                 let html = '';
-                stages.forEach((stage, idx) => {
-                    const percentage = Math.max(Number((stage.count / total * 100).toFixed(1)) || 0, 5); // Min 5% for visibility
-                    const convRate = idx > 0 ? (stage.conversion_rate || '0.0') : '100.0';
-                    // Make awareness, intent, lost and won clickable
-                    const isClickable = ['awareness', 'intent', 'lost', 'won'].includes(stage.stage);
-                    const cursor = isClickable ? 'cursor: pointer;' : '';
-                    const onClick = isClickable ? `onclick="showLeadsForStage('${stage.stage}', '${stage.stage_name}')"` : '';
-                    
+                funnelStages.forEach((s) => {
+                    const ofTotal = totalLeads > 0 ? (s.count / totalLeads * 100) : 0;
+                    const width = Math.max(Number(ofTotal.toFixed(1)) || 0, 5); // min 5% voor zichtbaarheid
+                    const onClick = `onclick="showLeadsForStage('${s.click}', '${s.name}')"`;
+
                     html += `
                         <div class="funnel-stage">
-                            <div class="funnel-bar ${stage.stage}" style="width: ${percentage}%; ${cursor}" ${onClick}>
-                                <span>${stage.stage_name}</span>
-                                <span class="funnel-count">${stage.count}</span>
+                            <div class="funnel-bar ${s.color}" style="width: ${width}%; cursor: pointer;" ${onClick}>
+                                <span>${s.name}</span>
+                                <span class="funnel-count">${s.count}</span>
                             </div>
                             <div class="funnel-stats">
-                                <div>${(stage.count / total * 100).toFixed(1)}% of total</div>
-                                ${idx > 0 ? `<span class="conversion-rate">${convRate}% conversion</span>` : ''}
+                                <div>${ofTotal.toFixed(1)}% of total</div>
+                                ${s.conv !== null ? `<span class="conversion-rate">${s.conv.toFixed(1)}% conversion</span>` : ''}
                             </div>
                         </div>
                     `;
                 });
-                
+
                 document.getElementById('pipelineFunnelContainer').innerHTML = html;
             } catch (error) {
                 console.error('Pipeline funnel error:', error);
@@ -5085,6 +5113,31 @@
                             <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${veiligNaam}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td>
                         </tr>`;
                     }).join('');
+                }
+
+                // Sales funnel conversie-tabel (zelfde cumulatieve Excel-model als de pipeline)
+                try {
+                    const fRes = await fetch(`/api/funnel${pc ? '?practice=' + pc : ''}`, { credentials: 'include' });
+                    const fData = await fRes.json();
+                    const fBody = document.getElementById('kwalFunnelBody');
+                    if (fBody) {
+                        if (fData.success && fData.stages) {
+                            const fm = buildFunnelModel(fData.stages);
+                            fBody.innerHTML = fm.stages.map(s => {
+                                const ofTotal = fm.totalLeads > 0 ? (s.count / fm.totalLeads * 100) : 0;
+                                return `<tr>
+                                    <td style="font-weight:500;">${s.name}</td>
+                                    <td>${s.count}</td>
+                                    <td>${ofTotal.toFixed(1)}%</td>
+                                    <td>${s.conv === null ? '&mdash;' : s.conv.toFixed(1) + '%'}</td>
+                                </tr>`;
+                            }).join('');
+                        } else {
+                            fBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px;">Geen data</td></tr>';
+                        }
+                    }
+                } catch(fe) {
+                    console.error('Funnel kwaliteit error:', fe);
                 }
 
             } catch(e) {

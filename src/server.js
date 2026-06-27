@@ -2336,17 +2336,29 @@ app.get('/api/leads-by-stage', async (req, res) => {
           lid_geworden_op,
           funnel_stage
         FROM public.leads
-        WHERE funnel_stage = $1
+        WHERE 1=1
       `;
-      
-      const params = [stage];
-      let paramCount = 2;
-      
-      // Strict: Intent (Benaderd) requires appointment_date
-      if (stage === 'intent') {
-        query += ` AND appointment_date IS NOT NULL`;
+
+      const params = [];
+      let paramCount = 1;
+
+      // Cumulatieve trechter-tokens (zelfde model als de Excel sales funnel):
+      //   all_leads    = alle leads (top van de trechter)
+      //   benaderd_cum = iedereen die ooit benaderd is (alles behalve awareness)
+      // Bestaande tokens (awareness/intent/won/lost) blijven exact werken.
+      if (stage === 'all_leads') {
+        // geen funnel_stage filter - alle leads
+      } else if (stage === 'benaderd_cum') {
+        query += ` AND funnel_stage <> 'awareness'`;
+      } else {
+        query += ` AND funnel_stage = $${paramCount++}`;
+        params.push(stage);
+        // Strict: Intent (Benaderd) requires appointment_date
+        if (stage === 'intent') {
+          query += ` AND appointment_date IS NOT NULL`;
+        }
       }
-      
+
       if (practice) {
         query += ` AND praktijk_code = $${paramCount++}`;
         params.push(practice);
