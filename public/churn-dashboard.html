@@ -2474,9 +2474,17 @@
                     }
 
                     if (stage === 'won') {
-                        const lidSinds = lead.lid_geworden_op
+                        const datum = lead.lid_geworden_op
                             ? new Date(lead.lid_geworden_op).toLocaleDateString('nl-NL')
-                            : '-';
+                            : null;
+                        // is_lid wordt gezet door de eClub-sync: toon dat de lead
+                        // als lid bij eClub bekend is, met datum indien beschikbaar.
+                        let lidSinds;
+                        if (lead.is_lid) {
+                            lidSinds = datum ? `${datum} (eClub)` : '(eClub)';
+                        } else {
+                            lidSinds = datum || '-';
+                        }
                         html += `<td style="padding: 12px; font-size: 14px; color: #16a34a; font-weight: 600;">${lidSinds}</td>`;
                     }
                     
