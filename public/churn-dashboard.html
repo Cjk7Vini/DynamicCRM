@@ -445,12 +445,11 @@
         .funnel-bar {
             min-width: 160px;
             height: 44px;
+            line-height: 44px;
             border-radius: 6px;
             transition: width .4s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+            text-align: center;
+            white-space: nowrap;
             padding: 0 14px;
             color: white;
             font-weight: 600;
@@ -467,7 +466,7 @@
 
         .funnel-bar:hover { filter: brightness(1.08); }
 
-        .funnel-count { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: white; }
+        .funnel-count { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: white; margin-left: 6px; }
 
         .funnel-stats {
             min-width: 120px;
