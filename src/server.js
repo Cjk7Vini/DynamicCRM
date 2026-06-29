@@ -905,6 +905,42 @@ app.get('/api/dashboard-todo', async (req, res) => {
   }
 });
 
+// GET /api/nazorg-leden — nazorg-patiënten + eClub-lidstatus (alleen eClub-praktijken)
+app.get('/api/nazorg-leden', async (req, res) => {
+  try {
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    const code = practice; // praktijk-rol: eigen code; admin met filter: die code; admin zonder filter: null
+
+    const result = await withWriteConnection(async (client) => {
+      if (!code) return { eclub: false, patienten: [] };
+
+      const prow = (await client.query('SELECT eclub_branch_id FROM praktijken WHERE code = $1', [code])).rows[0];
+      if (!prow || !prow.eclub_branch_id) return { eclub: false, patienten: [] };
+
+      // Auto-migratie zodat de kolommen bestaan, ook als de sync nog nooit liep
+      await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS is_lid BOOLEAN DEFAULT FALSE`);
+      await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS lid_sinds DATE`);
+
+      const pq = await client.query(`
+        SELECT id, naam, email, behandelaar, laatste_behandeling,
+               COALESCE(is_lid, FALSE) AS is_lid, lid_sinds
+        FROM nazorg_clienten
+        WHERE praktijk_code = $1
+        ORDER BY COALESCE(is_lid, FALSE) DESC, laatste_behandeling DESC NULLS LAST
+      `, [code]);
+      return { eclub: true, patienten: pq.rows };
+    });
+
+    const patienten = result.patienten || [];
+    const leden = patienten.filter(p => p.is_lid).length;
+    res.json({ success: true, eclub: result.eclub, totaal: patienten.length, leden, patienten });
+  } catch (err) {
+    console.error('Nazorg-leden error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/afspraken — alle leads met afspraak voor dashboard afspraken sectie
 app.get('/api/afspraken', async (req, res) => {
   try {

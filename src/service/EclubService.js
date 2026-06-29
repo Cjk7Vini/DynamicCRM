@@ -504,7 +504,45 @@ export default class EclubService {
     }
 
     console.log(`✅ [ECLUB-LEDEN] Sync klaar: ${matched} leads bijgewerkt van ${alleleden.length} leden`);
-    return { success: true, matched, updated, total: alleleden.length };
+
+    // Nazorg-patiënten koppelen aan eClub-lidmaatschap (match op e-mail).
+    // Eén connectie voor het hele blok. De nazorg-mailworkflow blijft ongemoeid.
+    let nazorgMatched = 0;
+    try {
+      await this.withWriteConnection(async (client) => {
+        // Auto-migratie (buiten de transactie, idempotent)
+        await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS is_lid BOOLEAN DEFAULT FALSE`);
+        await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS lid_sinds DATE`);
+        // Reset + hermarkeren atomair: alles-of-niets, zodat een onderbreking
+        // niet leidt tot patiënten die onterecht op 'geen lid' blijven staan.
+        await client.query('BEGIN');
+        try {
+          await client.query(`UPDATE nazorg_clienten SET is_lid = FALSE, lid_sinds = NULL WHERE praktijk_code = $1`, [practiceCode]);
+          for (const lid of alleleden) {
+            const email = (lid.email || '').toLowerCase().trim();
+            if (!email) continue;
+            const lidSinds = lid.membershipBeginsOn || null;
+            const r = await client.query(`
+              UPDATE nazorg_clienten
+              SET is_lid = TRUE, lid_sinds = COALESCE(lid_sinds, $2::date)
+              WHERE LOWER(email) = $1 AND praktijk_code = $3
+              RETURNING id
+            `, [email, lidSinds, practiceCode]);
+            nazorgMatched += r.rows.length;
+          }
+          await client.query('COMMIT');
+        } catch (txErr) {
+          await client.query('ROLLBACK');
+          throw txErr;
+        }
+      });
+      console.log(`✅ [ECLUB-LEDEN] ${nazorgMatched} nazorg-patiënt(en) gekoppeld aan lidmaatschap`);
+    } catch (err) {
+      nazorgMatched = 0;
+      console.warn(`⚠️ [ECLUB-LEDEN] Nazorg-match fout:`, err.message);
+    }
+
+    return { success: true, matched, updated, total: alleleden.length, nazorg_matched: nazorgMatched };
   }
 }
 
