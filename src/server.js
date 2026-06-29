@@ -4510,10 +4510,16 @@ app.get('/api/bezetting/resultaten/:praktijkCode', requireAuth, async (req, res)
       return {
         label: `${r.maand.charAt(0).toUpperCase() + r.maand.slice(1)} ${r.jaar}`,
         bezetting,
-        medewerkers: mws.map(m => ({
-          naam: m.naam,
-          productiviteit: Number(m.productiviteit) || 0
-        }))
+        medewerkers: mws.map(m => {
+          const rawProd = Number(m.productiviteit) || 0;
+          const prod = rawProd <= 1.5 ? Math.round(rawProd * 1000) / 10 : Math.round(rawProd * 10) / 10;
+          return {
+            naam: m.naam,
+            productiviteit: prod,
+            capaciteit: Number(m.capaciteit) || 0,
+            belasting: Number(m.belasting) || 0
+          };
+        })
       };
     });
 

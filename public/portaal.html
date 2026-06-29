@@ -1016,34 +1016,17 @@
           <div style="height:200px;position:relative;"><canvas id="prestatieChart"></canvas></div>
         </div>`;
 
-        // Medewerker prestaties
-        if (data.topMedewerkers.length > 0 || data.onderMedewerkers.length > 0) {
-          html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
-
-          if (data.topMedewerkers.length > 0) {
-            html += `<div>
-              <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Goed presterend</div>
-              ${data.topMedewerkers.map(m => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f0fdf4;border-radius:8px;margin-bottom:6px;border:1px solid #bbf7d0;">
-                  <span style="font-size:13px;color:#374151;">${m.naam}</span>
-                  <span style="font-size:13px;font-weight:700;color:#16a34a;">${m.productiviteit}%</span>
-                </div>`).join('')}
-            </div>`;
-          }
-
-          if (data.onderMedewerkers.length > 0) {
-            html += `<div>
-              <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Aandacht nodig</div>
-              ${data.onderMedewerkers.map(m => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:8px;margin-bottom:6px;border:1px solid #fecaca;">
-                  <span style="font-size:13px;color:#374151;">${m.naam}</span>
-                  <span style="font-size:13px;font-weight:700;color:#dc2626;">${m.productiviteit}%</span>
-                </div>`).join('')}
-            </div>`;
-          }
-
-          html += `</div>`;
-        }
+        // Medewerker bezetting per maand: staafgrafiek met doellijn + maand-filter
+        html += `<div style="margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#111827;">Medewerker bezetting</div>
+            <select id="prestatieMaandSelect" style="font-size:12px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#374151;cursor:pointer;">
+              ${maanden.map((m, i) => `<option value="${i}"${i === maanden.length - 1 ? ' selected' : ''}>${m.label}</option>`).join('')}
+            </select>
+          </div>
+          <div style="height:240px;position:relative;"><canvas id="prestatieMwChart"></canvas></div>
+        </div>
+        <div id="prestatieMwCards" style="margin-top:20px;"></div>`;
 
         inhoud.innerHTML = html;
 
@@ -1087,6 +1070,96 @@
             }
           });
         }
+
+        // ===== Medewerker bezetting per maand: staafgrafiek + uitleg-kaarten =====
+        let mwChart = null;
+        const DOEL = 85;
+
+        function mwUitleg(m) {
+          if (m.productiviteit > 105) {
+            return `Boven capaciteit: ${(m.productiviteit - 100).toFixed(1)}% overbelast (belasting ${m.belasting} / capaciteit ${m.capaciteit}).`;
+          }
+          if (m.productiviteit >= DOEL) {
+            return `Op of boven de doelstelling van ${DOEL}% (belasting ${m.belasting} / capaciteit ${m.capaciteit}).`;
+          }
+          const gat = (DOEL - m.productiviteit).toFixed(1);
+          return `${gat}% onder de doelstelling — te weinig behandelbelasting (${m.belasting}) t.o.v. de capaciteit (${m.capaciteit}).`;
+        }
+
+        function mwKaart(m, kleur, rand, achtergrond) {
+          return `<div style="padding:10px 14px;background:${achtergrond};border-radius:10px;margin-bottom:8px;border:1px solid ${rand};">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:13px;font-weight:600;color:#111827;">${m.naam}</span>
+              <span style="font-size:14px;font-weight:800;color:${kleur};">${m.productiviteit}%</span>
+            </div>
+            <div style="font-size:12px;color:#6b7280;margin-top:4px;line-height:1.4;">${mwUitleg(m)}</div>
+          </div>`;
+        }
+
+        function renderMaandMw(idx) {
+          const maand = maanden[idx];
+          if (!maand) return;
+          const mws = (maand.medewerkers || [])
+            .filter(m => m.naam && m.productiviteit > 0)
+            .sort((a, b) => b.productiviteit - a.productiviteit);
+
+          const mwCtx = document.getElementById('prestatieMwChart');
+          if (mwChart) { mwChart.destroy(); mwChart = null; }
+          if (mwCtx && window.Chart && mws.length) {
+            const maxP = Math.max(...mws.map(m => m.productiviteit), DOEL);
+            const yMax = Math.ceil(maxP / 10) * 10 + 10;
+            mwChart = new Chart(mwCtx, {
+              type: 'bar',
+              data: {
+                labels: mws.map(m => m.naam),
+                datasets: [{
+                  label: 'Bezetting %',
+                  data: mws.map(m => m.productiviteit),
+                  backgroundColor: mws.map(m => bezettingKleur(m.productiviteit)),
+                  borderRadius: 6,
+                  maxBarThickness: 54
+                }, {
+                  label: `Doelstelling (${DOEL}%)`,
+                  type: 'line',
+                  data: mws.map(() => DOEL),
+                  borderColor: '#22c55e',
+                  borderWidth: 1.5,
+                  borderDash: [6, 4],
+                  pointRadius: 0,
+                  fill: false
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                scales: {
+                  y: { min: 0, max: yMax, ticks: { callback: v => v + '%', font: { size: 11 } } },
+                  x: { ticks: { font: { size: 11 } } }
+                }
+              }
+            });
+          }
+
+          const cardsEl = document.getElementById('prestatieMwCards');
+          if (cardsEl) {
+            // Gelijk aan de staafkleuren: 85-105% = goed, daarbuiten = aandacht
+            const goed = mws.filter(m => m.productiviteit >= DOEL && m.productiviteit <= 105);
+            const aandacht = mws.filter(m => m.productiviteit < DOEL || m.productiviteit > 105);
+            let c = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
+            c += `<div><div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Goed presterend</div>`;
+            c += goed.length ? goed.map(m => mwKaart(m, '#16a34a', '#bbf7d0', '#f0fdf4')).join('') : `<div style="font-size:12px;color:#9ca3af;">Geen medewerkers op of boven doel deze maand.</div>`;
+            c += `</div>`;
+            c += `<div><div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Aandacht nodig</div>`;
+            c += aandacht.length ? aandacht.map(m => mwKaart(m, '#dc2626', '#fecaca', '#fef2f2')).join('') : `<div style="font-size:12px;color:#9ca3af;">Iedereen op of boven doel deze maand.</div>`;
+            c += `</div></div>`;
+            cardsEl.innerHTML = c;
+          }
+        }
+
+        const maandSel = document.getElementById('prestatieMaandSelect');
+        if (maandSel) maandSel.addEventListener('change', () => renderMaandMw(parseInt(maandSel.value, 10)));
+        renderMaandMw(maanden.length - 1);
 
       } catch(e) {
         document.getElementById('prestatieInhoud').innerHTML = `<div style="color:#dc2626;font-size:13px;">Fout bij laden: ${e.message}</div>`;
