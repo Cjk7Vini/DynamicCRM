@@ -3248,13 +3248,13 @@
                     if (!c) return '';
                     const naam = escHtml(t.volledige_naam) || ('Lead #' + t.id);
                     const args = `${t.id}, '${(t.volledige_naam || '').replace(/'/g, "\\'")}', '${t.emailadres || ''}', '${t.telefoon || ''}'`;
-                    return `<div onclick="todoActie('${t.type}', ${args})" style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;">
-                        <div style="width:10px;height:10px;border-radius:50%;background:${c.dot};flex-shrink:0;"></div>
+                    return `<div onclick="todoActie('${t.type}', ${args})" style="display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);cursor:pointer;">
+                        <div style="width:9px;height:9px;border-radius:50%;background:${c.dot};flex-shrink:0;"></div>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:14px;font-weight:600;color:var(--text-1);">${naam}</div>
-                            <div style="font-size:12px;color:var(--text-3);margin-top:2px;"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:1px 7px;border-radius:5px;background:${c.tagBg};color:${c.tagFg};margin-right:6px;">${c.tag}</span>${c.sub(t.dagen)}</div>
+                            <div style="font-size:13px;font-weight:600;color:var(--text-1);">${naam}</div>
+                            <div style="font-size:11px;color:var(--text-3);margin-top:1px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:${c.tagBg};color:${c.tagFg};margin-right:6px;">${c.tag}</span>${c.sub(t.dagen)}</div>
                         </div>
-                        <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;background:${c.btnBg};border:none;white-space:nowrap;" onclick="event.stopPropagation();todoActie('${t.type}', ${args})">${c.btn}</button>
+                        <button class="btn btn-primary" style="padding:5px 10px;font-size:11px;background:${c.btnBg};border:none;white-space:nowrap;" onclick="event.stopPropagation();todoActie('${t.type}', ${args})">${c.btn}</button>
                     </div>`;
                 }).join('');
             } catch (e) {
