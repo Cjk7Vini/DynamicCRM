@@ -1350,6 +1350,16 @@
             </div>
         </div>
 
+        <div class="card" id="todoCard">
+            <div class="card-header">
+                <div class="card-title">Vandaag te doen</div>
+                <div class="badge badge-amber" id="todoCount">0</div>
+            </div>
+            <div id="todoList" style="padding:2px 0;">
+                <div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">Laden...</div>
+            </div>
+        </div>
+
     </div><!-- end charts-row -->
     <span id="avgTime" style="display:none;"></span>
 
@@ -2502,6 +2512,7 @@
             // NEW: Enhanced dashboard features
             await loadPipelineFunnel();
             await loadForecastComparison();
+            await loadDashboardTodo();
             await loadMetaMarketing();
             await loadEclubData();
         }
@@ -3027,6 +3038,7 @@
             // NEW: Also reload enhanced sections
             loadPipelineFunnel();
             loadForecastComparison();
+            loadDashboardTodo();
             loadMetaMarketing();
             loadEclubData();
         }
@@ -3044,6 +3056,7 @@
                 loadSourcePerformance();
                 loadPipelineFunnel();
                 loadForecastComparison();
+                loadDashboardTodo();
                 loadMetaMarketing();
                 loadEclubData();
             } else if (name === 'afspraken') {
@@ -3205,6 +3218,63 @@
                     { color: 'lost',      name: 'Geen interesse', count: lost,       click: 'lost',         conv: pct(lost, benaderd) }
                 ]
             };
+        }
+
+        // Vandaag te doen: geprioriteerde actielijst (top 5 + totaal)
+        async function loadDashboardTodo() {
+            try {
+                const res = await fetch('/api/dashboard-todo' + buildQueryString(), { credentials: 'include' });
+                const data = await res.json();
+                const list = document.getElementById('todoList');
+                const countEl = document.getElementById('todoCount');
+                if (!list) return;
+                if (!data.success || !Array.isArray(data.taken)) {
+                    list.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">Geen data beschikbaar</div>';
+                    return;
+                }
+                if (countEl) countEl.textContent = data.totaal;
+                if (data.totaal === 0) {
+                    list.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">Geen openstaande taken. Goed bezig!</div>';
+                    return;
+                }
+                const TYPES = {
+                    geen_afspraak:     { tag:'Geen afspraak',     tagBg:'#fee2e2', tagFg:'#dc2626', dot:'#dc2626', btn:'Inplannen', btnBg:'#333399', sub: d => d + ' dag' + (d===1?'':'en') + ' geen afspraak ingepland' },
+                    geen_uitkomst:     { tag:'Geen uitkomst',     tagBg:'#cffafe', tagFg:'#0891b2', dot:'#0891b2', btn:'Uitkomst',  btnBg:'#0891b2', sub: d => 'Afspraak ' + d + ' dag' + (d===1?'':'en') + ' geleden, niets gelogd' },
+                    geen_2e_belpoging: { tag:'Geen 2e belpoging', tagBg:'#ffedd5', tagFg:'#c2410c', dot:'#f57c00', btn:'Bellen',    btnBg:'#f57c00', sub: d => '1e belpoging ' + d + ' dag' + (d===1?'':'en') + ' geleden' }
+                };
+                const top = data.taken.slice(0, 5);
+                list.innerHTML = top.map(t => {
+                    const c = TYPES[t.type];
+                    if (!c) return '';
+                    const naam = escHtml(t.volledige_naam) || ('Lead #' + t.id);
+                    const args = `${t.id}, '${(t.volledige_naam || '').replace(/'/g, "\\'")}', '${t.emailadres || ''}', '${t.telefoon || ''}'`;
+                    return `<div onclick="todoActie('${t.type}', ${args})" style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;">
+                        <div style="width:10px;height:10px;border-radius:50%;background:${c.dot};flex-shrink:0;"></div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:14px;font-weight:600;color:var(--text-1);">${naam}</div>
+                            <div style="font-size:12px;color:var(--text-3);margin-top:2px;"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:1px 7px;border-radius:5px;background:${c.tagBg};color:${c.tagFg};margin-right:6px;">${c.tag}</span>${c.sub(t.dagen)}</div>
+                        </div>
+                        <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;background:${c.btnBg};border:none;white-space:nowrap;" onclick="event.stopPropagation();todoActie('${t.type}', ${args})">${c.btn}</button>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('Dashboard-todo error:', e);
+            }
+        }
+
+        // Klik op een taak: navigeer naar de juiste actie/locatie
+        function todoActie(type, id, naam, email, tel) {
+            if (type === 'geen_afspraak') {
+                openApptModal(id, naam, email, tel);
+            } else if (type === 'geen_uitkomst') {
+                openApptModal(id, naam, email, tel, true);
+                uitkomstLeadId = id;
+                switchApptTab('uitkomst');
+                const titel = document.getElementById('apptModalTitle');
+                if (titel) titel.textContent = 'Uitkomst registreren voor ' + (naam || 'lead');
+            } else if (type === 'geen_2e_belpoging') {
+                showDashboardSection('belpogingen');
+            }
         }
 
         // NEW: Load Pipeline Funnel
@@ -4185,7 +4255,7 @@
                     const res = await fetch(`/api/appointment-outcome?id=${lid}&result=${selectedUitkomst}&token=${tokenData.token}`, { credentials: 'include' });
                     if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Fout'); }
                     showApptMsg('Uitkomst geregistreerd!', 'green');
-                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadKwaliteit(); }, 1200);
+                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadKwaliteit(); loadDashboardTodo(); }, 1200);
                 } catch(e) {
                     showApptMsg('Fout: ' + e.message, 'red');
                 } finally {
@@ -4218,7 +4288,7 @@
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Fout');
                     showApptMsg('Afspraak opgeslagen!', 'green');
-                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadsZonderAfspraak(); }, 1200);
+                    setTimeout(() => { closeApptModal(); loadAfspraken(); loadLeadsZonderAfspraak(); loadDashboardTodo(); }, 1200);
                 } catch(e) {
                     showApptMsg('Fout: ' + e.message, 'red');
                 } finally {

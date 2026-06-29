@@ -820,6 +820,91 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
   }
 });
 
+// GET /api/dashboard-todo — geprioriteerde actielijst ("Vandaag te doen")
+app.get('/api/dashboard-todo', async (req, res) => {
+  try {
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+
+    const taken = await withReadConnection(async (client) => {
+      const params = practice ? [practice] : [];
+      const pc = (n) => practice ? `AND l.praktijk_code = $${n}` : '';
+
+      // A. Geen afspraak: awareness, geen afspraak, minimaal 3 dagen oud
+      const qA = `
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - l.aangemaakt_op)) / 86400)::int AS dagen
+        FROM public.leads l
+        WHERE l.funnel_stage = 'awareness'
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
+          AND l.aangemaakt_op < NOW() - INTERVAL '3 days'
+          ${pc(1)}
+        ORDER BY l.aangemaakt_op ASC
+        LIMIT 100`;
+
+      // B. Geen uitkomst: intent, afspraak in het verleden, geen outcome gelogd
+      const qB = `
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(l.appointment_datetime,
+                 (l.appointment_date::date + COALESCE(l.appointment_time, '09:00')::time)))) / 86400)::int AS dagen
+        FROM public.leads l
+        WHERE l.funnel_stage = 'intent'
+          AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
+          AND COALESCE(l.appointment_datetime,
+                (l.appointment_date::date + COALESCE(l.appointment_time, '09:00')::time)) < NOW()
+          AND (l.outcome_sent IS NULL OR l.outcome_sent = FALSE)
+          ${pc(1)}
+        ORDER BY 5 DESC
+        LIMIT 100`;
+
+      // C. Geen 2e belpoging: precies 1 belpoging gelogd, 1e minstens 2 dagen geleden, nog open
+      const qC = `
+        SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - bp.laatste)) / 86400)::int AS dagen
+        FROM public.leads l
+        JOIN (
+          SELECT lead_id, COUNT(*) AS cnt, MAX(aangemaakt_op) AS laatste
+          FROM belpogingen GROUP BY lead_id
+        ) bp ON bp.lead_id = l.id
+        WHERE bp.cnt = 1
+          AND bp.laatste < NOW() - INTERVAL '2 days'
+          AND l.funnel_stage NOT IN ('won', 'lost')
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
+          ${pc(1)}
+        ORDER BY bp.laatste ASC
+        LIMIT 100`;
+
+      const [a, b, c] = await Promise.all([
+        client.query(qA, params),
+        client.query(qB, params),
+        client.query(qC, params)
+      ]);
+
+      const mapRow = (type) => (r) => ({
+        id: r.id,
+        type,
+        volledige_naam: r.volledige_naam,
+        emailadres: r.emailadres,
+        telefoon: r.telefoon,
+        dagen: Math.max(parseInt(r.dagen) || 0, 0)
+      });
+
+      return [
+        ...a.rows.map(mapRow('geen_afspraak')),
+        ...b.rows.map(mapRow('geen_uitkomst')),
+        ...c.rows.map(mapRow('geen_2e_belpoging'))
+      ].sort((x, y) => y.dagen - x.dagen);
+    });
+
+    res.json({ success: true, totaal: taken.length, taken });
+  } catch (err) {
+    console.error('Dashboard-todo error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/afspraken — alle leads met afspraak voor dashboard afspraken sectie
 app.get('/api/afspraken', async (req, res) => {
   try {
