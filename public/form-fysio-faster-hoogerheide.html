@@ -369,6 +369,7 @@
             const emailadres     = document.getElementById('emailadres').value.trim();
             const telefoon       = document.getElementById('telefoon').value.trim();
             const doel           = document.getElementById('doel').value;
+            const bron           = document.getElementById('bron').value || null;
             const toestemming    = document.getElementById('toestemming').checked;
             const praktijk_code  = document.getElementById('praktijk_code').value;
 
@@ -407,6 +408,7 @@
                         emailadres,
                         telefoon,
                         doel,
+                        bron,
                         toestemming: toestemming ? 'true' : 'false',
                         praktijk_code
                     })
