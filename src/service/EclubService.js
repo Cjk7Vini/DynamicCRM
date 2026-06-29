@@ -465,12 +465,6 @@ export default class EclubService {
 
     console.log(`📊 [ECLUB-LEDEN] ${alleleden.length} leden opgehaald voor branchId ${branchId}`);
 
-    // TIJDELIJKE DIAGNOSE: toon de veldnamen + een voorbeeld van één lid-record,
-    // zodat we zien onder welke key de lidmaatschapsdatum staat.
-    if (alleleden.length > 0) {
-      console.log(`🔎 [ECLUB-DIAG] lid-record keys=${JSON.stringify(Object.keys(alleleden[0]))} | voorbeeld=${JSON.stringify(alleleden[0]).slice(0, 600)}`);
-    }
-
     if (alleleden.length === 0) {
       return { success: true, matched: 0, updated: 0, total: 0 };
     }
@@ -480,7 +474,7 @@ export default class EclubService {
 
     for (const lid of alleleden) {
       const email = (lid.email || '').toLowerCase().trim();
-      const lidSinds = lid.membershipBeginsOn || null;
+      const lidSinds = lid.membershipBeginsOn || lid.registeredOn || null;
 
       if (!email) continue;
 
@@ -526,7 +520,7 @@ export default class EclubService {
           for (const lid of alleleden) {
             const email = (lid.email || '').toLowerCase().trim();
             if (!email) continue;
-            const lidSinds = lid.membershipBeginsOn || null;
+            const lidSinds = lid.membershipBeginsOn || lid.registeredOn || null;
             const r = await client.query(`
               UPDATE nazorg_clienten
               SET is_lid = TRUE, lid_sinds = COALESCE(lid_sinds, $2::date)
