@@ -1040,21 +1040,34 @@
             data: {
               labels: maanden.map(m => m.label),
               datasets: [{
-                label: 'Bezettingsgraad %',
+                label: 'Bezettingsgraad',
                 data: maanden.map(m => m.bezetting),
-                borderColor: '#333399',
-                backgroundColor: 'rgba(51,51,153,0.08)',
-                borderWidth: 2.5,
+                borderColor: '#4f46e5',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                backgroundColor: (context) => {
+                  const chart = context.chart;
+                  const { ctx: cc, chartArea } = chart;
+                  if (!chartArea) return 'rgba(79,70,229,0.10)';
+                  const g = cc.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                  g.addColorStop(0, 'rgba(79,70,229,0.28)');
+                  g.addColorStop(1, 'rgba(79,70,229,0.01)');
+                  return g;
+                },
                 pointBackgroundColor: maanden.map(m => bezettingKleur(m.bezetting)),
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
                 pointRadius: 5,
-                tension: 0.3,
-                fill: true
+                pointHoverRadius: 7,
+                pointHoverBorderWidth: 2,
+                pointHoverBorderColor: '#fff'
               }, {
                 label: 'Streefwaarde (85%)',
                 data: maanden.map(() => 85),
                 borderColor: '#22c55e',
                 borderWidth: 1.5,
-                borderDash: [6, 4],
+                borderDash: [5, 5],
                 pointRadius: 0,
                 fill: false
               }]
@@ -1062,10 +1075,14 @@
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { display: true, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, color: '#6b7280', font: { size: 11 } } },
+                tooltip: { backgroundColor: '#111827', padding: 10, cornerRadius: 8, titleColor: '#fff', bodyColor: '#e5e7eb', displayColors: false, callbacks: { label: c => c.dataset.label + ': ' + c.parsed.y + '%' } }
+              },
               scales: {
-                y: { min: 0, max: yMax, ticks: { callback: v => v + '%', font: { size: 11 } } },
-                x: { ticks: { font: { size: 11 } } }
+                y: { min: 0, max: yMax, border: { display: false }, grid: { color: '#eef0f4' }, ticks: { callback: v => v + '%', color: '#9ca3af', font: { size: 11 }, padding: 8 } },
+                x: { border: { display: false }, grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 }, padding: 6 } }
               }
             }
           });
@@ -1083,7 +1100,7 @@
             return `Op of boven de doelstelling van ${DOEL}% (belasting ${m.belasting} / capaciteit ${m.capaciteit}).`;
           }
           const gat = (DOEL - m.productiviteit).toFixed(1);
-          return `${gat}% onder de doelstelling — te weinig behandelbelasting (${m.belasting}) t.o.v. de capaciteit (${m.capaciteit}).`;
+          return `${gat}% onder de doelstelling van ${DOEL}%. Behandelbelasting (${m.belasting}) te laag t.o.v. de capaciteit (${m.capaciteit}).`;
         }
 
         function mwKaart(m, kleur, rand, achtergrond) {
