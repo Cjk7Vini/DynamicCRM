@@ -1350,26 +1350,6 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Hot leads</div>
-                <div class="badge badge-amber" id="hotLeadsCount">0</div>
-            </div>
-            <div class="card-body" style="padding:0;">
-                <table class="table" id="hotLeadsTable">
-                    <thead>
-                        <tr>
-                            <th>Naam</th>
-                            <th>Kans</th>
-                            <th>Stadium</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hotLeadsBody">
-                        <tr><td colspan="3" style="text-align:center; color:var(--text-3); padding:24px;" id="hotLeadsList">Laden...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div><!-- end charts-row -->
     <span id="avgTime" style="display:none;"></span>
 
@@ -2522,7 +2502,6 @@
             // NEW: Enhanced dashboard features
             await loadPipelineFunnel();
             await loadForecastComparison();
-            await loadHotLeads();
             await loadMetaMarketing();
             await loadEclubData();
         }
@@ -3048,7 +3027,6 @@
             // NEW: Also reload enhanced sections
             loadPipelineFunnel();
             loadForecastComparison();
-            loadHotLeads();
             loadMetaMarketing();
             loadEclubData();
         }
@@ -3066,7 +3044,6 @@
                 loadSourcePerformance();
                 loadPipelineFunnel();
                 loadForecastComparison();
-                loadHotLeads();
                 loadMetaMarketing();
                 loadEclubData();
             } else if (name === 'afspraken') {
@@ -3323,45 +3300,6 @@
                 }
             } catch (error) {
                 console.error('Forecast comparison error:', error);
-            }
-        }
-
-        // NEW: Load Hot Leads
-        async function loadHotLeads() {
-            try {
-                // Use buildQueryString to apply practice isolation
-                const queryString = buildQueryString();
-                const url = `/api/hot-leads?limit=5${queryString ? '&' + queryString.substring(1) : ''}`;
-                const res = await fetch(url, { credentials: 'include' });
-                const data = await res.json();
-                
-                const container = document.getElementById('hotLeadsList');
-                
-                if (!data.success || !data.leads || data.leads.length === 0) {
-                    container.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:12px;">Geen hot leads</div>';
-                    return;
-                }
-                
-                let html = '';
-                data.leads.forEach(lead => {
-                    html += `
-                        <div class="hot-lead-item">
-                            <div class="hot-lead-name">${escHtml(lead.volledige_naam)}</div>
-                            <div class="hot-lead-meta">
-                                <span>${escHtml(lead.praktijk_naam) || 'Geen praktijk'}</span>
-                                <span>${escHtml(lead.funnel_stage)}</span>
-                                <span class="hot-lead-likelihood">${lead.conversion_likelihood}% kans</span>
-                                <span>€${parseFloat(lead.expected_value || 0).toFixed(0)}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            } catch (error) {
-                console.error('Hot leads error:', error);
-                document.getElementById('hotLeadsList').innerHTML = 
-                    '<div style="text-align:center;color:#c62828;padding:20px;font-size:12px;">Error loading hot leads</div>';
             }
         }
 
