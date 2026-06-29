@@ -3257,6 +3257,18 @@
                         <button class="btn btn-primary" style="padding:5px 10px;font-size:11px;background:${c.btnBg};border:none;white-space:nowrap;" onclick="event.stopPropagation();todoActie('${t.type}', ${args})">${c.btn}</button>
                     </div>`;
                 }).join('');
+
+                // Hoogte gelijktrekken met de kaart ernaast (Mijn praktijk / prestaties),
+                // met subtiele scroll als de taken niet allemaal passen.
+                setTimeout(() => {
+                    const perf = document.getElementById('performanceCard');
+                    const header = document.querySelector('#todoCard .card-header');
+                    if (perf && perf.offsetHeight > 100) {
+                        const headerH = header ? header.offsetHeight : 52;
+                        list.style.maxHeight = Math.max(perf.offsetHeight - headerH, 240) + 'px';
+                        list.style.overflowY = 'auto';
+                    }
+                }, 300);
             } catch (e) {
                 console.error('Dashboard-todo error:', e);
             }
