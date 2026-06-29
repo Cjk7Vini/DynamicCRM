@@ -912,16 +912,14 @@ app.get('/api/nazorg-leden', async (req, res) => {
     if (practice === false) return;
     const code = practice; // praktijk-rol: eigen code; admin met filter: die code; admin zonder filter: null
 
-    const result = await withWriteConnection(async (client) => {
+    const result = await withReadConnection(async (client) => {
       if (!code) return { eclub: false, patienten: [] };
 
       const prow = (await client.query('SELECT eclub_branch_id FROM praktijken WHERE code = $1', [code])).rows[0];
       if (!prow || !prow.eclub_branch_id) return { eclub: false, patienten: [] };
 
-      // Auto-migratie zodat de kolommen bestaan, ook als de sync nog nooit liep
-      await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS is_lid BOOLEAN DEFAULT FALSE`);
-      await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS lid_sinds DATE`);
-
+      // De kolommen is_lid/lid_sinds zijn eenmalig in Neon toegevoegd
+      // (de app-rol mag nazorg_clienten niet alteren).
       const pq = await client.query(`
         SELECT id, naam, email, behandelaar, laatste_behandeling,
                COALESCE(is_lid, FALSE) AS is_lid, lid_sinds

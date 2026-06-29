@@ -510,9 +510,8 @@ export default class EclubService {
     let nazorgMatched = 0;
     try {
       await this.withWriteConnection(async (client) => {
-        // Auto-migratie (buiten de transactie, idempotent)
-        await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS is_lid BOOLEAN DEFAULT FALSE`);
-        await client.query(`ALTER TABLE nazorg_clienten ADD COLUMN IF NOT EXISTS lid_sinds DATE`);
+        // De kolommen is_lid/lid_sinds zijn eenmalig in Neon toegevoegd
+        // (de app-rol mag nazorg_clienten niet alteren).
         // Reset + hermarkeren atomair: alles-of-niets, zodat een onderbreking
         // niet leidt tot patiënten die onterecht op 'geen lid' blijven staan.
         await client.query('BEGIN');
