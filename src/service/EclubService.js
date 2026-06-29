@@ -465,6 +465,12 @@ export default class EclubService {
 
     console.log(`📊 [ECLUB-LEDEN] ${alleleden.length} leden opgehaald voor branchId ${branchId}`);
 
+    // TIJDELIJKE DIAGNOSE: toon de veldnamen + een voorbeeld van één lid-record,
+    // zodat we zien onder welke key de lidmaatschapsdatum staat.
+    if (alleleden.length > 0) {
+      console.log(`🔎 [ECLUB-DIAG] lid-record keys=${JSON.stringify(Object.keys(alleleden[0]))} | voorbeeld=${JSON.stringify(alleleden[0]).slice(0, 600)}`);
+    }
+
     if (alleleden.length === 0) {
       return { success: true, matched: 0, updated: 0, total: 0 };
     }
