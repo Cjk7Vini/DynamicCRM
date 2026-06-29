@@ -577,6 +577,14 @@ function toggleNazorg() {
   document.getElementById('nazorgLicenseType').disabled = !nazorgOn;
 }
 
+let calculatorOn = false;
+function toggleCalculator() {
+  calculatorOn = !calculatorOn;
+  document.getElementById('calculatorToggle').classList.toggle('on', calculatorOn);
+  document.getElementById('calculatorDot').className = 'lic-dot ' + (calculatorOn ? 'on' : 'off');
+  document.getElementById('calculatorLabel').style.color = calculatorOn ? 'var(--text-1)' : 'var(--text-3)';
+}
+
 function showAlert(id, type, msg) {
   document.getElementById(id).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
 }
