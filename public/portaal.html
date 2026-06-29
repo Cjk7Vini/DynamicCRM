@@ -1092,24 +1092,25 @@
         let mwChart = null;
         const DOEL = 85;
 
-        function mwUitleg(m) {
-          if (m.productiviteit > 105) {
-            return `Boven capaciteit: ${(m.productiviteit - 100).toFixed(1)}% overbelast (belasting ${m.belasting} / capaciteit ${m.capaciteit}).`;
-          }
-          if (m.productiviteit >= DOEL) {
-            return `Op of boven de doelstelling van ${DOEL}% (belasting ${m.belasting} / capaciteit ${m.capaciteit}).`;
-          }
-          const gat = (DOEL - m.productiviteit).toFixed(1);
-          return `${gat}% onder de doelstelling van ${DOEL}%. Behandelbelasting (${m.belasting}) te laag t.o.v. de capaciteit (${m.capaciteit}).`;
-        }
+        // Benuttingszones: status + kleur + betekenis op basis van het percentage
+        const ZONES = [
+          { max: 40,       status: 'Zeer lage benutting', kleur: '#D32F2F', betekenis: 'Capaciteit wordt onvoldoende benut. Er is direct aandacht nodig voor instroom, marketing of conversie.' },
+          { max: 60,       status: 'Lage benutting',      kleur: '#F57C00', betekenis: 'Er is nog veel ruimte beschikbaar. Focus op ledenwerving en betere opvolging van leads.' },
+          { max: 80,       status: 'Stabiele benutting',  kleur: '#FBC02D', betekenis: 'De bezetting ontwikkelt zich positief, maar er is nog voldoende ruimte om verder te groeien.' },
+          { max: 85,       status: 'Gezonde groei',       kleur: '#388E3C', betekenis: 'De locatie zit in een sterke groeifase. De capaciteit wordt goed benut, zonder dat de maximale grens direct wordt overschreden.' },
+          { max: Infinity, status: 'Boven capaciteit',    kleur: '#1B5E20', betekenis: 'De capaciteitsgrens is bereikt of wordt overschreden. Er moet gekeken worden naar uitbreiding van uren, extra personeel, betere spreiding of wachtlijstbeheer.' }
+        ];
+        const zoneVoor = p => ZONES.find(z => p <= z.max) || ZONES[ZONES.length - 1];
 
-        function mwKaart(m, kleur, rand, achtergrond) {
-          return `<div style="padding:10px 14px;background:${achtergrond};border-radius:10px;margin-bottom:8px;border:1px solid ${rand};">
+        function mwKaart(m) {
+          const z = zoneVoor(m.productiviteit);
+          return `<div style="padding:11px 14px;background:${z.kleur}12;border-radius:10px;margin-bottom:8px;border:1px solid ${z.kleur}55;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:13px;font-weight:600;color:#111827;">${m.naam}</span>
-              <span style="font-size:14px;font-weight:800;color:${kleur};">${m.productiviteit}%</span>
+              <span style="font-size:14px;font-weight:800;color:${z.kleur};">${m.productiviteit}%</span>
             </div>
-            <div style="font-size:12px;color:#6b7280;margin-top:4px;line-height:1.4;">${mwUitleg(m)}</div>
+            <span style="display:inline-block;margin-top:7px;font-size:11px;font-weight:700;color:#fff;background:${z.kleur};padding:2px 9px;border-radius:999px;">${z.status}</span>
+            <div style="font-size:12px;color:#4b5563;margin-top:6px;line-height:1.45;">${z.betekenis}</div>
           </div>`;
         }
 
@@ -1132,7 +1133,7 @@
                 datasets: [{
                   label: 'Bezetting %',
                   data: mws.map(m => m.productiviteit),
-                  backgroundColor: mws.map(m => bezettingKleur(m.productiviteit)),
+                  backgroundColor: mws.map(m => zoneVoor(m.productiviteit).kleur),
                   borderRadius: 6,
                   maxBarThickness: 54
                 }, {
@@ -1160,15 +1161,15 @@
 
           const cardsEl = document.getElementById('prestatieMwCards');
           if (cardsEl) {
-            // Gelijk aan de staafkleuren: 85-105% = goed, daarbuiten = aandacht
-            const goed = mws.filter(m => m.productiviteit >= DOEL && m.productiviteit <= 105);
-            const aandacht = mws.filter(m => m.productiviteit < DOEL || m.productiviteit > 105);
+            // Benuttingszones-split: >= 80% = Goed presterend, < 80% = Aandacht nodig
+            const goed = mws.filter(m => m.productiviteit >= 80);
+            const aandacht = mws.filter(m => m.productiviteit < 80);
             let c = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
             c += `<div><div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Goed presterend</div>`;
-            c += goed.length ? goed.map(m => mwKaart(m, '#16a34a', '#bbf7d0', '#f0fdf4')).join('') : `<div style="font-size:12px;color:#9ca3af;">Geen medewerkers op of boven doel deze maand.</div>`;
+            c += goed.length ? goed.map(m => mwKaart(m)).join('') : `<div style="font-size:12px;color:#9ca3af;">Geen medewerkers in deze categorie deze maand.</div>`;
             c += `</div>`;
             c += `<div><div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111827;margin-bottom:10px;">Aandacht nodig</div>`;
-            c += aandacht.length ? aandacht.map(m => mwKaart(m, '#dc2626', '#fecaca', '#fef2f2')).join('') : `<div style="font-size:12px;color:#9ca3af;">Iedereen op of boven doel deze maand.</div>`;
+            c += aandacht.length ? aandacht.map(m => mwKaart(m)).join('') : `<div style="font-size:12px;color:#9ca3af;">Geen medewerkers in deze categorie deze maand.</div>`;
             c += `</div></div>`;
             cardsEl.innerHTML = c;
           }
