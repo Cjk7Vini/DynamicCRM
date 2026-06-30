@@ -905,6 +905,161 @@ app.get('/api/dashboard-todo', async (req, res) => {
   }
 });
 
+// ==================== TICKETSYSTEEM ====================
+const TICKET_ADMIN_EMAIL = 'cruz@dynamic-health-consultancy.nl';
+const TICKET_TYPES = ['incident', 'wens', 'andere_vraag'];
+const TICKET_TYPE_LABEL = { incident: 'Incident', wens: 'Wens', andere_vraag: 'Andere vraag' };
+const TICKET_STATUSSEN = ['open', 'in_behandeling', 'opgelost', 'gesloten'];
+const ticketEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ticketMailOk = () => !!(SMTP.host && SMTP.user && SMTP.pass);
+
+// POST /api/tickets — nieuwe melding
+app.post('/api/tickets', requireAuth, async (req, res) => {
+  try {
+    const { type, categorie, prioriteit, bericht, omgeving } = req.body;
+    if (!type || !TICKET_TYPES.includes(type)) return res.status(400).json({ error: 'Ongeldig type' });
+    if (!bericht || !String(bericht).trim()) return res.status(400).json({ error: 'Bericht is verplicht' });
+
+    const praktijkCode = req.session.practiceCode || null;
+    const melderEmail = req.session.email || null;
+    const prio = (type === 'incident' && ['P1', 'P2', 'P3', 'P4'].includes(prioriteit)) ? prioriteit : null;
+    const tekst = String(bericht).trim();
+    const onderwerp = tekst.slice(0, 80);
+
+    const ticket = await withWriteConnection(async (client) => {
+      const info = praktijkCode
+        ? (await client.query('SELECT naam, email_to FROM praktijken WHERE code = $1', [praktijkCode])).rows[0] || {}
+        : {};
+      const melderNaam = info.naam || melderEmail || 'Onbekend';
+      const t = (await client.query(
+        `INSERT INTO tickets (praktijk_code, melder_naam, melder_email, omgeving, type, categorie, prioriteit, status, onderwerp)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8) RETURNING *`,
+        [praktijkCode, melderNaam, melderEmail, omgeving || null, type, categorie || null, prio, onderwerp]
+      )).rows[0];
+      await client.query(
+        `INSERT INTO ticket_berichten (ticket_id, auteur_type, auteur_naam, bericht) VALUES ($1,'praktijk',$2,$3)`,
+        [t.id, melderNaam, tekst]
+      );
+      return { ...t, praktijk_naam: info.naam };
+    });
+
+    if (ticketMailOk()) {
+      const label = TICKET_TYPE_LABEL[ticket.type];
+      const praktijk = ticket.praktijk_naam || ticket.praktijk_code || 'Onbekend';
+      sendMailResilient({
+        from: `"Dynamic Health Consultancy" <${SMTP.from}>`,
+        to: TICKET_ADMIN_EMAIL,
+        subject: `Nieuw ticket #${ticket.id}: ${label} (${praktijk})`,
+        text: `Nieuw ticket #${ticket.id}\nType: ${label}\nCategorie: ${ticket.categorie || 'n.v.t.'}\nPrioriteit: ${ticket.prioriteit || 'n.v.t.'}\nPraktijk: ${praktijk}\nMelder: ${ticket.melder_email || 'n.v.t.'}\nOmgeving: ${ticket.omgeving || 'n.v.t.'}\n\nBericht:\n${tekst}`,
+        html: `<p><strong>Nieuw ticket #${ticket.id}</strong></p><p>Type: ${label}<br>Categorie: ${ticketEsc(ticket.categorie) || 'n.v.t.'}<br>Prioriteit: ${ticket.prioriteit || 'n.v.t.'}<br>Praktijk: ${ticketEsc(praktijk)}<br>Melder: ${ticketEsc(ticket.melder_email) || 'n.v.t.'}<br>Omgeving: ${ticketEsc(ticket.omgeving) || 'n.v.t.'}</p><p><strong>Bericht:</strong><br>${ticketEsc(tekst).replace(/\n/g, '<br>')}</p>`
+      }).catch(e => console.error('Ticket mail fout:', e.message));
+    }
+
+    res.json({ success: true, id: ticket.id });
+  } catch (e) { console.error('Ticket create error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/tickets — lijst (admin: alles + filters; praktijk: alleen eigen)
+app.get('/api/tickets', requireAuth, async (req, res) => {
+  try {
+    const isAdmin = req.session.role === 'admin';
+    const { type, status, practice } = req.query;
+    const tickets = await withReadConnection(async (client) => {
+      let q = `SELECT t.*, p.naam AS praktijk_naam,
+                 (SELECT bericht FROM ticket_berichten b WHERE b.ticket_id = t.id ORDER BY b.aangemaakt_op DESC LIMIT 1) AS laatste_bericht
+               FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE 1=1`;
+      const params = []; let n = 1;
+      if (!isAdmin) { q += ` AND t.praktijk_code = $${n++}`; params.push(req.session.practiceCode); }
+      else if (practice) { q += ` AND t.praktijk_code = $${n++}`; params.push(practice); }
+      if (type) { q += ` AND t.type = $${n++}`; params.push(type); }
+      if (status) { q += ` AND t.status = $${n++}`; params.push(status); }
+      q += ` ORDER BY t.bijgewerkt_op DESC LIMIT 200`;
+      return (await client.query(q, params)).rows;
+    });
+    res.json({ success: true, tickets });
+  } catch (e) { console.error('Tickets list error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/tickets/:id — één ticket + conversatie
+app.get('/api/tickets/:id', requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = await withReadConnection(async (client) => {
+      const t = (await client.query(`SELECT t.*, p.naam AS praktijk_naam FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE t.id = $1`, [id])).rows[0];
+      if (!t) return null;
+      const berichten = (await client.query(`SELECT auteur_type, auteur_naam, bericht, aangemaakt_op FROM ticket_berichten WHERE ticket_id = $1 ORDER BY aangemaakt_op ASC`, [id])).rows;
+      return { t, berichten };
+    });
+    if (!data) return res.status(404).json({ error: 'Ticket niet gevonden' });
+    if (req.session.role !== 'admin' && data.t.praktijk_code !== req.session.practiceCode) return res.status(403).json({ error: 'Geen toegang' });
+    res.json({ success: true, ticket: data.t, berichten: data.berichten });
+  } catch (e) { console.error('Ticket get error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/tickets/:id/bericht — reactie toevoegen
+app.post('/api/tickets/:id/bericht', requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { bericht } = req.body;
+    if (!bericht || !String(bericht).trim()) return res.status(400).json({ error: 'Bericht is verplicht' });
+    const tekst = String(bericht).trim();
+    const isAdmin = req.session.role === 'admin';
+
+    const result = await withWriteConnection(async (client) => {
+      const t = (await client.query('SELECT t.*, p.naam AS praktijk_naam, p.email_to FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE t.id = $1', [id])).rows[0];
+      if (!t) return { notFound: true };
+      if (!isAdmin && t.praktijk_code !== req.session.practiceCode) return { forbidden: true };
+      const auteurType = isAdmin ? 'admin' : 'praktijk';
+      const auteurNaam = isAdmin ? 'Dynamic Health' : (t.praktijk_naam || req.session.email || 'Praktijk');
+      await client.query(`INSERT INTO ticket_berichten (ticket_id, auteur_type, auteur_naam, bericht) VALUES ($1,$2,$3,$4)`, [id, auteurType, auteurNaam, tekst]);
+      let nieuweStatus = t.status;
+      if (!isAdmin && (t.status === 'opgelost' || t.status === 'gesloten')) nieuweStatus = 'open';
+      await client.query(`UPDATE tickets SET bijgewerkt_op = NOW(), status = $2 WHERE id = $1`, [id, nieuweStatus]);
+      return { t, auteurType };
+    });
+    if (result.notFound) return res.status(404).json({ error: 'Niet gevonden' });
+    if (result.forbidden) return res.status(403).json({ error: 'Geen toegang' });
+
+    if (ticketMailOk()) {
+      const t = result.t;
+      const body = `${ticketEsc(tekst).replace(/\n/g, '<br>')}`;
+      if (result.auteurType === 'admin' && t.email_to) {
+        sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: t.email_to, subject: `Reactie op je ticket #${t.id}`, text: `Er is gereageerd op je ticket #${t.id}.\n\n${tekst}\n\nLog in om te reageren.`, html: `<p>Er is gereageerd op je ticket #${t.id}.</p><p>${body}</p>` }).catch(() => {});
+      } else if (result.auteurType === 'praktijk') {
+        sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: TICKET_ADMIN_EMAIL, subject: `Nieuwe reactie op ticket #${t.id} (${t.praktijk_naam || t.praktijk_code || 'Onbekend'})`, text: `Reactie op ticket #${t.id}:\n\n${tekst}`, html: `<p>Reactie op ticket #${t.id}:</p><p>${body}</p>` }).catch(() => {});
+      }
+    }
+    res.json({ success: true });
+  } catch (e) { console.error('Ticket bericht error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/tickets/:id — admin: status en/of prioriteit aanpassen
+app.patch('/api/tickets/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Alleen admin' });
+    const id = parseInt(req.params.id);
+    const { status, prioriteit } = req.body;
+    const result = await withWriteConnection(async (client) => {
+      const t = (await client.query('SELECT t.*, p.email_to FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE t.id = $1', [id])).rows[0];
+      if (!t) return { notFound: true };
+      const sets = ['bijgewerkt_op = NOW()']; const params = []; let n = 1;
+      if (status && TICKET_STATUSSEN.includes(status)) { sets.push(`status = $${n++}`); params.push(status); }
+      if (prioriteit && ['P1', 'P2', 'P3', 'P4'].includes(prioriteit) && t.type === 'incident') {
+        sets.push(`prioriteit = $${n++}`); params.push(prioriteit);
+        sets.push('prioriteit_vergrendeld = TRUE');
+      }
+      params.push(id);
+      const upd = (await client.query(`UPDATE tickets SET ${sets.join(', ')} WHERE id = $${n} RETURNING *`, params)).rows[0];
+      return { t, upd };
+    });
+    if (result.notFound) return res.status(404).json({ error: 'Niet gevonden' });
+    if (ticketMailOk() && result.t.email_to) {
+      sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: result.t.email_to, subject: `Update op je ticket #${id}`, text: `Je ticket #${id} is bijgewerkt. Status: ${result.upd.status}${result.upd.prioriteit ? `, prioriteit: ${result.upd.prioriteit}` : ''}.`, html: `<p>Je ticket #${id} is bijgewerkt.</p><p>Status: <strong>${ticketEsc(result.upd.status)}</strong>${result.upd.prioriteit ? `<br>Prioriteit: <strong>${result.upd.prioriteit}</strong>` : ''}</p>` }).catch(() => {});
+    }
+    res.json({ success: true });
+  } catch (e) { console.error('Ticket patch error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/nazorg-leden — nazorg-patiënten + eClub-lidstatus (alleen eClub-praktijken)
 app.get('/api/nazorg-leden', async (req, res) => {
   try {

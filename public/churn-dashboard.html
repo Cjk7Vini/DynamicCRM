@@ -1026,6 +1026,12 @@
             </div>
         </div>
 
+        <div class="sidebar-section-label" style="margin-top:8px;">Support</div>
+        <div class="sidebar-item" onclick="showDashboardSection('tickets', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            Tickets
+        </div>
+
         <div id="sidebarAlleLocaties" style="display:none;">
             <div class="sidebar-section-label" style="margin-top:8px;">Organisatie</div>
             <div class="sidebar-item" onclick="showDashboardSection('allelocaties', this)">
@@ -2057,6 +2063,42 @@
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="dash-section" id="dash-tickets">
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title">Tickets</div>
+            <div style="display:flex;gap:8px;">
+                <select id="ticketFilterType" onchange="loadTickets()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;">
+                    <option value="">Alle types</option><option value="incident">Incident</option><option value="wens">Wens</option><option value="andere_vraag">Andere vraag</option>
+                </select>
+                <select id="ticketFilterStatus" onchange="loadTickets()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;">
+                    <option value="">Alle statussen</option><option value="open">Open</option><option value="in_behandeling">In behandeling</option><option value="opgelost">Opgelost</option><option value="gesloten">Gesloten</option>
+                </select>
+            </div>
+        </div>
+        <table class="table">
+            <thead><tr><th>#</th><th>Praktijk</th><th>Type</th><th>Categorie</th><th>Prioriteit</th><th>Status</th><th>Bijgewerkt</th></tr></thead>
+            <tbody id="ticketsBody"><tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Laden...</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="ticketModalOverlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.2);">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div><div id="ticketDetailTitle" style="font-size:16px;font-weight:700;">Ticket</div><div id="ticketDetailSub" style="font-size:12px;color:var(--text-3);margin-top:2px;"></div></div>
+      <button onclick="sluitTicket()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+    </div>
+    <div id="ticketDetailMeta" style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;"></div>
+    <div id="ticketDetailThread" style="padding:18px 22px;"></div>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);">
+      <textarea id="ticketReply" placeholder="Typ je reactie..." style="width:100%;box-sizing:border-box;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;min-height:70px;resize:vertical;"></textarea>
+      <button class="btn btn-primary" onclick="verstuurTicketReactie()" style="margin-top:10px;">Reactie versturen</button>
+      <span id="ticketReplyMsg" style="font-size:12px;margin-left:10px;"></span>
+    </div>
+  </div>
 </div>
 
 </main>
@@ -4027,7 +4069,7 @@
                 else el.classList.add('active-sub');
             }
 
-            const titles = { dashboard: 'Analytics', belpogingen: 'Belpogingen', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
+            const titles = { dashboard: 'Analytics', belpogingen: 'Belpogingen', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', tickets: 'Tickets', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
@@ -4036,8 +4078,103 @@
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
             if (name === 'seizoen') { loadSeizoenData(); }
             if (name === 'kwaliteit') { loadLeadKwaliteit(); }
+            if (name === 'tickets') { loadTickets(); }
             if (name === 'instellingen') { loadInstellingen(); }
             if (name === 'allelocaties') { loadAlleLocaties(); }
+        }
+
+        // ── TICKETS ───────────────────────────────────────────────────
+        let _ticketId = null;
+        const TICKET_TYPE_LBL = { incident: 'Incident', wens: 'Wens', andere_vraag: 'Andere vraag' };
+        const TICKET_STATUS_LBL = { open: 'Open', in_behandeling: 'In behandeling', opgelost: 'Opgelost', gesloten: 'Gesloten' };
+
+        async function loadTickets() {
+            try {
+                const type = document.getElementById('ticketFilterType') ? document.getElementById('ticketFilterType').value : '';
+                const status = document.getElementById('ticketFilterStatus') ? document.getElementById('ticketFilterStatus').value : '';
+                const qs = new URLSearchParams();
+                if (type) qs.append('type', type);
+                if (status) qs.append('status', status);
+                const res = await fetch('/api/tickets' + (qs.toString() ? '?' + qs.toString() : ''), { credentials: 'include' });
+                const data = await res.json();
+                const body = document.getElementById('ticketsBody');
+                if (!body) return;
+                if (!data.success || !data.tickets || !data.tickets.length) {
+                    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;">Geen tickets.</td></tr>';
+                    return;
+                }
+                body.innerHTML = data.tickets.map(t => {
+                    const prio = t.prioriteit ? `<span style="font-size:12px;font-weight:700;background:#333399;color:#fff;padding:2px 9px;border-radius:999px;">${t.prioriteit}</span>` : '<span style="color:var(--text-3);">n.v.t.</span>';
+                    const datum = t.bijgewerkt_op ? new Date(t.bijgewerkt_op).toLocaleString('nl-NL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+                    return `<tr style="cursor:pointer;" onclick="openTicket(${t.id})">
+                        <td style="font-weight:700;color:#333399;">#${t.id}</td>
+                        <td>${escHtml(t.praktijk_naam || t.praktijk_code || '-')}</td>
+                        <td>${TICKET_TYPE_LBL[t.type] || t.type}</td>
+                        <td>${escHtml(t.categorie || '-')}</td>
+                        <td>${prio}</td>
+                        <td>${TICKET_STATUS_LBL[t.status] || t.status}</td>
+                        <td style="color:var(--text-3);font-size:12px;">${datum}</td>
+                    </tr>`;
+                }).join('');
+            } catch (e) { console.error('Tickets laden:', e); }
+        }
+
+        async function openTicket(id) {
+            _ticketId = id;
+            const isAdmin = currentUser && currentUser.role === 'admin';
+            try {
+                const res = await fetch('/api/tickets/' + id, { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) return;
+                const t = data.ticket;
+                document.getElementById('ticketDetailTitle').textContent = `#${t.id}${t.onderwerp ? ' · ' + t.onderwerp : ''}`;
+                document.getElementById('ticketDetailSub').textContent = `${t.praktijk_naam || t.praktijk_code || ''} · gemeld door ${t.melder_email || 'onbekend'} · ${t.omgeving || ''}`;
+                let meta = `<span><strong>Type:</strong> ${TICKET_TYPE_LBL[t.type] || t.type}</span><span><strong>Categorie:</strong> ${escHtml(t.categorie || '-')}</span>`;
+                if (isAdmin) {
+                    if (t.type === 'incident') {
+                        meta += `<span><strong>Prioriteit:</strong> <select onchange="wijzigTicket('prioriteit', this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;"><option value="">kies</option>${['P1', 'P2', 'P3', 'P4'].map(p => `<option ${t.prioriteit === p ? 'selected' : ''}>${p}</option>`).join('')}</select></span>`;
+                    }
+                    meta += `<span><strong>Status:</strong> <select onchange="wijzigTicket('status', this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;">${Object.keys(TICKET_STATUS_LBL).map(s => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${TICKET_STATUS_LBL[s]}</option>`).join('')}</select></span>`;
+                } else {
+                    meta += `<span><strong>Status:</strong> ${TICKET_STATUS_LBL[t.status] || t.status}</span>`;
+                }
+                document.getElementById('ticketDetailMeta').innerHTML = meta;
+                document.getElementById('ticketDetailThread').innerHTML = (data.berichten || []).map(b => {
+                    const isAdm = b.auteur_type === 'admin';
+                    const tijd = b.aangemaakt_op ? new Date(b.aangemaakt_op).toLocaleString('nl-NL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+                    return `<div style="margin-bottom:12px;text-align:${isAdm ? 'right' : 'left'};">
+                        <div style="font-size:11px;color:var(--text-3);margin-bottom:3px;">${escHtml(b.auteur_naam || '')} · ${tijd}</div>
+                        <div style="display:inline-block;max-width:80%;text-align:left;padding:9px 13px;border-radius:12px;font-size:14px;line-height:1.45;background:${isAdm ? '#333399' : '#f3f4f6'};color:${isAdm ? '#fff' : '#1d1d1f'};">${escHtml(b.bericht).replace(/\n/g, '<br>')}</div>
+                    </div>`;
+                }).join('');
+                document.getElementById('ticketReply').value = '';
+                document.getElementById('ticketReplyMsg').textContent = '';
+                document.getElementById('ticketModalOverlay').style.display = 'flex';
+            } catch (e) { console.error('Ticket openen:', e); }
+        }
+
+        function sluitTicket() { document.getElementById('ticketModalOverlay').style.display = 'none'; }
+
+        async function verstuurTicketReactie() {
+            const txt = (document.getElementById('ticketReply').value || '').trim();
+            const msg = document.getElementById('ticketReplyMsg');
+            if (!txt) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een bericht in.'; return; }
+            try {
+                const res = await fetch(`/api/tickets/${_ticketId}/bericht`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bericht: txt }) });
+                const d = await res.json();
+                if (d.success) { openTicket(_ticketId); loadTickets(); }
+                else { msg.style.color = '#dc2626'; msg.textContent = d.error || 'Mislukt.'; }
+            } catch (e) { msg.style.color = '#dc2626'; msg.textContent = 'Netwerkfout.'; }
+        }
+
+        async function wijzigTicket(veld, waarde) {
+            if (!waarde) return;
+            try {
+                const bodyObj = {}; bodyObj[veld] = waarde;
+                const res = await fetch(`/api/tickets/${_ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(bodyObj) });
+                const d = await res.json();
+                if (d.success) loadTickets();
+            } catch (e) { console.error('Ticket wijzigen:', e); }
         }
 
         // ── AFSPRAKEN ─────────────────────────────────────────────────
@@ -5522,5 +5659,6 @@
         }
 
     </script>
+    <script src="/js/report-widget.js"></script>
 </body>
 </html>
