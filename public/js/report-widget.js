@@ -143,19 +143,24 @@
   }
 
   function init() {
+    // Modal-styling en de open-functie meteen beschikbaar maken, zodat
+    // menu-items (openReportModal) altijd werken, ook vóór de auth-check.
+    injectStyles();
+    window.openReportModal = openModal;
+
+    // De zwevende knop alleen tonen voor ingelogde gebruikers.
     fetch('/api/auth/me', { credentials: 'include' })
       .then(function (r) { if (!r.ok) throw new Error('niet ingelogd'); return r.json(); })
       .then(function () {
-        injectStyles();
+        if (document.getElementById('rw-btn')) return;
         var btn = document.createElement('button');
         btn.id = 'rw-btn';
         btn.type = 'button';
         btn.textContent = 'Iets melden';
         btn.addEventListener('click', openModal);
         document.body.appendChild(btn);
-        window.openReportModal = openModal;
       })
-      .catch(function () { /* niet ingelogd: geen widget */ });
+      .catch(function () { /* niet ingelogd: geen zwevende knop */ });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
