@@ -1023,8 +1023,9 @@ app.post('/api/tickets/:id/bericht', requireAuth, async (req, res) => {
     if (ticketMailOk()) {
       const t = result.t;
       const body = `${ticketEsc(tekst).replace(/\n/g, '<br>')}`;
-      if (result.auteurType === 'admin' && t.email_to) {
-        sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: t.email_to, subject: `Reactie op je ticket #${t.id}`, text: `Er is gereageerd op je ticket #${t.id}.\n\n${tekst}\n\nLog in om te reageren.`, html: `<p>Er is gereageerd op je ticket #${t.id}.</p><p>${body}</p>` }).catch(() => {});
+      const ontvanger = t.melder_email || t.email_to; // melder die de ticket aanmaakte, anders praktijk-adres
+      if (result.auteurType === 'admin' && ontvanger) {
+        sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: ontvanger, subject: `Reactie op je ticket #${t.id}`, text: `Er is gereageerd op je ticket #${t.id}.\n\n${tekst}\n\nLog in om te reageren.`, html: `<p>Er is gereageerd op je ticket #${t.id}.</p><p>${body}</p>` }).catch(() => {});
       } else if (result.auteurType === 'praktijk') {
         sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: TICKET_ADMIN_EMAIL, subject: `Nieuwe reactie op ticket #${t.id} (${t.praktijk_naam || t.praktijk_code || 'Onbekend'})`, text: `Reactie op ticket #${t.id}:\n\n${tekst}`, html: `<p>Reactie op ticket #${t.id}:</p><p>${body}</p>` }).catch(() => {});
       }
@@ -1053,8 +1054,9 @@ app.patch('/api/tickets/:id', requireAuth, async (req, res) => {
       return { t, upd };
     });
     if (result.notFound) return res.status(404).json({ error: 'Niet gevonden' });
-    if (ticketMailOk() && result.t.email_to) {
-      sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: result.t.email_to, subject: `Update op je ticket #${id}`, text: `Je ticket #${id} is bijgewerkt. Status: ${result.upd.status}${result.upd.prioriteit ? `, prioriteit: ${result.upd.prioriteit}` : ''}.`, html: `<p>Je ticket #${id} is bijgewerkt.</p><p>Status: <strong>${ticketEsc(result.upd.status)}</strong>${result.upd.prioriteit ? `<br>Prioriteit: <strong>${result.upd.prioriteit}</strong>` : ''}</p>` }).catch(() => {});
+    const patchOntvanger = result.t.melder_email || result.t.email_to;
+    if (ticketMailOk() && patchOntvanger) {
+      sendMailResilient({ from: `"Dynamic Health Consultancy" <${SMTP.from}>`, to: patchOntvanger, subject: `Update op je ticket #${id}`, text: `Je ticket #${id} is bijgewerkt. Status: ${result.upd.status}${result.upd.prioriteit ? `, prioriteit: ${result.upd.prioriteit}` : ''}.`, html: `<p>Je ticket #${id} is bijgewerkt.</p><p>Status: <strong>${ticketEsc(result.upd.status)}</strong>${result.upd.prioriteit ? `<br>Prioriteit: <strong>${result.upd.prioriteit}</strong>` : ''}</p>` }).catch(() => {});
     }
     res.json({ success: true });
   } catch (e) { console.error('Ticket patch error:', e.message); res.status(500).json({ error: e.message }); }
