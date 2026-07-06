@@ -1642,12 +1642,16 @@
             </div>
             <div class="appt-filters">
                 <select class="appt-filter-select" id="apptUitkomstFilter" onchange="filterAfspraken()">
-                    <option value="">Alle uitkomsten</option>
+                    <option value="">Openstaand</option>
                     <option value="won">Lid geworden</option>
                     <option value="followup">Bedenktijd</option>
                     <option value="lost">Geen interesse</option>
                     <option value="open">Open</option>
                 </select>
+                <button class="btn btn-ghost" onclick="openNieuweLead()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                    Nieuwe lead
+                </button>
                 <button class="btn btn-primary" onclick="openApptModal(null)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Afspraak inplannen
@@ -2108,6 +2112,36 @@
 </main>
 
 <!-- ── AFSPRAAK MODAL ─────────────────────────────────────────────── -->
+<div id="nieuweLeadOverlay" style="display:none;position:fixed;inset:0;z-index:650;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);">
+      <div style="font-size:17px;font-weight:700;">Nieuwe lead handmatig invoeren</div>
+      <button onclick="sluitNieuweLead()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:22px 24px;">
+      <div style="margin-bottom:16px;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Volledige naam *</label><input type="text" id="nlNaam" placeholder="Voor- en achternaam" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">E-mail *</label><input type="email" id="nlEmail" placeholder="naam@voorbeeld.nl" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Telefoon *</label><input type="text" id="nlTel" placeholder="0612345678" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Bron</label><select id="nlBron" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option>Walk-in</option><option>Anders</option></select></div>
+        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Doel (optioneel)</label><input type="text" id="nlDoel" placeholder="bv. afvallen" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin:6px 0 12px;cursor:pointer;"><input type="checkbox" id="nlAfspraakToggle" checked onchange="document.getElementById('nlAfspraakBox').style.display=this.checked?'block':'none';"> Meteen een afspraak inplannen</label>
+      <div id="nlAfspraakBox" style="background:#f8f9fb;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Datum</label><input type="date" id="nlDatum" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+          <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Tijd</label><input type="time" id="nlTijd" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+        </div>
+        <div style="margin-top:12px;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Type</label><select id="nlType" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option value="rondleiding">Rondleiding</option><option value="vitaliteitscheck">Intake/Check-up</option></select></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:13px;font-size:15px;" onclick="verstuurNieuweLead()">Lead opslaan</button>
+      <div id="nlMsg" style="font-size:13px;text-align:center;margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
 <div class="appt-modal-overlay" id="apptModalOverlay">
     <div class="appt-modal-box">
         <div class="appt-modal-header">
@@ -4224,6 +4258,10 @@
             if (uitkomst) {
                 const map = { won: 'won', lost: 'lost', open: 'intent', followup: 'intent' };
                 filtered = leads.filter(l => l.funnel_stage === (map[uitkomst] || uitkomst));
+            } else {
+                // Standaard: verberg afgehandelde afspraken (lid geworden / geen interesse);
+                // die blijven vindbaar via het filter en in de pipeline-balkjes.
+                filtered = leads.filter(l => l.funnel_stage !== 'won' && l.funnel_stage !== 'lost');
             }
             if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:24px;">Geen afspraken gevonden</td></tr>'; return; }
             const uitkomstMap = { won: ['Lid geworden','badge-green'], intent: ['Open','badge-gray'], lost: ['Geen interesse','badge-red'] };
@@ -4248,6 +4286,51 @@
         }
 
         function filterAfspraken() { renderApptTable(apptData); }
+
+        // ── HANDMATIGE LEAD (walk-in) ─────────────────────────────────
+        function openNieuweLead() {
+            ['nlNaam', 'nlEmail', 'nlTel', 'nlDoel', 'nlDatum', 'nlTijd'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            document.getElementById('nlBron').value = 'Walk-in';
+            document.getElementById('nlAfspraakToggle').checked = true;
+            document.getElementById('nlAfspraakBox').style.display = 'block';
+            document.getElementById('nlMsg').textContent = '';
+            document.getElementById('nieuweLeadOverlay').style.display = 'flex';
+        }
+        function sluitNieuweLead() { document.getElementById('nieuweLeadOverlay').style.display = 'none'; }
+
+        async function verstuurNieuweLead() {
+            const msg = document.getElementById('nlMsg');
+            const naam = document.getElementById('nlNaam').value.trim();
+            const email = document.getElementById('nlEmail').value.trim();
+            const tel = document.getElementById('nlTel').value.trim();
+            const bron = document.getElementById('nlBron').value;
+            const doel = document.getElementById('nlDoel').value.trim();
+            const metAfspraak = document.getElementById('nlAfspraakToggle').checked;
+            if (naam.length < 2) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een naam in.'; return; }
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig e-mailadres in.'; return; }
+            if (!/^[0-9]{10,}$/.test(tel.replace(/\s/g, ''))) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig telefoonnummer in (min. 10 cijfers).'; return; }
+            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, praktijk_code: getPracticeCode() };
+            if (metAfspraak) {
+                const date = document.getElementById('nlDatum').value;
+                const time = document.getElementById('nlTijd').value;
+                if (!date || !time) { msg.style.color = '#dc2626'; msg.textContent = 'Vul datum en tijd in, of vink de afspraak uit.'; return; }
+                payload.afspraak = { date, time, type: document.getElementById('nlType').value };
+            }
+            msg.style.color = 'var(--text-3)'; msg.textContent = 'Opslaan...';
+            try {
+                const res = await fetch('/api/leads/handmatig', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
+                const d = await res.json();
+                if (res.ok && d.success) {
+                    msg.style.color = '#16a34a'; msg.textContent = 'Lead opgeslagen (#' + d.id + ').';
+                    setTimeout(() => {
+                        sluitNieuweLead();
+                        loadAfspraken();
+                        if (typeof loadKPIs === 'function') loadKPIs();
+                        if (typeof loadPipelineFunnel === 'function') loadPipelineFunnel();
+                    }, 1000);
+                } else { msg.style.color = '#dc2626'; msg.textContent = d.error || 'Opslaan mislukt.'; }
+            } catch (e) { msg.style.color = '#dc2626'; msg.textContent = 'Netwerkfout.'; }
+        }
 
         async function loadLeadsZonderAfspraak() {
             const pc = getActivePracticeCode();

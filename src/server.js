@@ -1096,6 +1096,63 @@ app.get('/api/nazorg-leden', async (req, res) => {
   }
 });
 
+// POST /api/leads/handmatig, handmatige lead-invoer (walk-in) vanuit dashboard.
+// Geen online-workflow: verstuurt geen nieuwe-lead-notificatie of Meta-events.
+app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
+  try {
+    const { volledige_naam, emailadres, telefoon, bron, doel, afspraak } = req.body;
+
+    let praktijkCode;
+    if (req.session.role === 'admin') {
+      praktijkCode = (req.body.praktijk_code || '').trim();
+      if (!praktijkCode) return res.status(400).json({ error: 'Selecteer eerst een praktijk' });
+    } else {
+      praktijkCode = req.session.practiceCode;
+      if (!praktijkCode) return res.status(400).json({ error: 'Geen praktijk aan dit account gekoppeld' });
+    }
+
+    const naam = (volledige_naam || '').trim();
+    const email = (emailadres || '').trim();
+    const tel = (telefoon || '').replace(/\s/g, '');
+    if (naam.length < 2) return res.status(400).json({ error: 'Naam is verplicht' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Geldig e-mailadres is verplicht' });
+    if (!/^[0-9]{10,}$/.test(tel)) return res.status(400).json({ error: 'Geldig telefoonnummer is verplicht (min. 10 cijfers)' });
+
+    const heeftAfspraak = afspraak && afspraak.date && afspraak.time;
+
+    const inserted = await withWriteConnection(async (client) => {
+      if (heeftAfspraak) {
+        return (await client.query(
+          `INSERT INTO public.leads
+             (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage,
+              appointment_date, appointment_time, appointment_datetime, status)
+           VALUES ($1,$2,$3,$4,$5,TRUE,$6,'intent',$7,$8,
+              timezone('Europe/Amsterdam', ($7::date + $8::time)::timestamp), 'Afspraak Gepland')
+           RETURNING id`,
+          [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode, afspraak.date, afspraak.time]
+        )).rows[0];
+      }
+      return (await client.query(
+        `INSERT INTO public.leads
+           (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage)
+         VALUES ($1,$2,$3,$4,$5,TRUE,$6,'awareness')
+         RETURNING id`,
+        [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode]
+      )).rows[0];
+    });
+
+    recordEvent({
+      lead_id: inserted.id,
+      practice_code: praktijkCode,
+      event_type: 'lead_submitted',
+      actor: 'manual',
+      metadata: { bron: bron || 'Walk-in', handmatig: true, afspraak: heeftAfspraak ? afspraak : null }
+    }).catch(e => console.warn('recordEvent (handmatig) failed:', e?.message));
+
+    res.json({ success: true, id: inserted.id });
+  } catch (e) { console.error('Handmatige lead error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/afspraken — alle leads met afspraak voor dashboard afspraken sectie
 app.get('/api/afspraken', async (req, res) => {
   try {
