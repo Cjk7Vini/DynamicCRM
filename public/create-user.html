@@ -978,6 +978,7 @@ function openUserModal(id) {
       <div class="modal-info-item"><div class="modal-info-label">Praktijkcode</div><div class="modal-info-value">${u.practice_code || u.organisation_codes || '—'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Dashboard</div><div class="modal-info-value">${u.license_type ? licenseLabel(u.license_type) + (u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : '') : '—'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Nazorg</div><div class="modal-info-value">${u.nazorg_enabled ? (u.nazorg_license_type === 'unlimited' ? 'Onbeperkt' : 'Actief') : 'Niet actief'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Laatst ingelogd</div><div class="modal-info-value">${u.last_login_at ? new Date(u.last_login_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Nog nooit'}</div></div>
     </div>
   </div>`;
 

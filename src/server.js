@@ -3596,7 +3596,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { search } = req.query;
     const users = await withReadConnection(async (client) => {
-      let q = `SELECT u.id, u.email, u.role, u.role_label, u.practice_code, u.created_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date, u.licenties,
+      let q = `SELECT u.id, u.email, u.role, u.role_label, u.practice_code, u.created_at, u.last_login_at, u.banned, u.organisation_codes, u.org_license_type, u.org_license_end_date, u.licenties,
                p.naam as praktijk_naam, p.license_type, p.license_start_date,
                p.license_end_date, p.actief as license_active,
                p.nazorg_enabled, p.nazorg_license_type, p.nazorg_license_end_date,
