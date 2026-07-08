@@ -498,6 +498,22 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function formatDateTime(d) {
+  if (!d) return 'Onbekend';
+  return new Date(d).toLocaleString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function sessieDuur(login, seen) {
+  if (!login || !seen) return 'Onbekend';
+  const ms = new Date(seen) - new Date(login);
+  if (ms < 0) return 'Onbekend';
+  const min = Math.round(ms / 60000);
+  if (min < 1) return 'Korter dan 1 minuut';
+  if (min < 60) return min + ' min';
+  const uur = Math.floor(min / 60), m = min % 60;
+  return uur + ' uur' + (m ? ' ' + m + ' min' : '');
+}
+
 function daysLeft(dateStr) {
   if (!dateStr) return null;
   return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
@@ -978,7 +994,10 @@ function openUserModal(id) {
       <div class="modal-info-item"><div class="modal-info-label">Praktijkcode</div><div class="modal-info-value">${u.practice_code || u.organisation_codes || '—'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Dashboard</div><div class="modal-info-value">${u.license_type ? licenseLabel(u.license_type) + (u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : '') : '—'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Nazorg</div><div class="modal-info-value">${u.nazorg_enabled ? (u.nazorg_license_type === 'unlimited' ? 'Onbeperkt' : 'Actief') : 'Niet actief'}</div></div>
-      <div class="modal-info-item"><div class="modal-info-label">Laatst ingelogd</div><div class="modal-info-value">${u.last_login_at ? new Date(u.last_login_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Nog nooit'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Laatst ingelogd</div><div class="modal-info-value">${u.last_login_at ? formatDateTime(u.last_login_at) : 'Nog nooit'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Laatst actief</div><div class="modal-info-value">${u.last_seen_at ? formatDateTime(u.last_seen_at) : 'Onbekend'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Status</div><div class="modal-info-value">${u.online ? '<span style="color:#16a34a;font-weight:700;">Nu online</span>' : 'Offline'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Laatste sessie</div><div class="modal-info-value">${sessieDuur(u.last_login_at, u.last_seen_at)}</div></div>
     </div>
   </div>`;
 
