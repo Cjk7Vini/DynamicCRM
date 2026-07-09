@@ -1247,7 +1247,7 @@
     </div>
 
     <!-- Charts row -->
-    <div class="charts-row">
+    <div class="charts-row admin-hide-when-all">
         <div class="card">
             <div class="card-header">
                 <div>
@@ -1276,7 +1276,7 @@
     </div>
 
     <!-- Sales pipeline + forecast row -->
-    <div class="charts-row">
+    <div class="charts-row admin-hide-when-all">
         <div class="card">
             <div class="card-header">
                 <div class="card-title">Sales pipeline</div>
@@ -1318,7 +1318,7 @@
 
     <!-- Practice performance + hot leads -->
     <div class="charts-row" style="align-items:start;">
-        <div class="card" id="performanceCard">
+        <div class="card admin-hide-when-all" id="performanceCard">
             <!-- Admin view -->
             <div id="adminPerformanceView">
                 <div class="card-header">
@@ -3159,6 +3159,11 @@
             const eclubCard = document.getElementById('eclubCard');
             if (overzicht) overzicht.style.display = adminAll ? 'block' : 'none';
             if (eclubCard) eclubCard.style.display = adminAll ? 'none' : '';
+            // Aggregaat-analytics (ledengroei, bronnen, pipeline, verwacht, prestaties)
+            // verbergen bij admin + Alle praktijken; die zijn per praktijk te bekijken.
+            document.querySelectorAll('.admin-hide-when-all').forEach(el => {
+                el.style.display = adminAll ? 'none' : '';
+            });
             if (adminAll) loadAdminOverzicht();
         }
 
