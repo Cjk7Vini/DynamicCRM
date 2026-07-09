@@ -1310,6 +1310,12 @@
         </div>
     </div>
 
+    <!-- Admin netwerk-overzicht (alleen admin + Alle praktijken) -->
+    <div id="adminPraktijkOverzicht" style="display:none;margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:700;margin:0 0 12px;">Praktijken</div>
+        <div id="adminPraktijkGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+    </div>
+
     <!-- Practice performance + hot leads -->
     <div class="charts-row" style="align-items:start;">
         <div class="card" id="performanceCard">
@@ -2613,6 +2619,7 @@
             await loadDashboardTodo();
             await loadMetaMarketing();
             await loadEclubData();
+            updateAdminHomeMode();
         }
 
         // Load practices for dropdown
@@ -3139,6 +3146,61 @@
             loadDashboardTodo();
             loadMetaMarketing();
             loadEclubData();
+            updateAdminHomeMode();
+        }
+
+        // Admin netwerk-overzicht: kaart-grid tonen bij admin + Alle praktijken, eClub-kaart dan verbergen
+        function updateAdminHomeMode() {
+            const isAdmin = currentUser && currentUser.role === 'admin';
+            const pf = document.getElementById('practiceFilter');
+            const praktijkGekozen = pf && pf.value;
+            const adminAll = isAdmin && !praktijkGekozen;
+            const overzicht = document.getElementById('adminPraktijkOverzicht');
+            const eclubCard = document.getElementById('eclubCard');
+            if (overzicht) overzicht.style.display = adminAll ? 'block' : 'none';
+            if (eclubCard) eclubCard.style.display = adminAll ? 'none' : '';
+            if (adminAll) loadAdminOverzicht();
+        }
+
+        async function loadAdminOverzicht() {
+            try {
+                const res = await fetch('/api/admin/praktijk-overzicht', { credentials: 'include' });
+                const data = await res.json();
+                const grid = document.getElementById('adminPraktijkGrid');
+                if (!grid) return;
+                if (!data.success || !data.praktijken || !data.praktijken.length) {
+                    grid.innerHTML = '<div style="color:var(--text-3);font-size:13px;">Geen praktijken.</div>';
+                    return;
+                }
+                grid.innerHTML = data.praktijken.map(p => {
+                    const border = p.status === 'aandacht' ? '#dc2626' : '#16a34a';
+                    const pill = p.status === 'aandacht'
+                        ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#dc2626;">Aandacht</span>'
+                        : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#16a34a;">Gezond</span>';
+                    const convCls = (p.conversie < 20 && p.leads_totaal >= 5) ? 'color:#c2410c;' : 'color:#16a34a;';
+                    const leden = p.actieve_leden != null ? p.actieve_leden : '&mdash;';
+                    const ledenTag = p.has_eclub ? ' <span style="font-size:9px;font-weight:700;color:#0891b2;background:#cffafe;padding:1px 5px;border-radius:4px;">eClub</span>' : '';
+                    const flags = p.flags && p.flags.length ? `<div style="margin-top:11px;font-size:12px;font-weight:600;color:#dc2626;">${escHtml(p.flags.join(' · '))}</div>` : '';
+                    return `<div onclick="openPraktijk('${p.code}')" style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.05);border-left:4px solid ${border};cursor:pointer;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:15px;font-weight:700;">${escHtml(p.naam || p.code)}</span>${pill}</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;">
+                            <div style="background:#f8f9fb;border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;">Leads/mnd</div><div style="font-size:15px;font-weight:800;">${p.leads_maand}</div></div>
+                            <div style="background:#f8f9fb;border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;">Conversie</div><div style="font-size:15px;font-weight:800;${convCls}">${p.conversie}%</div></div>
+                            <div style="background:#f8f9fb;border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;">Leden${ledenTag}</div><div style="font-size:15px;font-weight:800;">${leden}</div></div>
+                        </div>
+                        ${flags}
+                    </div>`;
+                }).join('');
+            } catch (e) { console.error('Admin-overzicht error:', e); }
+        }
+
+        function openPraktijk(code) {
+            const pf = document.getElementById('practiceFilter');
+            if (pf) {
+                pf.value = code;
+                if (typeof onPracticeFilterChange === 'function') onPracticeFilterChange();
+                else applyFilters();
+            }
         }
 
         // Refresh all data
@@ -3346,10 +3408,12 @@
                     if (!c) return '';
                     const naam = escHtml(t.volledige_naam) || ('Lead #' + t.id);
                     const args = `${t.id}, '${(t.volledige_naam || '').replace(/'/g, "\\'")}', '${t.emailadres || ''}', '${t.telefoon || ''}'`;
+                    const praktijkRegel = (currentUser && currentUser.role === 'admin' && t.praktijk_naam)
+                        ? `<div style="font-size:11px;color:#2563eb;font-weight:600;margin-top:1px;">${escHtml(t.praktijk_naam)}</div>` : '';
                     return `<div onclick="todoActie('${t.type}', ${args})" style="display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);cursor:pointer;">
                         <div style="width:9px;height:9px;border-radius:50%;background:${c.dot};flex-shrink:0;"></div>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:13px;font-weight:600;color:var(--text-1);">${naam}</div>
+                            <div style="font-size:13px;font-weight:600;color:var(--text-1);">${naam}</div>${praktijkRegel}
                             <div style="font-size:11px;color:var(--text-3);margin-top:1px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:${c.tagBg};color:${c.tagFg};margin-right:6px;">${c.tag}</span>${c.sub(t.dagen)}</div>
                         </div>
                         <button class="btn btn-primary" style="padding:5px 10px;font-size:11px;background:${c.btnBg};border:none;white-space:nowrap;" onclick="event.stopPropagation();todoActie('${t.type}', ${args})">${c.btn}</button>

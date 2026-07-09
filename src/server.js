@@ -833,7 +833,8 @@ app.get('/api/dashboard-todo', async (req, res) => {
       // A. Geen afspraak: awareness, geen afspraak, minimaal 3 dagen oud
       const qA = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
-               FLOOR(EXTRACT(EPOCH FROM (NOW() - l.aangemaakt_op)) / 86400)::int AS dagen
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - l.aangemaakt_op)) / 86400)::int AS dagen,
+               (SELECT naam FROM praktijken WHERE code = l.praktijk_code) AS praktijk_naam
         FROM public.leads l
         WHERE l.funnel_stage = 'awareness'
           AND l.appointment_datetime IS NULL
@@ -847,7 +848,8 @@ app.get('/api/dashboard-todo', async (req, res) => {
       const qB = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
                FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(l.appointment_datetime,
-                 (l.appointment_date::date + COALESCE(l.appointment_time, '09:00')::time)))) / 86400)::int AS dagen
+                 (l.appointment_date::date + COALESCE(l.appointment_time, '09:00')::time)))) / 86400)::int AS dagen,
+               (SELECT naam FROM praktijken WHERE code = l.praktijk_code) AS praktijk_naam
         FROM public.leads l
         WHERE l.funnel_stage = 'intent'
           AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
@@ -861,7 +863,8 @@ app.get('/api/dashboard-todo', async (req, res) => {
       // C. Geen 2e belpoging: precies 1 belpoging gelogd, 1e minstens 2 dagen geleden, nog open
       const qC = `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon,
-               FLOOR(EXTRACT(EPOCH FROM (NOW() - bp.laatste)) / 86400)::int AS dagen
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - bp.laatste)) / 86400)::int AS dagen,
+               (SELECT naam FROM praktijken WHERE code = l.praktijk_code) AS praktijk_naam
         FROM public.leads l
         JOIN (
           SELECT lead_id, COUNT(*) AS cnt, MAX(aangemaakt_op) AS laatste
@@ -888,6 +891,7 @@ app.get('/api/dashboard-todo', async (req, res) => {
         volledige_naam: r.volledige_naam,
         emailadres: r.emailadres,
         telefoon: r.telefoon,
+        praktijk_naam: r.praktijk_naam || null,
         dagen: Math.max(parseInt(r.dagen) || 0, 0)
       });
 
@@ -902,6 +906,83 @@ app.get('/api/dashboard-todo', async (req, res) => {
   } catch (err) {
     console.error('Dashboard-todo error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/praktijk-overzicht — netwerk-overzicht per praktijk (admin-only, alles uit eigen DB)
+app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+
+    const raw = await withReadConnection(async (client) => {
+      const leadStats = (await client.query(`
+        SELECT praktijk_code,
+          COUNT(*)::int AS leads_totaal,
+          COUNT(CASE WHEN aangemaakt_op >= date_trunc('month', NOW()) THEN 1 END)::int AS leads_maand,
+          COUNT(CASE WHEN funnel_stage = 'won' THEN 1 END)::int AS lid_geworden
+        FROM public.leads
+        WHERE praktijk_code IS NOT NULL
+        GROUP BY praktijk_code`)).rows;
+
+      const leden = (await client.query(`
+        SELECT DISTINCT ON (praktijk_code) praktijk_code, leden
+        FROM leden_historie
+        ORDER BY praktijk_code, jaar DESC, maand DESC`)).rows;
+
+      const taken = (await client.query(`
+        SELECT praktijk_code, COUNT(*)::int AS open_taken FROM (
+          SELECT id, praktijk_code FROM public.leads
+            WHERE funnel_stage = 'awareness' AND appointment_datetime IS NULL AND appointment_date IS NULL
+              AND aangemaakt_op < NOW() - INTERVAL '3 days'
+          UNION
+          SELECT id, praktijk_code FROM public.leads
+            WHERE funnel_stage = 'intent'
+              AND (appointment_datetime IS NOT NULL OR appointment_date IS NOT NULL)
+              AND COALESCE(appointment_datetime, (appointment_date::date + COALESCE(appointment_time, '09:00')::time)) < NOW()
+              AND (outcome_sent IS NULL OR outcome_sent = FALSE)
+          UNION
+          SELECT l.id, l.praktijk_code FROM public.leads l
+            JOIN (SELECT lead_id, COUNT(*) AS cnt, MAX(aangemaakt_op) AS laatste FROM belpogingen GROUP BY lead_id) bp ON bp.lead_id = l.id
+            WHERE bp.cnt = 1 AND bp.laatste < NOW() - INTERVAL '2 days'
+              AND l.funnel_stage NOT IN ('won', 'lost')
+              AND l.appointment_datetime IS NULL AND l.appointment_date IS NULL
+        ) t WHERE praktijk_code IS NOT NULL
+        GROUP BY praktijk_code`)).rows;
+
+      const praktijken = (await client.query(`
+        SELECT code, naam, (eclub_branch_id IS NOT NULL) AS has_eclub
+        FROM praktijken WHERE actief = TRUE`)).rows;
+
+      return { leadStats, leden, taken, praktijken };
+    });
+
+    const statsMap = Object.fromEntries(raw.leadStats.map(r => [r.praktijk_code, r]));
+    const ledenMap = Object.fromEntries(raw.leden.map(r => [r.praktijk_code, r.leden]));
+    const takenMap = Object.fromEntries(raw.taken.map(r => [r.praktijk_code, r.open_taken]));
+
+    const praktijken = raw.praktijken.map(p => {
+      const s = statsMap[p.code] || { leads_totaal: 0, leads_maand: 0, lid_geworden: 0 };
+      const open_taken = takenMap[p.code] || 0;
+      const conversie = s.leads_totaal > 0 ? Math.round(s.lid_geworden / s.leads_totaal * 1000) / 10 : 0;
+      const actieve_leden = ledenMap[p.code] != null ? ledenMap[p.code] : null;
+      const flags = [];
+      if (open_taken >= 10) flags.push(open_taken + ' openstaande taken');
+      if (s.leads_totaal >= 5 && conversie < 20) flags.push('Conversie laag (' + conversie + '%)');
+      const status = flags.length ? 'aandacht' : 'goed';
+      return {
+        code: p.code, naam: p.naam, has_eclub: p.has_eclub,
+        leads_maand: s.leads_maand, leads_totaal: s.leads_totaal, lid_geworden: s.lid_geworden,
+        conversie, actieve_leden, open_taken, status, flags
+      };
+    }).sort((a, b) =>
+      (a.status === 'aandacht' ? 0 : 1) - (b.status === 'aandacht' ? 0 : 1)
+      || b.leads_maand - a.leads_maand
+    );
+
+    res.json({ success: true, praktijken, aandacht: praktijken.filter(p => p.status === 'aandacht').length });
+  } catch (e) {
+    console.error('Praktijk-overzicht error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
