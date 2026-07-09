@@ -967,7 +967,9 @@ app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
       const actieve_leden = ledenMap[p.code] != null ? ledenMap[p.code] : null;
       const flags = [];
       if (open_taken >= 10) flags.push(open_taken + ' openstaande taken');
-      if (s.leads_totaal >= 5 && conversie < 20) flags.push('Conversie laag (' + conversie + '%)');
+      // Conversie pas als 'laag' markeren bij een betekenisvol aantal leads,
+      // anders kleuren praktijken met 1-2 leads onterecht rood in de presentatie.
+      if (s.leads_totaal >= 10 && conversie < 20) flags.push('Conversie laag (' + conversie + '%)');
       const status = flags.length ? 'aandacht' : 'goed';
       return {
         code: p.code, naam: p.naam, has_eclub: p.has_eclub,
@@ -975,7 +977,8 @@ app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
         conversie, actieve_leden, open_taken, status, flags
       };
     }).sort((a, b) =>
-      (a.status === 'aandacht' ? 0 : 1) - (b.status === 'aandacht' ? 0 : 1)
+      // Gezonde (groene) praktijken eerst, aandacht-praktijken onderaan.
+      (a.status === 'aandacht' ? 1 : 0) - (b.status === 'aandacht' ? 1 : 0)
       || b.leads_maand - a.leads_maand
     );
 

@@ -21,6 +21,7 @@
             --text-3:      #9090a8;
             --accent:      #2BB8A3;
             --accent-2:    #1a9985;
+            --sidebar-bg:  #172554;
             --green:       #99cc33;
             --red:         #e5334a;
             --amber:       #f59e0b;
@@ -45,7 +46,7 @@
             position: fixed;
             inset: 0 auto 0 0;
             width: var(--sidebar-w);
-            background: var(--accent);
+            background: var(--sidebar-bg);
             display: flex;
             flex-direction: column;
             z-index: 200;
@@ -197,7 +198,7 @@
         }
 
         .sidebar-select:focus { outline: none; border-color: rgba(255,255,255,.4); }
-        .sidebar-select option { background: var(--accent); }
+        .sidebar-select option { background: var(--sidebar-bg); }
 
         .sidebar-input {
             width: 100%;
@@ -3182,7 +3183,7 @@
                     const pill = p.status === 'aandacht'
                         ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#dc2626;">Aandacht</span>'
                         : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#16a34a;">Gezond</span>';
-                    const convCls = (p.conversie < 20 && p.leads_totaal >= 5) ? 'color:#c2410c;' : 'color:#16a34a;';
+                    const convCls = (p.conversie < 20 && p.leads_totaal >= 10) ? 'color:#c2410c;' : 'color:#16a34a;';
                     const leden = p.actieve_leden != null ? p.actieve_leden : '&mdash;';
                     const ledenTag = p.has_eclub ? ' <span style="font-size:9px;font-weight:700;color:#0891b2;background:#cffafe;padding:1px 5px;border-radius:4px;">eClub</span>' : '';
                     const flags = p.flags && p.flags.length ? `<div style="margin-top:11px;font-size:12px;font-weight:600;color:#dc2626;">${escHtml(p.flags.join(' · '))}</div>` : '';
