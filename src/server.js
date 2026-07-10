@@ -1170,10 +1170,17 @@ app.get('/api/errors/_test', requireAuth, async (req, res) => {
   try {
     if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin' });
     const praktijk = req.query.praktijk ? String(req.query.praktijk).toUpperCase() : (req.session.practiceCode || null);
-    await logError(new Error('TEST: nep-error via /api/errors/_test (mag genegeerd/opgelost worden)'), {
+    // Unieke lettercode zodat elke aanroep een nieuwe fingerprint krijgt en de
+    // AI-analyse telkens opnieuw draait (cijfers worden in de fingerprint
+    // genormaliseerd, dus we gebruiken letters).
+    const rnd = Array.from({ length: 5 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+    const msg = req.query.msg
+      ? String(req.query.msg)
+      : `TEST ${rnd}: nep-error via /api/errors/_test (mag genegeerd/opgelost worden)`;
+    await logError(new Error(msg), {
       route: '/api/errors/_test', method: 'GET', praktijkCode: praktijk, bron: 'test'
     });
-    res.json({ success: true, message: 'Test-error gelogd. Open /trigger om hem te zien.' });
+    res.json({ success: true, message: 'Test-error gelogd. Open /trigger; de AI-oplossing verschijnt na enkele seconden.' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
