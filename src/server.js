@@ -1359,6 +1359,24 @@ app.patch('/api/tickets/:id', requireAuth, async (req, res) => {
   } catch (e) { console.error('Ticket patch error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
+// DELETE /api/tickets/:id — ticket definitief verwijderen. Alleen superadmin.
+app.delete('/api/tickets/:id', requireAuth, async (req, res) => {
+  try {
+    if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag tickets verwijderen' });
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Ongeldig id' });
+    const result = await withWriteConnection(async (client) => {
+      const t = (await client.query('SELECT id FROM tickets WHERE id = $1', [id])).rows[0];
+      if (!t) return { notFound: true };
+      await client.query('DELETE FROM ticket_berichten WHERE ticket_id = $1', [id]);
+      await client.query('DELETE FROM tickets WHERE id = $1', [id]);
+      return { ok: true };
+    });
+    if (result.notFound) return res.status(404).json({ error: 'Niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { console.error('Ticket delete error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/nazorg-leden — nazorg-patiënten + eClub-lidstatus (alleen eClub-praktijken)
 app.get('/api/nazorg-leden', async (req, res) => {
   try {

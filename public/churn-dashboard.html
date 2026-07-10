@@ -2104,7 +2104,10 @@
   <div style="background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.2);">
     <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
       <div><div id="ticketDetailTitle" style="font-size:16px;font-weight:700;">Ticket</div><div id="ticketDetailSub" style="font-size:12px;color:var(--text-3);margin-top:2px;"></div></div>
-      <button onclick="sluitTicket()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="ticketDeleteBtn" onclick="verwijderTicket()" style="display:none;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;">Verwijderen</button>
+        <button onclick="sluitTicket()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+      </div>
     </div>
     <div id="ticketDetailMeta" style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;"></div>
     <div id="ticketDetailThread" style="padding:18px 22px;"></div>
@@ -4266,11 +4269,26 @@
                 const magReageren = ticketsSuperadmin || (currentUser && currentUser.role !== 'admin');
                 const replyBox = document.getElementById('ticketReplyBox');
                 if (replyBox) replyBox.style.display = magReageren ? 'block' : 'none';
+                // Verwijderen mag alleen de superadmin.
+                const delBtn = document.getElementById('ticketDeleteBtn');
+                if (delBtn) delBtn.style.display = ticketsSuperadmin ? 'inline-block' : 'none';
                 document.getElementById('ticketModalOverlay').style.display = 'flex';
             } catch (e) { console.error('Ticket openen:', e); }
         }
 
         function sluitTicket() { document.getElementById('ticketModalOverlay').style.display = 'none'; }
+
+        async function verwijderTicket() {
+            if (!_ticketId) return;
+            if (!confirm('Ticket #' + _ticketId + ' definitief verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
+            try {
+                const res = await fetch('/api/tickets/' + _ticketId, { method: 'DELETE', credentials: 'include' });
+                const d = await res.json();
+                if (!res.ok) { alert(d.error || 'Verwijderen mislukt'); return; }
+                sluitTicket();
+                loadTickets();
+            } catch (e) { alert('Netwerkfout.'); }
+        }
 
         async function verstuurTicketReactie() {
             const txt = (document.getElementById('ticketReply').value || '').trim();
