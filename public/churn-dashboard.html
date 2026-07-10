@@ -4244,12 +4244,20 @@
                 const t = data.ticket;
                 document.getElementById('ticketDetailTitle').textContent = `#${t.id}${t.onderwerp ? ' · ' + t.onderwerp : ''}`;
                 document.getElementById('ticketDetailSub').textContent = `${t.praktijk_naam || t.praktijk_code || ''} · gemeld door ${t.melder_email || 'onbekend'} · ${t.omgeving || ''}`;
-                let meta = `<span><strong>Type:</strong> ${TICKET_TYPE_LBL[t.type] || t.type}</span><span><strong>Categorie:</strong> ${escHtml(t.categorie || '-')}</span>`;
+                const selStyle = 'font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;';
+                let meta = '';
+                if (isAdmin) {
+                    const typeOpts = Object.keys(TICKET_TYPE_LBL).map(ty => `<option value="${ty}" ${t.type === ty ? 'selected' : ''}>${TICKET_TYPE_LBL[ty]}</option>`).join('');
+                    meta += `<span><strong>Type:</strong> <select onchange="wijzigTicket('type', this.value)" style="${selStyle}">${typeOpts}</select></span>`;
+                    meta += `<span><strong>Categorie:</strong> <input value="${escHtml(t.categorie || '')}" onchange="wijzigTicket('categorie', this.value)" placeholder="categorie" style="${selStyle}width:130px;"></span>`;
+                } else {
+                    meta += `<span><strong>Type:</strong> ${TICKET_TYPE_LBL[t.type] || t.type}</span><span><strong>Categorie:</strong> ${escHtml(t.categorie || '-')}</span>`;
+                }
                 if (isAdmin) {
                     if (t.type === 'incident') {
-                        meta += `<span><strong>Prioriteit:</strong> <select onchange="wijzigTicket('prioriteit', this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;"><option value="">kies</option>${['P1', 'P2', 'P3', 'P4'].map(p => `<option ${t.prioriteit === p ? 'selected' : ''}>${p}</option>`).join('')}</select></span>`;
+                        meta += `<span><strong>Prioriteit:</strong> <select onchange="wijzigTicket('prioriteit', this.value)" style="${selStyle}"><option value="">kies</option>${['P1', 'P2', 'P3', 'P4'].map(p => `<option ${t.prioriteit === p ? 'selected' : ''}>${p}</option>`).join('')}</select></span>`;
                     }
-                    meta += `<span><strong>Status:</strong> <select onchange="wijzigTicket('status', this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;">${Object.keys(TICKET_STATUS_LBL).map(s => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${TICKET_STATUS_LBL[s]}</option>`).join('')}</select></span>`;
+                    meta += `<span><strong>Status:</strong> <select onchange="wijzigTicket('status', this.value)" style="${selStyle}">${Object.keys(TICKET_STATUS_LBL).map(s => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${TICKET_STATUS_LBL[s]}</option>`).join('')}</select></span>`;
                 } else {
                     meta += `<span><strong>Status:</strong> ${TICKET_STATUS_LBL[t.status] || t.status}</span>`;
                 }

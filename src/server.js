@@ -1338,12 +1338,14 @@ app.patch('/api/tickets/:id', requireAuth, async (req, res) => {
   try {
     if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag tickets beheren' });
     const id = parseInt(req.params.id);
-    const { status, prioriteit } = req.body;
+    const { status, prioriteit, type, categorie } = req.body;
     const result = await withWriteConnection(async (client) => {
       const t = (await client.query('SELECT t.*, p.email_to FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE t.id = $1', [id])).rows[0];
       if (!t) return { notFound: true };
       const sets = ['bijgewerkt_op = NOW()']; const params = []; let n = 1;
       if (status && TICKET_STATUSSEN.includes(status)) { sets.push(`status = $${n++}`); params.push(status); }
+      if (type && TICKET_TYPES.includes(type)) { sets.push(`type = $${n++}`); params.push(type); }
+      if (categorie !== undefined) { sets.push(`categorie = $${n++}`); params.push(categorie ? String(categorie).slice(0, 80) : null); }
       if (prioriteit && ['P1', 'P2', 'P3', 'P4'].includes(prioriteit) && t.type === 'incident') {
         sets.push(`prioriteit = $${n++}`); params.push(prioriteit);
         sets.push('prioriteit_vergrendeld = TRUE');
