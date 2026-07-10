@@ -191,18 +191,19 @@ async function logError(errOrMsg, ctx = {}) {
           if (found.rows[0]) pc = found.rows[0].code;
         }
       }
+      const tip = knownTip(message);
       const upd = await client.query(
         `UPDATE error_log
             SET aantal = aantal + 1,
                 laatste_keer = NOW(),
                 status = CASE WHEN status = 'opgelost' THEN 'nieuw' ELSE status END,
-                praktijk_code = COALESCE($2, praktijk_code)
+                praktijk_code = COALESCE($2, praktijk_code),
+                oplossing = COALESCE(oplossing, $3)
           WHERE fingerprint = $1 AND laatste_keer > NOW() - INTERVAL '7 days'
           RETURNING id`,
-        [fingerprint, pc]
+        [fingerprint, pc, tip]
       );
       if (upd.rowCount === 0) {
-        const tip = knownTip(message);
         const ins = await client.query(
           `INSERT INTO error_log (fingerprint, message, stack, route, method, praktijk_code, bron, oplossing)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
@@ -222,6 +223,7 @@ async function logError(errOrMsg, ctx = {}) {
 
 // Bekende foutpatronen: directe, gratis tip zonder AI. Eerste match wint.
 const ERROR_PATTERNS = [
+  { re: /eclub|branch.?id/i, tip: 'Deze praktijk heeft geen (geldige) eClub branch-id gekoppeld. Vul eclub_branch_id in bij de praktijk in de database, of sla de eClub-sync over voor praktijken zonder koppeling.' },
   { re: /must be owner of (?:table|relation|view)/i, tip: 'Een ALTER/DDL wordt uitgevoerd door een rol zonder eigenaarrechten. Voer de wijziging als tabel-eigenaar uit in Neon, of haal de runtime-ALTER weg en draai de migratie handmatig.' },
   { re: /column .* does not exist/i, tip: 'Een query verwijst naar een kolom die (nog) niet bestaat. Controleer of de ALTER/migratie in Neon is gedraaid en of de kolomnaam exact klopt.' },
   { re: /relation .* does not exist/i, tip: 'De tabel bestaat niet in deze database. Draai de bijbehorende CREATE TABLE in Neon.' },
