@@ -686,9 +686,9 @@ async function createUser() {
 }
 
 let allUsers = [];
-async function loadUsers(search = '') {
+async function loadUsers(search = '', silent = false) {
   const c = document.getElementById('usersContainer');
-  c.innerHTML = '<div class="state-msg">Laden...</div>';
+  if (!silent) c.innerHTML = '<div class="state-msg">Laden...</div>';
   try {
     const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}&_=${Date.now()}` : `/api/admin/users?_=${Date.now()}`;
     const res = await fetch(url, { credentials: 'include' });
@@ -703,112 +703,6 @@ function searchUsers() { loadUsers(document.getElementById('searchInput').value.
 
 let openProfileId = null;
 
-function renderUsers(users) {
-  const c = document.getElementById('usersContainer');
-  // Filter: only show users with a license or that are admins
-  const filtered = users.filter(u =>
-    u.role === 'admin' ||
-    u.role === 'organisation' ||
-    u.banned ||
-    (u.practice_code && (u.license_type || u.license_active === false))
-  );
-  if (!filtered.length) { c.innerHTML = '<div class="state-msg">Geen gebruikers met licentie gevonden.</div>'; return; }
-  c.innerHTML = filtered.map(u => {
-    const initials = (u.email||'?').slice(0,2).toUpperCase();
-    const [bgColor, fgColor] = avatarColors(u.email||'a');
-    const dbBadge = u.role === 'organisation'
-      ? '<span class="badge badge-purple">Organisatie</span>'
-      : dashboardBadge(u);
-    const nzBadge = nazorgBadge(u);
-    const isBanned = u.banned;
-    const profileHtml = `
-    <div class="profile-panel" id="profile-${u.id}" style="display:none;">
-      <div class="profile-inner">
-        <div class="profile-title">
-          Profiel — ${u.email}
-          <button class="profile-close" onclick="closeProfile(${u.id})">×</button>
-        </div>
-        <div class="profile-lic">
-          ${u.license_type ? `<span class="badge badge-${u.license_active !== false ? 'green' : 'red'}">${licenseLabel(u.license_type)}${u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : ''}</span>` : ''}
-          ${u.nazorg_enabled ? `<span class="badge badge-purple">Nazorg${u.nazorg_license_end_date ? ' · tot ' + formatDate(u.nazorg_license_end_date) : ''}</span>` : ''}
-        </div>
-        ${u.role === 'organisation' ? `
-        <div style="margin-bottom:12px;">
-          <div class="pf-label" style="margin-bottom:8px;">Gekoppelde locaties (praktijkcodes)</div>
-          <div id="pf-org-codes-${u.id}">
-            ${(u.organisation_codes||'').split(',').filter(Boolean).map((code,i) => `
-              <div style="display:flex;gap:6px;margin-bottom:6px;">
-                <input class="pf-input pf-org-code-${u.id}" value="${code.trim()}" style="text-transform:uppercase;flex:1;">
-                <button onclick="this.parentElement.remove()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--red);cursor:pointer;font-size:13px;">×</button>
-              </div>`).join('')}
-          </div>
-          <button onclick="voegLocatieToe(${u.id})" style="margin-top:4px;padding:6px 12px;border:1px solid var(--accent);border-radius:6px;background:white;color:var(--accent);font-size:12px;cursor:pointer;font-family:inherit;">+ Locatie toevoegen</button>
-        </div>` : `
-        <div class="profile-grid">
-          <div><div class="pf-label">Naam contactpersoon</div><input class="pf-input" id="pf-naam-${u.id}" value="${u.contact_naam||''}"></div>
-          <div><div class="pf-label">Telefoonnummer</div><input class="pf-input" id="pf-tel-${u.id}" value="${u.contact_telefoon||''}"></div>
-          <div><div class="pf-label">Praktijkcode</div><input class="pf-input" value="${u.practice_code||''}" disabled style="opacity:.6;"></div>
-          <div><div class="pf-label">Locatie</div><input class="pf-input" id="pf-loc-${u.id}" value="${u.locatie||''}" placeholder="Adres praktijk..."></div>
-        </div>`}
-        <div class="profile-actions">
-          <button class="btn-cancel-sm" onclick="closeProfile(${u.id})">Annuleren</button>
-          <button class="btn-save" onclick="saveProfile(${u.id})">Opslaan</button>
-        </div>
-      </div>
-    </div>`;
-    return `
-    <div class="user-row" id="row-${u.id}" onclick="openProfile(${u.id}, event)">
-      <div class="user-avatar" style="background:${bgColor};color:${fgColor};">${initials}</div>
-      <div class="user-info">
-        <div class="user-email" style="color:var(--accent);text-decoration:underline;text-underline-offset:2px;">${u.email}</div>
-        <div class="user-name">${u.praktijk_naam || u.practice_code || 'Admin'}</div>
-      </div>
-      <div class="user-badges">
-        ${dbBadge}
-        ${nzBadge}
-      </div>
-      <div class="action-wrap">
-        <button class="btn-expand" id="btn-${u.id}" onclick="toggleInlineActions(${u.id}, event)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          Beheren
-        </button>
-      </div>
-    </div>
-    <div class="inline-actions" id="actions-${u.id}">
-      ${u.practice_code ? `
-      <div class="action-group">
-        <div class="action-group-title">Dashboard licentie</div>
-        <div class="action-btns">
-          <button class="btn-action" onclick="userAction(${u.id},'extend_12m')">+12 maanden</button>
-          <button class="btn-action" onclick="userAction(${u.id},'extend_24m')">+24 maanden</button>
-          <button class="btn-action" onclick="userAction(${u.id},'unlimited')">Onbeperkt</button>
-          <button class="btn-action" onclick="userAction(${u.id},'reactivate')">Heractiveren</button>
-          <button class="btn-action danger" onclick="userAction(${u.id},'stop')">Stopzetten</button>
-        </div>
-      </div>
-      <div class="action-group">
-        <div class="action-group-title">Nazorg portaal</div>
-        <div class="action-btns">
-          <button class="btn-action" onclick="userAction(${u.id},'nazorg_enable')">Activeren 12m</button>
-          <button class="btn-action" onclick="userAction(${u.id},'nazorg_enable_24m')">Activeren 24m</button>
-          <button class="btn-action" onclick="userAction(${u.id},'nazorg_unlimited')">Onbeperkt</button>
-          <button class="btn-action danger" onclick="userAction(${u.id},'nazorg_disable')">Deactiveren</button>
-        </div>
-      </div>` : ''}
-      <div class="action-group">
-        <div class="action-group-title">Account</div>
-        <div class="action-btns">
-          ${isBanned
-            ? `<button class="btn-action" onclick="userAction(${u.id},'unban')">Verbanning opheffen</button>`
-            : `<button class="btn-action danger" onclick="userAction(${u.id},'ban')">Verbannen</button>`
-          }
-          <button class="btn-action danger" onclick="userAction(${u.id},'delete')">Verwijderen</button>
-        </div>
-      </div>
-    </div>
-    ${profileHtml}`;
-  }).join('');
-}
 
 function openProfile(id, e) {
   if (e.target.closest('.action-wrap')) return;
@@ -911,11 +805,7 @@ function closeAllMenus() {
   });
 }
 
-checkAdmin();
-loadUsers();
-
-
-// ===== NIEUWE TABLE RENDER =====
+// ===== TABLE RENDER =====
 function renderUsers(users) {
   const c = document.getElementById('usersContainer');
   const filtered = users.filter(u =>
@@ -1138,6 +1028,16 @@ function handleModalClick(e) {
 
 checkAdmin();
 loadUsers();
+
+// Auto-refresh: houd de tijden en online-status actueel zonder handmatig herladen.
+// Niet verversen terwijl een gebruikersmodal open is, om de weergave niet te onderbreken.
+setInterval(function () {
+  var modal = document.getElementById('userModal');
+  if (modal && modal.classList.contains('open')) return;
+  var zoek = document.getElementById('searchInput');
+  loadUsers(zoek ? zoek.value.trim() : '', true);
+}, 45000);
 </script>
+<script src="/js/heartbeat.js"></script>
 </body>
 </html>
