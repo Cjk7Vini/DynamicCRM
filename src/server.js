@@ -1150,6 +1150,19 @@ app.get('/api/errors/max-id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/errors/_test — logt bewust een nep-error zodat je de trigger-flow
+// (alarm, praktijknaam, oplossing) een keer kunt zien. Alleen superadmin.
+app.get('/api/errors/_test', requireAuth, async (req, res) => {
+  try {
+    if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin' });
+    const praktijk = req.query.praktijk ? String(req.query.praktijk).toUpperCase() : (req.session.practiceCode || null);
+    await logError(new Error('TEST: nep-error via /api/errors/_test (mag genegeerd/opgelost worden)'), {
+      route: '/api/errors/_test', method: 'GET', praktijkCode: praktijk, bron: 'test'
+    });
+    res.json({ success: true, message: 'Test-error gelogd. Open /trigger om hem te zien.' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // PATCH /api/errors/:id — status bijwerken. Beheren mag alleen de superadmin.
 app.patch('/api/errors/:id', requireAuth, async (req, res) => {
   try {
