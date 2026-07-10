@@ -258,7 +258,7 @@ function renderList(errors) {
 }
 
 function copyError(id) {
-  const e = (window._errors || []).find(x => x.id === id);
+  const e = (window._errors || []).find(x => String(x.id) === String(id));
   if (!e) return;
   const praktijk = e.praktijk_code ? `${e.praktijk_naam || 'Onbekend'} (${e.praktijk_code})` : 'geen praktijk';
   const text =
@@ -275,7 +275,7 @@ ${e.stack ? '\nStacktrace:\n' + e.stack : ''}`;
 }
 
 async function maakTicket(id) {
-  const e = (window._errors || []).find(x => x.id === id);
+  const e = (window._errors || []).find(x => String(x.id) === String(id));
   if (!e) return;
   const praktijk = e.praktijk_code ? `${e.praktijk_naam || 'Onbekend'} (${e.praktijk_code})` : 'geen praktijk';
   if (!confirm('Ticket aanmaken voor ' + praktijk + '?\n\n' + e.message)) return;
