@@ -179,6 +179,18 @@ async function logError(errOrMsg, ctx = {}) {
       .slice(0, 400);
     const fingerprint = crypto.createHash('sha1').update(norm).digest('hex');
     await withWriteConnection(async (client) => {
+      // Geen praktijkcode uit de sessie? Probeer een echte code uit de tekst te
+      // halen (bijv. "praktijk H5R9KM" of in de route) en valideer tegen de
+      // praktijken-tabel, zodat de error toch aan de juiste praktijk hangt.
+      let pc = praktijkCode;
+      if (!pc) {
+        const hooi = (message + ' ' + (route || '') + ' ' + (stack || '')).toUpperCase();
+        const kandidaten = Array.from(new Set(hooi.match(/\b[A-Z0-9]{6}\b/g) || [])).slice(0, 50);
+        if (kandidaten.length) {
+          const found = await client.query('SELECT code FROM praktijken WHERE code = ANY($1) LIMIT 1', [kandidaten]);
+          if (found.rows[0]) pc = found.rows[0].code;
+        }
+      }
       const upd = await client.query(
         `UPDATE error_log
             SET aantal = aantal + 1,
@@ -187,14 +199,14 @@ async function logError(errOrMsg, ctx = {}) {
                 praktijk_code = COALESCE($2, praktijk_code)
           WHERE fingerprint = $1 AND laatste_keer > NOW() - INTERVAL '7 days'
           RETURNING id`,
-        [fingerprint, praktijkCode]
+        [fingerprint, pc]
       );
       if (upd.rowCount === 0) {
         const tip = knownTip(message);
         const ins = await client.query(
           `INSERT INTO error_log (fingerprint, message, stack, route, method, praktijk_code, bron, oplossing)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-          [fingerprint, message.slice(0, 2000), stack ? stack.slice(0, 6000) : null, route, method, praktijkCode, bron, tip]
+          [fingerprint, message.slice(0, 2000), stack ? stack.slice(0, 6000) : null, route, method, pc, bron, tip]
         );
         const newId = ins.rows[0] && ins.rows[0].id;
         // Niet-blokkerend: verrijk met een AI-analyse als er een API-key is.
