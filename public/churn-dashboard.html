@@ -2108,7 +2108,7 @@
     </div>
     <div id="ticketDetailMeta" style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;"></div>
     <div id="ticketDetailThread" style="padding:18px 22px;"></div>
-    <div style="padding:14px 22px;border-top:1px solid var(--border);">
+    <div id="ticketReplyBox" style="padding:14px 22px;border-top:1px solid var(--border);">
       <textarea id="ticketReply" placeholder="Typ je reactie..." style="width:100%;box-sizing:border-box;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;min-height:70px;resize:vertical;"></textarea>
       <button class="btn btn-primary" onclick="verstuurTicketReactie()" style="margin-top:10px;">Reactie versturen</button>
       <span id="ticketReplyMsg" style="font-size:12px;margin-left:10px;"></span>
@@ -4193,6 +4193,7 @@
 
         // ── TICKETS ───────────────────────────────────────────────────
         let _ticketId = null;
+        let ticketsSuperadmin = false; // alleen de superadmin mag tickets beheren
         const TICKET_TYPE_LBL = { incident: 'Incident', wens: 'Wens', andere_vraag: 'Andere vraag' };
         const TICKET_STATUS_LBL = { open: 'Open', in_behandeling: 'In behandeling', opgelost: 'Opgelost', gesloten: 'Gesloten' };
 
@@ -4205,6 +4206,7 @@
                 if (status) qs.append('status', status);
                 const res = await fetch('/api/tickets' + (qs.toString() ? '?' + qs.toString() : ''), { credentials: 'include' });
                 const data = await res.json();
+                ticketsSuperadmin = !!data.isSuperadmin;
                 const body = document.getElementById('ticketsBody');
                 if (!body) return;
                 if (!data.success || !data.tickets || !data.tickets.length) {
@@ -4229,7 +4231,9 @@
 
         async function openTicket(id) {
             _ticketId = id;
-            const isAdmin = currentUser && currentUser.role === 'admin';
+            // Beheer (status/prioriteit wijzigen, als beheerder reageren) mag alleen de superadmin.
+            // Praktijk-/organisatie-accounts mogen wel op hun eigen ticket reageren.
+            const isAdmin = ticketsSuperadmin;
             try {
                 const res = await fetch('/api/tickets/' + id, { credentials: 'include' });
                 const data = await res.json();
@@ -4257,6 +4261,11 @@
                 }).join('');
                 document.getElementById('ticketReply').value = '';
                 document.getElementById('ticketReplyMsg').textContent = '';
+                // Reageren mag: de superadmin, of een praktijk/organisatie op het eigen ticket.
+                // Een gewone admin (niet-superadmin) mag alleen lezen.
+                const magReageren = ticketsSuperadmin || (currentUser && currentUser.role !== 'admin');
+                const replyBox = document.getElementById('ticketReplyBox');
+                if (replyBox) replyBox.style.display = magReageren ? 'block' : 'none';
                 document.getElementById('ticketModalOverlay').style.display = 'flex';
             } catch (e) { console.error('Ticket openen:', e); }
         }

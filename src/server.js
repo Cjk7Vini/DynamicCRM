@@ -154,6 +154,133 @@ app.use(session({
   proxy: true
 }));
 
+// ==================== ERROR-TRIGGER: superadmin + centrale error-logging ====================
+// Alleen dit account mag tickets/errors BEHEREN. Andere admins mogen lezen.
+const SUPERADMIN_EMAIL = 'admin@dynamic-health-consultancy.nl';
+const isSuperadmin = (req) =>
+  !!req.session && req.session.role === 'admin' &&
+  String(req.session.email || '').toLowerCase() === SUPERADMIN_EMAIL;
+
+// Centrale error-logger: schrijft naar error_log, groepeert op fingerprint.
+// Faalt altijd stil (mag zelf nooit een request laten crashen).
+async function logError(errOrMsg, ctx = {}) {
+  try {
+    const message = (errOrMsg && errOrMsg.message) ? String(errOrMsg.message) : String(errOrMsg || 'Onbekende fout');
+    const stack = (errOrMsg && errOrMsg.stack) ? String(errOrMsg.stack) : null;
+    const route = ctx.route || null;
+    const method = ctx.method || null;
+    const praktijkCode = ctx.praktijkCode || null;
+    const bron = ctx.bron || 'app';
+    // Fingerprint: message + route, met cijfers/uuids genormaliseerd zodat
+    // varianten van dezelfde fout samen gegroepeerd worden.
+    const norm = (message + '|' + (route || ''))
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '#uuid')
+      .replace(/\d+/g, '#')
+      .slice(0, 400);
+    const fingerprint = crypto.createHash('sha1').update(norm).digest('hex');
+    await withWriteConnection(async (client) => {
+      const upd = await client.query(
+        `UPDATE error_log
+            SET aantal = aantal + 1,
+                laatste_keer = NOW(),
+                status = CASE WHEN status = 'opgelost' THEN 'nieuw' ELSE status END,
+                praktijk_code = COALESCE($2, praktijk_code)
+          WHERE fingerprint = $1 AND laatste_keer > NOW() - INTERVAL '7 days'
+          RETURNING id`,
+        [fingerprint, praktijkCode]
+      );
+      if (upd.rowCount === 0) {
+        const tip = knownTip(message);
+        const ins = await client.query(
+          `INSERT INTO error_log (fingerprint, message, stack, route, method, praktijk_code, bron, oplossing)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [fingerprint, message.slice(0, 2000), stack ? stack.slice(0, 6000) : null, route, method, praktijkCode, bron, tip]
+        );
+        const newId = ins.rows[0] && ins.rows[0].id;
+        // Niet-blokkerend: verrijk met een AI-analyse als er een API-key is.
+        if (newId && process.env.ANTHROPIC_API_KEY) {
+          setImmediate(() => generateAiSolution(newId, message, stack, route).catch(() => {}));
+        }
+      }
+    });
+  } catch (e) {
+    console.error('logError faalde:', e.message);
+  }
+}
+
+// Bekende foutpatronen: directe, gratis tip zonder AI. Eerste match wint.
+const ERROR_PATTERNS = [
+  { re: /must be owner of (?:table|relation|view)/i, tip: 'Een ALTER/DDL wordt uitgevoerd door een rol zonder eigenaarrechten. Voer de wijziging als tabel-eigenaar uit in Neon, of haal de runtime-ALTER weg en draai de migratie handmatig.' },
+  { re: /column .* does not exist/i, tip: 'Een query verwijst naar een kolom die (nog) niet bestaat. Controleer of de ALTER/migratie in Neon is gedraaid en of de kolomnaam exact klopt.' },
+  { re: /relation .* does not exist/i, tip: 'De tabel bestaat niet in deze database. Draai de bijbehorende CREATE TABLE in Neon.' },
+  { re: /duplicate key value|unique constraint/i, tip: 'Er wordt een record ingevoegd dat een uniek veld dupliceert. Gebruik een upsert (ON CONFLICT) of controleer op bestaan voor de insert.' },
+  { re: /invalid input syntax for type/i, tip: 'Een waarde heeft het verkeerde type voor de kolom (bijv. lege string naar date/int). Valideer en normaliseer de input voor de query.' },
+  { re: /ETIMEDOUT|ECONNREFUSED|timeout/i, tip: 'Een externe verbinding (DB of API) reageert niet. Controleer netwerk/credentials en gebruik een retry met backoff.' },
+  { re: /Cannot read propert(y|ies) of (undefined|null)/i, tip: 'Er wordt een eigenschap gelezen van undefined/null. Voeg een null-check of optional chaining toe rond de betreffende variabele.' },
+  { re: /JSON|Unexpected token/i, tip: 'Ongeldige JSON wordt geparsed. Controleer de payload/bron en vang parse-fouten af met try/catch.' },
+];
+function knownTip(message) {
+  for (const p of ERROR_PATTERNS) if (p.re.test(String(message || ''))) return p.tip;
+  return null;
+}
+
+// Verwijder gevoelige data (e-mail, lange nummers) voordat we naar de AI sturen.
+const scrubForAi = (s) => String(s || '')
+  .replace(/[\w.+-]+@[\w.-]+\.\w+/g, '[email]')
+  .replace(/\b\d{9,}\b/g, '[nr]');
+
+// AI-analyse via Claude. Faalt altijd stil; vult error_log.oplossing.
+async function generateAiSolution(errorId, message, stack, route) {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return;
+    const prompt =
+`Je bent een senior Node.js/Express + Postgres (Neon) engineer. Analyseer deze productie-error en geef in het Nederlands een korte, concrete diagnose plus stappen om het op te lossen. Maximaal 6 regels, geen inleiding.
+
+Route: ${route || '-'}
+Error: ${scrubForAi(message)}
+${stack ? 'Stacktrace:\n' + scrubForAi(stack).slice(0, 2000) : ''}`;
+    const resp = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }]
+    }, {
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      timeout: 20000
+    });
+    const txt = resp.data && resp.data.content && resp.data.content[0] && resp.data.content[0].text;
+    if (txt && txt.trim()) {
+      await withWriteConnection(async (client) =>
+        client.query(`UPDATE error_log SET oplossing = $2 WHERE id = $1`, [errorId, txt.trim().slice(0, 4000)])
+      );
+    }
+  } catch (e) {
+    console.error('AI-oplossing faalde:', e.message);
+  }
+}
+
+// Interceptor: vangt elke 5xx-respons op (zo loggen we ook de fouten die routes
+// zelf met res.status(500).json(...) afhandelen). Staat na session, dus
+// req.session is beschikbaar. De global error-handler zet __errLogged om
+// dubbel loggen te voorkomen.
+app.use((req, res, next) => {
+  const origStatus = res.status.bind(res);
+  const origJson = res.json.bind(res);
+  let statusCode = 200;
+  res.status = (c) => { statusCode = c; return origStatus(c); };
+  res.json = (body) => {
+    try {
+      if (statusCode >= 500 && !res.locals.__errLogged) {
+        res.locals.__errLogged = true;
+        const msg = (body && body.error) ? body.error : ('HTTP ' + statusCode);
+        logError(msg, { route: req.originalUrl, method: req.method, praktijkCode: req.session && req.session.practiceCode, bron: 'http' });
+      }
+    } catch (_) { /* nooit de respons breken */ }
+    return origJson(body);
+  };
+  next();
+});
+
 const postLimiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW || 60_000),
   max: Number(process.env.RATE_LIMIT_MAX || 30),
@@ -199,6 +326,7 @@ app.get('/landing.html', (req, res) => {
 
 app.get('/admin', (_req, res) => res.redirect(302, '/admin.html'));
 app.get('/dashboard', (_req, res) => res.redirect(302, '/churn-dashboard.html'));
+app.get('/trigger', (_req, res) => res.redirect(302, '/trigger.html'));
 app.get('/training', (_req, res) => res.redirect(302, '/training-form.html'));
 app.get(['/form.html/:code', '/r/:code'], (req, res) => {
   const { code } = req.params;
@@ -989,6 +1117,53 @@ app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
   }
 });
 
+// ==================== ERROR-TRIGGER ENDPOINTS ====================
+// GET /api/errors — lijst voor de trigger-pagina. Lezen mag elke admin.
+// ?sinceId= voor polling, ?status= om te filteren.
+app.get('/api/errors', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Alleen admin' });
+    const sinceId = parseInt(req.query.sinceId) || 0;
+    const status = req.query.status;
+    const rows = await withReadConnection(async (client) => {
+      let q = `SELECT e.*, p.naam AS praktijk_naam
+                 FROM error_log e LEFT JOIN praktijken p ON p.code = e.praktijk_code
+                WHERE 1=1`;
+      const params = []; let n = 1;
+      if (sinceId) { q += ` AND e.id > $${n++}`; params.push(sinceId); }
+      if (status) { q += ` AND e.status = $${n++}`; params.push(status); }
+      q += ` ORDER BY e.laatste_keer DESC LIMIT 200`;
+      return (await client.query(q, params)).rows;
+    });
+    res.json({ success: true, errors: rows, isSuperadmin: isSuperadmin(req) });
+  } catch (e) { console.error('Errors list error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/errors/max-id — lichtgewicht poll voor het alarm (nieuwste id + aantal nieuw)
+app.get('/api/errors/max-id', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Alleen admin' });
+    const row = await withReadConnection(async (client) =>
+      (await client.query(`SELECT COALESCE(MAX(id),0) AS max_id, COUNT(*) FILTER (WHERE status='nieuw') AS nieuw FROM error_log`)).rows[0]
+    );
+    res.json({ success: true, maxId: Number(row.max_id), nieuw: Number(row.nieuw) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/errors/:id — status bijwerken. Beheren mag alleen de superadmin.
+app.patch('/api/errors/:id', requireAuth, async (req, res) => {
+  try {
+    if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag errors beheren' });
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    if (!['nieuw', 'gezien', 'opgelost'].includes(status)) return res.status(400).json({ error: 'Ongeldige status' });
+    await withWriteConnection(async (client) =>
+      client.query(`UPDATE error_log SET status = $2 WHERE id = $1`, [id, status])
+    );
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ==================== TICKETSYSTEEM ====================
 const TICKET_ADMIN_EMAIL = 'cruz@dynamic-health-consultancy.nl';
 const TICKET_TYPES = ['incident', 'wens', 'andere_vraag'];
@@ -1004,7 +1179,17 @@ app.post('/api/tickets', requireAuth, async (req, res) => {
     if (!type || !TICKET_TYPES.includes(type)) return res.status(400).json({ error: 'Ongeldig type' });
     if (!bericht || !String(bericht).trim()) return res.status(400).json({ error: 'Bericht is verplicht' });
 
-    const praktijkCode = req.session.practiceCode || null;
+    const isAdmin = req.session.role === 'admin';
+    // Een admin die een ticket aanmaakt voert een beheeractie uit: alleen de superadmin mag dat.
+    // Praktijk- en organisatie-accounts maken gewoon hun eigen melding aan (bestaand gedrag).
+    if (isAdmin && !isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag tickets aanmaken' });
+
+    const bronIn = ['praktijk', 'email', 'trigger'].includes(req.body.bron) ? req.body.bron : 'praktijk';
+    const errorId = (isAdmin && req.body.error_id) ? (parseInt(req.body.error_id) || null) : null;
+    // Admin/superadmin mag een doelpraktijk meegeven (bijv. vanuit de trigger); anders eigen praktijk.
+    const praktijkCode = (isAdmin && req.body.praktijk_code)
+      ? String(req.body.praktijk_code).toUpperCase()
+      : (req.session.practiceCode || null);
     const melderEmail = req.session.email || null;
     const prio = (type === 'incident' && ['P1', 'P2', 'P3', 'P4'].includes(prioriteit)) ? prioriteit : null;
     const tekst = String(bericht).trim();
@@ -1014,11 +1199,11 @@ app.post('/api/tickets', requireAuth, async (req, res) => {
       const info = praktijkCode
         ? (await client.query('SELECT naam, email_to FROM praktijken WHERE code = $1', [praktijkCode])).rows[0] || {}
         : {};
-      const melderNaam = info.naam || melderEmail || 'Onbekend';
+      const melderNaam = bronIn === 'trigger' ? 'Trigger' : (info.naam || melderEmail || 'Onbekend');
       const t = (await client.query(
-        `INSERT INTO tickets (praktijk_code, melder_naam, melder_email, omgeving, type, categorie, prioriteit, status, onderwerp)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8) RETURNING *`,
-        [praktijkCode, melderNaam, melderEmail, omgeving || null, type, categorie || null, prio, onderwerp]
+        `INSERT INTO tickets (praktijk_code, melder_naam, melder_email, omgeving, type, categorie, prioriteit, status, onderwerp, bron, error_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8,$9,$10) RETURNING *`,
+        [praktijkCode, melderNaam, melderEmail, omgeving || null, type, categorie || null, prio, onderwerp, bronIn, errorId]
       )).rows[0];
       await client.query(
         `INSERT INTO ticket_berichten (ticket_id, auteur_type, auteur_naam, bericht) VALUES ($1,'praktijk',$2,$3)`,
@@ -1060,7 +1245,7 @@ app.get('/api/tickets', requireAuth, async (req, res) => {
       q += ` ORDER BY t.bijgewerkt_op DESC LIMIT 200`;
       return (await client.query(q, params)).rows;
     });
-    res.json({ success: true, tickets });
+    res.json({ success: true, tickets, isSuperadmin: isSuperadmin(req) });
   } catch (e) { console.error('Tickets list error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
@@ -1088,6 +1273,9 @@ app.post('/api/tickets/:id/bericht', requireAuth, async (req, res) => {
     if (!bericht || !String(bericht).trim()) return res.status(400).json({ error: 'Bericht is verplicht' });
     const tekst = String(bericht).trim();
     const isAdmin = req.session.role === 'admin';
+    // Beheerdersreacties mogen alleen van de superadmin komen. Praktijken mogen
+    // wel op hun eigen ticket blijven reageren.
+    if (isAdmin && !isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag als beheerder reageren' });
 
     const result = await withWriteConnection(async (client) => {
       const t = (await client.query('SELECT t.*, p.naam AS praktijk_naam, p.email_to FROM tickets t LEFT JOIN praktijken p ON p.code = t.praktijk_code WHERE t.id = $1', [id])).rows[0];
@@ -1121,7 +1309,7 @@ app.post('/api/tickets/:id/bericht', requireAuth, async (req, res) => {
 // PATCH /api/tickets/:id — admin: status en/of prioriteit aanpassen
 app.patch('/api/tickets/:id', requireAuth, async (req, res) => {
   try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Alleen admin' });
+    if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen superadmin mag tickets beheren' });
     const id = parseInt(req.params.id);
     const { status, prioriteit } = req.body;
     const result = await withWriteConnection(async (client) => {
@@ -5875,6 +6063,31 @@ app.get('/api/check-belpogingen', requireCron, async (req, res) => {
 // ============================================================
 // EINDE NAZORG PORTAAL
 // ============================================================
+
+// Global error-handler: vangt onafgevangen throws in routes/middleware en logt ze.
+// Moet ná alle routes staan. Vier argumenten = Express error-middleware.
+app.use((err, req, res, next) => {
+  try {
+    res.locals.__errLogged = true;
+    logError(err, { route: req.originalUrl, method: req.method, praktijkCode: req.session && req.session.practiceCode, bron: 'app' });
+  } catch (_) { /* nooit de respons breken */ }
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Er ging iets mis' });
+});
+
+// Proces-brede vangnetten. unhandledRejection is veilig te loggen; bij een
+// uncaughtException loggen we en sluiten daarna af zodat Render herstart
+// (gelijk aan het huidige gedrag zonder handler).
+process.on('unhandledRejection', (reason) => {
+  console.error('UnhandledRejection:', reason);
+  logError(reason instanceof Error ? reason : new Error(String(reason)), { bron: 'process' });
+});
+process.on('uncaughtException', (err) => {
+  console.error('UncaughtException:', err);
+  logError(err, { bron: 'process' });
+  setTimeout(() => process.exit(1), 800);
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server gestart op http://localhost:${PORT}`);
 });

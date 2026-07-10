@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Error Trigger | Dynamic Health</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#0f1117; --surface:#171a22; --surface-2:#1e222c; --border:#2a2f3a;
+    --text-1:#e7e9ee; --text-2:#9aa2b1; --text-3:#6b7280;
+    --red:#ef4444; --red-bg:#2a1414; --amber:#f59e0b; --green:#22c55e; --blue:#3b82f6;
+    --accent:#333399;
+  }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text-1); font-size:14px; line-height:1.5; }
+  .topbar { background:#0b0d12; border-bottom:1px solid var(--border); padding:0 22px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; }
+  .brand .dot { width:10px; height:10px; border-radius:50%; background:var(--green); box-shadow:0 0 0 0 rgba(34,197,94,.6); }
+  .brand .dot.alarm { background:var(--red); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(239,68,68,.7);} 70%{box-shadow:0 0 0 10px rgba(239,68,68,0);} 100%{box-shadow:0 0 0 0 rgba(239,68,68,0);} }
+  .top-actions { display:flex; align-items:center; gap:10px; }
+  .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-1); font-size:13px; font-family:inherit; cursor:pointer; }
+  .btn:hover { background:var(--border); }
+  .btn-sound.on { background:var(--green); color:#04220f; border-color:var(--green); }
+  .wrap { max-width:1100px; margin:0 auto; padding:22px; }
+  .filters { display:flex; gap:8px; margin-bottom:18px; align-items:center; flex-wrap:wrap; }
+  .chip { padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-2); cursor:pointer; font-size:12.5px; }
+  .chip.active { background:var(--accent); color:white; border-color:var(--accent); }
+  .count-badge { margin-left:auto; font-size:13px; color:var(--text-2); }
+  .err { background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--red); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .err.status-gezien { border-left-color:var(--amber); opacity:.9; }
+  .err.status-opgelost { border-left-color:var(--green); opacity:.62; }
+  .err-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .err-msg { font-size:15px; font-weight:600; color:var(--text-1); word-break:break-word; }
+  .err-meta { margin-top:8px; display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; color:var(--text-2); }
+  .err-meta b { color:var(--text-1); font-weight:600; }
+  .praktijk-tag { display:inline-block; background:#14233f; color:#93c5fd; padding:2px 9px; border-radius:6px; font-weight:600; }
+  .pill { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .pill-nieuw { background:var(--red-bg); color:#fca5a5; }
+  .pill-gezien { background:#2a2410; color:#fcd34d; }
+  .pill-opgelost { background:#0f2417; color:#86efac; }
+  .err-actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+  .err-actions .btn { padding:6px 11px; font-size:12.5px; }
+  .stack { margin-top:10px; }
+  .stack summary { cursor:pointer; color:var(--text-2); font-size:12.5px; }
+  .stack pre { margin-top:8px; background:#0b0d12; border:1px solid var(--border); border-radius:8px; padding:12px; overflow-x:auto; font-size:12px; color:#c9d1d9; white-space:pre-wrap; word-break:break-word; }
+  .oplossing { margin-top:10px; background:#101c14; border:1px solid #1f3d2a; border-radius:8px; padding:12px 14px; font-size:13px; color:#bbf7d0; }
+  .oplossing .oh { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#4ade80; margin-bottom:5px; }
+  .empty { text-align:center; color:var(--text-3); padding:60px 20px; }
+  /* Login */
+  .login-card { max-width:360px; margin:80px auto; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; }
+  .login-card h1 { font-size:18px; margin-bottom:6px; }
+  .login-card p { color:var(--text-2); font-size:13px; margin-bottom:18px; }
+  .login-card label { display:block; font-size:12px; color:var(--text-2); margin:12px 0 5px; }
+  .login-card input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-1); font-size:14px; font-family:inherit; }
+  .login-card .btn-primary { width:100%; margin-top:18px; background:var(--accent); border-color:var(--accent); color:white; padding:11px; }
+  .msg { margin-top:12px; font-size:13px; padding:9px 12px; border-radius:8px; display:none; }
+  .msg.err-m { display:block; background:var(--red-bg); color:#fca5a5; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111827; border:1px solid var(--border); color:var(--text-1); padding:10px 16px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .2s; z-index:100; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+let ADMIN = null;
+let IS_SUPER = false;
+let SOUND_ON = false;
+let audioCtx = null;
+let lastMaxId = null;
+let currentFilter = 'nieuw';
+let pollTimer = null;
+
+// ---------- helpers ----------
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDt(dt) {
+  if (!dt) return '-';
+  const d = new Date(dt);
+  return d.toLocaleDateString('nl-NL', { day:'numeric', month:'short' }) + ' ' + d.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' });
+}
+function toast(t) {
+  const el = document.getElementById('toast');
+  el.textContent = t; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1800);
+}
+function beep() {
+  if (!SOUND_ON) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Twee korte tonen als "alarm"
+    [0, 0.22].forEach((offset, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = i === 0 ? 880 : 660;
+      gain.gain.setValueAtTime(0.001, audioCtx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + offset + 0.18);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime + offset);
+      osc.stop(audioCtx.currentTime + offset + 0.2);
+    });
+  } catch (e) { /* stil */ }
+}
+
+// ---------- auth flow ----------
+async function init() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (res.status === 401) return renderLogin();
+    const data = await res.json();
+    if (!data.success || !data.user) return renderLogin();
+    if (data.user.role !== 'admin') return renderDenied(data.user.email);
+    ADMIN = data.user;
+    renderApp();
+    startPolling();
+  } catch (e) { renderLogin(); }
+}
+
+function renderLogin() {
+  document.getElementById('app').innerHTML = `
+    <div class="login-card">
+      <h1>Error Trigger</h1>
+      <p>Log in met een admin-account.</p>
+      <label>E-mail</label>
+      <input id="li-email" type="email" autocomplete="username">
+      <label>Wachtwoord</label>
+      <input id="li-pass" type="password" autocomplete="current-password">
+      <button class="btn btn-primary" id="li-btn">Inloggen</button>
+      <div class="msg" id="li-msg"></div>
+    </div>`;
+  const doLogin = async () => {
+    const email = document.getElementById('li-email').value.trim();
+    const password = document.getElementById('li-pass').value;
+    const msg = document.getElementById('li-msg');
+    msg.className = 'msg';
+    try {
+      const r = await fetch('/api/auth/login', {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({ email, password })
+      });
+      const d = await r.json();
+      if (!r.ok) { msg.className = 'msg err-m'; msg.textContent = d.error || 'Inloggen mislukt'; return; }
+      init();
+    } catch (e) { msg.className = 'msg err-m'; msg.textContent = 'Netwerkfout.'; }
+  };
+  document.getElementById('li-btn').onclick = doLogin;
+  document.getElementById('li-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+}
+
+function renderDenied(email) {
+  document.getElementById('app').innerHTML = `
+    <div class="login-card">
+      <h1>Geen toegang</h1>
+      <p>${esc(email)} is geen admin-account. De trigger-pagina is alleen voor admins.</p>
+    </div>`;
+}
+
+// ---------- main app ----------
+function renderApp() {
+  document.getElementById('app').innerHTML = `
+    <div class="topbar">
+      <div class="brand"><span class="dot" id="statusDot"></span> Error Trigger</div>
+      <div class="top-actions">
+        <button class="btn btn-sound" id="soundBtn">🔔 Geluid uit</button>
+        <button class="btn" id="refreshBtn">Verversen</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="filters">
+        <span class="chip active" data-f="nieuw">Nieuw</span>
+        <span class="chip" data-f="gezien">Gezien</span>
+        <span class="chip" data-f="opgelost">Opgelost</span>
+        <span class="chip" data-f="">Alles</span>
+        <span class="count-badge" id="countBadge"></span>
+      </div>
+      <div id="list"><div class="empty">Laden...</div></div>
+    </div>`;
+
+  document.getElementById('soundBtn').onclick = toggleSound;
+  document.getElementById('refreshBtn').onclick = () => loadList(true);
+  document.querySelectorAll('.chip').forEach(c => {
+    c.onclick = () => {
+      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      currentFilter = c.getAttribute('data-f');
+      loadList(true);
+    };
+  });
+  loadList(true);
+}
+
+function toggleSound() {
+  SOUND_ON = !SOUND_ON;
+  const btn = document.getElementById('soundBtn');
+  btn.classList.toggle('on', SOUND_ON);
+  btn.textContent = SOUND_ON ? '🔔 Geluid aan' : '🔔 Geluid uit';
+  if (SOUND_ON) {
+    // AudioContext activeren binnen de klik (browsers eisen een gebruikersactie)
+    try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {}
+    beep();
+  }
+}
+
+async function loadList(showLoading) {
+  const list = document.getElementById('list');
+  if (showLoading) list.innerHTML = '<div class="empty">Laden...</div>';
+  try {
+    const q = currentFilter ? ('?status=' + encodeURIComponent(currentFilter)) : '';
+    const res = await fetch('/api/errors' + q, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.success) { list.innerHTML = '<div class="empty">Kon errors niet laden.</div>'; return; }
+    IS_SUPER = !!data.isSuperadmin;
+    renderList(data.errors);
+    document.getElementById('countBadge').textContent = data.errors.length + ' getoond';
+  } catch (e) { list.innerHTML = '<div class="empty">Fout bij laden.</div>'; }
+}
+
+function renderList(errors) {
+  const list = document.getElementById('list');
+  if (!errors.length) { list.innerHTML = '<div class="empty">Geen errors in deze weergave. Mooi zo.</div>'; return; }
+  list.innerHTML = errors.map(e => {
+    const praktijk = e.praktijk_code
+      ? `<span class="praktijk-tag">${esc(e.praktijk_naam || 'Onbekende praktijk')} (${esc(e.praktijk_code)})</span>`
+      : '<span style="color:var(--text-3);">geen praktijk</span>';
+    const pillCls = e.status === 'opgelost' ? 'pill-opgelost' : e.status === 'gezien' ? 'pill-gezien' : 'pill-nieuw';
+    const stack = e.stack ? `<details class="stack"><summary>Stacktrace</summary><pre>${esc(e.stack)}</pre></details>` : '';
+    const oplossing = e.oplossing ? `<div class="oplossing"><div class="oh">Mogelijke oplossing</div>${esc(e.oplossing).replace(/\n/g,'<br>')}</div>` : '';
+    const superBtns = IS_SUPER ? `
+      ${e.status !== 'gezien' ? `<button class="btn" onclick="setStatus(${e.id},'gezien')">Markeer gezien</button>` : ''}
+      ${e.status !== 'opgelost' ? `<button class="btn" onclick="setStatus(${e.id},'opgelost')">Markeer opgelost</button>` : ''}` : '';
+    return `
+    <div class="err status-${esc(e.status)}" id="err-${e.id}">
+      <div class="err-top">
+        <div class="err-msg">${esc(e.message)}</div>
+        <span class="pill ${pillCls}">${esc(e.status)}</span>
+      </div>
+      <div class="err-meta">
+        <span>${praktijk}</span>
+        <span><b>${esc(e.method || '')}</b> ${esc(e.route || '-')}</span>
+        <span>Bron: <b>${esc(e.bron)}</b></span>
+        <span>Aantal: <b>${e.aantal}</b></span>
+        <span>Laatst: <b>${fmtDt(e.laatste_keer)}</b></span>
+      </div>
+      ${oplossing}
+      ${stack}
+      <div class="err-actions">
+        <button class="btn" onclick="copyError(${e.id})">Kopieer tekst</button>
+        ${IS_SUPER ? `<button class="btn" onclick="maakTicket(${e.id})">Maak ticket</button>` : ''}
+        ${superBtns}
+      </div>
+    </div>`;
+  }).join('');
+  window._errors = errors;
+}
+
+function copyError(id) {
+  const e = (window._errors || []).find(x => x.id === id);
+  if (!e) return;
+  const praktijk = e.praktijk_code ? `${e.praktijk_naam || 'Onbekend'} (${e.praktijk_code})` : 'geen praktijk';
+  const text =
+`[ERROR #${e.id}] status: ${e.status}
+Praktijk: ${praktijk}
+Route: ${e.method || ''} ${e.route || '-'}
+Bron: ${e.bron} | Aantal: ${e.aantal}
+Laatste keer: ${fmtDt(e.laatste_keer)}
+
+Bericht:
+${e.message}
+${e.stack ? '\nStacktrace:\n' + e.stack : ''}`;
+  navigator.clipboard.writeText(text).then(() => toast('Gekopieerd naar klembord')).catch(() => toast('Kopiëren mislukt'));
+}
+
+async function maakTicket(id) {
+  const e = (window._errors || []).find(x => x.id === id);
+  if (!e) return;
+  const praktijk = e.praktijk_code ? `${e.praktijk_naam || 'Onbekend'} (${e.praktijk_code})` : 'geen praktijk';
+  if (!confirm('Ticket aanmaken voor ' + praktijk + '?\n\n' + e.message)) return;
+  const bericht =
+`Automatisch ticket vanuit de error-trigger.
+
+Error #${e.id}
+Route: ${e.method || ''} ${e.route || '-'}
+Bron: ${e.bron} | Aantal: ${e.aantal}
+
+Bericht:
+${e.message}
+${e.stack ? '\nStacktrace:\n' + e.stack : ''}${e.oplossing ? '\n\nMogelijke oplossing:\n' + e.oplossing : ''}`;
+  try {
+    const r = await fetch('/api/tickets', {
+      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+      body: JSON.stringify({
+        type: 'incident',
+        prioriteit: 'P2',
+        bericht,
+        bron: 'trigger',
+        error_id: e.id,
+        praktijk_code: e.praktijk_code || null,
+        omgeving: 'trigger'
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Ticket aanmaken mislukt'); return; }
+    toast('Ticket #' + d.id + ' aangemaakt');
+    setStatus(id, 'gezien');
+  } catch (err) { toast('Netwerkfout'); }
+}
+
+async function setStatus(id, status) {
+  try {
+    const r = await fetch('/api/errors/' + id, {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+      body: JSON.stringify({ status })
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Mislukt'); return; }
+    loadList(false);
+  } catch (e) { toast('Netwerkfout'); }
+}
+
+// ---------- polling / alarm ----------
+function startPolling() {
+  poll();
+  pollTimer = setInterval(poll, 8000);
+}
+async function poll() {
+  try {
+    const res = await fetch('/api/errors/max-id', { credentials: 'include' });
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d.success) return;
+    if (lastMaxId === null) { lastMaxId = d.maxId; updateDot(d.nieuw); return; }
+    if (d.maxId > lastMaxId) {
+      lastMaxId = d.maxId;
+      beep();
+      flashAlarm();
+      loadList(false);
+      toast('Nieuwe error binnengekomen');
+    }
+    updateDot(d.nieuw);
+  } catch (e) { /* stil */ }
+}
+function updateDot(nieuw) {
+  const dot = document.getElementById('statusDot');
+  if (dot) dot.classList.toggle('alarm', nieuw > 0);
+}
+function flashAlarm() {
+  const dot = document.getElementById('statusDot');
+  if (dot) dot.classList.add('alarm');
+}
+
+init();
+</script>
+</body>
+</html>
