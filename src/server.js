@@ -1054,6 +1054,26 @@ app.get('/api/dashboard-todo', async (req, res) => {
   }
 });
 
+// In-memory cache voor live eClub-ledenaantallen in het admin-overzicht.
+// Voorkomt dat elke overzicht-load opnieuw de (langzamere) eClub-API bevraagt.
+const ECLUB_LEDEN_TTL = 15 * 60 * 1000; // 15 minuten
+const eclubLedenCache = new Map();
+async function eclubActieveLedenGecacht(code) {
+  const nu = Date.now();
+  const c = eclubLedenCache.get(code);
+  if (c && (nu - c.ts) < ECLUB_LEDEN_TTL) return c.aantal;
+  try {
+    const aantal = await Promise.race([
+      eclubService.getActieveLeden(code),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('eclub-timeout')), 6000))
+    ]);
+    eclubLedenCache.set(code, { aantal, ts: nu });
+    return aantal;
+  } catch (e) {
+    return c ? c.aantal : null; // val terug op oude cache indien aanwezig
+  }
+}
+
 // GET /api/admin/praktijk-overzicht — netwerk-overzicht per praktijk (admin-only, alles uit eigen DB)
 app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
   try {
@@ -1126,6 +1146,13 @@ app.get('/api/admin/praktijk-overzicht', requireAuth, async (req, res) => {
       (a.status === 'aandacht' ? 1 : 0) - (b.status === 'aandacht' ? 1 : 0)
       || b.leads_maand - a.leads_maand
     );
+
+    // Live eClub-ledenaantallen voor eClub-praktijken (gecachet, parallel, met
+    // time-out). Manuele praktijken houden hun leden_historie-waarde.
+    await Promise.all(praktijken.filter(p => p.has_eclub).map(async (p) => {
+      const live = await eclubActieveLedenGecacht(p.code);
+      if (live != null) p.actieve_leden = live;
+    }));
 
     res.json({ success: true, praktijken, aandacht: praktijken.filter(p => p.status === 'aandacht').length });
   } catch (e) {

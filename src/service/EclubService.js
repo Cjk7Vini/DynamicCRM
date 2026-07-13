@@ -312,6 +312,22 @@ export default class EclubService {
     return kpis;
   }
 
+  // Lichte telling van actieve leden (1 API-call), voor het admin-overzicht.
+  // Gebruikt exact dezelfde bron als leden_actief in getKPIs (subscribed van
+  // de huidige maand), zodat het getal overeenkomt met de eClub-kaart.
+  // Geeft null terug als er geen koppeling/credentials is of bij een fout.
+  async getActieveLeden(practiceCode) {
+    if (!this.hasCredentials()) return null;
+    const { branchId, orgId } = await this._getEclubConfig(practiceCode);
+    if (!branchId) return null;
+    const huidig = this._huidigeMaand();
+    const rows = await this.getMembershipStatusTweeMananden(branchId, huidig.jaar, huidig.maand, orgId);
+    const huidigStatus = (rows && (rows[1] || rows[0])) || null;
+    if (!huidigStatus) return null;
+    const n = parseInt(huidigStatus.subscribed);
+    return Number.isFinite(n) ? n : null;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // AUTHENTICATIE TEST
   // ─────────────────────────────────────────────────────────────────────────
