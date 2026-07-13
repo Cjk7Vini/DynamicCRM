@@ -3162,7 +3162,10 @@
             const overzicht = document.getElementById('adminPraktijkOverzicht');
             const eclubCard = document.getElementById('eclubCard');
             if (overzicht) overzicht.style.display = adminAll ? 'block' : 'none';
-            if (eclubCard) eclubCard.style.display = adminAll ? 'none' : '';
+            // eClub-kaart verbergen bij admin+Alle praktijken, en ook wanneer de
+            // functie-rol (Medewerker/Marketing) geen eClub mag zien.
+            const magEclub = (typeof canSeeEclub !== 'function') || canSeeEclub();
+            if (eclubCard) eclubCard.style.display = (adminAll || !magEclub) ? 'none' : '';
             // Aggregaat-analytics (ledengroei, bronnen, pipeline, verwacht, prestaties)
             // verbergen bij admin + Alle praktijken; die zijn per praktijk te bekijken.
             document.querySelectorAll('.admin-hide-when-all').forEach(el => {

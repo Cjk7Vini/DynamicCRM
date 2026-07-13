@@ -166,6 +166,9 @@ const isSuperadmin = (req) =>
 async function logError(errOrMsg, ctx = {}) {
   try {
     const message = (errOrMsg && errOrMsg.message) ? String(errOrMsg.message) : String(errOrMsg || 'Onbekende fout');
+    // Verwachte, goedaardige condities die geen systeemfout zijn en dus niet op
+    // de trigger horen. Een praktijk zonder eClub-koppeling is normaal, geen bug.
+    if (ctx.bron !== 'test' && /geen eclub branch\s?id/i.test(message)) return;
     const stack = (errOrMsg && errOrMsg.stack) ? String(errOrMsg.stack) : null;
     const route = ctx.route || null;
     const method = ctx.method || null;
