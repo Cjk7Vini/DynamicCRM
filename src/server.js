@@ -4012,7 +4012,7 @@ app.get('/api/admin/login-report', requireAuth, async (req, res) => {
         `SELECT user_id, to_char(date_trunc('month', ingelogd_op), 'YYYY-MM') AS maand, COUNT(*)::int AS n
            FROM login_events
           WHERE ingelogd_op >= date_trunc('month', NOW()) - INTERVAL '11 months'
-          GROUP BY user_id, maand`)).rows;
+          GROUP BY user_id, to_char(date_trunc('month', ingelogd_op), 'YYYY-MM')`)).rows;
       const totalen = (await client.query(
         `SELECT user_id, COUNT(*)::int AS n FROM login_events GROUP BY user_id`)).rows;
       return { users, perMaand, totalen };
@@ -4029,7 +4029,7 @@ app.get('/api/admin/login-report', requireAuth, async (req, res) => {
       maanden: maandMap[String(u.id)] || {}
     }));
     res.json({ success: true, maanden, rapport });
-  } catch (error) { console.error('Login-report error:', error); res.status(500).json({ error: 'Fout bij ophalen rapport' }); }
+  } catch (error) { console.error('Login-report error:', error); res.status(500).json({ error: 'Login-report: ' + error.message }); }
 });
 
 // PATCH /api/admin/users/:id
