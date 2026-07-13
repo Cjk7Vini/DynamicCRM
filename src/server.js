@@ -3472,12 +3472,13 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(500).json({ error: 'Session opslaan mislukt' });
       }
       
-      // Update last login
+      // Update last login + leg de login vast in de historie (voor maand-tellingen)
       withWriteConnection(async (client) => {
         await client.query(
           'UPDATE public.users SET last_login_at = NOW(), last_seen_at = NOW() WHERE id = $1',
           [user.id]
         );
+        await client.query('INSERT INTO login_events (user_id) VALUES ($1)', [user.id]);
       }).catch(console.error);
       
       res.json({
@@ -3971,10 +3972,64 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
       const params = [req.session.userId];
       if (search) { params.push(`%${search}%`); q += ` AND (u.email ILIKE $${params.length} OR u.practice_code ILIKE $${params.length} OR p.naam ILIKE $${params.length})`; }
       q += ' ORDER BY u.role ASC, u.created_at DESC';
-      return (await client.query(q, params)).rows;
+      const rows = (await client.query(q, params)).rows;
+      // Logins deze maand er los bij ophalen en mergen. Fout-tolerant: als de
+      // login_events-tabel nog niet bestaat, blijft de gebruikerslijst gewoon werken.
+      try {
+        const counts = (await client.query(
+          `SELECT user_id, COUNT(*)::int AS n FROM login_events
+            WHERE ingelogd_op >= date_trunc('month', NOW()) GROUP BY user_id`
+        )).rows;
+        const map = Object.fromEntries(counts.map(c => [String(c.user_id), c.n]));
+        rows.forEach(u => { u.logins_deze_maand = map[String(u.id)] || 0; });
+      } catch (e) {
+        rows.forEach(u => { u.logins_deze_maand = 0; });
+      }
+      return rows;
     });
     res.json({ success: true, users });
   } catch (error) { console.error('Get users error:', error); res.status(500).json({ error: 'Fout bij ophalen gebruikers' }); }
+});
+
+// GET /api/admin/login-report — inloggedrag per gebruiker, per maand (admin-only)
+app.get('/api/admin/login-report', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+    // Kolommen: de laatste 12 maanden, nieuwste eerst (YYYY-MM).
+    const nu = new Date();
+    const maanden = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(nu.getFullYear(), nu.getMonth() - i, 1);
+      maanden.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    }
+    const data = await withReadConnection(async (client) => {
+      const users = (await client.query(
+        `SELECT u.id, u.email, u.role, u.role_label, u.practice_code, p.naam AS praktijk_naam,
+                u.last_login_at, u.last_seen_at
+           FROM public.users u LEFT JOIN public.praktijken p ON p.code = u.practice_code
+          WHERE u.id != $1 ORDER BY u.email ASC`, [req.session.userId])).rows;
+      const perMaand = (await client.query(
+        `SELECT user_id, to_char(date_trunc('month', ingelogd_op), 'YYYY-MM') AS maand, COUNT(*)::int AS n
+           FROM login_events
+          WHERE ingelogd_op >= date_trunc('month', NOW()) - INTERVAL '11 months'
+          GROUP BY user_id, maand`)).rows;
+      const totalen = (await client.query(
+        `SELECT user_id, COUNT(*)::int AS n FROM login_events GROUP BY user_id`)).rows;
+      return { users, perMaand, totalen };
+    });
+    const totaalMap = Object.fromEntries(data.totalen.map(r => [String(r.user_id), r.n]));
+    const maandMap = {};
+    data.perMaand.forEach(r => {
+      const k = String(r.user_id);
+      (maandMap[k] = maandMap[k] || {})[r.maand] = r.n;
+    });
+    const rapport = data.users.map(u => ({
+      ...u,
+      totaal: totaalMap[String(u.id)] || 0,
+      maanden: maandMap[String(u.id)] || {}
+    }));
+    res.json({ success: true, maanden, rapport });
+  } catch (error) { console.error('Login-report error:', error); res.status(500).json({ error: 'Fout bij ophalen rapport' }); }
 });
 
 // PATCH /api/admin/users/:id

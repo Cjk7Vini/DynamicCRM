@@ -356,6 +356,7 @@
         <div style="display:flex;gap:8px;">
           <input type="text" id="searchInput" placeholder="Zoeken..." style="width:200px;padding:7px 11px;font-size:13px;" onkeydown="if(event.key==='Enter') searchUsers()">
           <button class="btn-search" onclick="searchUsers()">Zoeken</button>
+          <button class="btn-search" onclick="downloadLoginRapport()" title="Download inloggedrag als CSV">Rapport</button>
         </div>
       </div>
       <div id="usersContainer">
@@ -701,6 +702,42 @@ async function loadUsers(search = '', silent = false) {
 
 function searchUsers() { loadUsers(document.getElementById('searchInput').value.trim()); }
 
+async function downloadLoginRapport() {
+  try {
+    const res = await fetch('/api/admin/login-report', { credentials: 'include' });
+    const data = await res.json();
+    if (!data.success || !data.rapport) { alert('Kon rapport niet laden.'); return; }
+    const esc = (v) => {
+      const s = (v == null ? '' : String(v));
+      return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const fmt = (dt) => dt ? new Date(dt).toLocaleString('nl-NL') : '';
+    const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+    const maandLabel = (key) => { const p = key.split('-'); return maandNamen[parseInt(p[1], 10) - 1] + ' ' + p[0]; };
+    // Maanden chronologisch (oud -> nieuw) als kolommen.
+    const maandenChrono = (data.maanden || []).slice().reverse();
+    const header = ['E-mail', 'Rol', 'Functie-rol', 'Praktijkcode', 'Praktijk']
+      .concat(maandenChrono.map(maandLabel))
+      .concat(['Totaal', 'Laatst ingelogd', 'Laatst actief']);
+    const lines = [header.join(';')];
+    data.rapport.forEach(r => {
+      const row = [esc(r.email), esc(r.role), esc(r.role_label || ''), esc(r.practice_code || ''), esc(r.praktijk_naam || '')];
+      maandenChrono.forEach(k => row.push((r.maanden && r.maanden[k]) || 0));
+      row.push(r.totaal, esc(fmt(r.last_login_at)), esc(fmt(r.last_seen_at)));
+      lines.push(row.join(';'));
+    });
+    const csv = '﻿' + lines.join('\r\n'); // BOM zodat Excel UTF-8 herkent
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const nu = new Date();
+    const naam = 'inloggedrag_' + nu.getFullYear() + '-' + String(nu.getMonth() + 1).padStart(2, '0') + '-' + String(nu.getDate()).padStart(2, '0') + '.csv';
+    const a = document.createElement('a');
+    a.href = url; a.download = naam;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) { alert('Fout bij genereren rapport.'); }
+}
+
 let openProfileId = null;
 
 
@@ -888,6 +925,7 @@ function openUserModal(id) {
       <div class="modal-info-item"><div class="modal-info-label">Laatst actief</div><div class="modal-info-value">${u.last_seen_at ? formatDateTime(u.last_seen_at) : 'Onbekend'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Status</div><div class="modal-info-value">${u.online ? '<span style="color:#16a34a;font-weight:700;">Nu online</span>' : 'Offline'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Laatste sessie</div><div class="modal-info-value">${sessieDuur(u.last_login_at, u.last_seen_at)}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Logins deze maand</div><div class="modal-info-value">${u.logins_deze_maand != null ? u.logins_deze_maand : 0}</div></div>
     </div>
   </div>`;
 
