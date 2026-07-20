@@ -354,7 +354,7 @@
             </div>
 
             <button type="submit" class="submit-button" id="submitButton">
-                Ja, ik doe mee met het Fit Zomer Programma! &#8594;
+                Verstuur aanvraag
             </button>
 
             <div class="security-note">
@@ -423,7 +423,7 @@
                 document.getElementById('msg').textContent = 'Vul alle verplichte velden in.';
                 document.getElementById('msg').style.display = 'block';
                 btn.disabled = false;
-                btn.textContent = 'Ja, ik doe mee met het Fit Zomer Programma! →';
+                btn.textContent = 'Verstuur aanvraag';
                 return;
             }
 
@@ -433,7 +433,7 @@
                 document.getElementById('msg').textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers).';
                 document.getElementById('msg').style.display = 'block';
                 btn.disabled = false;
-                btn.textContent = 'Ja, ik doe mee met het Fit Zomer Programma! →';
+                btn.textContent = 'Verstuur aanvraag';
                 return;
             }
 
@@ -472,14 +472,14 @@
                     document.getElementById('msg').textContent = json.error || 'Er is iets misgegaan. Probeer het opnieuw.';
                     document.getElementById('msg').style.display = 'block';
                     btn.disabled = false;
-                    btn.textContent = 'Ja, ik doe mee met het Fit Zomer Programma! →';
+                    btn.textContent = 'Verstuur aanvraag';
                 }
             } catch (err) {
                 document.getElementById('msg').className = 'error';
                 document.getElementById('msg').textContent = 'Geen verbinding. Controleer je internet en probeer opnieuw.';
                 document.getElementById('msg').style.display = 'block';
                 btn.disabled = false;
-                btn.textContent = 'Ja, ik doe mee met het Fit Zomer Programma! →';
+                btn.textContent = 'Verstuur aanvraag';
             }
         });
     </script>
