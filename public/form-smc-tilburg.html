@@ -58,6 +58,43 @@
             height: auto;
         }
 
+        /* Tekst-fallback voor het logo: verschijnt alleen als het PNG-bestand
+           (nog) niet aanwezig is, zodat de kop nooit leeg is. */
+        .logo-fallback {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+        .lf-smc {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-style: italic;
+            font-size: 54px;
+            line-height: 1;
+            color: var(--navy);
+            letter-spacing: -1.5px;
+        }
+        .lf-txt {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+            line-height: 1.15;
+        }
+        .lf-txt b {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-style: italic;
+            font-size: 22px;
+            color: var(--navy);
+        }
+        .lf-txt i {
+            font-weight: 500;
+            font-style: italic;
+            font-size: 14px;
+            color: var(--navy);
+        }
+
         h1 {
             font-family: 'Anton', 'Montserrat', sans-serif;
             font-weight: 400;
@@ -326,7 +363,12 @@
 <div class="container">
 
     <div class="logo">
-        <img src="/images/smc-tilburg-logo.png" alt="SMC Tilburg" onerror="this.style.display='none'">
+        <img src="/images/smc-tilburg-logo.png" alt="SMC Tilburg"
+             onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex';">
+        <div class="logo-fallback" id="logoFallback">
+            <span class="lf-smc">SMC</span>
+            <span class="lf-txt"><b>Tilburg</b><i>Medisch specialist in beweegzorg</i></span>
+        </div>
     </div>
 
     <div class="hero-block">
