@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aanmelden - SMC Tilburg</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy:       #10003D;
+            --magenta:    #D1107B;
+            --lightgray:  #F3F5F8;
+            --text-dark:  #10003D;
+            --text-mid:   #4a4a58;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--lightgray);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 580px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 44px 40px;
+            border-radius: 10px;
+            box-shadow: 0 8px 40px rgba(16,0,61,0.10);
+        }
+
+        /* Navy hero-blok met witte tekst en magenta accent (huisstijl SMC).
+           Het logo staat in dit blok zodat de donkere logo-achtergrond
+           naadloos in het navy opgaat. */
+        .hero-block {
+            background: var(--navy);
+            border-radius: 10px;
+            padding: 30px 30px 28px;
+            margin-bottom: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-logo {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .hero-logo img {
+            max-width: 200px;
+            height: auto;
+        }
+
+        h1 {
+            font-family: 'Anton', 'Montserrat', sans-serif;
+            font-weight: 400;
+            color: #fff;
+            font-size: 30px;
+            line-height: 1.05;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tagline {
+            font-size: 13.5px;
+            color: #cfc9dd;
+            font-weight: 500;
+            margin-bottom: 18px;
+        }
+
+        .benefits {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #e8e6f0;
+            font-weight: 500;
+        }
+
+        .benefit-icon {
+            width: 22px;
+            height: 22px;
+            background: var(--magenta);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .benefit-icon svg {
+            width: 12px;
+            height: 12px;
+            stroke: #fff;
+            stroke-width: 3;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--navy);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .required { color: var(--magenta); }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e3e1ea;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-dark);
+            background: #fafafc;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--magenta);
+            background: #fff;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 3px;
+            accent-color: var(--magenta);
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: var(--text-mid);
+            line-height: 1.6;
+        }
+
+        .checkbox-label a {
+            color: var(--magenta);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--magenta);
+            color: #fff;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            font-family: 'Montserrat', sans-serif;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.25s;
+            box-shadow: 0 4px 18px rgba(209,16,123,0.30);
+        }
+
+        .submit-btn:hover {
+            background: var(--navy);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(16,0,61,0.30);
+        }
+
+        .submit-btn:disabled {
+            background: #c9c6d4;
+            color: #fff;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            text-align: center;
+            font-size: 12px;
+            color: #9a97a8;
+            margin-top: 14px;
+        }
+
+        #msg {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+        #msg.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+        #msg.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; display: block; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(16,0,61,0.60);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .success-modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 48px 36px;
+            max-width: 460px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(16,0,61,0.25);
+            animation: slideUp 0.35s ease;
+        }
+
+        .success-icon {
+            width: 72px; height: 72px;
+            background: var(--magenta);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 24px rgba(209,16,123,0.30);
+        }
+
+        .success-icon svg {
+            width: 36px; height: 36px;
+            stroke: #fff; stroke-width: 3;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+
+        .success-modal h2 {
+            font-family: 'Anton', 'Montserrat', sans-serif;
+            font-weight: 400;
+            color: var(--navy);
+            font-size: 26px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .success-modal p {
+            color: var(--text-mid);
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .practice-name-highlight {
+            color: var(--magenta);
+            font-weight: 700;
+        }
+
+        .close-button {
+            background: var(--navy);
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 20px;
+            font-family: 'Montserrat', sans-serif;
+            transition: background 0.2s;
+        }
+
+        .close-button:hover { background: var(--magenta); }
+
+        .auto-close-note {
+            color: #9a97a8;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(32px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 640px) {
+            .container { padding: 30px 22px; }
+            h1 { font-size: 25px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+
+<div class="container">
+
+    <div class="hero-block">
+
+        <div class="hero-logo">
+            <img src="/images/Logo png1.png" alt="SMC Tilburg" onerror="this.style.display='none'">
+        </div>
+
+        <h1>Plan hier jouw gratis adviesgesprek bij SMC Tilburg!</h1>
+        <p class="tagline">Binnen 1 werkdag nemen we contact op om een afspraak in te plannen.</p>
+        <div class="benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+                </div>
+                <span>Gratis en vrijblijvende kennismaking</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+                </div>
+                <span>Persoonlijk advies over jouw huidige fitheid en doelen</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+                </div>
+                <span>Ontdek hoe SMC Tilburg bij jou past</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="msg"></div>
+
+<form id="leadForm">
+        <input type="hidden" id="praktijk_code" name="praktijk_code" value="F1C90E">
+
+        <div class="form-group">
+            <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+            <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+        </div>
+
+        <div class="form-group">
+            <label for="emailadres">E-mailadres <span class="required">*</span></label>
+            <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
+        </div>
+
+        <div class="form-group">
+            <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+            <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+        </div>
+
+        <div class="form-group">
+            <label for="doel">Wat is je voornaamste doel? <span class="required">*</span></label>
+            <select id="doel" name="doel">
+                <option value="">Selecteer je doel</option>
+                <option value="Fitter en actiever worden">Fitter en actiever worden</option>
+                <option value="Klachten voorkomen of verminderen">Klachten voorkomen of verminderen</option>
+                <option value="Sterker worden">Sterker worden</option>
+                <option value="Anders">Anders</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+                <label for="bron">
+                    Hoe heb je ons gevonden?
+                </label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
+            </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+            <label for="toestemming" class="checkbox-label">
+                Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen. <span class="required">*</span>
+            </label>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">
+            Plan mijn gratis adviesgesprek
+        </button>
+
+        <p class="security-note">Je gegevens worden veilig verwerkt en nooit gedeeld met derden</p>
+    </form>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+    <div class="success-modal">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52"><polyline points="14 27 22 35 38 19"/></svg>
+        </div>
+        <h2>Aanmelding verstuurd!</h2>
+        <p>Je aanmelding is verstuurd naar</p>
+        <p class="practice-name-highlight">SMC Tilburg</p>
+        <p style="margin-top:14px;">We nemen zo spoedig mogelijk contact met je op voor een afspraak.</p>
+        <button class="close-button" onclick="sluitModal()">Sluiten</button>
+        <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+    </div>
+</div>
+
+<footer style="text-align:center;padding:16px;font-size:12px;color:#9a97a8;margin-top:8px;">
+    Copyright &copy; Dynamic Health Consultancy
+</footer>
+
+<script>
+    var PRACTICE_CODE = 'F1C90E';
+    var API_URL = 'https://dynamiccrm.onrender.com';
+    var countdownTimer;
+    var currentEventId = null;
+    var currentSubmitToken = null;
+    var currentLeadId = null;
+
+    document.getElementById('praktijk_code').value = PRACTICE_CODE;
+
+    document.getElementById('leadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('msg');
+        var origText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Bezig met verzenden...';
+        msg.style.display = 'none';
+
+        var email = document.getElementById('emailadres').value.trim();
+        var phone = document.getElementById('telefoon').value.trim();
+
+        if (!email || !email.includes('@') || !email.includes('.')) {
+            msg.textContent = 'Vul een geldig e-mailadres in.';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        var phoneDigits = phone.replace(/\D/g, '');
+        if (!phone || phoneDigits.length < 10) {
+            msg.textContent = 'Vul een geldig telefoonnummer in (minimaal 10 cijfers).';
+            msg.className = 'error';
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+
+        // eventId voor de fetch genereren zodat server het ontvangt voor CAPI deduplicatie
+        var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        var formData = {
+            praktijk_code: PRACTICE_CODE,
+            volledige_naam: document.getElementById('volledige_naam').value.trim(),
+            emailadres: email,
+            telefoon: phoneDigits,
+            bron: document.getElementById('bron')?.value || null,
+            doel: document.getElementById('doel').value || null,
+            toestemming: document.getElementById('toestemming').checked,
+            meta_event_id: eventId,
+            event_source_url: window.location.href
+        };
+
+        try {
+            var response = await fetch(API_URL + '/leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            var resData2 = await response.json().catch(function() { return {}; });
+            if (response.ok) {
+                currentSubmitToken = resData2.submit_token || '';
+                currentLeadId = (resData2.lead && resData2.lead.id) ? String(resData2.lead.id) : '';
+                var url = 'thankyou.html?s=' + PRACTICE_CODE +
+                    '&eid=' + encodeURIComponent(eventId) +
+                    '&st=' + encodeURIComponent(currentSubmitToken) +
+                    '&lid=' + encodeURIComponent(currentLeadId);
+                window.location.href = url;
+                return;
+            } else {
+                msg.textContent = resData2.error || 'Er ging iets mis. Probeer het opnieuw.';
+                msg.className = 'error';
+            }
+        } catch(err) {
+            msg.textContent = 'Kan geen verbinding maken. Controleer je internetverbinding.';
+            msg.className = 'error';
+        }
+
+        btn.disabled = false;
+        btn.textContent = origText;
+    });
+
+    function toonModal(eid) {
+        currentEventId = eid || null;
+        document.getElementById('successModal').classList.add('active');
+        var sec = 10;
+        var cd = document.getElementById('countdown');
+        countdownTimer = setInterval(function() {
+            sec--;
+            cd.textContent = sec;
+            if (sec <= 0) { sluitModal(); }
+        }, 1000);
+    }
+
+    function sluitModal() {
+        document.getElementById('successModal').classList.remove('active');
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('leadForm').reset();
+        document.getElementById('praktijk_code').value = PRACTICE_CODE;
+        var url = 'thankyou.html?s=' + PRACTICE_CODE;
+        if (currentEventId) url += '&eid=' + encodeURIComponent(currentEventId);
+        if (currentSubmitToken) url += '&st=' + encodeURIComponent(currentSubmitToken);
+        if (currentLeadId) url += '&lid=' + encodeURIComponent(currentLeadId);
+        window.location.href = url;
+    }
+</script>
+
+</body>
+</html>
