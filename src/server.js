@@ -2507,60 +2507,44 @@ app.get('/api/check-reminders', requireCron, async (req, res) => {
         if (appt.praktijk_email && SMTP.host) {
           const reminderHtml = `
             <!DOCTYPE html>
-            <html>
-            <head><meta charset="utf-8"></head>
-            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;padding:20px">
-              <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
-                <tr>
-                  <td>
-                    <div style="background:#fef3c7;border-radius:12px;padding:16px;margin-bottom:20px;border-left:4px solid #f59e0b">
-                      <p style="color:#92400e;font-size:16px;margin:0;font-weight:600">⏰ Afspraak over 1 uur!</p>
-                    </div>
-                    
-                    <h1 style="color:#111827;font-size:20px;margin:0 0 20px 0">Afspraak herinnering</h1>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:16px">
-                      Beste,
-                    </p>
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin-bottom:20px">
-                      Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur.<br/>
-                      U kunt nu uw afspraak voorbereiden voor de lead.
-                    </p>
-                    
-                    <div style="background:#f9fafb;border-radius:12px;padding:20px;margin:20px 0">
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Naam:</strong> ${appt.volledige_naam}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Telefoonnummer:</strong> ${appt.telefoon || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Email:</strong> ${appt.emailadres || 'Niet opgegeven'}</p>
-                      <p style="color:#374151;font-size:14px;margin:8px 0"><strong>Tijd:</strong> ${formattedTime}</p>
-                    </div>
-
-                    <div style="margin:30px 0">
-                      <p style="color:#111827;font-size:15px;font-weight:600;margin-bottom:16px">Na de afspraak:</p>
-                      
-                      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin-bottom:16px">
-                        Na afloop van de afspraak ontvangt u automatisch een e-mail om de uitkomst te registreren.
-                        Mocht de lead niet zijn komen opdagen, klik dan op de onderstaande knop.
-                      </p>
-
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td style="padding:0 0 10px 0">
-                            <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
-                              ✗ Afspraak gemist
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
-
-                    <p style="color:#111827;font-size:15px;line-height:1.6;margin:20px 0 0 0">
-                      Met vriendelijke groet,<br/>
-                      <strong>Dynamic Health Consultancy</strong>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </body>
-            </html>`;
+            <html lang="nl">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#f4f4f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 0;"><tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <tr><td style="background:#1A1D21;padding:24px 40px;">
+                <img src="https://dynamic-health-consultancy.nl/images/dynamic-logo-2.png" alt="Dynamic Health Consultancy" style="height:36px;width:auto;display:inline-block;vertical-align:middle;margin-right:12px;"><span style="color:white;font-size:14px;font-weight:500;vertical-align:middle;">Dynamic Health Consultancy</span>
+              </td></tr>
+              <tr><td style="padding:36px 40px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border-radius:6px;border-left:4px solid #f59e0b;margin:0 0 24px;">
+                  <tr><td style="padding:14px 18px;"><p style="margin:0;font-size:15px;font-weight:600;color:#92400e;">⏰ Afspraak over 1 uur</p></td></tr>
+                </table>
+                <p style="margin:0 0 20px;font-size:15px;color:#3A3D40;line-height:1.6;">Beste,</p>
+                <p style="margin:0 0 24px;font-size:15px;color:#3A3D40;line-height:1.6;">Uw afspraak met <strong>${appt.volledige_naam}</strong> is over een uur. U kunt de afspraak nu voorbereiden.</p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9fb;border-radius:6px;margin:0 0 28px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#9090a8;">Afspraakgegevens</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Naam:</strong> ${appt.volledige_naam}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Telefoonnummer:</strong> ${appt.telefoon || 'Niet opgegeven'}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#3A3D40;"><strong>Email:</strong> ${appt.emailadres || 'Niet opgegeven'}</p>
+                    <p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Tijd:</strong> ${formattedTime}</p>
+                  </td></tr>
+                </table>
+                <p style="margin:0 0 10px;font-size:15px;font-weight:600;color:#3A3D40;">Na de afspraak</p>
+                <p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.6;">Na afloop ontvangt u automatisch een e-mail om de uitkomst te registreren. Is de lead niet komen opdagen? Klik dan op de knop hieronder.</p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                  <tr><td>
+                    <a href="${missedUrl}" style="display:block;background:#ef4444;color:#fff;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">✗ Afspraak gemist</a>
+                  </td></tr>
+                </table>
+                <p style="margin:0;font-size:15px;color:#3A3D40;line-height:1.6;">Met vriendelijke groet,<br><strong>Dynamic Health Consultancy</strong></p>
+              </td></tr>
+              <tr><td style="background:#f4f4f6;padding:16px 40px;border-top:1px solid #e4e4e8;">
+                <p style="margin:0;font-size:12px;color:#9090a8;text-align:center;">Dynamic Health Consultancy</p>
+              </td></tr>
+            </table>
+            </td></tr></table>
+            </body></html>`;
 
           await sendMailResilient({
             from: `"${appt.praktijk_naam}" <${SMTP.from}>`,
