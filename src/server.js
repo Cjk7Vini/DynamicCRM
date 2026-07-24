@@ -1456,7 +1456,8 @@ app.get('/api/nazorg-leden', async (req, res) => {
 // Geen online-workflow: verstuurt geen nieuwe-lead-notificatie of Meta-events.
 app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
   try {
-    const { volledige_naam, emailadres, telefoon, bron, doel, afspraak } = req.body;
+    const { volledige_naam, emailadres, telefoon, bron, doel, afspraak, behandelaar } = req.body;
+    const behand = (behandelaar || '').toString().trim().slice(0, 200) || null;
 
     let praktijkCode;
     if (req.session.role === 'admin') {
@@ -1477,24 +1478,38 @@ app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
     const heeftAfspraak = afspraak && afspraak.date && afspraak.time;
 
     const inserted = await withWriteConnection(async (client) => {
-      if (heeftAfspraak) {
+      // withBehand=true slaat de behandelaar mee op. Bestaat de kolom nog niet,
+      // dan valt de insert terug op de variant zonder behandelaar (geen omvallen).
+      const doInsert = async (withBehand) => {
+        if (heeftAfspraak) {
+          const cols = withBehand ? ', status, behandelaar' : ', status';
+          const vals = withBehand ? `, 'Afspraak Gepland', $9` : `, 'Afspraak Gepland'`;
+          const params = [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode, afspraak.date, afspraak.time];
+          if (withBehand) params.push(behand);
+          return (await client.query(
+            `INSERT INTO public.leads
+               (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage,
+                appointment_date, appointment_time, appointment_datetime${cols})
+             VALUES ($1,$2,$3,$4,$5,TRUE,$6,'intent',$7,$8,
+                timezone('Europe/Amsterdam', ($7::date + $8::time)::timestamp)${vals})
+             RETURNING id`, params)).rows[0];
+        }
+        const params = [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode];
+        if (withBehand) params.push(behand);
         return (await client.query(
           `INSERT INTO public.leads
-             (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage,
-              appointment_date, appointment_time, appointment_datetime, status)
-           VALUES ($1,$2,$3,$4,$5,TRUE,$6,'intent',$7,$8,
-              timezone('Europe/Amsterdam', ($7::date + $8::time)::timestamp), 'Afspraak Gepland')
-           RETURNING id`,
-          [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode, afspraak.date, afspraak.time]
-        )).rows[0];
+             (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage${withBehand ? ', behandelaar' : ''})
+           VALUES ($1,$2,$3,$4,$5,TRUE,$6,'awareness'${withBehand ? ', $7' : ''})
+           RETURNING id`, params)).rows[0];
+      };
+      try {
+        return await doInsert(true);
+      } catch (e) {
+        if (/behandelaar/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
+          return await doInsert(false);
+        }
+        throw e;
       }
-      return (await client.query(
-        `INSERT INTO public.leads
-           (volledige_naam, emailadres, telefoon, bron, doel, toestemming, praktijk_code, funnel_stage)
-         VALUES ($1,$2,$3,$4,$5,TRUE,$6,'awareness')
-         RETURNING id`,
-        [naam, email, tel, bron || 'Walk-in', doel || null, praktijkCode]
-      )).rows[0];
     });
 
     recordEvent({
@@ -1517,7 +1532,7 @@ app.get('/api/afspraken', async (req, res) => {
     const leads = await withReadConnection(async (client) => {
       let query = `
         SELECT
-          l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
+          l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
           l.aangemaakt_op, l.appointment_date, l.appointment_time,
           l.appointment_datetime,
           COALESCE(l.appointment_datetime,

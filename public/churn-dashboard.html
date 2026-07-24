@@ -2135,8 +2135,12 @@
         <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Telefoon *</label><input type="text" id="nlTel" placeholder="0612345678" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
       </div>
       <div style="display:flex;gap:12px;margin-bottom:16px;">
-        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Bron</label><select id="nlBron" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option>Walk-in</option><option>Anders</option></select></div>
+        <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Bron</label><select id="nlBron" onchange="toggleNlBehandelaar()" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option>Walk-in</option><option>Website</option><option>Fysiotherapie</option><option>Anders</option></select></div>
         <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Doel (optioneel)</label><input type="text" id="nlDoel" placeholder="bv. afvallen" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
+      </div>
+      <div id="nlBehandelaarBox" style="display:none;margin-bottom:16px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Behandelaar <span style="color:#dc2626;">*</span></label>
+        <input type="text" id="nlBehandelaar" placeholder="Naam behandelaar" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;">
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin:6px 0 12px;cursor:pointer;"><input type="checkbox" id="nlAfspraakToggle" checked onchange="document.getElementById('nlAfspraakBox').style.display=this.checked?'block':'none';"> Meteen een afspraak inplannen</label>
       <div id="nlAfspraakBox" style="background:#f8f9fb;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -4384,8 +4388,9 @@
                 const tijd = d && !isNaN(d) ? d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : (l.appointment_time ? l.appointment_time.substring(0,5) : '—');
                 const [label, cls] = uitkomstMap[l.funnel_stage] || ['Open','badge-gray'];
                 const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
+                const behandelaarRegel = l.behandelaar ? `<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:2px;">Behandelaar: ${escHtml(l.behandelaar)}</div>` : '';
                 return `<tr>
-                    <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
+                    <td style="font-weight:500;">${l.volledige_naam||'—'}${behandelaarRegel}</td>
                     <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
                     <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
                     <td>${datum}</td>
@@ -4401,14 +4406,22 @@
 
         // ── HANDMATIGE LEAD (walk-in) ─────────────────────────────────
         function openNieuweLead() {
-            ['nlNaam', 'nlEmail', 'nlTel', 'nlDoel', 'nlDatum', 'nlTijd'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            ['nlNaam', 'nlEmail', 'nlTel', 'nlDoel', 'nlDatum', 'nlTijd', 'nlBehandelaar'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
             document.getElementById('nlBron').value = 'Walk-in';
+            toggleNlBehandelaar();
             document.getElementById('nlAfspraakToggle').checked = true;
             document.getElementById('nlAfspraakBox').style.display = 'block';
             document.getElementById('nlMsg').textContent = '';
             document.getElementById('nieuweLeadOverlay').style.display = 'flex';
         }
         function sluitNieuweLead() { document.getElementById('nieuweLeadOverlay').style.display = 'none'; }
+
+        // Toon het Behandelaar-veld alleen wanneer bron = Fysiotherapie.
+        function toggleNlBehandelaar() {
+            const bron = document.getElementById('nlBron').value;
+            const box = document.getElementById('nlBehandelaarBox');
+            if (box) box.style.display = (bron === 'Fysiotherapie') ? 'block' : 'none';
+        }
 
         async function verstuurNieuweLead() {
             const msg = document.getElementById('nlMsg');
@@ -4417,11 +4430,13 @@
             const tel = document.getElementById('nlTel').value.trim();
             const bron = document.getElementById('nlBron').value;
             const doel = document.getElementById('nlDoel').value.trim();
+            const behandelaar = document.getElementById('nlBehandelaar') ? document.getElementById('nlBehandelaar').value.trim() : '';
             const metAfspraak = document.getElementById('nlAfspraakToggle').checked;
             if (naam.length < 2) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een naam in.'; return; }
             if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig e-mailadres in.'; return; }
             if (!/^[0-9]{10,}$/.test(tel.replace(/\s/g, ''))) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig telefoonnummer in (min. 10 cijfers).'; return; }
-            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, praktijk_code: getPracticeCode() };
+            if (bron === 'Fysiotherapie' && !behandelaar) { msg.style.color = '#dc2626'; msg.textContent = 'Vul de behandelaar in.'; return; }
+            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, behandelaar: (bron === 'Fysiotherapie' ? behandelaar : null), praktijk_code: getPracticeCode() };
             if (metAfspraak) {
                 const date = document.getElementById('nlDatum').value;
                 const time = document.getElementById('nlTijd').value;
