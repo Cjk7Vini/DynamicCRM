@@ -4353,6 +4353,29 @@ async function requireTeamManager(req, res) {
   return true;
 }
 
+// Bepaalt welke praktijkcodes deze gebruiker mag beheren (team/rechten).
+// - practice Eigenaar/Manager -> alleen de eigen praktijkcode
+// - organisation -> alle gekoppelde locaties (de organisatie is eigenaar)
+// Schrijft zelf een 403 en geeft null terug bij geen toegang.
+function getTeamManagerCodes(req, res) {
+  const role = req.session.role;
+  if (role === 'organisation') {
+    const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+    if (!codes.length) { res.status(403).json({ error: 'Geen locaties gekoppeld' }); return null; }
+    return codes;
+  }
+  if (role === 'practice' && req.session.practiceCode) {
+    const rl = req.session.roleLabel || 'Eigenaar';
+    if (rl !== 'Eigenaar' && rl !== 'Manager') {
+      res.status(403).json({ error: 'Alleen een eigenaar of manager kan teamleden beheren' });
+      return null;
+    }
+    return [req.session.practiceCode];
+  }
+  res.status(403).json({ error: 'Geen toegang' });
+  return null;
+}
+
 // GET /api/praktijk-team — alle accounts gekoppeld aan de eigen praktijk
 app.get('/api/praktijk-team', requireAuth, async (req, res) => {
   try {
@@ -4377,7 +4400,8 @@ app.get('/api/praktijk-team', requireAuth, async (req, res) => {
 // PATCH /api/praktijk-team/:id/rol — functie-rol van een teamlid wijzigen
 app.patch('/api/praktijk-team/:id/rol', requireAuth, async (req, res) => {
   try {
-    if (!await requireTeamManager(req, res)) return;
+    const codes = getTeamManagerCodes(req, res);
+    if (!codes) return;
     const { id } = req.params;
     const { role_label } = req.body;
     const VALID = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
@@ -4385,11 +4409,11 @@ app.patch('/api/praktijk-team/:id/rol', requireAuth, async (req, res) => {
     if (String(id) === String(req.session.userId)) {
       return res.status(400).json({ error: 'Je kunt je eigen rol niet wijzigen' });
     }
-    // Bevestig dat het teamlid bij dezelfde praktijk hoort.
+    // Bevestig dat het teamlid bij een van de toegestane locaties hoort.
     const target = await withReadConnection(async (client) => {
       const r = await client.query(
-        `SELECT id FROM public.users WHERE id = $1 AND role = 'practice' AND practice_code = $2`,
-        [id, req.session.practiceCode]
+        `SELECT id FROM public.users WHERE id = $1 AND role = 'practice' AND practice_code = ANY($2)`,
+        [id, codes]
       );
       return r.rows[0];
     });
@@ -4426,6 +4450,44 @@ app.delete('/api/praktijk-team/:id', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Teamlid verwijderen error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/organisatie-team — accounts per gekoppelde locatie (alleen organisatie-accounts)
+app.get('/api/organisatie-team', requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== 'organisation') {
+      return res.status(403).json({ error: 'Alleen organisatie-accounts' });
+    }
+    const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+    if (!codes.length) return res.json({ success: true, locaties: [], currentUserId: req.session.userId });
+
+    const { praktijken, users } = await withReadConnection(async (client) => {
+      const praktijken = (await client.query(
+        `SELECT code, naam FROM public.praktijken WHERE code = ANY($1)`, [codes]
+      )).rows;
+      const users = (await client.query(
+        `SELECT id, email, role_label, practice_code, last_login_at, banned
+         FROM public.users
+         WHERE role = 'practice' AND practice_code = ANY($1)
+         ORDER BY created_at ASC`, [codes]
+      )).rows;
+      return { praktijken, users };
+    });
+
+    const naamMap = {};
+    praktijken.forEach(p => { naamMap[p.code] = p.naam; });
+    // Volgorde van de gekoppelde codes aanhouden.
+    const locaties = codes.map(code => ({
+      code,
+      naam: naamMap[code] || code,
+      accounts: users.filter(u => u.practice_code === code)
+    }));
+
+    res.json({ success: true, locaties, currentUserId: req.session.userId });
+  } catch (err) {
+    console.error('Organisatie-team ophalen error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

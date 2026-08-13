@@ -1915,8 +1915,27 @@
         </div>
     </div>
 
+    <!-- Account overzicht per locatie (alleen organisatie-accounts) -->
+    <div class="card" id="accountOverzichtCard" style="display:none;margin-bottom:20px;">
+        <div class="card-header">
+            <div>
+                <div class="card-title">Account overzicht</div>
+                <div class="card-subtitle">Accounts per locatie. Klik op een rol om de rechten aan te passen.</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="accountOverzichtFeedback" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
+            <div id="accountOverzichtLijst"><div style="color:var(--text-3);font-size:13px;">Laden...</div></div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:14px;line-height:1.5;">
+                Medewerker: ziet leads, afspraken, belpogingen en rapportages - geen eClub/omzet, geen Meta.<br>
+                Marketing: zoals Medewerker + Meta (incl. sync) - geen eClub/omzet.<br>
+                Manager / Eigenaar: volledige toegang. Nieuwe accounts aanmaken loopt via Dynamic Health.
+            </div>
+        </div>
+    </div>
+
     <!-- Licentie overzicht -->
-    <div class="card" style="margin-bottom:20px;">
+    <div class="card" id="licentieCard" style="margin-bottom:20px;">
         <div class="card-header">
             <div>
                 <div class="card-title">Licenties</div>
@@ -2786,6 +2805,14 @@
             }
         }
 
+        // Maakt de churn-grafiek en vernietigt eerst synchroon een bestaande op
+        // hetzelfde canvas. Synchroon destroy+create voorkomt 'canvas already in use'
+        // bij (bijna) gelijktijdige aanroepen.
+        function makeChurnChart(ctx, cfg) {
+            try { const ex = Chart.getChart(ctx); if (ex) ex.destroy(); } catch(e) {}
+            return new Chart(ctx, cfg);
+        }
+
         // Load Churn Forecast Chart - eClub historische data
         async function loadChurnForecast() {
             try {
@@ -2799,7 +2826,7 @@
                 churnForecastChart = null;
 
                 if (!practice) {
-                    churnForecastChart = new Chart(ctx, {
+                    churnForecastChart = makeChurnChart(ctx, {
                         type: 'bar',
                         data: { labels: [], datasets: [] },
                         options: { responsive: true, maintainAspectRatio: false }
@@ -2839,13 +2866,13 @@
                         const maandNamenArr = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
                         const labels = ledenKeys.map(k => { const [j,m] = k.split('-'); return `${maandNamenArr[parseInt(m)-1]} ${j}`; });
                         const values = ledenKeys.map(k => ledenHistorieLookup[k]);
-                        churnForecastChart = new Chart(ctx, {
+                        churnForecastChart = makeChurnChart(ctx, {
                             type: 'bar',
                             data: { labels, datasets: [{ label: 'Actieve leden (werkelijk)', data: values, backgroundColor: 'rgba(51,153,204,0.7)', borderColor: '#3399CC', borderWidth: 1 }] },
                             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } }, scales: { y: { beginAtZero: false, grace: '10%' } } }
                         });
                     } else {
-                        churnForecastChart = new Chart(ctx, {
+                        churnForecastChart = makeChurnChart(ctx, {
                             type: 'bar',
                             data: { labels: [], datasets: [] },
                             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
@@ -2871,7 +2898,7 @@
                     const ledenValues = ledenKeys.map(k => ledenHistorieLookup[k]);
                     const labels = history.length > 0 ? history.map(d => d.periode) : ledenLabels;
                     const values = history.length > 0 ? history.map(d => d.subscribed) : ledenValues;
-                    churnForecastChart = new Chart(ctx, {
+                    churnForecastChart = makeChurnChart(ctx, {
                         type: 'bar',
                         data: {
                             labels,
@@ -2905,7 +2932,7 @@
                     return ledenHistorieLookup[`${p.jaar}-${p.maand}`] || null;
                 });
 
-                churnForecastChart = new Chart(ctx, {
+                churnForecastChart = makeChurnChart(ctx, {
                     type: 'bar',
                     data: {
                         labels,
@@ -5205,6 +5232,14 @@
                 // Teambeheer alleen voor eigenaar/manager
                 renderTeambeheer(p);
 
+                // Organisatie-accounts: toon het accountoverzicht per locatie i.p.v. licenties.
+                const isOrg = currentUser && currentUser.role === 'organisation';
+                const accCard = document.getElementById('accountOverzichtCard');
+                const licCard = document.getElementById('licentieCard');
+                if (accCard) accCard.style.display = isOrg ? 'block' : 'none';
+                if (licCard) licCard.style.display = isOrg ? 'none' : '';
+                if (isOrg) renderOrganisatieTeam();
+
                 // Aanpasbare velden
                 // Vul velden en zet juiste modus
                 const heeftData = !!(p.contact_naam || p.locatie);
@@ -5267,8 +5302,8 @@
                     </div>
                 `).join('');
 
-                // Aanvraag knoppen voor niet-actieve licenties (niet voor admin)
-                const inactief = p.role !== 'admin' ? licenties.filter(l => !l.actief) : [];
+                // Aanvraag knoppen voor niet-actieve licenties (niet voor admin/organisatie)
+                const inactief = (p.role !== 'admin' && !isOrg) ? licenties.filter(l => !l.actief) : [];
                 const aanvraagCard = document.getElementById('licentieAanvraagCard');
                 const aanvraagBtns = document.getElementById('licentieAanvraagButtons');
 
@@ -5413,7 +5448,80 @@
             fb.textContent = msg;
         }
 
+        function accountFeedback(ok, msg) {
+            const fb = document.getElementById('accountOverzichtFeedback');
+            if (!fb) return;
+            fb.style.display = 'block';
+            fb.style.background = ok ? '#ecfdf5' : '#fef2f2';
+            fb.style.color = ok ? '#065f46' : '#991b1b';
+            fb.textContent = msg;
+        }
+
+        // Accountoverzicht per locatie voor organisatie-accounts.
+        let _orgTeamData = [];
+        async function renderOrganisatieTeam() {
+            const lijst = document.getElementById('accountOverzichtLijst');
+            if (!lijst) return;
+            lijst.innerHTML = '<div style="color:var(--text-3);font-size:13px;">Laden...</div>';
+            try {
+                const res = await fetch('/api/organisatie-team', { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) { lijst.innerHTML = `<div style="color:#991b1b;font-size:13px;">${data.error || 'Kon accounts niet laden.'}</div>`; return; }
+                const meId = data.currentUserId;
+                const locaties = data.locaties || [];
+                if (!locaties.length) { lijst.innerHTML = '<div style="color:var(--text-3);font-size:13px;">Geen locaties gekoppeld.</div>'; return; }
+                const rollen = ['Eigenaar','Manager','Marketing','Medewerker'];
+                _orgTeamData = [];
+                lijst.innerHTML = locaties.map((loc, li) => {
+                    const accounts = loc.accounts || [];
+                    const rows = accounts.length ? accounts.map(u => {
+                        _orgTeamData.push(u);
+                        const isMe = String(u.id) === String(meId);
+                        const cur = u.role_label || 'Eigenaar';
+                        const opts = rollen.map(r => `<option value="${r}" ${cur === r ? 'selected' : ''}>${r}</option>`).join('');
+                        return `<div class="oa-row" style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;" data-uid="${u.id}">
+                            <div style="flex:1;min-width:0;"><div class="oa-email" style="font-size:13px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div></div>
+                            ${isMe
+                                ? `<span style="font-size:13px;color:var(--text-3);padding:0 8px;">${cur} (jij)</span>`
+                                : `<select onchange="wijzigTeamRol(${u.id}, this.value)" style="padding:7px 9px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--surface-2);color:var(--text-1);">${opts}</select>`}
+                        </div>`;
+                    }).join('') : '<div style="color:var(--text-3);font-size:12px;padding:2px 2px 4px;">Nog geen accounts voor deze locatie.</div>';
+                    return `<div style="margin-bottom:${li < locaties.length - 1 ? '22px' : '2px'};">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <div class="oa-loc-naam" style="font-size:14px;font-weight:700;color:var(--text-1);"></div>
+                            <span class="oa-loc-code" style="font-size:11px;font-family:monospace;color:var(--text-3);background:var(--surface-2);padding:1px 7px;border-radius:20px;"></span>
+                            <span style="font-size:11px;color:var(--text-3);margin-left:auto;">${accounts.length} account${accounts.length === 1 ? '' : 's'}</span>
+                        </div>
+                        ${rows}
+                    </div>`;
+                }).join('');
+                // Namen/codes/e-mails XSS-veilig invullen via textContent.
+                const groepen = lijst.children;
+                for (let i = 0; i < groepen.length; i++) {
+                    const loc = locaties[i];
+                    const nEl = groepen[i].querySelector('.oa-loc-naam');
+                    const cEl = groepen[i].querySelector('.oa-loc-code');
+                    if (nEl) nEl.textContent = loc.naam;
+                    if (cEl) cEl.textContent = loc.code;
+                }
+                lijst.querySelectorAll('.oa-row').forEach(row => {
+                    const uid = row.getAttribute('data-uid');
+                    const member = _orgTeamData.find(m => String(m.id) === uid);
+                    const emailEl = row.querySelector('.oa-email');
+                    if (member && emailEl) emailEl.textContent = member.email;
+                });
+            } catch(e) {
+                lijst.innerHTML = '';
+                const div = document.createElement('div');
+                div.style.color = '#991b1b'; div.style.fontSize = '13px';
+                div.textContent = 'Netwerkfout: ' + e.message;
+                lijst.appendChild(div);
+            }
+        }
+
         async function wijzigTeamRol(id, role_label) {
+            const isOrg = currentUser && currentUser.role === 'organisation';
+            const fb = (ok, msg) => isOrg ? accountFeedback(ok, msg) : teamFeedback(ok, msg);
             try {
                 const res = await fetch('/api/praktijk-team/' + id + '/rol', {
                     method: 'PATCH',
@@ -5422,9 +5530,9 @@
                     body: JSON.stringify({ role_label })
                 });
                 const data = await res.json();
-                if (data.success) teamFeedback(true, 'Rol bijgewerkt.');
-                else { teamFeedback(false, data.error || 'Fout bij wijzigen.'); loadInstellingen(); }
-            } catch(e) { teamFeedback(false, 'Netwerkfout: ' + e.message); }
+                if (data.success) fb(true, 'Rol bijgewerkt.');
+                else { fb(false, data.error || 'Fout bij wijzigen.'); isOrg ? renderOrganisatieTeam() : loadInstellingen(); }
+            } catch(e) { fb(false, 'Netwerkfout: ' + e.message); }
         }
 
         async function verwijderTeamlid(id, email) {
