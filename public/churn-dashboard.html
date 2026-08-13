@@ -963,7 +963,7 @@
     <nav class="sidebar-nav">
 
         <div class="sidebar-section-label">Overzicht</div>
-        <div class="sidebar-item active" onclick="showDashboardSection('dashboard', this)">
+        <div class="sidebar-item active" id="navDashboard" onclick="showDashboardSection('dashboard', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                 <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
@@ -1035,7 +1035,7 @@
 
         <div id="sidebarAlleLocaties" style="display:none;">
             <div class="sidebar-section-label" style="margin-top:8px;">Organisatie</div>
-            <div class="sidebar-item" onclick="showDashboardSection('allelocaties', this)">
+            <div class="sidebar-item" id="navAlleLocaties" onclick="showDashboardSection('allelocaties', this)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
                 </svg>
@@ -2673,6 +2673,9 @@
                         } catch(e) {
                             select.innerHTML = codes.map(c => `<option value="${c}">${c}</option>`).join('');
                         }
+                        // Standaard op het organisatieoverzicht landen (niet stiekem 1 locatie).
+                        select.value = '';
+                        showDashboardSection('allelocaties', document.getElementById('navAlleLocaties'));
                     }
                     return;
                 }
@@ -4163,6 +4166,20 @@
         }
 
         function onPracticeFilterChange() {
+            // Organisatie-accounts: de locatiekeuze stuurt de navigatie.
+            // "Alle locaties" -> het eenvoudige organisatieoverzicht.
+            // Een specifieke locatie -> het normale dashboard van die locatie.
+            if (currentUser && currentUser.role === 'organisation') {
+                const val = document.getElementById('practiceFilter')?.value || '';
+                if (!val) {
+                    showDashboardSection('allelocaties', document.getElementById('navAlleLocaties'));
+                } else {
+                    showDashboardSection('dashboard', document.getElementById('navDashboard'));
+                    loadChurnForecast();
+                }
+                return;
+            }
+
             // Herlaad het hoofddashboard altijd
             applyFilters();
             // Herlaad ook de actieve nieuwe sectie
