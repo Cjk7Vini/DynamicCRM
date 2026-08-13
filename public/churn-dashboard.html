@@ -5062,47 +5062,72 @@
                 }
             }));
 
-            // Render tabel
-            const tbody = document.getElementById('alleLocatiesBody');
-            tbody.innerHTML = locatieData.map(l => `
-                <tr>
-                    <td style="font-weight:600;">${l.naam}</td>
-                    <td style="text-align:right;">${l.leadsDezeM}</td>
-                    <td style="text-align:right;">${l.conv}%</td>
-                    <td style="text-align:right;">${l.actiefLeden !== null ? l.actiefLeden : '—'}</td>
-                    <td style="text-align:right;">${l.churnPct !== null ? l.churnPct + '%' : '—'}</td>
-                    <td style="text-align:right;">${l.cpl !== null ? '€' + parseFloat(l.cpl).toFixed(2) : '—'}</td>
-                    <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="gaNaarLocatie('${l.code}')">Bekijken</button></td>
-                </tr>
-            `).join('');
+            // Alleen locaties met echte data tellen mee in gemiddelden en inzichten.
+            const isActief = l => (l.actiefLeden !== null) || (l.churnPct !== null) || (l.cpl !== null) || (l.alleLeads && l.alleLeads.length > 0);
+            const actief = locatieData.filter(isActief);
 
-            // Gemiddelden rij
-            const gemConv = Math.round(locatieData.reduce((s,l) => s+l.conv, 0) / locatieData.length);
-            const gemLeden = locatieData.filter(l => l.actiefLeden !== null);
-            const gemLedenGem = gemLeden.length ? Math.round(gemLeden.reduce((s,l) => s+l.actiefLeden, 0) / gemLeden.length) : null;
-            const gemChurn = locatieData.filter(l => l.churnPct !== null);
-            const gemChurnGem = gemChurn.length ? Math.round(gemChurn.reduce((s,l) => s+l.churnPct, 0) / gemChurn.length * 10) / 10 : null;
-            const gemLeads = Math.round(locatieData.reduce((s,l) => s+l.leadsDezeM, 0) / locatieData.length * 10) / 10;
+            // Render tabel — niet-geactiveerde locaties tonen we, maar zonder loze nullen.
+            const tbody = document.getElementById('alleLocatiesBody');
+            const nietGeactTag = '<span style="font-size:10px;font-weight:700;color:#9ca3af;background:#f3f4f6;padding:1px 7px;border-radius:999px;margin-left:8px;">Niet geactiveerd</span>';
+            tbody.innerHTML = locatieData.map(l => {
+                const a = isActief(l);
+                return `
+                <tr>
+                    <td style="font-weight:600;">${l.naam}${a ? '' : nietGeactTag}</td>
+                    <td style="text-align:right;">${a ? l.leadsDezeM : '\u2014'}</td>
+                    <td style="text-align:right;">${a ? l.conv + '%' : '\u2014'}</td>
+                    <td style="text-align:right;">${l.actiefLeden !== null ? l.actiefLeden : '\u2014'}</td>
+                    <td style="text-align:right;">${l.churnPct !== null ? l.churnPct + '%' : '\u2014'}</td>
+                    <td style="text-align:right;">${l.cpl !== null ? '\u20ac' + parseFloat(l.cpl).toFixed(2) : '\u2014'}</td>
+                    <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="gaNaarLocatie('${l.code}')">Bekijken</button></td>
+                </tr>`;
+            }).join('');
+
+            // Gemiddelden — uitsluitend over geactiveerde locaties, consistent voor elke kolom.
+            const _avg = (arr, sel) => arr.length ? arr.reduce((s,l)=>s+sel(l),0)/arr.length : null;
+            const _r1 = v => v === null ? null : Math.round(v*10)/10;
+            const gemConv     = actief.length ? Math.round(_avg(actief, l=>l.conv)) : null;
+            const gemLeads    = actief.length ? _r1(_avg(actief, l=>l.leadsDezeM)) : null;
+            const ledenArr    = actief.filter(l => l.actiefLeden !== null);
+            const gemLedenGem = ledenArr.length ? Math.round(_avg(ledenArr, l=>l.actiefLeden)) : null;
+            const churnArr    = actief.filter(l => l.churnPct !== null);
+            const gemChurnGem = churnArr.length ? _r1(_avg(churnArr, l=>l.churnPct)) : null;
 
             tbody.innerHTML += `
                 <tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border);">
                     <td>Gemiddelde</td>
-                    <td style="text-align:right;">${gemLeads}</td>
-                    <td style="text-align:right;">${gemConv}%</td>
-                    <td style="text-align:right;">${gemLedenGem !== null ? gemLedenGem : '—'}</td>
-                    <td style="text-align:right;">${gemChurnGem !== null ? gemChurnGem + '%' : '—'}</td>
-                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">${gemLeads !== null ? gemLeads : '\u2014'}</td>
+                    <td style="text-align:right;">${gemConv !== null ? gemConv + '%' : '\u2014'}</td>
+                    <td style="text-align:right;">${gemLedenGem !== null ? gemLedenGem : '\u2014'}</td>
+                    <td style="text-align:right;">${gemChurnGem !== null ? gemChurnGem + '%' : '\u2014'}</td>
+                    <td style="text-align:right;">\u2014</td>
                     <td></td>
                 </tr>`;
 
-            // Advies
-            const beste = [...locatieData].sort((a,b) => b.conv - a.conv)[0];
-            const minste = [...locatieData].sort((a,b) => a.leadsDezeM - b.leadsDezeM)[0];
-            document.getElementById('alleLocatiesAdvies').innerHTML = [
-                beste ? `${beste.naam} heeft de hoogste conversie (${beste.conv}%).` : null,
-                minste && locatieData.length > 1 ? `${minste.naam} heeft de minste leads deze maand (${minste.leadsDezeM}). Overweeg extra inzet.` : null,
-                gemChurnGem !== null ? `Gemiddelde churn over alle locaties: ${gemChurnGem}%.` : null
-            ].filter(Boolean).map(t => `<div class="advice-item"><div class="advice-dot"></div>${t}</div>`).join('');
+            // Inzichten — alleen tonen wat betekenis heeft (geen loze 0%-adviezen).
+            const inzichten = [];
+            if (actief.length) {
+                const besteConv = [...actief].filter(l => l.conv > 0).sort((a,b)=>b.conv-a.conv)[0];
+                if (besteConv && actief.length > 1) {
+                    inzichten.push(`${besteConv.naam} heeft de hoogste conversie (${besteConv.conv}%).`);
+                }
+                const totLeads = actief.reduce((s,l)=>s+l.leadsDezeM,0);
+                const maxLeads = Math.max(...actief.map(l=>l.leadsDezeM));
+                const minste   = [...actief].sort((a,b)=>a.leadsDezeM-b.leadsDezeM)[0];
+                if (actief.length > 1 && totLeads > 0 && minste.leadsDezeM < maxLeads) {
+                    inzichten.push(`${minste.naam} heeft de minste leads deze maand (${minste.leadsDezeM}). Overweeg extra inzet.`);
+                }
+                if (gemChurnGem !== null) {
+                    inzichten.push(`Gemiddelde churn over de geactiveerde locaties: ${gemChurnGem}%.`);
+                }
+            }
+            const nietAc = locatieData.length - actief.length;
+            if (nietAc > 0) {
+                inzichten.push(`${nietAc} locatie${nietAc>1?'s zijn':' is'} nog niet geactiveerd en tel${nietAc>1?'len':'t'} niet mee in de gemiddelden.`);
+            }
+            document.getElementById('alleLocatiesAdvies').innerHTML = inzichten.length
+                ? inzichten.map(t => `<div class="advice-item"><div class="advice-dot"></div>${t}</div>`).join('')
+                : `<div class="advice-item"><div class="advice-dot"></div>Nog geen gegevens om te vergelijken.</div>`;
 
             // Leads chart per locatie per maand
             const maandKort = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
