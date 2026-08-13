@@ -1083,8 +1083,8 @@
     <div class="sidebar-sync-section" id="eclubSyncSection" style="display:none;">
         <span class="sidebar-filter-label">eClub Sync</span>
         <div style="font-size:12px; color:rgba(255,255,255,.5); margin-bottom:8px;">
-            Laatste sync: <span id="lastSyncTime">—</span><br>
-            Leden: <span id="eclubMemberCount">—</span>
+            Laatste sync: <span id="lastSyncTime">-</span><br>
+            Leden: <span id="eclubMemberCount">-</span>
         </div>
         <button id="btnEclubSync" class="btn btn-ghost" style="width:100%; background:rgba(255,255,255,.1); color:white; border-color:rgba(255,255,255,.2);" onclick="syncEclub()">
             <span id="syncButtonText">Sync leden</span>
@@ -1106,8 +1106,8 @@
             <button class="user-dropdown-btn" onclick="toggleUserMenu()" id="userDropdownBtn">
                 <div class="user-avatar" id="userIcon">A</div>
                 <div class="user-details">
-                    <div class="user-email" id="userEmail">—</div>
-                    <div class="user-role" id="userRole">—</div>
+                    <div class="user-email" id="userEmail">-</div>
+                    <div class="user-role" id="userRole">-</div>
                 </div>
                 <svg style="width:14px;height:14px;flex-shrink:0;transition:transform .2s;" id="userDropdownArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
@@ -1227,22 +1227,22 @@
     <div class="kpi-grid" id="kpiGrid">
         <div class="kpi-card">
             <div class="kpi-label">Totaal leads</div>
-            <div class="kpi-value" id="totalLeads">—</div>
+            <div class="kpi-value" id="totalLeads">-</div>
             <div class="kpi-sub">Alle leads in database</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Conversie ratio</div>
-            <div class="kpi-value" id="conversionRate">—</div>
+            <div class="kpi-value" id="conversionRate">-</div>
             <div class="kpi-sub">Lead → Lid geworden</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Actieve praktijken</div>
-            <div class="kpi-value" id="activePractices">—</div>
+            <div class="kpi-value" id="activePractices">-</div>
             <div class="kpi-sub">Praktijken met leads</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Gem. leads/maand</div>
-            <div class="kpi-value" id="avgLeadsPerMonth">—</div>
+            <div class="kpi-value" id="avgLeadsPerMonth">-</div>
             <div class="kpi-sub">Huidige praktijk</div>
         </div>
     </div>
@@ -1271,7 +1271,7 @@
                 <div class="chart-wrap" style="height:200px;">
                     <canvas id="sourceChart"></canvas>
                 </div>
-                <div id="topSource" style="margin-top:12px; font-size:12px; color:var(--text-3);">Top bron: <strong id="topSourceName">—</strong></div>
+                <div id="topSource" style="margin-top:12px; font-size:12px; color:var(--text-3);">Top bron: <strong id="topSourceName">-</strong></div>
             </div>
         </div>
     </div>
@@ -1293,12 +1293,12 @@
                 <div class="forecast-grid">
                     <div class="forecast-card">
                         <div class="forecast-label">Verwacht</div>
-                        <div class="forecast-value" id="forecastExpected">—</div>
+                        <div class="forecast-value" id="forecastExpected">-</div>
                         <div class="forecast-sub">8 leads/mnd × 1 mnd</div>
                     </div>
                     <div class="forecast-card">
                         <div class="forecast-label">Actueel</div>
-                        <div class="forecast-value" id="forecastActual">—</div>
+                        <div class="forecast-value" id="forecastActual">-</div>
                         <div class="forecast-sub">Daadwerkelijk gewonnen</div>
                     </div>
                 </div>
@@ -1385,7 +1385,7 @@
         <div class="card-header">
             <div>
                 <div class="card-title">Meta Marketing Performance</div>
-                <div class="card-subtitle" id="metaLastSync">Laatste sync: —</div>
+                <div class="card-subtitle" id="metaLastSync">Laatste sync: -</div>
             </div>
             <button class="btn btn-sync" onclick="syncMetaData(this)">Sync Nu</button>
         </div>
@@ -1511,8 +1511,8 @@
                     <option value="11">November</option><option value="12">December</option>
                 </select>
                 <select id="eclubKwartaalSelect" class="period-select" onchange="syncEclub()" style="display:none;">
-                    <option value="1">Q1 (jan–mrt)</option><option value="2">Q2 (apr–jun)</option>
-                    <option value="3">Q3 (jul–sep)</option><option value="4">Q4 (okt–dec)</option>
+                    <option value="1">Q1 (jan-mrt)</option><option value="2">Q2 (apr-jun)</option>
+                    <option value="3">Q3 (jul-sep)</option><option value="4">Q4 (okt-dec)</option>
                 </select>
                 <select id="eclubJaarSelect" class="period-select" onchange="syncEclub()"></select>
                 <button class="meta-sync-btn" onclick="syncEclub()">Sync Nu</button>
@@ -1522,19 +1522,19 @@
             <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:20px;">
                 <div class="metric-card highlight">
                     <div class="metric-label">Actieve leden</div>
-                    <div class="metric-value" id="eclubVisited">—</div>
+                    <div class="metric-value" id="eclubVisited">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Nieuwe leden</div>
-                    <div class="metric-value" id="eclubRegistrations">—</div>
+                    <div class="metric-value" id="eclubRegistrations">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Gestopt</div>
-                    <div class="metric-value" id="eclubPending">—</div>
+                    <div class="metric-value" id="eclubPending">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Churn %</div>
-                    <div class="metric-value" id="eclubConversionRate">—</div>
+                    <div class="metric-value" id="eclubConversionRate">-</div>
                 </div>
             </div>
 
@@ -1542,28 +1542,28 @@
             <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="metric-card">
                     <div class="metric-label">Leden aantal</div>
-                    <div class="metric-value" id="eclubActiveMembers">—</div>
-                    <div class="kpi-sub"><span id="eclubNewMembers">—</span> gestart | <span id="eclubChurnedMembers">—</span> gestopt</div>
+                    <div class="metric-value" id="eclubActiveMembers">-</div>
+                    <div class="kpi-sub"><span id="eclubNewMembers">-</span> gestart | <span id="eclubChurnedMembers">-</span> gestopt</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Gem. duur lidmaatschap</div>
-                    <div class="metric-value" id="eclubAvgDuration">—</div>
+                    <div class="metric-value" id="eclubAvgDuration">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Aantal bezoeken</div>
-                    <div class="metric-value" id="eclubTotalVisits">—</div>
+                    <div class="metric-value" id="eclubTotalVisits">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Retentie</div>
-                    <div class="metric-value" id="eclubRetention">—</div>
+                    <div class="metric-value" id="eclubRetention">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Omzet per locatie</div>
-                    <div class="metric-value" id="eclubRevenue">—</div>
+                    <div class="metric-value" id="eclubRevenue">-</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Omzet per lid</div>
-                    <div class="metric-value" id="eclubRevenuePerMember">—</div>
+                    <div class="metric-value" id="eclubRevenuePerMember">-</div>
                 </div>
             </div>
         </div>
@@ -1621,22 +1621,22 @@
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
         <div class="insight-card ic-highlight">
             <div class="insight-label">Totaal afspraken</div>
-            <div class="insight-value" id="apptTotal">—</div>
+            <div class="insight-value" id="apptTotal">-</div>
             <div class="insight-sub">Alle tijden</div>
         </div>
         <div class="insight-card">
             <div class="insight-label">Komende 7 dagen</div>
-            <div class="insight-value" id="apptUpcoming">—</div>
+            <div class="insight-value" id="apptUpcoming">-</div>
             <div class="insight-sub">Ingepland</div>
         </div>
         <div class="insight-card">
             <div class="insight-label">Conversie</div>
-            <div class="insight-value" id="apptConversie">—</div>
+            <div class="insight-value" id="apptConversie">-</div>
             <div class="insight-sub">Afspraak naar lid</div>
         </div>
         <div class="insight-card ic-red">
             <div class="insight-label">Geen uitkomst</div>
-            <div class="insight-value" id="apptOpenCount">—</div>
+            <div class="insight-value" id="apptOpenCount">-</div>
             <div class="insight-sub">Wacht op registratie</div>
         </div>
     </div>
@@ -1725,22 +1725,22 @@
     <div class="insight-grid-4" id="seizoenKpiGrid">
         <div class="insight-card ic-highlight">
             <div class="insight-label">Beste maand leads</div>
-            <div class="insight-value" id="seizoenBesteMaand">—</div>
-            <div class="insight-sub" id="seizoenBesteSub">—</div>
+            <div class="insight-value" id="seizoenBesteMaand">-</div>
+            <div class="insight-sub" id="seizoenBesteSub">-</div>
         </div>
         <div class="insight-card">
             <div class="insight-label">Zwakste maand leads</div>
-            <div class="insight-value" id="seizoenZwaksteMaand">—</div>
-            <div class="insight-sub" id="seizoenZwaksteSub">—</div>
+            <div class="insight-value" id="seizoenZwaksteMaand">-</div>
+            <div class="insight-sub" id="seizoenZwaksteSub">-</div>
         </div>
         <div class="insight-card">
             <div class="insight-label">Beste kwartaal conversie</div>
-            <div class="insight-value" id="seizoenBesteKwartaal">—</div>
+            <div class="insight-value" id="seizoenBesteKwartaal">-</div>
             <div class="insight-sub">Lead naar lid</div>
         </div>
         <div class="insight-card">
             <div class="insight-label">Totaal Meta spend</div>
-            <div class="insight-value" id="seizoenMetaSpend">—</div>
+            <div class="insight-value" id="seizoenMetaSpend">-</div>
             <div class="insight-sub" id="seizoenMetaSub">dit jaar</div>
         </div>
     </div>
@@ -1816,7 +1816,7 @@
     <div class="advice-block" style="margin-bottom:20px;">
         <div class="advice-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-            Organisatieoverzicht — gemiddelden over alle locaties
+            Organisatieoverzicht - gemiddelden over alle locaties
         </div>
         <div id="alleLocatiesAdvies">
             <div class="advice-item"><div class="advice-dot"></div>Data wordt geladen...</div>
@@ -1855,7 +1855,7 @@
     <!-- Leads per locatie grafiek -->
     <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
-            <div class="card-title">Leads per locatie — afgelopen 6 maanden</div>
+            <div class="card-title">Leads per locatie - afgelopen 6 maanden</div>
         </div>
         <div class="card-body">
             <div style="position:relative;height:260px;"><canvas id="alleLocatiesChart"></canvas></div>
@@ -1879,7 +1879,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
                 <div>
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">E-mailadres</div>
-                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielEmail">—</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielEmail">-</div>
                 </div>
                 <div>
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Rol</div>
@@ -1889,20 +1889,20 @@
                 </div>
                 <div id="profielPraktijkcodeRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijkcode</div>
-                    <div style="font-size:15px;font-weight:600;color:var(--accent);font-family:monospace;" id="profielCode">—</div>
+                    <div style="font-size:15px;font-weight:600;color:var(--accent);font-family:monospace;" id="profielCode">-</div>
                 </div>
                 <div id="profielPraktijknaamRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Praktijknaam</div>
-                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielNaam">—</div>
+                    <div style="font-size:15px;font-weight:500;color:var(--text-1);" id="profielNaam">-</div>
                 </div>
                 <div id="profielContactRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Contactpersoon</div>
-                    <div id="profielContactDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">—</div>
+                    <div id="profielContactDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">-</div>
                     <input type="text" id="profielContactInput" placeholder="Naam contactpersoon" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;display:none;">
                 </div>
                 <div id="profielLocatieRij">
                     <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Locatie</div>
-                    <div id="profielLocatieDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">—</div>
+                    <div id="profielLocatieDisplay" style="font-size:15px;font-weight:500;color:var(--text-1);display:none;">-</div>
                     <input type="text" id="profielLocatieInput" placeholder="Bijv. Amsterdam" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--surface-2);color:var(--text-1);outline:none;display:none;">
                 </div>
             </div>
@@ -1957,8 +1957,8 @@
             <div id="teambeheerFeedback" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;"></div>
             <div id="teambeheerLijst"><div style="color:var(--text-3);font-size:13px;">Laden...</div></div>
             <div style="font-size:11px;color:var(--text-3);margin-top:14px;line-height:1.5;">
-                Medewerker: ziet leads, afspraken, belpogingen en rapportages — geen eClub/omzet, geen Meta.<br>
-                Marketing: zoals Medewerker + Meta (incl. sync) — geen eClub/omzet.<br>
+                Medewerker: ziet leads, afspraken, belpogingen en rapportages - geen eClub/omzet, geen Meta.<br>
+                Marketing: zoals Medewerker + Meta (incl. sync) - geen eClub/omzet.<br>
                 Manager / Eigenaar: volledige toegang. Nieuwe accounts aanmaken loopt via Dynamic Health.
             </div>
         </div>
@@ -1970,22 +1970,22 @@
     <div class="insight-grid-4">
         <div class="insight-card ic-red">
             <div class="insight-label">Geen uitkomst</div>
-            <div class="insight-value" id="kwalNoOutcome">—</div>
+            <div class="insight-value" id="kwalNoOutcome">-</div>
             <div class="insight-sub">Afspraak geweest, niks geregistreerd</div>
         </div>
         <div class="insight-card ic-amber">
             <div class="insight-label">Geen opvolging</div>
-            <div class="insight-value" id="kwalNoFollowup">—</div>
+            <div class="insight-value" id="kwalNoFollowup">-</div>
             <div class="insight-sub">Reminder verstuurd, geen actie</div>
         </div>
         <div class="insight-card ic-blue">
             <div class="insight-label">Oud zonder afspraak</div>
-            <div class="insight-value" id="kwalOldNoAppt">—</div>
+            <div class="insight-value" id="kwalOldNoAppt">-</div>
             <div class="insight-sub">Meer dan 14 dagen, nog awareness</div>
         </div>
         <div class="insight-card ic-highlight">
             <div class="insight-label">Totaal aandacht nodig</div>
-            <div class="insight-value" id="kwalTotal">—</div>
+            <div class="insight-value" id="kwalTotal">-</div>
             <div class="insight-sub">Leads buiten normale flow</div>
         </div>
     </div>
@@ -2172,8 +2172,8 @@
             <!-- Tab 1: Afspraak inplannen -->
             <div id="apptTabAfspraak">
                 <div class="appt-lead-info" id="apptModalLeadInfo" style="display:none;">
-                    <div class="appt-lead-name" id="apptModalLeadName">—</div>
-                    <div class="appt-lead-meta" id="apptModalLeadMeta">—</div>
+                    <div class="appt-lead-name" id="apptModalLeadName">-</div>
+                    <div class="appt-lead-meta" id="apptModalLeadMeta">-</div>
                 </div>
                 <div id="apptModalLeadSelect">
                     <div class="form-group">
@@ -2768,7 +2768,7 @@
                     document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
                     document.getElementById('conversionRate').textContent = conversionRate + '%';
                     document.getElementById('activePractices').textContent = activePractices;
-                    document.getElementById('avgLeadsPerMonth').textContent = avgLeadsDisplay || '—';
+                    document.getElementById('avgLeadsPerMonth').textContent = avgLeadsDisplay || '-';
 
                     // Top bron ophalen
                     const sourcesRes = await fetch('/api/sources' + buildQueryString(), { credentials: 'include' });
@@ -2831,7 +2831,7 @@
                 const allHistory = (eclubData.success && eclubData.data && eclubData.data.length > 0) ? eclubData.data : [];
                 const history = allHistory.filter(d => d.subscribed > 0);
 
-                // Als beide leeg zijn — check leden_historie
+                // Als beide leeg zijn - check leden_historie
                 if (prognose.length === 0 && history.length === 0) {
                     const ledenKeys = Object.keys(ledenHistorieLookup).sort();
                     if (ledenKeys.length > 0) {
@@ -3197,7 +3197,7 @@
                         ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#dc2626;">Aandacht</span>'
                         : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#16a34a;">Gezond</span>';
                     const convCls = (p.conversie < 20 && p.leads_totaal >= 10) ? 'color:#c2410c;' : 'color:#16a34a;';
-                    const leden = p.actieve_leden != null ? p.actieve_leden : '&mdash;';
+                    const leden = p.actieve_leden != null ? p.actieve_leden : '-';
                     const ledenTag = p.has_eclub ? ' <span style="font-size:9px;font-weight:700;color:#0891b2;background:#cffafe;padding:1px 5px;border-radius:4px;">eClub</span>' : '';
                     const flags = p.flags && p.flags.length ? `<div style="margin-top:11px;font-size:12px;font-weight:600;color:#dc2626;">${escHtml(p.flags.join(' · '))}</div>` : '';
                     return `<div onclick="openPraktijk('${p.code}')" style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.05);border-left:4px solid ${border};cursor:pointer;">
@@ -3310,7 +3310,7 @@
 
                 const wb = XLSX.utils.book_new();
 
-                // Sheet 1: Funnel — gebruik .stages
+                // Sheet 1: Funnel - gebruik .stages
                 if (funnelData.success && funnelData.stages && funnelData.stages.length > 0) {
                     // Zelfde cumulatieve Excel-trechter als op het dashboard
                     const fm = buildFunnelModel(funnelData.stages);
@@ -3322,7 +3322,7 @@
                     XLSX.utils.book_append_sheet(wb, funnelSheet, 'Conversie Funnel');
                 }
 
-                // Sheet 2: Praktijk performance — gebruik .data
+                // Sheet 2: Praktijk performance - gebruik .data
                 if (performanceData.success && performanceData.data && performanceData.data.length > 0) {
                     const perfSheet = XLSX.utils.json_to_sheet(performanceData.data.map(d => ({
                         'Praktijk':      d.practice_name || d.praktijk_naam,
@@ -3334,7 +3334,7 @@
                     XLSX.utils.book_append_sheet(wb, perfSheet, 'Praktijk Performance');
                 }
 
-                // Sheet 3: Lead bronnen — gebruik .sources (niet .data!)
+                // Sheet 3: Lead bronnen - gebruik .sources (niet .data!)
                 if (sourcesData.success && sourcesData.sources && sourcesData.sources.length > 0) {
                     const sourcesSheet = XLSX.utils.json_to_sheet(sourcesData.sources.map(d => ({
                         'Bron':          d.bron || d.source || 'Onbekend',
@@ -3343,7 +3343,7 @@
                     XLSX.utils.book_append_sheet(wb, sourcesSheet, 'Lead Bronnen');
                 }
 
-                // Sheet 4: Churn forecast — gebruik .forecast
+                // Sheet 4: Churn forecast - gebruik .forecast
                 if (forecastData.success && forecastData.forecast && forecastData.forecast.length > 0) {
                     const forecastSheet = XLSX.utils.json_to_sheet(forecastData.forecast.map(d => ({
                         'Maand':             d.month,
@@ -4175,7 +4175,6 @@
                     showDashboardSection('allelocaties', document.getElementById('navAlleLocaties'));
                 } else {
                     showDashboardSection('dashboard', document.getElementById('navDashboard'));
-                    loadChurnForecast();
                 }
                 return;
             }
@@ -4401,15 +4400,15 @@
             tbody.innerHTML = filtered.map(l => {
                 const rawDt = l.appointment_datetime || (l.appointment_date ? l.appointment_date + 'T09:00:00' : null);
                 const d = rawDt ? new Date(rawDt) : null;
-                const datum = d && !isNaN(d) ? d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : (l.appointment_date || '—');
-                const tijd = d && !isNaN(d) ? d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : (l.appointment_time ? l.appointment_time.substring(0,5) : '—');
+                const datum = d && !isNaN(d) ? d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }) : (l.appointment_date || '-');
+                const tijd = d && !isNaN(d) ? d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : (l.appointment_time ? l.appointment_time.substring(0,5) : '-');
                 const [label, cls] = uitkomstMap[l.funnel_stage] || ['Open','badge-gray'];
                 const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
                 const behandelaarRegel = l.behandelaar ? `<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:2px;">Behandelaar: ${escHtml(l.behandelaar)}</div>` : '';
                 return `<tr>
-                    <td style="font-weight:500;">${l.volledige_naam||'—'}${behandelaarRegel}</td>
-                    <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
-                    <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
+                    <td style="font-weight:500;">${l.volledige_naam||'-'}${behandelaarRegel}</td>
+                    <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'-'}</td>
+                    <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'-'}</td>
                     <td>${datum}</td>
                     <td>${tijd}</td>
                     <td>${type}</td>
@@ -4488,11 +4487,11 @@
                 tbody.innerHTML = leads.map(l => {
                     const datum = new Date(l.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
                     return `<tr>
-                        <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
-                        <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
-                        <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
+                        <td style="font-weight:500;">${l.volledige_naam||'-'}</td>
+                        <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'-'}</td>
+                        <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'-'}</td>
                         <td>${datum}</td>
-                        <td>${l.bron||'—'}</td>
+                        <td>${l.bron||'-'}</td>
                         <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id}, '${(l.volledige_naam||'').replace(/'/g,"\\'")}', '${l.emailadres||''}', '${l.telefoon||''}')">Inplannen</button></td>
                     </tr>`;
                 }).join('');
@@ -4797,13 +4796,13 @@
                 const actieveWaarden = perMaand.filter(v => v > 0);
                 const minIdx = perMaand.indexOf(Math.min(...(actieveWaarden.length ? actieveWaarden : [0])));
 
-                document.getElementById('seizoenBesteMaand').textContent = maandNamen[maxIdx] || '—';
+                document.getElementById('seizoenBesteMaand').textContent = maandNamen[maxIdx] || '-';
                 document.getElementById('seizoenBesteSub').textContent = perMaand[maxIdx] + ' leads';
-                document.getElementById('seizoenZwaksteMaand').textContent = actieveWaarden.length ? maandNamen[minIdx] : '—';
-                document.getElementById('seizoenZwaksteSub').textContent = actieveWaarden.length ? perMaand[minIdx] + ' leads' : '—';
+                document.getElementById('seizoenZwaksteMaand').textContent = actieveWaarden.length ? maandNamen[minIdx] : '-';
+                document.getElementById('seizoenZwaksteSub').textContent = actieveWaarden.length ? perMaand[minIdx] + ' leads' : '-';
 
                 const fmtEur = v => v >= 1000 ? '€' + (v/1000).toFixed(1) + 'k' : '€' + Math.round(v);
-                document.getElementById('seizoenMetaSpend').textContent = metaTotaalSpend > 0 ? fmtEur(metaTotaalSpend) : '—';
+                document.getElementById('seizoenMetaSpend').textContent = metaTotaalSpend > 0 ? fmtEur(metaTotaalSpend) : '-';
                 document.getElementById('seizoenMetaSub').textContent = metaTotaalSpend > 0 ? `${jaar} totaal` : 'Geen Meta koppeling';
 
                 // Kwartaal conversie
@@ -4842,15 +4841,15 @@
                 document.getElementById('seizoenIndeling').innerHTML = `
                     <div style="display:flex;flex-direction:column;gap:10px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
-                            <div style="font-size:13px;font-weight:500;">${hoog.join(', ') || '—'}</div>
+                            <div style="font-size:13px;font-weight:500;">${hoog.join(', ') || '-'}</div>
                             <span class="season-badge season-hot">Topmaanden</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
-                            <div style="font-size:13px;font-weight:500;">${mid.join(', ') || '—'}</div>
+                            <div style="font-size:13px;font-weight:500;">${mid.join(', ') || '-'}</div>
                             <span class="season-badge season-warm">Gemiddeld</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-sm);">
-                            <div style="font-size:13px;font-weight:500;">${laag.join(', ') || '—'}</div>
+                            <div style="font-size:13px;font-weight:500;">${laag.join(', ') || '-'}</div>
                             <span class="season-badge season-cool">Laag</span>
                         </div>
                     </div>`;
@@ -5066,7 +5065,7 @@
             const isActief = l => (l.actiefLeden !== null) || (l.churnPct !== null) || (l.cpl !== null) || (l.alleLeads && l.alleLeads.length > 0);
             const actief = locatieData.filter(isActief);
 
-            // Render tabel — niet-geactiveerde locaties tonen we, maar zonder loze nullen.
+            // Render tabel - niet-geactiveerde locaties tonen we, maar zonder loze nullen.
             const tbody = document.getElementById('alleLocatiesBody');
             const nietGeactTag = '<span style="font-size:10px;font-weight:700;color:#9ca3af;background:#f3f4f6;padding:1px 7px;border-radius:999px;margin-left:8px;">Niet geactiveerd</span>';
             tbody.innerHTML = locatieData.map(l => {
@@ -5074,16 +5073,16 @@
                 return `
                 <tr>
                     <td style="font-weight:600;">${l.naam}${a ? '' : nietGeactTag}</td>
-                    <td style="text-align:right;">${a ? l.leadsDezeM : '\u2014'}</td>
-                    <td style="text-align:right;">${a ? l.conv + '%' : '\u2014'}</td>
-                    <td style="text-align:right;">${l.actiefLeden !== null ? l.actiefLeden : '\u2014'}</td>
-                    <td style="text-align:right;">${l.churnPct !== null ? l.churnPct + '%' : '\u2014'}</td>
-                    <td style="text-align:right;">${l.cpl !== null ? '\u20ac' + parseFloat(l.cpl).toFixed(2) : '\u2014'}</td>
+                    <td style="text-align:right;">${a ? l.leadsDezeM : '-'}</td>
+                    <td style="text-align:right;">${a ? l.conv + '%' : '-'}</td>
+                    <td style="text-align:right;">${l.actiefLeden !== null ? l.actiefLeden : '-'}</td>
+                    <td style="text-align:right;">${l.churnPct !== null ? l.churnPct + '%' : '-'}</td>
+                    <td style="text-align:right;">${l.cpl !== null ? '\u20ac' + parseFloat(l.cpl).toFixed(2) : '-'}</td>
                     <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="gaNaarLocatie('${l.code}')">Bekijken</button></td>
                 </tr>`;
             }).join('');
 
-            // Gemiddelden — uitsluitend over geactiveerde locaties, consistent voor elke kolom.
+            // Gemiddelden - uitsluitend over geactiveerde locaties, consistent voor elke kolom.
             const _avg = (arr, sel) => arr.length ? arr.reduce((s,l)=>s+sel(l),0)/arr.length : null;
             const _r1 = v => v === null ? null : Math.round(v*10)/10;
             const gemConv     = actief.length ? Math.round(_avg(actief, l=>l.conv)) : null;
@@ -5096,15 +5095,15 @@
             tbody.innerHTML += `
                 <tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border);">
                     <td>Gemiddelde</td>
-                    <td style="text-align:right;">${gemLeads !== null ? gemLeads : '\u2014'}</td>
-                    <td style="text-align:right;">${gemConv !== null ? gemConv + '%' : '\u2014'}</td>
-                    <td style="text-align:right;">${gemLedenGem !== null ? gemLedenGem : '\u2014'}</td>
-                    <td style="text-align:right;">${gemChurnGem !== null ? gemChurnGem + '%' : '\u2014'}</td>
-                    <td style="text-align:right;">\u2014</td>
+                    <td style="text-align:right;">${gemLeads !== null ? gemLeads : '-'}</td>
+                    <td style="text-align:right;">${gemConv !== null ? gemConv + '%' : '-'}</td>
+                    <td style="text-align:right;">${gemLedenGem !== null ? gemLedenGem : '-'}</td>
+                    <td style="text-align:right;">${gemChurnGem !== null ? gemChurnGem + '%' : '-'}</td>
+                    <td style="text-align:right;">-</td>
                     <td></td>
                 </tr>`;
 
-            // Inzichten — alleen tonen wat betekenis heeft (geen loze 0%-adviezen).
+            // Inzichten - alleen tonen wat betekenis heeft (geen loze 0%-adviezen).
             const inzichten = [];
             if (actief.length) {
                 const besteConv = [...actief].filter(l => l.conv > 0).sort((a,b)=>b.conv-a.conv)[0];
@@ -5184,16 +5183,16 @@
                 const p = data.profiel;
 
                 // Profiel velden
-                document.getElementById('profielEmail').textContent    = p.email || '—';
-                document.getElementById('profielCode').textContent     = p.practice_code || '—';
-                document.getElementById('profielNaam').textContent     = p.praktijk_naam || '—';
+                document.getElementById('profielEmail').textContent    = p.email || '-';
+                document.getElementById('profielCode').textContent     = p.practice_code || '-';
+                document.getElementById('profielNaam').textContent     = p.praktijk_naam || '-';
 
                 // Rol dropdown
                 const rolLabels = ['Eigenaar', 'Manager', 'Marketing', 'Medewerker'];
                 const rolSel = document.getElementById('profielRolSelect');
                 if (rolSel) {
                     // Rol is uitsluitend leesbaar: wijzigen kan alleen door admin of
-                    // de eigenaar via teambeheer — niet door de gebruiker zelf.
+                    // de eigenaar via teambeheer - niet door de gebruiker zelf.
                     rolSel.disabled = true;
                     if (p.role === 'admin') {
                         rolSel.innerHTML = '<option>Administrator</option>';
@@ -5299,9 +5298,9 @@
             const hoofdKnop      = document.getElementById('profielHoofdKnop');
             const annuleerKnop   = document.getElementById('profielAnnuleerKnop');
 
-            if (contactDisplay) { contactDisplay.textContent = contact || '—'; contactDisplay.style.display = isEdit ? 'none' : 'block'; }
+            if (contactDisplay) { contactDisplay.textContent = contact || '-'; contactDisplay.style.display = isEdit ? 'none' : 'block'; }
             if (contactInput)   { contactInput.value = contact || ''; contactInput.style.display = isEdit ? 'block' : 'none'; }
-            if (locatieDisplay) { locatieDisplay.textContent = locatie || '—'; locatieDisplay.style.display = isEdit ? 'none' : 'block'; }
+            if (locatieDisplay) { locatieDisplay.textContent = locatie || '-'; locatieDisplay.style.display = isEdit ? 'none' : 'block'; }
             if (locatieInput)   { locatieInput.value = locatie || ''; locatieInput.style.display = isEdit ? 'block' : 'none'; }
             if (hoofdKnop)      { hoofdKnop.textContent = isEdit ? 'Profiel opslaan' : 'Profiel wijzigen'; }
             if (annuleerKnop)   { annuleerKnop.style.display = isEdit && (contact || locatie) ? 'inline-flex' : 'none'; }
@@ -5311,8 +5310,8 @@
             const hoofdKnop = document.getElementById('profielHoofdKnop');
             if (hoofdKnop?.textContent.trim() === 'Profiel wijzigen') {
                 // Naar edit modus
-                const contact = document.getElementById('profielContactDisplay')?.textContent.replace('—','').trim() || '';
-                const locatie = document.getElementById('profielLocatieDisplay')?.textContent.replace('—','').trim() || '';
+                const contact = document.getElementById('profielContactDisplay')?.textContent.replace('-','').trim() || '';
+                const locatie = document.getElementById('profielLocatieDisplay')?.textContent.replace('-','').trim() || '';
                 zetProfielModus('edit', contact, locatie);
             } else {
                 slaProfielOp();
@@ -5373,7 +5372,7 @@
                     const isMe = String(u.id) === String(meId);
                     const cur = u.role_label || 'Eigenaar';
                     const opts = rollen.map(r => `<option value="${r}" ${cur === r ? 'selected' : ''}>${r}</option>`).join('');
-                    // Email via data-attribuut + textContent achteraf — voorkomt XSS
+                    // Email via data-attribuut + textContent achteraf - voorkomt XSS
                     return `<div class="tm-row" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;" data-uid="${u.id}">
                         <div style="flex:1;min-width:0;">
                             <div class="tm-email" style="font-size:13px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isMe ? ' <span style=\"color:var(--text-3);font-weight:400;\">(jij)</span>' : ''}</div>
@@ -5495,13 +5494,13 @@
                         const rawDt = l.appointment_datetime || (l.appointment_date ? l.appointment_date + 'T' + (l.appointment_time || '09:00:00') : null);
                         const d = rawDt ? new Date(rawDt) : null;
                         const dagen = d ? Math.floor((now - d) / (1000*60*60*24)) : 0;
-                        const datumStr = d && !isNaN(d) ? d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'}) : (l.appointment_date || '—');
+                        const datumStr = d && !isNaN(d) ? d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'}) : (l.appointment_date || '-');
                         const type = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
                         const dagenCls = dagen > 5 ? 'badge-red' : 'badge-amber';
                         return `<tr>
-                            <td style="font-weight:500;">${l.volledige_naam||'—'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'—'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'—'}</td>
+                            <td style="font-weight:500;">${l.volledige_naam||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'-'}</td>
                             <td>${datumStr}</td>
                             <td>${type}</td>
                             <td><span class="badge ${dagenCls}">${dagen} dag${dagen !== 1 ? 'en' : ''}</span></td>
@@ -5521,11 +5520,11 @@
                             : '<span class="badge badge-blue">Reminder 1</span>';
                         const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\\'");
                         return `<tr>
-                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
+                            <td style="font-weight:500;">${l.volledige_naam||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'-'}</td>
                             <td>${datum}</td>
-                            <td>${l.bron||'&mdash;'}</td>
+                            <td>${l.bron||'-'}</td>
                             <td>${rem}</td>
                             <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${veiligNaam}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td>
                         </tr>`;
@@ -5543,12 +5542,12 @@
                         const dagenCls = dagen > 21 ? 'badge-red' : 'badge-amber';
                         const veiligNaam = (l.volledige_naam||'').replace(/'/g, "\\'");
                         return `<tr>
-                            <td style="font-weight:500;">${l.volledige_naam||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'&mdash;'}</td>
-                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'&mdash;'}</td>
+                            <td style="font-weight:500;">${l.volledige_naam||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.emailadres||'-'}</td>
+                            <td style="font-size:12px;color:var(--text-3);">${l.telefoon||'-'}</td>
                             <td>${datum}</td>
                             <td><span class="badge ${dagenCls}">${dagen} dag${dagen !== 1 ? 'en' : ''}</span></td>
-                            <td>${l.bron||'&mdash;'}</td>
+                            <td>${l.bron||'-'}</td>
                             <td><button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="openApptModal(${l.id},'${veiligNaam}','${l.emailadres||''}','${l.telefoon||''}')">Inplannen</button></td>
                         </tr>`;
                     }).join('');
@@ -5568,7 +5567,7 @@
                                     <td style="font-weight:500;">${s.name}</td>
                                     <td>${s.count}</td>
                                     <td>${ofTotal.toFixed(1)}%</td>
-                                    <td>${s.conv === null ? '&mdash;' : s.conv.toFixed(1) + '%'}</td>
+                                    <td>${s.conv === null ? '-' : s.conv.toFixed(1) + '%'}</td>
                                 </tr>`;
                             }).join('');
                         } else {
@@ -5594,14 +5593,14 @@
                                 body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px;">Nog geen nazorg-patiënten.</td></tr>';
                             } else {
                                 body.innerHTML = pData.patienten.map(p => {
-                                    const inNazorg = p.laatste_behandeling ? new Date(p.laatste_behandeling).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'}) : '&mdash;';
+                                    const inNazorg = p.laatste_behandeling ? new Date(p.laatste_behandeling).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'}) : '-';
                                     const status = p.is_lid
                                         ? `<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;white-space:nowrap;">Lid${p.lid_sinds ? ' sinds ' + new Date(p.lid_sinds).toLocaleDateString('nl-NL') : ''}</span>`
                                         : `<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#f3f4f6;color:#9ca3af;">Nog geen lid</span>`;
                                     return `<tr>
-                                        <td style="font-weight:500;">${escHtml(p.naam) || '&mdash;'}</td>
-                                        <td style="font-size:12px;color:var(--text-3);">${escHtml(p.email) || '&mdash;'}</td>
-                                        <td>${escHtml(p.behandelaar) || '&mdash;'}</td>
+                                        <td style="font-weight:500;">${escHtml(p.naam) || '-'}</td>
+                                        <td style="font-size:12px;color:var(--text-3);">${escHtml(p.email) || '-'}</td>
+                                        <td>${escHtml(p.behandelaar) || '-'}</td>
                                         <td>${inNazorg}</td>
                                         <td>${status}</td>
                                     </tr>`;
@@ -5664,7 +5663,7 @@
                 const res  = await fetch(`/api/meta/summary/${practice}?dateFrom=${dateFrom}&dateTo=${dateTo}`, { credentials: 'include' });
                 const d    = await res.json();
 
-                // Meta summary geeft direct het object terug — geen .data wrapper
+                // Meta summary geeft direct het object terug - geen .data wrapper
                 if (!d.meta_enabled) { alert('Meta is niet ingeschakeld voor deze praktijk'); return; }
 
                 const ws = XLSX.utils.aoa_to_sheet([
