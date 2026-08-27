@@ -21,6 +21,7 @@ import { withReadConnection, withWriteConnection } from './db.js';
 import axios from 'axios';
 import MetaService from './service/MetaService.js';
 import EclubService from './service/EclubService.js';
+import marketingRouter from './marketing/router.js';
 
 const app = express();
 
@@ -153,6 +154,11 @@ app.use(session({
   },
   proxy: true
 }));
+
+// ==================== MARKETING STUDIO (geisoleerde module) ====================
+// Volledig losgekoppeld van het churn-dashboard: eigen schema marketing.*,
+// eigen routes /marketing en /api/mkt/*, eigen sessie-namespace req.session.mkt.
+app.use(marketingRouter);
 
 // ==================== ERROR-TRIGGER: superadmin + centrale error-logging ====================
 // Alleen dit account mag tickets/errors BEHEREN. Andere admins mogen lezen.

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Studio</title>
+<style>
+:root{
+  --bg:#0b0d12; --panel:#141821; --panel-2:#1b2130; --line:#252c3b;
+  --ink:#eef2f8; --muted:#8a93a6; --accent:#6d5efc; --accent-2:#22d3ee; --ok:#34d399; --err:#f87171;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+.hidden{display:none!important}
+a{color:var(--accent-2);text-decoration:none}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(1200px 600px at 20% -10%,rgba(109,94,252,.18),transparent),radial-gradient(1000px 500px at 100% 0%,rgba(34,211,238,.12),transparent)}
+.login-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:36px 32px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.brand-dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+.brand b{font-size:18px;letter-spacing:-.01em}
+.brand span{display:block;font-size:11px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
+h1{font-size:20px;margin-bottom:4px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600;letter-spacing:.02em}
+input{width:100%;padding:12px 14px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--accent)}
+.btn{width:100%;margin-top:22px;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c6bff);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:transform .15s,opacity .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.msg{margin-top:14px;font-size:13px;padding:10px 12px;border-radius:9px;display:none}
+.msg.err{display:block;background:rgba(248,113,113,.12);color:var(--err);border:1px solid rgba(248,113,113,.3)}
+
+/* APP SHELL */
+.shell{min-height:100vh;display:grid;grid-template-columns:250px 1fr}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column}
+.side .brand{margin-bottom:26px}
+.nav{display:flex;flex-direction:column;gap:4px;flex:1}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:var(--muted);font-size:14px;font-weight:500;cursor:pointer}
+.nav a.active,.nav a:hover{background:var(--panel-2);color:var(--ink)}
+.nav .soon{margin-left:auto;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--line);padding:2px 6px;border-radius:20px}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.6}
+.side-foot{border-top:1px solid var(--line);padding-top:14px;font-size:12px;color:var(--muted)}
+.logout{margin-top:10px;color:var(--err);cursor:pointer;font-weight:600;font-size:13px}
+.main{padding:34px 40px}
+.topline{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-2);font-weight:700}
+.topline h2{font-size:26px;letter-spacing:-.02em;margin-top:4px}
+.pill{font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:6px 12px;border-radius:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+.card h3{font-size:15px;margin-bottom:6px}
+.card p{color:var(--muted);font-size:13.5px}
+.card .tag{display:inline-block;margin-top:14px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-2);background:rgba(34,211,238,.1);padding:3px 9px;border-radius:20px}
+.welcome{background:linear-gradient(135deg,rgba(109,94,252,.14),rgba(34,211,238,.08));border:1px solid var(--line);border-radius:18px;padding:28px 30px;margin-bottom:26px}
+.welcome h3{font-size:20px;letter-spacing:-.01em}
+.welcome p{color:var(--muted);margin-top:6px;font-size:14px}
+@media(max-width:800px){.shell{grid-template-columns:1fr}.side{display:none}.main{padding:24px 18px}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginView">
+  <div class="login-card">
+    <div class="brand"><div class="brand-dot"></div><div><b>Marketing Studio</b><span>Powered by Dynamic Health</span></div></div>
+    <h1>Welkom terug</h1>
+    <div class="sub">Log in op je marketing-werkplek.</div>
+    <label for="email">E-mailadres</label>
+    <input id="email" type="email" autocomplete="username" placeholder="jij@bureau.nl">
+    <label for="password">Wachtwoord</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+    <button class="btn" id="loginBtn" onclick="doLogin()">Inloggen</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="shell hidden" id="appView">
+  <aside class="side">
+    <div class="brand"><div class="brand-dot"></div><div><b>Marketing Studio</b><span id="wsSlug">workspace</span></div></div>
+    <nav class="nav">
+      <a class="active"><span class="dot"></span> Overzicht</a>
+      <a>Klanten <span class="soon">binnenkort</span></a>
+      <a>Contentkalender <span class="soon">binnenkort</span></a>
+      <a>Goedkeuringen <span class="soon">binnenkort</span></a>
+      <a>Analytics <span class="soon">binnenkort</span></a>
+      <a>Rapportages <span class="soon">binnenkort</span></a>
+    </nav>
+    <div class="side-foot">
+      <div id="accEmail">—</div>
+      <div class="logout" onclick="doLogout()">Uitloggen</div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topline">
+      <div>
+        <div class="eyebrow">Marketing Studio</div>
+        <h2 id="wsName">Workspace</h2>
+      </div>
+      <div class="pill" id="licPill">Licentie</div>
+    </div>
+
+    <div class="welcome">
+      <h3>Je werkplek staat klaar 🚀</h3>
+      <p>Dit is het fundament (stap 1). De modules hieronder bouwen we stap voor stap uit: klanten, contentplanning, goedkeuringen, analytics en automatische rapportages.</p>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h3>Klanten</h3><p>Beheer per klant een eigen space met kanalen, assets en team.</p><span class="tag">Stap 2</span></div>
+      <div class="card"><h3>Contentkalender</h3><p>Plan en plan posts in, per klant, in één overzicht.</p><span class="tag">Stap 3</span></div>
+      <div class="card"><h3>Goedkeuringen</h3><p>Klant bekijkt en keurt content goed. Geen WhatsApp-chaos meer.</p><span class="tag">Stap 4</span></div>
+      <div class="card"><h3>Integraties</h3><p>Koppel Meta, Google en meer. Data en publiceren op één plek.</p><span class="tag">Stap 5</span></div>
+      <div class="card"><h3>Rapportages</h3><p>Automatische rapporten naar klant, manager of eigenaar.</p><span class="tag">Stap 6</span></div>
+    </div>
+  </main>
+</div>
+
+<script>
+var loginView = document.getElementById('loginView');
+var appView   = document.getElementById('appView');
+
+async function doLogin(){
+  var btn = document.getElementById('loginBtn');
+  var msg = document.getElementById('loginMsg');
+  msg.className = 'msg';
+  var email = document.getElementById('email').value.trim();
+  var password = document.getElementById('password').value;
+  if(!email || !password){ msg.className='msg err'; msg.textContent='Vul je e-mail en wachtwoord in.'; return; }
+  btn.disabled = true; btn.textContent = 'Bezig...';
+  try{
+    var r = await fetch('/api/mkt/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email,password})});
+    var d = await r.json();
+    if(r.ok && d.success){ showApp(d.account, d.workspace); }
+    else { msg.className='msg err'; msg.textContent = d.error || 'Inloggen mislukt.'; }
+  }catch(e){ msg.className='msg err'; msg.textContent='Geen verbinding. Probeer opnieuw.'; }
+  btn.disabled = false; btn.textContent = 'Inloggen';
+}
+
+function showApp(account, workspace){
+  loginView.classList.add('hidden');
+  appView.classList.remove('hidden');
+  document.getElementById('wsName').textContent = workspace.name || 'Workspace';
+  document.getElementById('wsSlug').textContent = workspace.slug || 'workspace';
+  document.getElementById('accEmail').textContent = account.email || '';
+}
+
+async function doLogout(){
+  try{ await fetch('/api/mkt/auth/logout',{method:'POST',credentials:'include'}); }catch(e){}
+  appView.classList.add('hidden'); loginView.classList.remove('hidden');
+  document.getElementById('password').value='';
+}
+
+// Al ingelogd? Direct de app tonen.
+(async function(){
+  try{
+    var r = await fetch('/api/mkt/auth/me',{credentials:'include'});
+    if(r.ok){
+      var d = await r.json();
+      if(d.success && d.account){
+        showApp(
+          {email:d.account.email, role:d.account.role, name:d.account.full_name},
+          {name:d.account.workspace_name, slug:d.account.slug, modules:d.account.modules}
+        );
+        var lic = document.getElementById('licPill');
+        var end = d.account.license_end ? (' · tot ' + new Date(d.account.license_end).toLocaleDateString('nl-NL')) : '';
+        lic.textContent = 'Licentie: ' + (d.account.license_type || '—') + end;
+      }
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

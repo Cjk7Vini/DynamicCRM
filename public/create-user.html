@@ -196,7 +196,62 @@
   </div>
 </header>
 
-<div class="layout">
+<style>
+  .mkt-tabbar{max-width:1200px;margin:0 auto 6px;padding:0 4px;display:flex;gap:8px}
+  .mkt-tab{padding:9px 18px;border:1px solid var(--border);background:#fff;border-radius:10px 10px 0 0;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer}
+  .mkt-tab.mkt-tab-active{color:var(--text-1);border-bottom-color:#fff;box-shadow:0 -2px 0 #6d5efc inset}
+</style>
+<div class="mkt-tabbar">
+  <button id="tabBtnDHC" class="mkt-tab mkt-tab-active" onclick="mktTab('dhc')">DHC-accounts</button>
+  <button id="tabBtnMkt" class="mkt-tab" onclick="mktTab('mkt')">Marketing</button>
+</div>
+
+<!-- MARKETING TAB (los product, eigen schema/licenties) -->
+<div id="marketingView" style="display:none;max-width:1200px;margin:0 auto;">
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><div>
+      <div class="card-title">Marketing workspace aanmaken</div>
+      <div class="card-subtitle">Nieuw bureau/team + eigenaar-login + licentie (los van DHC)</div>
+    </div></div>
+    <div class="card-body">
+      <div id="mktAlert"></div>
+      <div class="form-group"><label>Workspace / bedrijfsnaam</label><input type="text" id="mktName" placeholder="Bijv. Studio Vonk"></div>
+      <div class="form-row">
+        <div><label>Eigenaar e-mail</label><input type="email" id="mktEmail" placeholder="eigenaar@bureau.nl"></div>
+        <div><label>Eigenaar naam</label><input type="text" id="mktOwnerName" placeholder="Voor- en achternaam"></div>
+      </div>
+      <div class="form-group"><label>Tijdelijk wachtwoord</label>
+        <div class="password-row"><input type="text" id="mktPass" value="Marketing2026!"><button class="btn-gen" onclick="mktGenPass()">Genereer</button></div>
+        <div class="form-help">Min. 8 tekens, hoofdletter, kleine letter, cijfer</div>
+      </div>
+      <div class="form-row">
+        <div><label>Licentie</label>
+          <select id="mktLicense">
+            <option value="trial">Trial (14 dagen)</option>
+            <option value="1m">1 maand</option>
+            <option value="3m">3 maanden</option>
+            <option value="6m">6 maanden</option>
+            <option value="12m" selected>12 maanden</option>
+            <option value="24m">24 maanden</option>
+            <option value="unlimited">Onbeperkt</option>
+          </select>
+        </div>
+        <div><label>Max. seats</label><input type="number" id="mktSeats" value="3" min="1"></div>
+        <div><label>Max. klanten</label><input type="number" id="mktClients" value="5" min="1"></div>
+      </div>
+      <button class="btn btn-primary" id="mktCreateBtn" onclick="mktCreate()" style="margin-top:8px;">Workspace aanmaken</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div>
+      <div class="card-title">Marketing workspaces</div>
+      <div class="card-subtitle">Bestaande workspaces en hun licentie</div>
+    </div></div>
+    <div class="card-body"><div id="mktList"><div style="color:var(--text-3);font-size:13px;">Laden...</div></div></div>
+  </div>
+</div>
+
+<div class="layout" id="dhcView">
 
   <!-- LINKER KOLOM: Gebruiker aanmaken -->
   <div>
@@ -1075,6 +1130,68 @@ setInterval(function () {
   var zoek = document.getElementById('searchInput');
   loadUsers(zoek ? zoek.value.trim() : '', true);
 }, 45000);
+// ==================== MARKETING TAB ====================
+function mktTab(which){
+  var isM = which === 'mkt';
+  document.getElementById('dhcView').style.display = isM ? 'none' : '';
+  document.getElementById('marketingView').style.display = isM ? 'block' : 'none';
+  document.getElementById('tabBtnDHC').classList.toggle('mkt-tab-active', !isM);
+  document.getElementById('tabBtnMkt').classList.toggle('mkt-tab-active', isM);
+  if (isM) loadMarketingWorkspaces();
+}
+function mktGenPass(){
+  var cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var p='Mk'; for(var i=0;i<9;i++)p+=cs[Math.floor(Math.random()*cs.length)]; p+='7!';
+  document.getElementById('mktPass').value=p;
+}
+function mktAlert(ok,msg){
+  var el=document.getElementById('mktAlert');
+  el.innerHTML='<div style="padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;background:'+(ok?'#ecfdf5':'#fef2f2')+';color:'+(ok?'#065f46':'#991b1b')+';border:1px solid '+(ok?'#a7f3d0':'#fecaca')+';">'+msg+'</div>';
+}
+async function mktCreate(){
+  var btn=document.getElementById('mktCreateBtn');
+  var body={
+    name: document.getElementById('mktName').value.trim(),
+    ownerEmail: document.getElementById('mktEmail').value.trim(),
+    ownerName: document.getElementById('mktOwnerName').value.trim(),
+    ownerPassword: document.getElementById('mktPass').value,
+    licenseType: document.getElementById('mktLicense').value,
+    maxSeats: document.getElementById('mktSeats').value,
+    maxClients: document.getElementById('mktClients').value,
+    modules: ['planner','reporting']
+  };
+  if(!body.name || !body.ownerEmail || !body.ownerPassword){ mktAlert(false,'Naam, eigenaar e-mail en wachtwoord zijn verplicht.'); return; }
+  btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok && d.success){
+      mktAlert(true,'Workspace "'+d.workspace.name+'" aangemaakt. Eigenaar kan inloggen op /marketing met '+d.owner.email+'.');
+      document.getElementById('mktName').value=''; document.getElementById('mktEmail').value=''; document.getElementById('mktOwnerName').value=''; mktGenPass();
+      loadMarketingWorkspaces();
+    } else { mktAlert(false, d.error || 'Aanmaken mislukt.'); }
+  }catch(e){ mktAlert(false,'Netwerkfout: '+e.message); }
+  btn.disabled=false; btn.textContent='Workspace aanmaken';
+}
+async function loadMarketingWorkspaces(){
+  var el=document.getElementById('mktList');
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok || !d.success){ el.innerHTML='<div style="color:#991b1b;font-size:13px;">'+(d.error||'Kon niet laden.')+'</div>'; return; }
+    if(!d.workspaces.length){ el.innerHTML='<div style="color:var(--text-3);font-size:13px;">Nog geen workspaces.</div>'; return; }
+    el.innerHTML='<table class="users-table"><thead><tr><th>Workspace</th><th>Eigenaar</th><th>Licentie</th><th>Seats/Klanten</th><th>Accounts</th></tr></thead><tbody>'+
+      d.workspaces.map(function(w){
+        var end=w.license_end?(' <span style="color:var(--text-3)">tot '+new Date(w.license_end).toLocaleDateString('nl-NL')+'</span>'):'';
+        return '<tr><td style="font-weight:600;">'+esc(w.name)+' <span style="color:var(--text-3);font-family:monospace;font-size:11px;">'+esc(w.slug)+'</span></td>'+
+          '<td>'+esc(w.owner_email||'—')+'</td>'+
+          '<td>'+esc(w.license_type)+end+'</td>'+
+          '<td>'+w.max_seats+' / '+w.max_clients+'</td>'+
+          '<td>'+w.accounts+'</td></tr>';
+      }).join('')+'</tbody></table>';
+  }catch(e){ el.innerHTML='<div style="color:#991b1b;font-size:13px;">Netwerkfout.</div>'; }
+}
+function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
 </script>
 <script src="/js/heartbeat.js"></script>
 </body>
