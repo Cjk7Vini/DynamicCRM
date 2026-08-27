@@ -30,6 +30,45 @@ function cloudinarySign(params, apiSecret) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
 
+// Versleuteling voor gevoelige tokens (AES-256-GCM). Sleutel uit env MKT_SECRET_KEY.
+// Zonder sleutel wordt in leesbare vorm opgeslagen (met 'raw:' prefix) als terugval.
+function mktKey() {
+  const s = process.env.MKT_SECRET_KEY;
+  if (!s) return null;
+  return crypto.createHash('sha256').update(String(s)).digest(); // 32 bytes
+}
+function encryptSecret(plain) {
+  if (plain == null || plain === '') return null;
+  const key = mktKey();
+  if (!key) return 'raw:' + String(plain);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return 'enc:v1:' + iv.toString('base64') + ':' + tag.toString('base64') + ':' + ct.toString('base64');
+}
+function decryptSecret(stored) {
+  if (stored == null) return null;
+  if (stored.startsWith('raw:')) return stored.slice(4);
+  if (!stored.startsWith('enc:v1:')) return null;
+  const key = mktKey();
+  if (!key) return null;
+  try {
+    const [, , ivb, tagb, ctb] = stored.split(':');
+    const iv = Buffer.from(ivb, 'base64'), tag = Buffer.from(tagb, 'base64'), ct = Buffer.from(ctb, 'base64');
+    const d = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    d.setAuthTag(tag);
+    return Buffer.concat([d.update(ct), d.final()]).toString('utf8');
+  } catch (_) { return null; }
+}
+// Toon een token nooit volledig terug: alleen of het is ingesteld + laatste 4 tekens.
+function maskSecret(stored) {
+  const v = decryptSecret(stored);
+  if (!v) return { set: false, hint: '' };
+  const tail = v.length > 4 ? v.slice(-4) : v;
+  return { set: true, hint: '••••' + tail };
+}
+
 const SALT_ROUNDS = 12;
 const VALID_LICENSE = ['trial', '1m', '3m', '6m', '12m', '24m', 'unlimited'];
 const VALID_MODULES = ['planner', 'reporting', 'publishing', 'assets', 'tasks', 'billing', 'integrations'];
@@ -768,6 +807,73 @@ router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
       try { await cloudinaryDestroy(done.public_id, done.resource_type); } catch (_) { /* best-effort */ }
     }
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
+// STAP 4 - KOPPELINGEN per klant (API-sleutels, pixels, tokens)
+// Eén rij per klant. Gevoelige tokens worden versleuteld opgeslagen en
+// nooit volledig teruggegeven (alleen gemaskeerd).
+// =======================================================================
+const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
+const INT_SECRET = ['meta_access_token', 'google_ads_developer_token', 'tiktok_access_token'];
+
+function integrationsView(row) {
+  const out = {};
+  for (const f of INT_PLAIN) out[f] = row ? (row[f] || '') : '';
+  for (const f of INT_SECRET) out[f] = maskSecret(row ? row[f] : null);
+  out.encrypted = !!mktKey();
+  return out;
+}
+
+// Koppelingen ophalen (gemaskeerd).
+router.get('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan koppelingen bekijken' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    res.json({ success: true, integrations: integrationsView(row) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Koppelingen opslaan. Lege tokenvelden laten het bestaande token ongemoeid.
+router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan koppelingen wijzigen' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+
+    const existing = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+
+    const vals = {};
+    for (const f of INT_PLAIN) {
+      vals[f] = (b[f] !== undefined) ? (String(b[f]).trim() || null) : (existing[f] || null);
+    }
+    for (const f of INT_SECRET) {
+      if (b[f] !== undefined && String(b[f]).trim() !== '') vals[f] = encryptSecret(String(b[f]).trim());
+      else vals[f] = existing[f] || null;
+    }
+
+    const cols = [...INT_PLAIN, ...INT_SECRET];
+    const insertCols = ['client_id', 'workspace_id', ...cols, 'updated_at'];
+    const params = [okClient, wsId, ...cols.map((f) => vals[f])];
+    const placeholders = params.map((_, i) => `$${i + 1}`).join(',') + ',now()';
+    const updates = cols.map((f) => `${f}=EXCLUDED.${f}`).join(', ') + ', updated_at=now()';
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.client_integrations (${insertCols.join(',')})
+       VALUES (${placeholders})
+       ON CONFLICT (client_id) DO UPDATE SET ${updates}
+       RETURNING *`, params
+    )).rows[0]);
+    res.json({ success: true, integrations: integrationsView(row) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

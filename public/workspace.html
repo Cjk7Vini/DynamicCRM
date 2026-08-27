@@ -315,6 +315,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button class="active" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'content')">Content</button>
           <button onclick="dTab(this,'assets')">Assets</button>
+          <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button onclick="dTab(this,'report')">Rapportage</button>
         </div>
         <div id="dInfo">
@@ -366,6 +367,42 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
           <div id="assetsMsg" class="inline-msg"></div>
           <div id="assetsBody"><div class="empty">Laden...</div></div>
+        </div>
+        <div id="dIntegrations" style="display:none">
+          <div id="intMsg" class="inline-msg"></div>
+          <div class="card" style="max-width:640px">
+            <p style="color:var(--muted);font-size:13px;margin-bottom:6px">Voer hier de koppelingen van deze klant in. Zodra de platform-goedkeuringen (Meta/Google) rond zijn, publiceert de workspace hiermee rechtstreeks. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
+            <div id="intEncWarn" style="display:none;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border:1px solid rgba(245,158,11,.28);padding:9px 12px;border-radius:9px;margin-bottom:14px"></div>
+
+            <div class="nav-label" style="padding-left:0">Meta (Facebook / Instagram)</div>
+            <div class="row2">
+              <div class="field"><label>Facebook Page ID</label><input id="int_meta_page_id"></div>
+              <div class="field"><label>Instagram user ID</label><input id="int_meta_ig_user_id"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>Meta Pixel ID</label><input id="int_meta_pixel_id"></div>
+              <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
+            </div>
+
+            <div class="nav-label" style="padding-left:0;margin-top:10px">Google</div>
+            <div class="row2">
+              <div class="field"><label>Google Ads customer ID</label><input id="int_google_ads_customer_id"></div>
+              <div class="field"><label>Google Ads developer token</label><input id="int_google_ads_developer_token" type="password"></div>
+            </div>
+            <div class="field"><label>GA4 measurement ID</label><input id="int_ga4_measurement_id" placeholder="G-XXXXXXX"></div>
+
+            <div class="nav-label" style="padding-left:0;margin-top:10px">TikTok</div>
+            <div class="row2">
+              <div class="field"><label>TikTok Pixel ID</label><input id="int_tiktok_pixel_id"></div>
+              <div class="field"><label>TikTok access token</label><input id="int_tiktok_access_token" type="password"></div>
+            </div>
+
+            <div class="field"><label>Notities</label><textarea id="int_notes" rows="2" placeholder="Extra info over de koppelingen"></textarea></div>
+            <div class="actions-split">
+              <span style="font-size:12px;color:var(--muted);align-self:center">Laat een token leeg om het ongewijzigd te laten.</span>
+              <button class="btn btn-primary" id="intSaveBtn" onclick="saveIntegrations()">Koppelingen opslaan</button>
+            </div>
+          </div>
         </div>
         <div id="dReport" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Rapportage</h4><p>Automatische rapporten voor deze klant komen in Stap 6.</p></div></div>
       </section>
@@ -595,14 +632,18 @@ function renderClientDetail(c){
   document.getElementById('dfColor').value=c.brand_color||'#6366f1';
   document.getElementById('dfStatus').value=c.status||'active';
   document.getElementById('dfNotes').value=c.notes||'';
-  document.getElementById('dDeleteBtn').style.display=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin')?'':'none';
+  var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
+  document.getElementById('dDeleteBtn').style.display=isOwnerMgr?'':'none';
+  document.getElementById('tabIntegrations').style.display=isOwnerMgr?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
 function dTabShow(which){
   document.getElementById('dInfo').style.display=which==='info'?'':'none';
   document.getElementById('dContent').style.display=which==='content'?'':'none';
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
+  document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
+  if(which==='integrations'){loadIntegrations();}
   if(which==='content'){document.getElementById('newPostBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadPosts();}
   if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
 }
@@ -683,11 +724,42 @@ async function uploadAsset(input){
   btn.disabled=false; btn.textContent='+ Uploaden';
 }
 async function delAsset(id){
-  if(!confirm('Deze afbeelding verwijderen?'))return;
+  if(!confirm('Dit bestand verwijderen?'))return;
   try{
     var r=await fetch('/api/mkt/assets/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
     if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Verwijderen mislukt.');}
   }catch(e){showMsg('assetsMsg',false,'Netwerkfout.');}
+}
+
+// ---- Koppelingen (integraties) ----
+var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
+var INT_SECRET=['meta_access_token','google_ads_developer_token','tiktok_access_token'];
+async function loadIntegrations(){
+  if(!CURRENT_CLIENT)return; hideMsg('intMsg');
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){showMsg('intMsg',false,d.error||'Kon koppelingen niet laden.');return;}
+    var g=d.integrations;
+    INT_PLAIN.forEach(function(f){var el=document.getElementById('int_'+f);if(el)el.value=g[f]||'';});
+    INT_SECRET.forEach(function(f){var el=document.getElementById('int_'+f);if(el){var s=g[f]||{};el.value='';el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';}});
+    var warn=document.getElementById('intEncWarn');
+    if(!g.encrypted){warn.style.display='block';warn.textContent='Let op: er is nog geen MKT_SECRET_KEY ingesteld in Render, dus tokens worden nu onversleuteld opgeslagen. Stel die sleutel in voor versleuteling.';}
+    else {warn.style.display='none';}
+  }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
+}
+async function saveIntegrations(){
+  if(!CURRENT_CLIENT)return; var btn=document.getElementById('intSaveBtn'); hideMsg('intMsg');
+  var payload={};
+  INT_PLAIN.forEach(function(f){payload[f]=document.getElementById('int_'+f).value.trim();});
+  INT_SECRET.forEach(function(f){var v=document.getElementById('int_'+f).value.trim();if(v)payload[f]=v;});
+  btn.disabled=true; btn.textContent='Opslaan...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('intMsg',true,'Koppelingen opgeslagen.');loadIntegrations();}
+    else {showMsg('intMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Koppelingen opslaan';
 }
 
 // ---- Contentkalender ----
