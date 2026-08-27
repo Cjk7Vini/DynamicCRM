@@ -621,7 +621,7 @@ function openEditPost(id){
   var body=document.getElementById('postsBody');
   fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d.success)return;
-    var p=d.posts.filter(function(x){return x.id===id;})[0]; if(!p)return;
+    var p=d.posts.filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
     EDIT_POST=p; hideMsg('postMsg');
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';document.getElementById('pfBody').value=p.body||'';
