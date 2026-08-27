@@ -45,8 +45,14 @@ function requireDhcAdmin(req, res, next) {
   return res.status(403).json({ error: 'Admin toegang vereist' });
 }
 function requireMkt(req, res, next) {
-  if (req.session && req.session.mkt && req.session.mkt.accountId) return next();
+  const m = req.session && req.session.mkt;
+  // Gewoon marketing-account, of een platform-admin die een workspace heeft gekozen.
+  if (m && (m.accountId || (m.platformAdmin && m.workspaceId))) return next();
   return res.status(401).json({ error: 'Niet ingelogd' });
+}
+function requireMktPlatform(req, res, next) {
+  if (req.session && req.session.mkt && req.session.mkt.platformAdmin) return next();
+  return res.status(403).json({ error: 'Alleen platform-admin' });
 }
 
 // ---- shell (statische marketing-werkplekpagina) ------------------------
@@ -297,33 +303,40 @@ router.post('/api/mkt/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord verplicht' });
+    const em = String(email).toLowerCase().trim();
+
+    // 1) Marketing-account
     const acc = await withReadConnection(async (c) => (await c.query(
       `SELECT a.*, w.name AS workspace_name, w.slug AS workspace_slug, w.active AS ws_active,
               w.license_type, w.license_end, w.modules
          FROM marketing.accounts a
          JOIN marketing.workspaces w ON w.id = a.workspace_id
-        WHERE a.email=$1 AND a.active=true AND (a.banned IS NULL OR a.banned=false)`,
-      [String(email).toLowerCase().trim()]
+        WHERE a.email=$1 AND a.active=true AND (a.banned IS NULL OR a.banned=false)`, [em]
     )).rows[0]);
-    if (!acc) return res.status(401).json({ error: 'Onjuiste inloggegevens' });
-    if (!acc.ws_active) return res.status(403).json({ error: 'Deze workspace is niet actief' });
-    if (acc.license_end && new Date(acc.license_end) < new Date()) {
-      return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
+    if (acc && await bcrypt.compare(password, acc.password_hash)) {
+      if (!acc.ws_active) return res.status(403).json({ error: 'Deze workspace is niet actief' });
+      if (acc.license_end && new Date(acc.license_end) < new Date())
+        return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
+      req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email };
+      await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
+      return req.session.save(() => res.json({
+        success: true, platformAdmin: false,
+        account: { id: acc.id, email: acc.email, role: acc.role, name: acc.full_name },
+        workspace: { id: acc.workspace_id, name: acc.workspace_name, slug: acc.workspace_slug, modules: acc.modules }
+      }));
     }
-    const ok = await bcrypt.compare(password, acc.password_hash);
-    if (!ok) return res.status(401).json({ error: 'Onjuiste inloggegevens' });
 
-    req.session.mkt = {
-      accountId: acc.id, workspaceId: acc.workspace_id,
-      role: acc.role, email: acc.email
-    };
-    await withWriteConnection(async (c) =>
-      c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
-    req.session.save(() => res.json({
-      success: true,
-      account: { id: acc.id, email: acc.email, role: acc.role, name: acc.full_name },
-      workspace: { id: acc.workspace_id, name: acc.workspace_name, slug: acc.workspace_slug, modules: acc.modules }
-    }));
+    // 2) DHC platform-admin: krijgt overzicht over alle workspaces.
+    const admin = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, email, password_hash FROM public.users
+        WHERE email=$1 AND role='admin' AND active=TRUE AND (banned IS NULL OR banned=FALSE)`, [em]
+    )).rows[0]);
+    if (admin && await bcrypt.compare(password, admin.password_hash)) {
+      req.session.mkt = { platformAdmin: true, role: 'platform_admin', email: admin.email, workspaceId: null };
+      return req.session.save(() => res.json({ success: true, platformAdmin: true, email: admin.email }));
+    }
+
+    return res.status(401).json({ error: 'Onjuiste inloggegevens' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -334,17 +347,54 @@ router.post('/api/mkt/auth/logout', (req, res) => {
 
 router.get('/api/mkt/auth/me', requireMkt, async (req, res) => {
   try {
+    const m = req.session.mkt;
+    if (m.platformAdmin) {
+      let workspace = null;
+      if (m.workspaceId) {
+        workspace = await withReadConnection(async (c) => (await c.query(
+          `SELECT id, name, slug, modules, license_type, license_end, max_seats, max_clients
+             FROM marketing.workspaces WHERE id=$1`, [m.workspaceId]
+        )).rows[0]) || null;
+      }
+      return res.json({ success: true, platformAdmin: true, email: m.email, workspace });
+    }
     const data = await withReadConnection(async (c) => (await c.query(
       `SELECT a.id, a.email, a.full_name, a.role,
               w.id AS workspace_id, w.name AS workspace_name, w.slug, w.modules,
               w.license_type, w.license_end, w.max_seats, w.max_clients
          FROM marketing.accounts a
          JOIN marketing.workspaces w ON w.id=a.workspace_id
-        WHERE a.id=$1`, [req.session.mkt.accountId]
+        WHERE a.id=$1`, [m.accountId]
     )).rows[0]);
     if (!data) { delete req.session.mkt; return res.status(401).json({ error: 'Sessie verlopen' }); }
-    res.json({ success: true, account: data });
+    res.json({ success: true, platformAdmin: false, account: data });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- PLATFORM-ADMIN: overzicht + workspace kiezen -------------------------
+router.get('/api/mkt/platform/workspaces', requireMktPlatform, async (req, res) => {
+  try {
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT w.id, w.name, w.slug, w.license_type, w.license_end, w.active,
+              (SELECT COUNT(*)::int FROM marketing.accounts a WHERE a.workspace_id=w.id) AS accounts,
+              (SELECT COUNT(*)::int FROM marketing.clients cl WHERE cl.workspace_id=w.id) AS clients
+         FROM marketing.workspaces w ORDER BY w.name ASC`
+    )).rows);
+    res.json({ success: true, workspaces: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/platform/enter', requireMktPlatform, async (req, res) => {
+  try {
+    const { workspaceId } = req.body || {};
+    const ws = await withReadConnection(async (c) => (await c.query('SELECT id, name, slug FROM marketing.workspaces WHERE id=$1', [workspaceId])).rows[0]);
+    if (!ws) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    req.session.mkt.workspaceId = ws.id;
+    req.session.save(() => res.json({ success: true, workspace: ws }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/platform/exit', requireMktPlatform, (req, res) => {
+  req.session.mkt.workspaceId = null;
+  req.session.save(() => res.json({ success: true }));
 });
 
 // =======================================================================
@@ -352,8 +402,8 @@ router.get('/api/mkt/auth/me', requireMkt, async (req, res) => {
 // Alles strikt gescopet op req.session.mkt.workspaceId.
 // =======================================================================
 const CLIENT_STATUS = ['active', 'paused', 'archived'];
-function mktCanManage(req) { return req.session?.mkt && req.session.mkt.role !== 'client'; }
-function mktIsOwnerOrManager(req) { return req.session?.mkt && (req.session.mkt.role === 'owner' || req.session.mkt.role === 'manager'); }
+function mktCanManage(req) { const m = req.session?.mkt; return m && (m.platformAdmin || m.role !== 'client'); }
+function mktIsOwnerOrManager(req) { const m = req.session?.mkt; return m && (m.platformAdmin || m.role === 'owner' || m.role === 'manager'); }
 
 // Lijst klanten van de eigen workspace (standaard zonder gearchiveerde).
 router.get('/api/mkt/clients', requireMkt, async (req, res) => {
@@ -391,7 +441,7 @@ router.post('/api/mkt/clients', requireMkt, async (req, res) => {
       `INSERT INTO marketing.clients (workspace_id, name, contact_name, contact_email, website, brand_color, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING id, name, contact_name, contact_email, website, brand_color, status, archived, created_at`,
-      [wsId, String(name).trim(), contact_name || null, contact_email || null, website || null, brand_color || null, notes || null, req.session.mkt.accountId]
+      [wsId, String(name).trim(), contact_name || null, contact_email || null, website || null, brand_color || null, notes || null, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, client: row });
   } catch (e) { res.status(500).json({ error: e.message }); }

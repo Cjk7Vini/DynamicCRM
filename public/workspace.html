@@ -178,6 +178,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- ===================== WORKSPACE-KIEZER (platform-admin) ===================== -->
+<div class="login hidden" id="pickerView">
+  <div class="login-card" style="max-width:560px">
+    <div class="logo"><div class="logo-mark">MS</div><div><b>Marketing Studio</b><span>Platform-admin</span></div></div>
+    <h1 style="margin-top:22px">Kies een workspace</h1>
+    <div class="lead">Ingelogd als platform-admin (<span id="pkEmail"></span>). Open een workspace om te beheren.</div>
+    <div id="pkList" style="margin-top:6px;display:grid;gap:10px"></div>
+    <div style="margin-top:18px"><span class="logout" style="display:inline-flex" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Uitloggen</span></div>
+  </div>
+</div>
+
 <!-- ===================== APP ===================== -->
 <div class="shell hidden" id="appView">
   <aside class="side">
@@ -186,6 +197,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div class="ws-ava" id="wsAva">W</div>
       <div style="min-width:0"><div class="nm" id="wsName">Workspace</div><div class="sub" id="wsPlan">-</div></div>
     </div>
+    <div id="platformBar" style="display:none;margin:-6px 4px 12px"><a onclick="switchWorkspace()" style="font-size:12px;color:var(--accent-2);cursor:pointer;font-weight:600">&#8592; Alle workspaces</a></div>
     <div class="nav-label">Werkplek</div>
     <nav class="nav" id="navMenu">
       <a data-view="overzicht" class="active" onclick="navTo('overzicht')">
@@ -325,7 +337,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
 <script>
 var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
-var ME=null, CURRENT_CLIENT=null;
+var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false;
 var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space'};
 
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
@@ -347,16 +359,29 @@ async function doLogin(){
 }
 async function doLogout(){
   try{await fetch('/api/mkt/auth/logout',{method:'POST',credentials:'include'});}catch(e){}
-  ME=null; appView.classList.add('hidden'); loginView.classList.remove('hidden'); document.getElementById('password').value='';
+  ME=null; IS_PLATFORM=false;
+  appView.classList.add('hidden'); document.getElementById('pickerView').classList.add('hidden');
+  loginView.classList.remove('hidden'); document.getElementById('password').value='';
 }
 async function bootstrap(){
   var r=await fetch('/api/mkt/auth/me',{credentials:'include'}); if(!r.ok)return;
-  var d=await r.json(); if(!d.success)return; ME=d.account;
-  loginView.classList.add('hidden'); appView.classList.remove('hidden');
+  var d=await r.json(); if(!d.success)return;
+  IS_PLATFORM = !!d.platformAdmin;
+  // Platform-admin zonder gekozen workspace -> toon kiezer.
+  if(IS_PLATFORM && !d.workspace){ showPicker(d.email); return; }
+  // Bepaal ME (normaal account of platform-in-workspace).
+  if(IS_PLATFORM){
+    var w=d.workspace;
+    ME={ email:d.email, role:'platform_admin', full_name:'Platform-admin',
+         workspace_name:w.name, slug:w.slug, modules:w.modules,
+         license_type:w.license_type, license_end:w.license_end, max_seats:w.max_seats, max_clients:w.max_clients };
+  } else { ME=d.account; }
+  loginView.classList.add('hidden'); document.getElementById('pickerView').classList.add('hidden'); appView.classList.remove('hidden');
+  document.getElementById('platformBar').style.display = IS_PLATFORM ? 'block' : 'none';
   var wsName=ME.workspace_name||'Workspace';
   document.getElementById('wsName').textContent=wsName;
   document.getElementById('wsAva').textContent=initials(wsName);
-  document.getElementById('wsPlan').textContent=(ME.license_type||'-');
+  document.getElementById('wsPlan').textContent = IS_PLATFORM ? ('platform-admin · '+(ME.license_type||'-')) : (ME.license_type||'-');
   document.getElementById('accEmail').textContent=ME.email||'';
   document.getElementById('accRole').textContent=ME.role||'';
   document.getElementById('userAva').textContent=initials(ME.full_name||ME.email);
@@ -367,6 +392,38 @@ async function bootstrap(){
   var canManage=ME.role!=='client';
   document.getElementById('topNewClient').style.display=canManage?'':'none';
   navTo('overzicht');
+}
+function showPicker(email){
+  loginView.classList.add('hidden'); appView.classList.add('hidden');
+  document.getElementById('pickerView').classList.remove('hidden');
+  document.getElementById('pkEmail').textContent=email||'';
+  loadWorkspacesPicker();
+}
+async function loadWorkspacesPicker(){
+  var el=document.getElementById('pkList'); el.innerHTML='<div style="color:var(--muted);font-size:14px">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/platform/workspaces',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){ el.innerHTML='<div style="color:var(--err);font-size:14px">'+esc(d.error||'Kon niet laden.')+'</div>'; return; }
+    if(!d.workspaces.length){ el.innerHTML='<div style="color:var(--muted);font-size:14px">Nog geen workspaces. Maak er een aan via create-user.</div>'; return; }
+    el.innerHTML=d.workspaces.map(function(w){
+      return '<div class="cl-card" style="cursor:pointer;padding:16px" onclick="enterWorkspace('+w.id+')"><div class="cl-top">'+
+        '<div class="cl-ava" style="width:40px;height:40px;font-size:15px;background:linear-gradient(135deg,var(--accent),var(--accent-2))">'+esc(initials(w.name))+'</div>'+
+        '<span class="status '+(w.active?'active':'archived')+'">'+(w.active?'actief':'inactief')+'</span></div>'+
+        '<h4 style="margin:12px 0 3px">'+esc(w.name)+'</h4><div class="mut">'+w.clients+' klanten · '+w.accounts+' accounts · '+esc(w.license_type)+'</div></div>';
+    }).join('');
+  }catch(e){ el.innerHTML='<div style="color:var(--err);font-size:14px">Netwerkfout.</div>'; }
+}
+async function enterWorkspace(id){
+  try{
+    var r=await fetch('/api/mkt/platform/enter',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({workspaceId:id})});
+    var d=await r.json();
+    if(r.ok&&d.success){ await bootstrap(); } else alert(d.error||'Kon workspace niet openen.');
+  }catch(e){ alert('Netwerkfout.'); }
+}
+async function switchWorkspace(){
+  try{ await fetch('/api/mkt/platform/exit',{method:'POST',credentials:'include'}); }catch(e){}
+  await bootstrap();
 }
 function navTo(view){
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
@@ -434,7 +491,7 @@ function renderClientDetail(c){
   document.getElementById('dfColor').value=c.brand_color||'#6366f1';
   document.getElementById('dfStatus').value=c.status||'active';
   document.getElementById('dfNotes').value=c.notes||'';
-  document.getElementById('dDeleteBtn').style.display=(ME.role==='owner'||ME.role==='manager')?'':'none';
+  document.getElementById('dDeleteBtn').style.display=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin')?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
 function dTabShow(which){
