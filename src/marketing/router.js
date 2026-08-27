@@ -8,9 +8,24 @@
 
 import express from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { withReadConnection, withWriteConnection } from '../db.js';
+
+// Cloudinary-config uit environment (staat in Render, niet in de code).
+function cloudinaryConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (cloudName && apiKey && apiSecret) return { cloudName, apiKey, apiSecret };
+  return null;
+}
+// Cloudinary-handtekening: sha1 van gesorteerde params + secret.
+function cloudinarySign(params, apiSecret) {
+  const toSign = Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join('&');
+  return crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -630,13 +645,55 @@ router.get('/api/mkt/clients/:clientId/assets', requireMkt, async (req, res) => 
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT id, filename, mime, size_bytes, created_at
+      `SELECT id, filename, mime, size_bytes, created_at,
+              provider, url, public_id, resource_type, format
          FROM marketing.assets
         WHERE workspace_id=$1 AND client_id=$2
         ORDER BY created_at DESC`,
       [wsId, okClient]
     )).rows);
     res.json({ success: true, assets: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Vraag een upload-handtekening voor Cloudinary (browser uploadt rechtstreeks).
+router.post('/api/mkt/clients/:clientId/assets/sign', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    const cfg = cloudinaryConfig();
+    if (!cfg) return res.status(500).json({ error: 'Cloudinary is niet geconfigureerd op de server' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `mkt/ws${wsId}/client${okClient}`;
+    const signature = cloudinarySign({ folder, timestamp }, cfg.apiSecret);
+    res.json({ success: true, cloudName: cfg.cloudName, apiKey: cfg.apiKey, timestamp, folder, signature });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Registreer een geuploade Cloudinary-asset in de database.
+// Body: { public_id, url, resource_type, format, bytes, filename, mime }.
+router.post('/api/mkt/clients/:clientId/assets/register', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const b = req.body || {};
+    if (!b.public_id || !b.url) return res.status(400).json({ error: 'Onvolledige upload-gegevens' });
+    const rtype = (b.resource_type === 'video' || b.resource_type === 'image') ? b.resource_type : 'image';
+    const name = (b.filename && String(b.filename).trim().slice(0, 200)) || 'bestand';
+    const size = Number.isFinite(Number(b.bytes)) ? Math.max(0, Math.floor(Number(b.bytes))) : 0;
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.assets (workspace_id, client_id, filename, mime, size_bytes, provider, public_id, url, resource_type, format, created_by)
+       VALUES ($1,$2,$3,$4,$5,'cloudinary',$6,$7,$8,$9,$10)
+       RETURNING id, filename, mime, size_bytes, created_at, provider, url, public_id, resource_type, format`,
+      [wsId, okClient, name, b.mime || null, size, String(b.public_id), String(b.url), rtype, b.format || null, req.session.mkt.accountId || null]
+    )).rows[0]);
+    res.json({ success: true, asset: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -686,15 +743,30 @@ router.get('/api/mkt/assets/:id', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Asset verwijderen.
+// Verwijder een bestand bij Cloudinary (best-effort, blokkeert de DB-delete niet).
+async function cloudinaryDestroy(publicId, resourceType) {
+  const cfg = cloudinaryConfig();
+  if (!cfg || !publicId) return;
+  const rtype = resourceType === 'video' ? 'video' : 'image';
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = cloudinarySign({ public_id: publicId, timestamp }, cfg.apiSecret);
+  const body = new URLSearchParams({ public_id: publicId, timestamp: String(timestamp), api_key: cfg.apiKey, signature });
+  await fetch(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/${rtype}/destroy`, { method: 'POST', body });
+}
+
+// Asset verwijderen (uit DB, en bij Cloudinary als het daar staat).
 router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
   try {
     if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
     const done = await withWriteConnection(async (c) => (await c.query(
-      `DELETE FROM marketing.assets WHERE id=$1 AND workspace_id=$2 RETURNING id`,
+      `DELETE FROM marketing.assets WHERE id=$1 AND workspace_id=$2
+       RETURNING id, provider, public_id, resource_type`,
       [req.params.id, req.session.mkt.workspaceId]
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Asset niet gevonden' });
+    if (done.provider === 'cloudinary' && done.public_id) {
+      try { await cloudinaryDestroy(done.public_id, done.resource_type); } catch (_) { /* best-effort */ }
+    }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

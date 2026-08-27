@@ -354,8 +354,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="section-h">
             <span class="pill" id="assetInfo">Beeldmateriaal</span>
             <div>
-              <input type="file" id="assetInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadAsset(this)">
-              <button class="btn btn-primary" id="uploadBtn" onclick="document.getElementById('assetInput').click()">+ Afbeelding uploaden</button>
+              <input type="file" id="assetInput" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="uploadAsset(this)">
+              <button class="btn btn-primary" id="uploadBtn" onclick="document.getElementById('assetInput').click()">+ Uploaden</button>
             </div>
           </div>
           <div id="assetsMsg" class="inline-msg"></div>
@@ -606,14 +606,20 @@ async function loadAssets(){
     if(!r.ok||!d.success){body.innerHTML='';showMsg('assetsMsg',false,d.error||'Kon assets niet laden.');return;}
     document.getElementById('assetInfo').textContent=d.assets.length+' bestand'+(d.assets.length===1?'':'en');
     if(!d.assets.length){
-      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Nog geen beeldmateriaal</h4><p>Upload afbeeldingen voor deze klant (PNG, JPG, WEBP, GIF, max 8 MB).</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="document.getElementById(\'assetInput\').click()">+ Afbeelding uploaden</button>':'')+'</div>';
+      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Nog geen beeldmateriaal</h4><p>Upload afbeeldingen of video\'s voor deze klant.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="document.getElementById(\'assetInput\').click()">+ Uploaden</button>':'')+'</div>';
       return;
     }
     var canManage=ME.role!=='client';
     body.innerHTML='<div class="asset-grid">'+d.assets.map(function(a){
-      var url='/api/mkt/assets/'+a.id;
+      var url=(a.provider==='cloudinary'&&a.url)?a.url:('/api/mkt/assets/'+a.id);
       var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="delAsset('+a.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'):'';
-      return '<div class="asset-card"><img class="asset-thumb" src="'+url+'" alt="'+esc(a.filename)+'" title="Klik om te openen" onclick="window.open(\''+url+'\',\'_blank\')" loading="lazy">'+
+      var thumb;
+      if(a.resource_type==='video'){
+        thumb='<video class="asset-thumb" src="'+esc(url)+'" controls preload="metadata"></video>';
+      } else {
+        thumb='<img class="asset-thumb" src="'+esc(url)+'" alt="'+esc(a.filename)+'" title="Klik om te openen" onclick="window.open(\''+esc(url)+'\',\'_blank\')" loading="lazy">';
+      }
+      return '<div class="asset-card">'+thumb+
         '<div class="asset-info"><div style="min-width:0"><div class="nm">'+esc(a.filename)+'</div><div class="sz">'+fmtSize(a.size_bytes)+'</div></div>'+del+'</div></div>';
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('assetsMsg',false,'Netwerkfout.');}
@@ -622,22 +628,34 @@ async function uploadAsset(input){
   var file=input.files&&input.files[0]; input.value='';
   if(!file)return;
   hideMsg('assetsMsg');
-  if(file.size>8*1024*1024){showMsg('assetsMsg',false,'Bestand is te groot (max 8 MB).');return;}
-  var okMime=['image/png','image/jpeg','image/webp','image/gif'];
-  if(okMime.indexOf(file.type)<0){showMsg('assetsMsg',false,'Alleen PNG, JPG, WEBP of GIF.');return;}
+  var okImg=['image/png','image/jpeg','image/webp','image/gif'];
+  var okVid=['video/mp4','video/quicktime','video/webm'];
+  var isVid=okVid.indexOf(file.type)>=0;
+  if(okImg.indexOf(file.type)<0 && !isVid){showMsg('assetsMsg',false,'Alleen afbeeldingen (PNG, JPG, WEBP, GIF) of video (MP4, MOV, WEBM).');return;}
+  var maxBytes=isVid?100*1024*1024:15*1024*1024;
+  if(file.size>maxBytes){showMsg('assetsMsg',false,'Bestand is te groot (max '+(isVid?'100 MB voor video':'15 MB voor afbeeldingen')+').');return;}
   var btn=document.getElementById('uploadBtn'); btn.disabled=true; btn.textContent='Uploaden...';
   try{
-    var b64=await new Promise(function(resolve,reject){
-      var fr=new FileReader();
-      fr.onload=function(){var s=String(fr.result);var i=s.indexOf(',');resolve(i>=0?s.slice(i+1):s);};
-      fr.onerror=function(){reject(new Error('leesfout'));};
-      fr.readAsDataURL(file);
-    });
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({filename:file.name,mime:file.type,data_base64:b64})});
-    var d=await r.json();
-    if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Upload mislukt.');}
+    // 1) handtekening ophalen bij onze backend
+    var sr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var sd=await sr.json();
+    if(!sr.ok||!sd.success){showMsg('assetsMsg',false,sd.error||'Kon upload niet voorbereiden.');btn.disabled=false;btn.textContent='+ Uploaden';return;}
+    // 2) rechtstreeks naar Cloudinary
+    var fd=new FormData();
+    fd.append('file',file);
+    fd.append('api_key',sd.apiKey);
+    fd.append('timestamp',sd.timestamp);
+    fd.append('signature',sd.signature);
+    fd.append('folder',sd.folder);
+    var cr=await fetch('https://api.cloudinary.com/v1_1/'+sd.cloudName+'/auto/upload',{method:'POST',body:fd});
+    var cd=await cr.json();
+    if(!cr.ok||!cd.public_id){showMsg('assetsMsg',false,(cd.error&&cd.error.message)||'Upload naar Cloudinary mislukt.');btn.disabled=false;btn.textContent='+ Uploaden';return;}
+    // 3) registreren in onze database
+    var rr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({public_id:cd.public_id,url:cd.secure_url,resource_type:cd.resource_type,format:cd.format,bytes:cd.bytes,filename:file.name,mime:file.type})});
+    var rd=await rr.json();
+    if(rr.ok&&rd.success){loadAssets();} else {showMsg('assetsMsg',false,rd.error||'Opslaan mislukt.');}
   }catch(e){showMsg('assetsMsg',false,'Netwerkfout bij uploaden.');}
-  btn.disabled=false; btn.textContent='+ Afbeelding uploaden';
+  btn.disabled=false; btn.textContent='+ Uploaden';
 }
 async function delAsset(id){
   if(!confirm('Deze afbeelding verwijderen?'))return;
