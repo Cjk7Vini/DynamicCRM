@@ -44,9 +44,16 @@ function requireDhcAdmin(req, res, next) {
   if (req.session && req.session.role === 'admin') return next();
   return res.status(403).json({ error: 'Admin toegang vereist' });
 }
+// Ingelogd op de marketing-module (account OF platform-admin, workspace optioneel).
+// Gebruikt door /me zodat een platform-admin zonder gekozen workspace de kiezer kan zien.
+function requireMktSession(req, res, next) {
+  const m = req.session && req.session.mkt;
+  if (m && (m.accountId || m.platformAdmin)) return next();
+  return res.status(401).json({ error: 'Niet ingelogd' });
+}
+// Mag in een workspace werken: gewoon account, of platform-admin MET gekozen workspace.
 function requireMkt(req, res, next) {
   const m = req.session && req.session.mkt;
-  // Gewoon marketing-account, of een platform-admin die een workspace heeft gekozen.
   if (m && (m.accountId || (m.platformAdmin && m.workspaceId))) return next();
   return res.status(401).json({ error: 'Niet ingelogd' });
 }
@@ -345,7 +352,7 @@ router.post('/api/mkt/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-router.get('/api/mkt/auth/me', requireMkt, async (req, res) => {
+router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
   try {
     const m = req.session.mkt;
     if (m.platformAdmin) {
