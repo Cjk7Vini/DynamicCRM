@@ -120,6 +120,27 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .status.active{background:var(--ok-soft);color:var(--ok)}
 .status.paused{background:var(--warn-soft);color:var(--warn)}
 .status.archived{background:var(--line);color:var(--muted)}
+/* post statussen */
+.status.idea{background:var(--panel-3);color:var(--ink-2)}
+.status.draft{background:var(--accent-soft);color:var(--accent-2)}
+.status.scheduled{background:var(--warn-soft);color:var(--warn)}
+.status.approved{background:var(--ok-soft);color:var(--ok)}
+.status.published{background:rgba(52,211,153,.2);color:var(--ok)}
+/* post lijst */
+.post-list{display:flex;flex-direction:column;gap:10px}
+.post-row{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 17px;display:flex;align-items:flex-start;gap:14px;transition:border-color .12s}
+.post-row:hover{border-color:var(--line-2)}
+.post-main{min-width:0;flex:1}
+.post-main h5{font-size:14.5px;margin-bottom:4px;letter-spacing:-.01em}
+.post-main .cap{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.post-meta{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.chan{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--panel-3);color:var(--ink-2)}
+.when{font-size:12px;color:var(--muted)}
+.post-acts{display:flex;gap:6px;flex-shrink:0}
+.icon-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .12s,border-color .12s}
+.icon-btn:hover{color:var(--ink);border-color:var(--line-2)}
+.icon-btn.del:hover{color:var(--err);border-color:rgba(248,113,113,.28)}
+.icon-btn svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none}
 
 /* empty state */
 .empty{background:var(--panel);border:1px dashed var(--line-2);border-radius:16px;padding:46px 30px;text-align:center}
@@ -304,7 +325,23 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
         </div>
-        <div id="dContent" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Contentkalender</h4><p>Plannen en inplannen van posts voor deze klant komt in Stap 3.</p></div></div>
+        <div id="dContent" style="display:none">
+          <div class="section-h">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <select id="postFilter" onchange="loadPosts()" style="width:auto;padding:8px 12px">
+                <option value="">Alle statussen</option>
+                <option value="idea">Idee</option>
+                <option value="draft">Concept</option>
+                <option value="scheduled">Ingepland</option>
+                <option value="approved">Goedgekeurd</option>
+                <option value="published">Gepubliceerd</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="newPostBtn" onclick="openNewPost()">+ Nieuwe post</button>
+          </div>
+          <div id="postsMsg" class="inline-msg"></div>
+          <div id="postsBody"><div class="empty">Laden...</div></div>
+        </div>
         <div id="dAssets" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Assets</h4><p>Beeldmateriaal uploaden en organiseren komt in Stap 3.</p></div></div>
         <div id="dReport" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Rapportage</h4><p>Automatische rapporten voor deze klant komen in Stap 6.</p></div></div>
       </section>
@@ -331,6 +368,44 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeNewClient()">Annuleren</button>
       <button class="btn btn-primary" id="ncCreateBtn" onclick="createClient()">Klant aanmaken</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: post (nieuw + bewerken) -->
+<div class="modal-ov" id="postModal">
+  <div class="modal">
+    <h3 id="postModalTitle">Nieuwe post</h3>
+    <div class="sub">Plan content voor deze klant.</div>
+    <div id="postMsg" class="inline-msg"></div>
+    <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
+    <div class="row2">
+      <div class="field"><label>Kanaal</label>
+        <select id="pfChannel">
+          <option value="instagram">Instagram</option>
+          <option value="facebook">Facebook</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="tiktok">TikTok</option>
+          <option value="youtube">YouTube</option>
+          <option value="blog">Blog</option>
+          <option value="other">Overig</option>
+        </select>
+      </div>
+      <div class="field"><label>Status</label>
+        <select id="pfStatus">
+          <option value="idea">Idee</option>
+          <option value="draft">Concept</option>
+          <option value="scheduled">Ingepland</option>
+          <option value="approved">Goedgekeurd</option>
+          <option value="published">Gepubliceerd</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
+    <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="4" placeholder="De post-tekst..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePost()">Annuleren</button>
+      <button class="btn btn-primary" id="pfSaveBtn" onclick="savePost()">Opslaan</button>
     </div>
   </div>
 </div>
@@ -499,6 +574,85 @@ function dTabShow(which){
   document.getElementById('dContent').style.display=which==='content'?'':'none';
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
+  if(which==='content'){document.getElementById('newPostBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadPosts();}
+}
+
+// ---- Contentkalender ----
+var EDIT_POST=null;
+var POST_STATUS_LABEL={idea:'Idee',draft:'Concept',scheduled:'Ingepland',approved:'Goedgekeurd',published:'Gepubliceerd'};
+var POST_CHAN_LABEL={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',tiktok:'TikTok',youtube:'YouTube',blog:'Blog',other:'Overig'};
+function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function toLocalInput(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
+async function loadPosts(){
+  if(!CURRENT_CLIENT)return;
+  var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  var st=document.getElementById('postFilter').value;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts'+(st?('?status='+st):''),{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
+    if(!d.posts.length){
+      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Nog geen content</h4><p>Plan je eerste post voor deze klant.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewPost()">+ Nieuwe post</button>':'')+'</div>';
+      return;
+    }
+    var canManage=ME.role!=='client';
+    body.innerHTML='<div class="post-list">'+d.posts.map(function(p){
+      var when=p.scheduled_at?('<span class="when">'+esc(fmtWhen(p.scheduled_at))+'</span>'):'';
+      var acts=canManage?('<div class="post-acts">'+
+        '<button class="icon-btn" title="Bewerken" onclick=\'openEditPost('+p.id+')\'><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></button>'+
+        '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'+
+        '</div>'):'';
+      return '<div class="post-row"><div class="post-main"><h5>'+esc(p.title)+'</h5>'+
+        (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
+        '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
+        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+when+'</div></div>'+acts+'</div>';
+    }).join('')+'</div>';
+  }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
+}
+function openNewPost(){
+  EDIT_POST=null; hideMsg('postMsg');
+  document.getElementById('postModalTitle').textContent='Nieuwe post';
+  document.getElementById('pfTitle').value='';document.getElementById('pfBody').value='';
+  document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
+  document.getElementById('pfWhen').value='';
+  document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
+}
+function openEditPost(id){
+  var body=document.getElementById('postsBody');
+  fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.success)return;
+    var p=d.posts.filter(function(x){return x.id===id;})[0]; if(!p)return;
+    EDIT_POST=p; hideMsg('postMsg');
+    document.getElementById('postModalTitle').textContent='Post bewerken';
+    document.getElementById('pfTitle').value=p.title||'';document.getElementById('pfBody').value=p.body||'';
+    document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
+    document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
+    document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
+  });
+}
+function closePost(){document.getElementById('postModal').classList.remove('open');}
+async function savePost(){
+  var btn=document.getElementById('pfSaveBtn'); hideMsg('postMsg');
+  var title=document.getElementById('pfTitle').value.trim();
+  if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
+  var when=document.getElementById('pfWhen').value;
+  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():''};
+  btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var url=EDIT_POST?('/api/mkt/posts/'+EDIT_POST.id):('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts');
+    var method=EDIT_POST?'PATCH':'POST';
+    var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){closePost();loadPosts();} else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Opslaan';
+}
+async function delPost(id){
+  if(!confirm('Deze post verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/posts/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){loadPosts();} else {showMsg('postsMsg',false,d.error||'Verwijderen mislukt.');}
+  }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
 }
 async function saveClient(){
   if(!CURRENT_CLIENT)return; hideMsg('dEditMsg');

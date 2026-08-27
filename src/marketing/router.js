@@ -501,4 +501,118 @@ router.delete('/api/mkt/clients/:id', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// STAP 3 - CONTENTKALENDER (posts per klant)
+// Alles strikt gescopet op workspace_id EN de klant moet in die workspace zitten.
+// =======================================================================
+const POST_STATUS = ['idea', 'draft', 'scheduled', 'approved', 'published'];
+const POST_CHANNELS = ['instagram', 'facebook', 'linkedin', 'tiktok', 'youtube', 'blog', 'other'];
+
+// Controleert dat de klant bestaat EN bij de actieve workspace hoort.
+// Geeft het klant-id terug, of null als het niet mag.
+async function clientInWorkspace(clientId, wsId) {
+  return await withReadConnection(async (c) => {
+    const row = (await c.query(
+      'SELECT id FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [clientId, wsId]
+    )).rows[0];
+    return row ? row.id : null;
+  });
+}
+
+// Lijst posts van een klant (optioneel filteren op status), nieuwste/geplande eerst.
+router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const status = String(req.query.status || '');
+    const filterStatus = POST_STATUS.includes(status) ? status : null;
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at
+         FROM marketing.content_posts
+        WHERE workspace_id=$1 AND client_id=$2
+          ${filterStatus ? 'AND status=$3' : ''}
+        ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`,
+      filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
+    )).rows);
+    res.json({ success: true, posts: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Nieuwe post aanmaken voor een klant.
+router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om content te beheren' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const { title, body, channel, status, scheduled_at } = req.body || {};
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'Titel is verplicht' });
+    const ch = POST_CHANNELS.includes(channel) ? channel : 'other';
+    const st = POST_STATUS.includes(status) ? status : 'idea';
+    let when = null;
+    if (scheduled_at) {
+      const d = new Date(scheduled_at);
+      if (isNaN(d.getTime())) return res.status(400).json({ error: 'Ongeldige planningsdatum' });
+      when = d;
+    }
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at`,
+      [wsId, okClient, String(title).trim(), body || null, ch, st, when, req.session.mkt.accountId || null]
+    )).rows[0]);
+    res.json({ success: true, post: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Post bijwerken (titel, tekst, kanaal, status, planning).
+router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om content te beheren' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {};
+    const sets = [], vals = []; let i = 1;
+    if (b.title !== undefined) {
+      if (!String(b.title).trim()) return res.status(400).json({ error: 'Titel mag niet leeg zijn' });
+      sets.push(`title=$${i++}`); vals.push(String(b.title).trim());
+    }
+    if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
+    if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
+    if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    if (b.scheduled_at !== undefined) {
+      if (b.scheduled_at === '' || b.scheduled_at === null) { sets.push(`scheduled_at=$${i++}`); vals.push(null); }
+      else {
+        const d = new Date(b.scheduled_at);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Ongeldige planningsdatum' });
+        sets.push(`scheduled_at=$${i++}`); vals.push(d);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    sets.push(`updated_at=now()`);
+    vals.push(req.params.id, wsId);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.content_posts SET ${sets.join(', ')}
+        WHERE id=$${i++} AND workspace_id=$${i}
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at`, vals
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true, post: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Post verwijderen.
+router.delete('/api/mkt/posts/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om content te beheren' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      `DELETE FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2 RETURNING id`,
+      [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
