@@ -49,9 +49,10 @@ function requireMkt(req, res, next) {
   return res.status(401).json({ error: 'Niet ingelogd' });
 }
 
-// ---- shell (statische marketing-dashboardpagina) -----------------------
-router.get('/marketing', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', '..', 'public', 'marketing', 'index.html'));
+// ---- shell (statische marketing-werkplekpagina) ------------------------
+// De omgeving heet workspace.html; /marketing en /workspace zijn aliassen.
+router.get(['/marketing', '/workspace', '/workspace.html'], (req, res) => {
+  res.sendFile(path.join(__dirname, '..', '..', 'public', 'workspace.html'));
 });
 
 // =======================================================================

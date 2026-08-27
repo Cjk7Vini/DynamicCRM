@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Studio - Workspace</title>
+<style>
+:root{
+  --bg:#0a0c12; --bg-2:#0e111a;
+  --panel:#121622; --panel-2:#171c2a; --panel-3:#1d2434;
+  --line:#232a3a; --line-2:#2c3448;
+  --ink:#eef1f8; --ink-2:#c3cad9; --muted:#828da5; --faint:#5b647c;
+  --accent:#6366f1; --accent-2:#22d3ee; --accent-soft:rgba(99,102,241,.14);
+  --ok:#34d399; --ok-soft:rgba(52,211,153,.12);
+  --warn:#f59e0b; --warn-soft:rgba(245,158,11,.14);
+  --err:#f87171; --err-soft:rgba(248,113,113,.12);
+  --shadow:0 20px 50px rgba(0,0,0,.45);
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+.hidden{display:none!important}
+button{font-family:inherit}
+svg{display:block}
+
+/* ---------- BUTTONS ---------- */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:none;border-radius:10px;font-weight:650;font-size:13.5px;cursor:pointer;transition:transform .12s,box-shadow .12s,background .12s;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#7c74ff);color:#fff;box-shadow:0 6px 18px rgba(99,102,241,.35)}
+.btn-primary:hover{transform:translateY(-1px)}
+.btn-ghost{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-2)}
+.btn-ghost:hover{border-color:var(--line-2);color:var(--ink)}
+.btn-danger{background:var(--err-soft);border:1px solid rgba(248,113,113,.28);color:var(--err)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+/* ---------- LOGIN ---------- */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
+.login::before{content:"";position:absolute;width:900px;height:900px;top:-360px;left:-200px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.18),transparent 60%)}
+.login::after{content:"";position:absolute;width:800px;height:800px;bottom:-380px;right:-220px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.12),transparent 60%)}
+.login-card{position:relative;width:100%;max-width:400px;background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line);border-radius:20px;padding:38px 34px;box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;box-shadow:0 6px 16px rgba(99,102,241,.4)}
+.logo b{font-size:16px;letter-spacing:-.01em}
+.logo span{display:block;font-size:10px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
+.login h1{font-size:22px;margin:26px 0 4px;letter-spacing:-.02em}
+.login .lead{color:var(--muted);font-size:14px;margin-bottom:20px}
+label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600}
+input,textarea,select{width:100%;padding:11px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.login .btn{width:100%;justify-content:center;margin-top:22px}
+.msg{margin-top:14px;font-size:13px;padding:10px 12px;border-radius:9px;display:none}
+.msg.err{display:block;background:var(--err-soft);color:var(--err);border:1px solid rgba(248,113,113,.28)}
+
+/* ---------- APP SHELL ---------- */
+.shell{display:grid;grid-template-columns:256px 1fr;min-height:100vh}
+.side{background:linear-gradient(180deg,var(--panel),var(--bg-2));border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px}
+.side .logo{padding:6px 8px 0}
+.ws-chip{margin:18px 4px 18px;padding:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;gap:10px}
+.ws-ava{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0}
+.ws-chip .nm{font-size:13.5px;font-weight:650;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-chip .sub{font-size:11px;color:var(--muted)}
+.nav-label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);padding:6px 10px;margin-top:6px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:550;cursor:pointer;transition:background .12s,color .12s}
+.nav a svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.9;fill:none;flex-shrink:0}
+.nav a.active{background:var(--accent-soft);color:#fff}
+.nav a.active svg{stroke:var(--accent-2)}
+.nav a:not(.disabled):not(.active):hover{background:var(--panel-2);color:var(--ink-2)}
+.nav a.disabled{color:var(--faint);cursor:default}
+.nav a .soon{margin-left:auto;font-size:9px;letter-spacing:.08em;text-transform:uppercase;background:var(--line);color:var(--muted);padding:2px 6px;border-radius:20px}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px}
+.user-chip{display:flex;align-items:center;gap:10px;padding:8px 8px}
+.user-ava{width:32px;height:32px;border-radius:50%;background:var(--panel-3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--ink-2)}
+.user-chip .em{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-chip .ro{font-size:11px;color:var(--muted);text-transform:capitalize}
+.logout{margin-top:8px;display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;color:var(--muted);font-size:13px;cursor:pointer}
+.logout:hover{background:var(--err-soft);color:var(--err)}
+.logout svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.9;fill:none}
+
+.main{min-width:0;background:radial-gradient(1200px 500px at 100% -5%,rgba(99,102,241,.06),transparent)}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 34px;border-bottom:1px solid var(--line);background:rgba(10,12,18,.72);backdrop-filter:blur(10px)}
+.topbar .tt{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.topbar h2{font-size:20px;letter-spacing:-.02em;margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.pill{font-size:12px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);padding:6px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:7px}
+.pill .d{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.content{padding:30px 34px}
+.view{display:none}.view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* welcome / stat cards */
+.hero{background:linear-gradient(120deg,rgba(99,102,241,.14),rgba(34,211,238,.06));border:1px solid var(--line);border-radius:18px;padding:26px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.hero h3{font-size:19px;letter-spacing:-.01em}
+.hero p{color:var(--ink-2);margin-top:6px;font-size:14px;max-width:56ch}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:26px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.stat .k{font-size:12px;color:var(--muted);font-weight:600}
+.stat .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+.stat .v.accent{color:var(--accent-2)}
+.section-h{display:flex;align-items:center;justify-content:space-between;margin:6px 0 14px}
+.section-h h4{font-size:15px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.mod{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;transition:border-color .12s,transform .12s}
+.mod.live{cursor:pointer}
+.mod.live:hover{transform:translateY(-2px);border-color:var(--accent)}
+.mod h5{font-size:14.5px;margin-bottom:5px}
+.mod p{color:var(--muted);font-size:13px}
+.mod .tag{display:inline-block;margin-top:14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--panel-3);color:var(--muted)}
+.mod .tag.on{background:var(--ok-soft);color:var(--ok)}
+
+/* client grid */
+.cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.cl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
+.cl-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 14px 30px rgba(0,0,0,.35)}
+.cl-top{display:flex;justify-content:space-between;align-items:flex-start}
+.cl-ava{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.cl-card h4{font-size:16px;margin:14px 0 3px;letter-spacing:-.01em}
+.cl-card .mut{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:700}
+.status.active{background:var(--ok-soft);color:var(--ok)}
+.status.paused{background:var(--warn-soft);color:var(--warn)}
+.status.archived{background:var(--line);color:var(--muted)}
+
+/* empty state */
+.empty{background:var(--panel);border:1px dashed var(--line-2);border-radius:16px;padding:46px 30px;text-align:center}
+.empty svg{width:40px;height:40px;stroke:var(--faint);stroke-width:1.6;fill:none;margin:0 auto 14px}
+.empty h4{font-size:16px;margin-bottom:6px}
+.empty p{color:var(--muted);font-size:14px;margin-bottom:18px}
+
+/* forms */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+.field{margin-bottom:15px}
+.field label{margin:0 0 6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.color-in{height:44px;padding:5px;cursor:pointer}
+.inline-msg{font-size:13px;padding:9px 12px;border-radius:9px;margin-bottom:14px;display:none}
+
+/* detail */
+.back{display:inline-flex;align-items:center;gap:7px;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:16px}
+.back:hover{color:var(--ink-2)}
+.detail-head{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.detail-head .cl-ava{width:56px;height:56px;border-radius:15px;font-size:22px}
+.detail-head h2{font-size:24px;letter-spacing:-.02em}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:24px 0 22px}
+.tabs button{background:none;border:none;color:var(--muted);padding:11px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.active{color:var(--ink);border-bottom-color:var(--accent)}
+.actions-split{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+
+/* modal */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(4,6,12,.66);z-index:50;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)}
+.modal-ov.open{display:flex;animation:fade .18s ease}
+.modal{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
+.modal h3{font-size:19px;letter-spacing:-.01em}
+.modal .sub{color:var(--muted);font-size:13px;margin:4px 0 18px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+
+@media(max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .topbar,.content{padding-left:18px;padding-right:18px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div class="login" id="loginView">
+  <div class="login-card">
+    <div class="logo"><div class="logo-mark">MS</div><div><b>Marketing Studio</b><span>Powered by Dynamic Health</span></div></div>
+    <h1>Welkom terug</h1>
+    <div class="lead">Log in op je workspace.</div>
+    <label for="email">E-mailadres</label>
+    <input id="email" type="email" autocomplete="username" placeholder="jij@bureau.nl">
+    <label for="password">Wachtwoord</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">Inloggen</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="shell hidden" id="appView">
+  <aside class="side">
+    <div class="logo"><div class="logo-mark">MS</div><div><b>Marketing Studio</b><span>Workspace</span></div></div>
+    <div class="ws-chip">
+      <div class="ws-ava" id="wsAva">W</div>
+      <div style="min-width:0"><div class="nm" id="wsName">Workspace</div><div class="sub" id="wsPlan">-</div></div>
+    </div>
+    <div class="nav-label">Werkplek</div>
+    <nav class="nav" id="navMenu">
+      <a data-view="overzicht" class="active" onclick="navTo('overzicht')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+        Overzicht
+      </a>
+      <a data-view="clients" onclick="navTo('clients')">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3.2"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Klanten
+      </a>
+    </nav>
+    <div class="nav-label">Binnenkort</div>
+    <nav class="nav">
+      <a class="disabled"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Contentkalender <span class="soon">3</span></a>
+      <a class="disabled"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Assets <span class="soon">3</span></a>
+      <a class="disabled"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Goedkeuringen <span class="soon">5</span></a>
+      <a class="disabled"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Analytics <span class="soon">6</span></a>
+      <a class="disabled"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Rapportages <span class="soon">6</span></a>
+    </nav>
+    <div class="side-foot">
+      <div class="user-chip">
+        <div class="user-ava" id="userAva">?</div>
+        <div style="min-width:0"><div class="em" id="accEmail">-</div><div class="ro" id="accRole">-</div></div>
+      </div>
+      <div class="logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Uitloggen</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><div class="tt">Marketing Studio</div><h2 id="pageTitle">Overzicht</h2></div>
+      <div class="topbar-right">
+        <span class="pill" id="licPill"><span class="d"></span> Licentie</span>
+        <button class="btn btn-primary" id="topNewClient" onclick="openNewClient()" style="display:none">+ Nieuwe klant</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- OVERZICHT -->
+      <section class="view active" id="viewOverzicht">
+        <div class="hero">
+          <div>
+            <h3>Je workspace staat klaar</h3>
+            <p>Beheer je klanten, plan content, laat goedkeuren en rapporteer - straks allemaal op één plek. We bouwen het stap voor stap uit.</p>
+          </div>
+          <button class="btn btn-primary" onclick="navTo('clients')">Naar klanten</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Actieve klanten</div><div class="v accent" id="stClients">-</div></div>
+          <div class="stat"><div class="k">Licentie</div><div class="v" id="stLicense" style="font-size:20px">-</div></div>
+          <div class="stat"><div class="k">Seats</div><div class="v" id="stSeats">-</div></div>
+        </div>
+        <div class="section-h"><h4>Modules</h4></div>
+        <div class="grid">
+          <div class="mod live" onclick="navTo('clients')"><h5>Klanten</h5><p>Beheer per klant een eigen space.</p><span class="tag on">Actief</span></div>
+          <div class="mod"><h5>Contentkalender</h5><p>Plan en plan posts in, per klant.</p><span class="tag">Stap 3</span></div>
+          <div class="mod"><h5>Assets</h5><p>Beeldmateriaal uploaden en organiseren.</p><span class="tag">Stap 3</span></div>
+          <div class="mod"><h5>Goedkeuringen</h5><p>Klant bekijkt en keurt content goed.</p><span class="tag">Stap 5</span></div>
+          <div class="mod"><h5>Rapportages</h5><p>Automatische rapporten naar de klant.</p><span class="tag">Stap 6</span></div>
+        </div>
+      </section>
+
+      <!-- KLANTEN -->
+      <section class="view" id="viewClients">
+        <div class="section-h">
+          <span class="pill" id="clientLimitPill">Klanten: -</span>
+        </div>
+        <div id="clientsMsg" class="inline-msg"></div>
+        <div id="clientsBody"><div class="empty">Laden...</div></div>
+      </section>
+
+      <!-- KLANT DETAIL -->
+      <section class="view" id="viewClientDetail">
+        <span class="back" onclick="navTo('clients')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Terug naar klanten</span>
+        <div class="detail-head">
+          <div class="cl-ava" id="dBadge">?</div>
+          <div><div class="tt" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)">Klant-space</div><h2 id="dName">Klant</h2></div>
+        </div>
+        <div class="tabs" id="dTabs">
+          <button class="active" onclick="dTab(this,'info')">Gegevens</button>
+          <button onclick="dTab(this,'content')">Content</button>
+          <button onclick="dTab(this,'assets')">Assets</button>
+          <button onclick="dTab(this,'report')">Rapportage</button>
+        </div>
+        <div id="dInfo">
+          <div id="dEditMsg" class="inline-msg"></div>
+          <div class="card" style="max-width:580px">
+            <div class="field"><label>Klantnaam</label><input id="dfName"></div>
+            <div class="row2">
+              <div class="field"><label>Contactpersoon</label><input id="dfContact"></div>
+              <div class="field"><label>Contact e-mail</label><input id="dfEmail" type="email"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>Website</label><input id="dfWebsite" placeholder="https://"></div>
+              <div class="field"><label>Merkkleur</label><input id="dfColor" type="color" class="color-in"></div>
+            </div>
+            <div class="field"><label>Status</label>
+              <select id="dfStatus"><option value="active">Actief</option><option value="paused">Gepauzeerd</option><option value="archived">Gearchiveerd</option></select>
+            </div>
+            <div class="field"><label>Notities</label><textarea id="dfNotes" rows="3"></textarea></div>
+            <div class="actions-split">
+              <button class="btn btn-danger" id="dDeleteBtn" onclick="deleteClient()">Verwijderen</button>
+              <button class="btn btn-primary" onclick="saveClient()">Wijzigingen opslaan</button>
+            </div>
+          </div>
+        </div>
+        <div id="dContent" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Contentkalender</h4><p>Plannen en inplannen van posts voor deze klant komt in Stap 3.</p></div></div>
+        <div id="dAssets" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Assets</h4><p>Beeldmateriaal uploaden en organiseren komt in Stap 3.</p></div></div>
+        <div id="dReport" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Rapportage</h4><p>Automatische rapporten voor deze klant komen in Stap 6.</p></div></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL: nieuwe klant -->
+<div class="modal-ov" id="newClientModal">
+  <div class="modal">
+    <h3>Nieuwe klant</h3>
+    <div class="sub">Maak een eigen space aan voor deze klant.</div>
+    <div id="newClientMsg" class="inline-msg"></div>
+    <div class="field"><label>Klantnaam *</label><input id="ncName" placeholder="Bijv. Bakkerij Jansen"></div>
+    <div class="row2">
+      <div class="field"><label>Contactpersoon</label><input id="ncContact"></div>
+      <div class="field"><label>Contact e-mail</label><input id="ncEmail" type="email"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Website</label><input id="ncWebsite" placeholder="https://"></div>
+      <div class="field"><label>Merkkleur</label><input id="ncColor" type="color" value="#6366f1" class="color-in"></div>
+    </div>
+    <div class="field"><label>Notities</label><textarea id="ncNotes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeNewClient()">Annuleren</button>
+      <button class="btn btn-primary" id="ncCreateBtn" onclick="createClient()">Klant aanmaken</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
+var ME=null, CURRENT_CLIENT=null;
+var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space'};
+
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
+function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
+function showMsg(id,ok,txt){var el=document.getElementById(id);if(!el)return;el.style.display='block';el.style.background=ok?'var(--ok-soft)':'var(--err-soft)';el.style.color=ok?'var(--ok)':'var(--err)';el.textContent=txt;}
+function hideMsg(id){var el=document.getElementById(id);if(el)el.style.display='none';}
+
+async function doLogin(){
+  var btn=document.getElementById('loginBtn'), msg=document.getElementById('loginMsg'); msg.className='msg';
+  var email=document.getElementById('email').value.trim(), password=document.getElementById('password').value;
+  if(!email||!password){msg.className='msg err';msg.textContent='Vul je e-mail en wachtwoord in.';return;}
+  btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:password})});
+    var d=await r.json();
+    if(r.ok&&d.success){await bootstrap();} else {msg.className='msg err';msg.textContent=d.error||'Inloggen mislukt.';}
+  }catch(e){msg.className='msg err';msg.textContent='Geen verbinding. Probeer opnieuw.';}
+  btn.disabled=false; btn.textContent='Inloggen';
+}
+async function doLogout(){
+  try{await fetch('/api/mkt/auth/logout',{method:'POST',credentials:'include'});}catch(e){}
+  ME=null; appView.classList.add('hidden'); loginView.classList.remove('hidden'); document.getElementById('password').value='';
+}
+async function bootstrap(){
+  var r=await fetch('/api/mkt/auth/me',{credentials:'include'}); if(!r.ok)return;
+  var d=await r.json(); if(!d.success)return; ME=d.account;
+  loginView.classList.add('hidden'); appView.classList.remove('hidden');
+  var wsName=ME.workspace_name||'Workspace';
+  document.getElementById('wsName').textContent=wsName;
+  document.getElementById('wsAva').textContent=initials(wsName);
+  document.getElementById('wsPlan').textContent=(ME.license_type||'-');
+  document.getElementById('accEmail').textContent=ME.email||'';
+  document.getElementById('accRole').textContent=ME.role||'';
+  document.getElementById('userAva').textContent=initials(ME.full_name||ME.email);
+  var end=ME.license_end?(' · tot '+new Date(ME.license_end).toLocaleDateString('nl-NL')):'';
+  document.getElementById('licPill').innerHTML='<span class="d"></span> '+esc(ME.license_type||'-')+esc(end);
+  document.getElementById('stLicense').textContent=(ME.license_type||'-');
+  document.getElementById('stSeats').textContent=(ME.max_seats||'-');
+  var canManage=ME.role!=='client';
+  document.getElementById('topNewClient').style.display=canManage?'':'none';
+  navTo('overzicht');
+}
+function navTo(view){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.querySelectorAll('#navMenu a[data-view]').forEach(function(a){a.classList.toggle('active',a.getAttribute('data-view')===view);});
+  document.getElementById('pageTitle').textContent=TITLES[view]||'Overzicht';
+  document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
+  if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
+  else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
+  else {document.getElementById('viewOverzicht').classList.add('active');}
+}
+
+// ---- Klanten ----
+async function loadClients(){
+  var body=document.getElementById('clientsBody'); hideMsg('clientsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('clientsMsg',false,d.error||'Kon klanten niet laden.');return;}
+    var max=ME.max_clients||0;
+    document.getElementById('clientLimitPill').textContent='Klanten: '+d.clients.length+(max?(' / '+max):'');
+    document.getElementById('stClients').textContent=d.clients.length;
+    if(!d.clients.length){
+      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3.2"/></svg><h4>Nog geen klanten</h4><p>Maak je eerste klant-space aan om te beginnen.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewClient()">+ Nieuwe klant</button>':'')+'</div>';
+      return;
+    }
+    body.innerHTML='<div class="cl-grid">'+d.clients.map(function(c){
+      var col=c.brand_color||'#6366f1';
+      return '<div class="cl-card" onclick="openClient('+c.id+')"><div class="cl-top">'+
+        '<div class="cl-ava" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
+        '<span class="status '+esc(c.status)+'">'+esc(c.status)+'</span></div>'+
+        '<h4>'+esc(c.name)+'</h4><div class="mut">'+esc(c.contact_name||c.contact_email||'Geen contact')+'</div></div>';
+    }).join('')+'</div>';
+  }catch(e){body.innerHTML='';showMsg('clientsMsg',false,'Netwerkfout.');}
+}
+function openNewClient(){hideMsg('newClientMsg');['ncName','ncContact','ncEmail','ncWebsite','ncNotes'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('ncColor').value='#6366f1';document.getElementById('newClientModal').classList.add('open');document.getElementById('ncName').focus();}
+function closeNewClient(){document.getElementById('newClientModal').classList.remove('open');}
+async function createClient(){
+  var btn=document.getElementById('ncCreateBtn'); hideMsg('newClientMsg');
+  var body={name:document.getElementById('ncName').value.trim(),contact_name:document.getElementById('ncContact').value.trim(),contact_email:document.getElementById('ncEmail').value.trim(),website:document.getElementById('ncWebsite').value.trim(),brand_color:document.getElementById('ncColor').value,notes:document.getElementById('ncNotes').value.trim()};
+  if(!body.name){showMsg('newClientMsg',false,'Klantnaam is verplicht.');return;}
+  btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/clients',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){closeNewClient();loadClients();} else {showMsg('newClientMsg',false,d.error||'Aanmaken mislukt.');}
+  }catch(e){showMsg('newClientMsg',false,'Netwerkfout: '+e.message);}
+  btn.disabled=false; btn.textContent='Klant aanmaken';
+}
+async function openClient(id){
+  try{
+    var r=await fetch('/api/mkt/clients/'+id,{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){alert(d.error||'Kon klant niet laden.');return;}
+    CURRENT_CLIENT=d.client; renderClientDetail(d.client); navTo('clientDetail');
+    document.querySelectorAll('#dTabs button').forEach(function(b,i){b.classList.toggle('active',i===0);});
+    dTabShow('info');
+  }catch(e){alert('Netwerkfout.');}
+}
+function renderClientDetail(c){
+  hideMsg('dEditMsg');
+  document.getElementById('dName').textContent=c.name;
+  var b=document.getElementById('dBadge'); b.textContent=initials(c.name); b.style.background=c.brand_color||'#6366f1';
+  document.getElementById('dfName').value=c.name||'';
+  document.getElementById('dfContact').value=c.contact_name||'';
+  document.getElementById('dfEmail').value=c.contact_email||'';
+  document.getElementById('dfWebsite').value=c.website||'';
+  document.getElementById('dfColor').value=c.brand_color||'#6366f1';
+  document.getElementById('dfStatus').value=c.status||'active';
+  document.getElementById('dfNotes').value=c.notes||'';
+  document.getElementById('dDeleteBtn').style.display=(ME.role==='owner'||ME.role==='manager')?'':'none';
+}
+function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
+function dTabShow(which){
+  document.getElementById('dInfo').style.display=which==='info'?'':'none';
+  document.getElementById('dContent').style.display=which==='content'?'':'none';
+  document.getElementById('dAssets').style.display=which==='assets'?'':'none';
+  document.getElementById('dReport').style.display=which==='report'?'':'none';
+}
+async function saveClient(){
+  if(!CURRENT_CLIENT)return; hideMsg('dEditMsg');
+  var body={name:document.getElementById('dfName').value.trim(),contact_name:document.getElementById('dfContact').value.trim(),contact_email:document.getElementById('dfEmail').value.trim(),website:document.getElementById('dfWebsite').value.trim(),brand_color:document.getElementById('dfColor').value,status:document.getElementById('dfStatus').value,notes:document.getElementById('dfNotes').value.trim()};
+  if(!body.name){showMsg('dEditMsg',false,'Klantnaam is verplicht.');return;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){CURRENT_CLIENT=d.client;renderClientDetail(d.client);showMsg('dEditMsg',true,'Opgeslagen.');}
+    else {showMsg('dEditMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('dEditMsg',false,'Netwerkfout.');}
+}
+async function deleteClient(){
+  if(!CURRENT_CLIENT)return;
+  if(!confirm('Klant "'+CURRENT_CLIENT.name+'" definitief verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'DELETE',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){CURRENT_CLIENT=null;navTo('clients');} else {showMsg('dEditMsg',false,d.error||'Verwijderen mislukt.');}
+  }catch(e){showMsg('dEditMsg',false,'Netwerkfout.');}
+}
+
+(async function(){try{var r=await fetch('/api/mkt/auth/me',{credentials:'include'});if(r.ok){var d=await r.json();if(d.success)await bootstrap();}}catch(e){}})();
+</script>
+</body>
+</html>
