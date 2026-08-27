@@ -78,99 +78,311 @@ input:focus{border-color:var(--accent)}
 </div>
 
 <!-- APP SHELL -->
+<style>
+  .btn-sm{padding:9px 16px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--accent),#7c6bff);color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+  .btn-ghost{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-weight:600}
+  .btn-danger{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--err)}
+  .view{display:none}.view.active{display:block}
+  .nav a{user-select:none}
+  .cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:20px}
+  .cl-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;cursor:pointer;transition:transform .12s,border-color .12s}
+  .cl-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .cl-badge{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#0b0d12;font-size:16px}
+  .cl-card h4{font-size:16px;margin:12px 0 2px}
+  .cl-card .muted{color:var(--muted);font-size:13px}
+  .status{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:20px;font-weight:700}
+  .status.active{background:rgba(52,211,153,.12);color:var(--ok)}
+  .status.paused{background:rgba(234,179,8,.14);color:#eab308}
+  .status.archived{background:var(--line);color:var(--muted)}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  .field input,.field textarea,.field select{width:100%;padding:11px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none;font-family:inherit}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:center;justify-content:center;padding:20px}
+  .modal-ov.open{display:flex}
+  .modal{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;max-height:90vh;overflow:auto}
+  .modal h3{font-size:18px;margin-bottom:4px}
+  .modal .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .detail-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .back{color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;display:inline-block}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:22px 0 20px}
+  .tabs button{background:none;border:none;color:var(--muted);padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
+  .tabs button.active{color:var(--ink);border-bottom-color:var(--accent)}
+  .soonbox{background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:30px;text-align:center;color:var(--muted);font-size:14px}
+  .inline-msg{font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+</style>
 <div class="shell hidden" id="appView">
   <aside class="side">
     <div class="brand"><div class="brand-dot"></div><div><b>Marketing Studio</b><span id="wsSlug">workspace</span></div></div>
-    <nav class="nav">
-      <a class="active"><span class="dot"></span> Overzicht</a>
-      <a>Klanten <span class="soon">binnenkort</span></a>
+    <nav class="nav" id="navMenu">
+      <a data-view="overzicht" class="active" onclick="navTo('overzicht')"><span class="dot"></span> Overzicht</a>
+      <a data-view="clients" onclick="navTo('clients')"><span class="dot"></span> Klanten</a>
       <a>Contentkalender <span class="soon">binnenkort</span></a>
       <a>Goedkeuringen <span class="soon">binnenkort</span></a>
       <a>Analytics <span class="soon">binnenkort</span></a>
       <a>Rapportages <span class="soon">binnenkort</span></a>
     </nav>
     <div class="side-foot">
-      <div id="accEmail">—</div>
+      <div id="accEmail">-</div>
       <div class="logout" onclick="doLogout()">Uitloggen</div>
     </div>
   </aside>
   <main class="main">
-    <div class="topline">
-      <div>
-        <div class="eyebrow">Marketing Studio</div>
-        <h2 id="wsName">Workspace</h2>
+
+    <!-- OVERZICHT -->
+    <section class="view active" id="viewOverzicht">
+      <div class="topline">
+        <div><div class="eyebrow">Marketing Studio</div><h2 id="wsName">Workspace</h2></div>
+        <div class="pill" id="licPill">Licentie</div>
       </div>
-      <div class="pill" id="licPill">Licentie</div>
-    </div>
+      <div class="welcome">
+        <h3>Je werkplek staat klaar</h3>
+        <p>Beheer je klanten hieronder. Per klant komt straks een eigen ruimte met assets, planning, goedkeuringen en rapportages.</p>
+      </div>
+      <div class="grid">
+        <div class="card" style="cursor:pointer" onclick="navTo('clients')"><h3>Klanten</h3><p id="ovClientCount">Bekijk en beheer je klanten.</p><span class="tag">Actief</span></div>
+        <div class="card"><h3>Contentkalender</h3><p>Plan en plan posts in, per klant.</p><span class="tag">Stap 3</span></div>
+        <div class="card"><h3>Assets</h3><p>Beeldmateriaal uploaden en organiseren per klant.</p><span class="tag">Stap 3</span></div>
+        <div class="card"><h3>Goedkeuringen</h3><p>Klant bekijkt en keurt content goed.</p><span class="tag">Stap 5</span></div>
+        <div class="card"><h3>Rapportages</h3><p>Automatische rapporten naar klant of manager.</p><span class="tag">Stap 6</span></div>
+      </div>
+    </section>
 
-    <div class="welcome">
-      <h3>Je werkplek staat klaar 🚀</h3>
-      <p>Dit is het fundament (stap 1). De modules hieronder bouwen we stap voor stap uit: klanten, contentplanning, goedkeuringen, analytics en automatische rapportages.</p>
-    </div>
+    <!-- KLANTEN -->
+    <section class="view" id="viewClients">
+      <div class="topline">
+        <div><div class="eyebrow">Workspace</div><h2>Klanten</h2></div>
+        <button class="btn-sm" id="newClientBtn" onclick="openNewClient()">+ Nieuwe klant</button>
+      </div>
+      <div class="pill" id="clientLimitPill" style="margin-bottom:6px">Klanten: -</div>
+      <div id="clientsMsg" class="inline-msg"></div>
+      <div id="clientsBody"><div class="soonbox">Laden...</div></div>
+    </section>
 
-    <div class="grid">
-      <div class="card"><h3>Klanten</h3><p>Beheer per klant een eigen space met kanalen, assets en team.</p><span class="tag">Stap 2</span></div>
-      <div class="card"><h3>Contentkalender</h3><p>Plan en plan posts in, per klant, in één overzicht.</p><span class="tag">Stap 3</span></div>
-      <div class="card"><h3>Goedkeuringen</h3><p>Klant bekijkt en keurt content goed. Geen WhatsApp-chaos meer.</p><span class="tag">Stap 4</span></div>
-      <div class="card"><h3>Integraties</h3><p>Koppel Meta, Google en meer. Data en publiceren op één plek.</p><span class="tag">Stap 5</span></div>
-      <div class="card"><h3>Rapportages</h3><p>Automatische rapporten naar klant, manager of eigenaar.</p><span class="tag">Stap 6</span></div>
-    </div>
+    <!-- KLANT DETAIL -->
+    <section class="view" id="viewClientDetail">
+      <span class="back" onclick="navTo('clients')">&#8592; Terug naar klanten</span>
+      <div class="detail-head">
+        <div class="cl-badge" id="dBadge">?</div>
+        <div><div class="eyebrow">Klant-space</div><h2 id="dName">Klant</h2></div>
+      </div>
+      <div class="tabs" id="dTabs">
+        <button class="active" onclick="dTab(this,'info')">Gegevens</button>
+        <button onclick="dTab(this,'content')">Content</button>
+        <button onclick="dTab(this,'assets')">Assets</button>
+        <button onclick="dTab(this,'report')">Rapportage</button>
+      </div>
+      <div id="dInfo">
+        <div id="dEditMsg" class="inline-msg"></div>
+        <div class="card" style="max-width:560px">
+          <div class="field"><label>Klantnaam</label><input id="dfName"></div>
+          <div class="row2">
+            <div class="field"><label>Contactpersoon</label><input id="dfContact"></div>
+            <div class="field"><label>Contact e-mail</label><input id="dfEmail" type="email"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Website</label><input id="dfWebsite" placeholder="https://"></div>
+            <div class="field"><label>Merkkleur</label><input id="dfColor" type="color" style="height:44px;padding:4px"></div>
+          </div>
+          <div class="field"><label>Status</label>
+            <select id="dfStatus"><option value="active">Actief</option><option value="paused">Gepauzeerd</option><option value="archived">Gearchiveerd</option></select>
+          </div>
+          <div class="field"><label>Notities</label><textarea id="dfNotes" rows="3"></textarea></div>
+          <div class="modal-actions" style="justify-content:space-between">
+            <button class="btn-sm btn-danger" id="dDeleteBtn" onclick="deleteClient()">Verwijderen</button>
+            <button class="btn-sm" onclick="saveClient()">Opslaan</button>
+          </div>
+        </div>
+      </div>
+      <div id="dContent" style="display:none"><div class="soonbox">Contentkalender voor deze klant komt in Stap 3.</div></div>
+      <div id="dAssets" style="display:none"><div class="soonbox">Asset-bibliotheek voor deze klant komt in Stap 3.</div></div>
+      <div id="dReport" style="display:none"><div class="soonbox">Rapportages voor deze klant komen in Stap 6.</div></div>
+    </section>
   </main>
+</div>
+
+<!-- MODAL: nieuwe klant -->
+<div class="modal-ov" id="newClientModal">
+  <div class="modal">
+    <h3>Nieuwe klant</h3>
+    <div class="sub">Maak een eigen ruimte aan voor deze klant.</div>
+    <div id="newClientMsg" class="inline-msg"></div>
+    <div class="field"><label>Klantnaam *</label><input id="ncName" placeholder="Bijv. Bakkerij Jansen"></div>
+    <div class="row2">
+      <div class="field"><label>Contactpersoon</label><input id="ncContact"></div>
+      <div class="field"><label>Contact e-mail</label><input id="ncEmail" type="email"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Website</label><input id="ncWebsite" placeholder="https://"></div>
+      <div class="field"><label>Merkkleur</label><input id="ncColor" type="color" value="#6d5efc" style="height:44px;padding:4px"></div>
+    </div>
+    <div class="field"><label>Notities</label><textarea id="ncNotes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-sm btn-ghost" onclick="closeNewClient()">Annuleren</button>
+      <button class="btn-sm" id="ncCreateBtn" onclick="createClient()">Klant aanmaken</button>
+    </div>
+  </div>
 </div>
 
 <script>
 var loginView = document.getElementById('loginView');
 var appView   = document.getElementById('appView');
+var ME = null;               // account+workspace info
+var CURRENT_CLIENT = null;
+
+function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+function initials(n){ return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase() || '?'; }
+function showMsg(id,ok,txt){ var el=document.getElementById(id); if(!el)return; el.style.display='block'; el.style.background=ok?'rgba(52,211,153,.12)':'rgba(248,113,113,.12)'; el.style.color=ok?'#34d399':'#f87171'; el.textContent=txt; }
+function hideMsg(id){ var el=document.getElementById(id); if(el)el.style.display='none'; }
 
 async function doLogin(){
-  var btn = document.getElementById('loginBtn');
-  var msg = document.getElementById('loginMsg');
-  msg.className = 'msg';
-  var email = document.getElementById('email').value.trim();
-  var password = document.getElementById('password').value;
-  if(!email || !password){ msg.className='msg err'; msg.textContent='Vul je e-mail en wachtwoord in.'; return; }
-  btn.disabled = true; btn.textContent = 'Bezig...';
+  var btn=document.getElementById('loginBtn'), msg=document.getElementById('loginMsg');
+  msg.className='msg';
+  var email=document.getElementById('email').value.trim(), password=document.getElementById('password').value;
+  if(!email||!password){ msg.className='msg err'; msg.textContent='Vul je e-mail en wachtwoord in.'; return; }
+  btn.disabled=true; btn.textContent='Bezig...';
   try{
-    var r = await fetch('/api/mkt/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email,password})});
-    var d = await r.json();
-    if(r.ok && d.success){ showApp(d.account, d.workspace); }
-    else { msg.className='msg err'; msg.textContent = d.error || 'Inloggen mislukt.'; }
+    var r=await fetch('/api/mkt/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:password})});
+    var d=await r.json();
+    if(r.ok&&d.success){ await bootstrap(); }
+    else { msg.className='msg err'; msg.textContent=d.error||'Inloggen mislukt.'; }
   }catch(e){ msg.className='msg err'; msg.textContent='Geen verbinding. Probeer opnieuw.'; }
-  btn.disabled = false; btn.textContent = 'Inloggen';
-}
-
-function showApp(account, workspace){
-  loginView.classList.add('hidden');
-  appView.classList.remove('hidden');
-  document.getElementById('wsName').textContent = workspace.name || 'Workspace';
-  document.getElementById('wsSlug').textContent = workspace.slug || 'workspace';
-  document.getElementById('accEmail').textContent = account.email || '';
+  btn.disabled=false; btn.textContent='Inloggen';
 }
 
 async function doLogout(){
   try{ await fetch('/api/mkt/auth/logout',{method:'POST',credentials:'include'}); }catch(e){}
-  appView.classList.add('hidden'); loginView.classList.remove('hidden');
+  ME=null; appView.classList.add('hidden'); loginView.classList.remove('hidden');
   document.getElementById('password').value='';
 }
 
-// Al ingelogd? Direct de app tonen.
-(async function(){
+// Haalt /me op en tekent de app.
+async function bootstrap(){
+  var r=await fetch('/api/mkt/auth/me',{credentials:'include'});
+  if(!r.ok) return;
+  var d=await r.json(); if(!d.success) return;
+  ME=d.account;
+  loginView.classList.add('hidden'); appView.classList.remove('hidden');
+  document.getElementById('wsName').textContent=ME.workspace_name||'Workspace';
+  document.getElementById('wsSlug').textContent=ME.slug||'workspace';
+  document.getElementById('accEmail').textContent=ME.email||'';
+  var end=ME.license_end?(' · tot '+new Date(ME.license_end).toLocaleDateString('nl-NL')):'';
+  document.getElementById('licPill').textContent='Licentie: '+(ME.license_type||'-')+end;
+  // Client-role mag geen klanten beheren.
+  var canManage = ME.role!=='client';
+  document.getElementById('newClientBtn').style.display = canManage?'':'none';
+  navTo('overzicht');
+}
+
+function navTo(view){
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  document.querySelectorAll('#navMenu a[data-view]').forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-view')===view); });
+  var el=document.getElementById('view'+view.charAt(0).toUpperCase()+view.slice(1));
+  if(view==='clients'){ document.getElementById('viewClients').classList.add('active'); loadClients(); }
+  else if(view==='clientDetail'){ document.getElementById('viewClientDetail').classList.add('active'); }
+  else { document.getElementById('viewOverzicht').classList.add('active'); }
+}
+
+// ---- Klanten ----
+async function loadClients(){
+  var body=document.getElementById('clientsBody'); hideMsg('clientsMsg');
+  body.innerHTML='<div class="soonbox">Laden...</div>';
   try{
-    var r = await fetch('/api/mkt/auth/me',{credentials:'include'});
-    if(r.ok){
-      var d = await r.json();
-      if(d.success && d.account){
-        showApp(
-          {email:d.account.email, role:d.account.role, name:d.account.full_name},
-          {name:d.account.workspace_name, slug:d.account.slug, modules:d.account.modules}
-        );
-        var lic = document.getElementById('licPill');
-        var end = d.account.license_end ? (' · tot ' + new Date(d.account.license_end).toLocaleDateString('nl-NL')) : '';
-        lic.textContent = 'Licentie: ' + (d.account.license_type || '—') + end;
-      }
-    }
-  }catch(e){}
-})();
+    var r=await fetch('/api/mkt/clients',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){ body.innerHTML=''; showMsg('clientsMsg',false,d.error||'Kon klanten niet laden.'); return; }
+    var max=ME.max_clients||0;
+    document.getElementById('clientLimitPill').textContent='Klanten: '+d.clients.length+(max?(' / '+max):'');
+    document.getElementById('ovClientCount').textContent=d.clients.length+' klant'+(d.clients.length===1?'':'en')+' in beheer.';
+    if(!d.clients.length){ body.innerHTML='<div class="soonbox">Nog geen klanten. Klik op “+ Nieuwe klant” om te beginnen.</div>'; return; }
+    body.innerHTML='<div class="cl-grid">'+d.clients.map(function(c){
+      var col=c.brand_color||'#6d5efc';
+      return '<div class="cl-card" onclick="openClient('+c.id+')">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div class="cl-badge" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
+        '<span class="status '+esc(c.status)+'">'+esc(c.status)+'</span></div>'+
+        '<h4>'+esc(c.name)+'</h4>'+
+        '<div class="muted">'+esc(c.contact_name||c.contact_email||'Geen contact')+'</div></div>';
+    }).join('')+'</div>';
+  }catch(e){ body.innerHTML=''; showMsg('clientsMsg',false,'Netwerkfout.'); }
+}
+
+function openNewClient(){ hideMsg('newClientMsg'); ['ncName','ncContact','ncEmail','ncWebsite','ncNotes'].forEach(function(id){document.getElementById(id).value='';}); document.getElementById('newClientModal').classList.add('open'); }
+function closeNewClient(){ document.getElementById('newClientModal').classList.remove('open'); }
+async function createClient(){
+  var btn=document.getElementById('ncCreateBtn'); hideMsg('newClientMsg');
+  var body={ name:document.getElementById('ncName').value.trim(), contact_name:document.getElementById('ncContact').value.trim(),
+    contact_email:document.getElementById('ncEmail').value.trim(), website:document.getElementById('ncWebsite').value.trim(),
+    brand_color:document.getElementById('ncColor').value, notes:document.getElementById('ncNotes').value.trim() };
+  if(!body.name){ showMsg('newClientMsg',false,'Klantnaam is verplicht.'); return; }
+  btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/clients',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){ closeNewClient(); loadClients(); }
+    else { showMsg('newClientMsg',false,d.error||'Aanmaken mislukt.'); }
+  }catch(e){ showMsg('newClientMsg',false,'Netwerkfout: '+e.message); }
+  btn.disabled=false; btn.textContent='Klant aanmaken';
+}
+
+async function openClient(id){
+  try{
+    var r=await fetch('/api/mkt/clients/'+id,{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){ alert(d.error||'Kon klant niet laden.'); return; }
+    CURRENT_CLIENT=d.client; renderClientDetail(d.client); navTo('clientDetail');
+  }catch(e){ alert('Netwerkfout.'); }
+}
+function renderClientDetail(c){
+  hideMsg('dEditMsg');
+  document.getElementById('dName').textContent=c.name;
+  var badge=document.getElementById('dBadge'); badge.textContent=initials(c.name); badge.style.background=c.brand_color||'#6d5efc';
+  document.getElementById('dfName').value=c.name||'';
+  document.getElementById('dfContact').value=c.contact_name||'';
+  document.getElementById('dfEmail').value=c.contact_email||'';
+  document.getElementById('dfWebsite').value=c.website||'';
+  document.getElementById('dfColor').value=c.brand_color||'#6d5efc';
+  document.getElementById('dfStatus').value=c.status||'active';
+  document.getElementById('dfNotes').value=c.notes||'';
+  var canDelete = ME.role==='owner'||ME.role==='manager';
+  document.getElementById('dDeleteBtn').style.display = canDelete?'':'none';
+}
+function dTab(btn,which){
+  document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');}); btn.classList.add('active');
+  document.getElementById('dInfo').style.display=which==='info'?'':'none';
+  document.getElementById('dContent').style.display=which==='content'?'':'none';
+  document.getElementById('dAssets').style.display=which==='assets'?'':'none';
+  document.getElementById('dReport').style.display=which==='report'?'':'none';
+}
+async function saveClient(){
+  if(!CURRENT_CLIENT) return; hideMsg('dEditMsg');
+  var body={ name:document.getElementById('dfName').value.trim(), contact_name:document.getElementById('dfContact').value.trim(),
+    contact_email:document.getElementById('dfEmail').value.trim(), website:document.getElementById('dfWebsite').value.trim(),
+    brand_color:document.getElementById('dfColor').value, status:document.getElementById('dfStatus').value,
+    notes:document.getElementById('dfNotes').value.trim() };
+  if(!body.name){ showMsg('dEditMsg',false,'Klantnaam is verplicht.'); return; }
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){ CURRENT_CLIENT=d.client; renderClientDetail(d.client); showMsg('dEditMsg',true,'Opgeslagen.'); }
+    else { showMsg('dEditMsg',false,d.error||'Opslaan mislukt.'); }
+  }catch(e){ showMsg('dEditMsg',false,'Netwerkfout.'); }
+}
+async function deleteClient(){
+  if(!CURRENT_CLIENT) return;
+  if(!confirm('Klant "'+CURRENT_CLIENT.name+'" definitief verwijderen?')) return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'DELETE',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){ CURRENT_CLIENT=null; navTo('clients'); }
+    else { showMsg('dEditMsg',false,d.error||'Verwijderen mislukt.'); }
+  }catch(e){ showMsg('dEditMsg',false,'Netwerkfout.'); }
+}
+
+// Al ingelogd?
+(async function(){ try{ var r=await fetch('/api/mkt/auth/me',{credentials:'include'}); if(r.ok){ var d=await r.json(); if(d.success) await bootstrap(); } }catch(e){} })();
 </script>
 </body>
 </html>

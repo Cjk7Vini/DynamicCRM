@@ -207,4 +207,101 @@ router.get('/api/mkt/auth/me', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// STAP 2 — CLIENT SPACES (klanten binnen een workspace)
+// Alles strikt gescopet op req.session.mkt.workspaceId.
+// =======================================================================
+const CLIENT_STATUS = ['active', 'paused', 'archived'];
+function mktCanManage(req) { return req.session?.mkt && req.session.mkt.role !== 'client'; }
+function mktIsOwnerOrManager(req) { return req.session?.mkt && (req.session.mkt.role === 'owner' || req.session.mkt.role === 'manager'); }
+
+// Lijst klanten van de eigen workspace (standaard zonder gearchiveerde).
+router.get('/api/mkt/clients', requireMkt, async (req, res) => {
+  try {
+    const includeArchived = String(req.query.archived || '') === '1';
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, name, contact_name, contact_email, website, brand_color, status, archived, created_at
+         FROM marketing.clients
+        WHERE workspace_id = $1 ${includeArchived ? '' : 'AND archived = false'}
+        ORDER BY name ASC`,
+      [req.session.mkt.workspaceId]
+    )).rows);
+    res.json({ success: true, clients: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Nieuwe klant aanmaken (owner/manager/member). Respecteert max_clients van de licentie.
+router.post('/api/mkt/clients', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om klanten te beheren' });
+    const { name, contact_name, contact_email, website, brand_color, notes } = req.body || {};
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'Klantnaam is verplicht' });
+
+    const wsId = req.session.mkt.workspaceId;
+    const limit = await withReadConnection(async (c) => {
+      const ws = (await c.query('SELECT max_clients FROM marketing.workspaces WHERE id=$1', [wsId])).rows[0];
+      const used = (await c.query('SELECT COUNT(*)::int AS n FROM marketing.clients WHERE workspace_id=$1 AND archived=false', [wsId])).rows[0].n;
+      return { max: ws ? ws.max_clients : 0, used };
+    });
+    if (limit.used >= limit.max) {
+      return res.status(403).json({ error: `Je licentie staat maximaal ${limit.max} actieve klanten toe. Archiveer een klant of upgrade de licentie.` });
+    }
+
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.clients (workspace_id, name, contact_name, contact_email, website, brand_color, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, name, contact_name, contact_email, website, brand_color, status, archived, created_at`,
+      [wsId, String(name).trim(), contact_name || null, contact_email || null, website || null, brand_color || null, notes || null, req.session.mkt.accountId]
+    )).rows[0]);
+    res.json({ success: true, client: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Eén klant ophalen (alleen binnen eigen workspace).
+router.get('/api/mkt/clients/:id', requireMkt, async (req, res) => {
+  try {
+    const row = await withReadConnection(async (c) => (await c.query(
+      `SELECT * FROM marketing.clients WHERE id=$1 AND workspace_id=$2`,
+      [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Klant niet gevonden' });
+    res.json({ success: true, client: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Klant bijwerken (owner/manager/member).
+router.patch('/api/mkt/clients/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om klanten te beheren' });
+    const b = req.body || {};
+    const sets = [], vals = []; let i = 1;
+    const map = { name: 'name', contact_name: 'contact_name', contact_email: 'contact_email', website: 'website', brand_color: 'brand_color', notes: 'notes' };
+    for (const k of Object.keys(map)) {
+      if (b[k] !== undefined) { sets.push(`${map[k]}=$${i++}`); vals.push(b[k] === '' ? null : b[k]); }
+    }
+    if (b.status !== undefined && CLIENT_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    if (typeof b.archived === 'boolean') { sets.push(`archived=$${i++}`); vals.push(b.archived); }
+    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    vals.push(req.params.id, req.session.mkt.workspaceId);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.clients SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i} RETURNING *`, vals
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Klant niet gevonden' });
+    res.json({ success: true, client: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Klant verwijderen (alleen owner/manager).
+router.delete('/api/mkt/clients/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen een eigenaar of manager kan een klant verwijderen' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      `DELETE FROM marketing.clients WHERE id=$1 AND workspace_id=$2 RETURNING id`,
+      [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Klant niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
