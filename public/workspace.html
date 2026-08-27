@@ -449,6 +449,30 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   <div class="viewer-box" id="viewerBox"></div>
 </div>
 
+<!-- MODAL: publiceren naar Meta -->
+<div class="modal-ov" id="publishModal">
+  <div class="modal">
+    <h3>Publiceren</h3>
+    <div class="sub">Plaats deze content rechtstreeks op het social account van de klant.</div>
+    <div id="publishMsg" class="inline-msg"></div>
+    <div class="field"><label>Kanaal</label>
+      <select id="pubChannel" onchange="pubChannelChanged()">
+        <option value="instagram">Instagram</option>
+        <option value="facebook">Facebook</option>
+      </select>
+    </div>
+    <div class="field"><label>Bestand (afbeelding of video)</label>
+      <select id="pubAsset"><option value="">Geen bestand</option></select>
+      <div id="pubAssetHint" style="font-size:12px;color:var(--muted);margin-top:6px">Instagram vereist een bestand. Facebook kan ook zonder.</div>
+    </div>
+    <div class="field"><label>Tekst / caption</label><textarea id="pubCaption" rows="4"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePublish()">Annuleren</button>
+      <button class="btn btn-primary" id="pubBtn" onclick="publishNow()">Nu publiceren</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: post (nieuw + bewerken) -->
 <div class="modal-ov" id="postModal">
   <div class="modal">
@@ -831,6 +855,46 @@ async function shareApprovalLink(){
   }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
 }
 function copyShareLink(){var el=document.getElementById('shareLinkIn');if(!el)return;el.select();try{navigator.clipboard.writeText(el.value);el.nextElementSibling;}catch(e){document.execCommand('copy');}var b=event.target;var t=b.textContent;b.textContent='Gekopieerd';setTimeout(function(){b.textContent=t;},1400);}
+var PUBLISH_POST=null;
+function pubChannelChanged(){
+  var ch=document.getElementById('pubChannel').value;
+  document.getElementById('pubAssetHint').textContent=ch==='instagram'?'Instagram vereist een bestand.':'Facebook kan met of zonder bestand.';
+}
+async function openPublish(postId){
+  hideMsg('publishMsg');
+  // post ophalen voor caption
+  try{
+    var pr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}); var pd=await pr.json();
+    var post=(pd.posts||[]).filter(function(x){return String(x.id)===String(postId);})[0];
+    PUBLISH_POST=post||{id:postId};
+    document.getElementById('pubCaption').value=post?((post.body||post.title)||''):'';
+    document.getElementById('pubChannel').value='instagram';
+    // assets ophalen voor de keuzelijst
+    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
+    var sel=document.getElementById('pubAsset');
+    var opts='<option value="">Geen bestand</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ opts+='<option value="'+a.id+'">'+esc(a.filename)+' ('+(a.resource_type==='video'?'video':'foto')+')</option>'; } });
+    sel.innerHTML=opts;
+    pubChannelChanged();
+    document.getElementById('publishModal').classList.add('open');
+  }catch(e){ showMsg('postsMsg',false,'Kon publiceren niet voorbereiden.'); }
+}
+function closePublish(){document.getElementById('publishModal').classList.remove('open');}
+async function publishNow(){
+  var btn=document.getElementById('pubBtn'); hideMsg('publishMsg');
+  var channel=document.getElementById('pubChannel').value;
+  var assetId=document.getElementById('pubAsset').value;
+  var caption=document.getElementById('pubCaption').value;
+  if(channel==='instagram'&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
+  btn.disabled=true; btn.textContent='Publiceren...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({channel:channel,caption:caption,assetId:assetId||null,postId:PUBLISH_POST?PUBLISH_POST.id:null})});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('publishMsg',true,'Gepubliceerd op '+channel+'. Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
+    else {showMsg('publishMsg',false,d.error||'Publiceren mislukt.');}
+  }catch(e){showMsg('publishMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Nu publiceren';
+}
 async function loadPosts(){
   if(!CURRENT_CLIENT)return;
   var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
@@ -852,7 +916,8 @@ async function loadPosts(){
         if(p.approval==='none'){appBtn='<button class="icon-btn" title="Ter goedkeuring sturen" onclick="setApproval('+p.id+',\'pending\')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>';}
         else if(p.approval==='pending'){appBtn='<button class="icon-btn" title="Goedkeuring intrekken" onclick="setApproval('+p.id+',\'none\')"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>';}
       }
-      var acts=canManage?('<div class="post-acts">'+appBtn+
+      var pubBtn=canManage?('<button class="icon-btn" title="Publiceren" onclick="openPublish('+p.id+')"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>'):'';
+      var acts=canManage?('<div class="post-acts">'+appBtn+pubBtn+
         '<button class="icon-btn" title="Bewerken" onclick=\'openEditPost('+p.id+')\'><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></button>'+
         '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'+
         '</div>'):'';

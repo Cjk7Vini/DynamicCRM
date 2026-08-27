@@ -883,6 +883,114 @@ router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
 });
 
 // =======================================================================
+// STAP 7 - PUBLICEREN naar Meta (Instagram / Facebook) via Graph API
+// Werkt met een access token dat per klant is opgeslagen (Koppelingen-tab).
+// In dev-modus van de Meta-app kun je op je eigen accounts posten.
+// =======================================================================
+const GRAPH = 'https://graph.facebook.com/v21.0';
+
+async function graphPost(pathAndId, params) {
+  const body = new URLSearchParams(params);
+  const r = await fetch(`${GRAPH}/${pathAndId}`, { method: 'POST', body });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Meta API-fout');
+  return j;
+}
+async function graphGet(pathAndId, params) {
+  const qs = new URLSearchParams(params).toString();
+  const r = await fetch(`${GRAPH}/${pathAndId}?${qs}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Meta API-fout');
+  return j;
+}
+
+router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om te publiceren' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const { channel, caption, assetId, postId } = req.body || {};
+    if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
+
+    const intg = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld voor deze klant' });
+    const token = decryptSecret(intg.meta_access_token);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+
+    // Media-URL (moet publiek zijn: Cloudinary).
+    let mediaUrl = null, mediaType = 'image';
+    if (assetId) {
+      const asset = await withReadConnection(async (c) => (await c.query(
+        'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+        [assetId, okClient, wsId]
+      )).rows[0]);
+      if (!asset) return res.status(404).json({ error: 'Gekozen bestand niet gevonden' });
+      if (asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Alleen bestanden met een publieke URL kunnen worden gepubliceerd' });
+      mediaUrl = asset.url;
+      mediaType = asset.resource_type === 'video' ? 'video' : 'image';
+    }
+    const cap = (caption != null) ? String(caption) : '';
+
+    let result = {};
+    if (channel === 'instagram') {
+      if (!intg.meta_ig_user_id) return res.status(400).json({ error: 'Instagram user ID ontbreekt in de koppelingen' });
+      if (!mediaUrl) return res.status(400).json({ error: 'Instagram vereist een afbeelding of video. Kies een bestand.' });
+      const igId = intg.meta_ig_user_id;
+      // 1) media-container aanmaken
+      const createParams = mediaType === 'video'
+        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: token }
+        : { image_url: mediaUrl, caption: cap, access_token: token };
+      const created = await graphPost(`${igId}/media`, createParams);
+      // 2) video-container moet klaar zijn voor publish
+      if (mediaType === 'video') {
+        let ready = false;
+        for (let i = 0; i < 20 && !ready; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const st = await graphGet(`${created.id}`, { fields: 'status_code', access_token: token });
+          if (st.status_code === 'FINISHED') ready = true;
+          else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
+        }
+        if (!ready) throw new Error('Video-verwerking duurt te lang, probeer het later opnieuw');
+      }
+      // 3) publiceren
+      const pub = await graphPost(`${igId}/media_publish`, { creation_id: created.id, access_token: token });
+      result = { id: pub.id, channel: 'instagram' };
+    } else {
+      if (!intg.meta_page_id) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen' });
+      const pageId = intg.meta_page_id;
+      // Pagina-token ophalen via het gebruikers-token.
+      let pageToken = token;
+      try {
+        const pg = await graphGet(`${pageId}`, { fields: 'access_token', access_token: token });
+        if (pg.access_token) pageToken = pg.access_token;
+      } catch (_) { /* val terug op het meegegeven token */ }
+      if (mediaUrl && mediaType === 'image') {
+        const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
+        result = { id: pub.post_id || pub.id, channel: 'facebook' };
+      } else {
+        const pub = await graphPost(`${pageId}/feed`, { message: cap, access_token: pageToken });
+        result = { id: pub.id, channel: 'facebook' };
+      }
+    }
+
+    // Post markeren als gepubliceerd.
+    if (postId) {
+      try {
+        await withWriteConnection(async (c) => c.query(
+          `UPDATE marketing.content_posts SET status='published', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND client_id=$3`,
+          [postId, wsId, okClient]
+        ));
+      } catch (_) { /* niet blokkerend */ }
+    }
+    res.json({ success: true, result });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 6 - RAPPORTAGE per klant (cijfers uit eigen data)
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/stats', requireMkt, async (req, res) => {
