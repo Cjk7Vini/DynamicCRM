@@ -141,6 +141,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .icon-btn:hover{color:var(--ink);border-color:var(--line-2)}
 .icon-btn.del:hover{color:var(--err);border-color:rgba(248,113,113,.28)}
 .icon-btn svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none}
+/* assets */
+.asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.asset-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:border-color .12s}
+.asset-card:hover{border-color:var(--line-2)}
+.asset-thumb{width:100%;aspect-ratio:1/1;background:var(--panel-2);display:block;object-fit:cover;cursor:pointer}
+.asset-info{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.asset-info .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asset-info .sz{font-size:11px;color:var(--muted)}
 
 /* empty state */
 .empty{background:var(--panel);border:1px dashed var(--line-2);border-radius:16px;padding:46px 30px;text-align:center}
@@ -342,7 +350,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div id="postsMsg" class="inline-msg"></div>
           <div id="postsBody"><div class="empty">Laden...</div></div>
         </div>
-        <div id="dAssets" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Assets</h4><p>Beeldmateriaal uploaden en organiseren komt in Stap 3.</p></div></div>
+        <div id="dAssets" style="display:none">
+          <div class="section-h">
+            <span class="pill" id="assetInfo">Beeldmateriaal</span>
+            <div>
+              <input type="file" id="assetInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadAsset(this)">
+              <button class="btn btn-primary" id="uploadBtn" onclick="document.getElementById('assetInput').click()">+ Afbeelding uploaden</button>
+            </div>
+          </div>
+          <div id="assetsMsg" class="inline-msg"></div>
+          <div id="assetsBody"><div class="empty">Laden...</div></div>
+        </div>
         <div id="dReport" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Rapportage</h4><p>Automatische rapporten voor deze klant komen in Stap 6.</p></div></div>
       </section>
     </div>
@@ -575,6 +593,58 @@ function dTabShow(which){
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   if(which==='content'){document.getElementById('newPostBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadPosts();}
+  if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
+}
+
+// ---- Assets ----
+function fmtSize(b){b=Number(b)||0;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
+async function loadAssets(){
+  if(!CURRENT_CLIENT)return;
+  var body=document.getElementById('assetsBody'); hideMsg('assetsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('assetsMsg',false,d.error||'Kon assets niet laden.');return;}
+    document.getElementById('assetInfo').textContent=d.assets.length+' bestand'+(d.assets.length===1?'':'en');
+    if(!d.assets.length){
+      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Nog geen beeldmateriaal</h4><p>Upload afbeeldingen voor deze klant (PNG, JPG, WEBP, GIF, max 8 MB).</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="document.getElementById(\'assetInput\').click()">+ Afbeelding uploaden</button>':'')+'</div>';
+      return;
+    }
+    var canManage=ME.role!=='client';
+    body.innerHTML='<div class="asset-grid">'+d.assets.map(function(a){
+      var url='/api/mkt/assets/'+a.id;
+      var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="delAsset('+a.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'):'';
+      return '<div class="asset-card"><img class="asset-thumb" src="'+url+'" alt="'+esc(a.filename)+'" title="Klik om te openen" onclick="window.open(\''+url+'\',\'_blank\')" loading="lazy">'+
+        '<div class="asset-info"><div style="min-width:0"><div class="nm">'+esc(a.filename)+'</div><div class="sz">'+fmtSize(a.size_bytes)+'</div></div>'+del+'</div></div>';
+    }).join('')+'</div>';
+  }catch(e){body.innerHTML='';showMsg('assetsMsg',false,'Netwerkfout.');}
+}
+async function uploadAsset(input){
+  var file=input.files&&input.files[0]; input.value='';
+  if(!file)return;
+  hideMsg('assetsMsg');
+  if(file.size>8*1024*1024){showMsg('assetsMsg',false,'Bestand is te groot (max 8 MB).');return;}
+  var okMime=['image/png','image/jpeg','image/webp','image/gif'];
+  if(okMime.indexOf(file.type)<0){showMsg('assetsMsg',false,'Alleen PNG, JPG, WEBP of GIF.');return;}
+  var btn=document.getElementById('uploadBtn'); btn.disabled=true; btn.textContent='Uploaden...';
+  try{
+    var b64=await new Promise(function(resolve,reject){
+      var fr=new FileReader();
+      fr.onload=function(){var s=String(fr.result);var i=s.indexOf(',');resolve(i>=0?s.slice(i+1):s);};
+      fr.onerror=function(){reject(new Error('leesfout'));};
+      fr.readAsDataURL(file);
+    });
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({filename:file.name,mime:file.type,data_base64:b64})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Upload mislukt.');}
+  }catch(e){showMsg('assetsMsg',false,'Netwerkfout bij uploaden.');}
+  btn.disabled=false; btn.textContent='+ Afbeelding uploaden';
+}
+async function delAsset(id){
+  if(!confirm('Deze afbeelding verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/assets/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Verwijderen mislukt.');}
+  }catch(e){showMsg('assetsMsg',false,'Netwerkfout.');}
 }
 
 // ---- Contentkalender ----

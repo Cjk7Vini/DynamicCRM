@@ -615,4 +615,88 @@ router.delete('/api/mkt/posts/:id', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// STAP 3 - ASSETS (beeldmateriaal per klant, opgeslagen als bytea in Neon)
+// Upload via base64-JSON met een ruimere body-limiet, alleen op deze route.
+// =======================================================================
+const ASSET_MAX_BYTES = 8 * 1024 * 1024; // 8 MB per bestand
+const ASSET_MIME_OK = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const assetUploadParser = express.json({ limit: '12mb' });
+
+// Lijst assets van een klant (alleen metadata, niet de bytes).
+router.get('/api/mkt/clients/:clientId/assets', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, filename, mime, size_bytes, created_at
+         FROM marketing.assets
+        WHERE workspace_id=$1 AND client_id=$2
+        ORDER BY created_at DESC`,
+      [wsId, okClient]
+    )).rows);
+    res.json({ success: true, assets: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Upload een asset (base64). Body: { filename, mime, data_base64 }.
+router.post('/api/mkt/clients/:clientId/assets', assetUploadParser, requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const { filename, mime, data_base64 } = req.body || {};
+    if (!mime || !ASSET_MIME_OK.includes(mime)) {
+      return res.status(400).json({ error: 'Alleen afbeeldingen (PNG, JPG, WEBP, GIF) zijn toegestaan' });
+    }
+    if (!data_base64 || typeof data_base64 !== 'string') {
+      return res.status(400).json({ error: 'Geen bestand ontvangen' });
+    }
+    let buf;
+    try { buf = Buffer.from(data_base64, 'base64'); } catch (_) { buf = null; }
+    if (!buf || !buf.length) return res.status(400).json({ error: 'Bestand kon niet worden gelezen' });
+    if (buf.length > ASSET_MAX_BYTES) {
+      return res.status(413).json({ error: 'Bestand is te groot (max 8 MB)' });
+    }
+    const name = (filename && String(filename).trim().slice(0, 200)) || 'afbeelding';
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.assets (workspace_id, client_id, filename, mime, size_bytes, data, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id, filename, mime, size_bytes, created_at`,
+      [wsId, okClient, name, mime, buf.length, buf, req.session.mkt.accountId || null]
+    )).rows[0]);
+    res.json({ success: true, asset: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Serveer de bytes van een asset (voor <img> en download). Gescopet op workspace.
+router.get('/api/mkt/assets/:id', requireMkt, async (req, res) => {
+  try {
+    const row = await withReadConnection(async (c) => (await c.query(
+      `SELECT filename, mime, data FROM marketing.assets WHERE id=$1 AND workspace_id=$2`,
+      [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Asset niet gevonden' });
+    res.setHeader('Content-Type', row.mime || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(row.data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Asset verwijderen.
+router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      `DELETE FROM marketing.assets WHERE id=$1 AND workspace_id=$2 RETURNING id`,
+      [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Asset niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
