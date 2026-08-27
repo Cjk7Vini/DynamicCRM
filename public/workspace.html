@@ -149,6 +149,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .asset-info{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .asset-info .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .asset-info .sz{font-size:11px;color:var(--muted)}
+.asset-thumbwrap{position:relative;cursor:pointer}
+.asset-thumbwrap .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.asset-thumbwrap .play span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.asset-thumbwrap .play svg{width:20px;height:20px;fill:#fff;margin-left:2px}
+.viewer-box{max-width:920px;width:100%}
+.viewer-box img,.viewer-box video{width:100%;max-height:82vh;object-fit:contain;border-radius:12px;background:#000;display:block}
 
 /* empty state */
 .empty{background:var(--panel);border:1px dashed var(--line-2);border-radius:16px;padding:46px 30px;text-align:center}
@@ -390,6 +396,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: media-viewer (lightbox) -->
+<div class="modal-ov" id="viewerModal" onclick="if(event.target===this)closeViewer()">
+  <div class="viewer-box" id="viewerBox"></div>
+</div>
+
 <!-- MODAL: post (nieuw + bewerken) -->
 <div class="modal-ov" id="postModal">
   <div class="modal">
@@ -598,6 +609,16 @@ function dTabShow(which){
 
 // ---- Assets ----
 function fmtSize(b){b=Number(b)||0;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
+// Cloudinary genereert een poster (eerste frame) door /upload/ -> /upload/so_0/ en extensie .jpg.
+function videoPoster(url){try{if(url.indexOf('/upload/')<0)return url;return url.replace('/upload/','/upload/so_0/').replace(/\.[a-z0-9]+$/i,'.jpg');}catch(e){return url;}}
+function openViewer(url,type){
+  var box=document.getElementById('viewerBox');
+  box.innerHTML=(type==='video')
+    ? '<video src="'+esc(url)+'" controls autoplay playsinline></video>'
+    : '<img src="'+esc(url)+'" alt="">';
+  document.getElementById('viewerModal').classList.add('open');
+}
+function closeViewer(){document.getElementById('viewerModal').classList.remove('open');document.getElementById('viewerBox').innerHTML='';}
 async function loadAssets(){
   if(!CURRENT_CLIENT)return;
   var body=document.getElementById('assetsBody'); hideMsg('assetsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
@@ -615,9 +636,13 @@ async function loadAssets(){
       var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="delAsset('+a.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'):'';
       var thumb;
       if(a.resource_type==='video'){
-        thumb='<video class="asset-thumb" src="'+esc(url)+'" controls preload="metadata"></video>';
+        var poster=videoPoster(url);
+        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'video\')">'+
+          '<img class="asset-thumb" src="'+esc(poster)+'" alt="'+esc(a.filename)+'" loading="lazy" onerror="this.style.background=\'#0b0e16\'">'+
+          '<div class="play"><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div></div>';
       } else {
-        thumb='<img class="asset-thumb" src="'+esc(url)+'" alt="'+esc(a.filename)+'" title="Klik om te openen" onclick="window.open(\''+esc(url)+'\',\'_blank\')" loading="lazy">';
+        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'image\')">'+
+          '<img class="asset-thumb" src="'+esc(url)+'" alt="'+esc(a.filename)+'" loading="lazy"></div>';
       }
       return '<div class="asset-card">'+thumb+
         '<div class="asset-info"><div style="min-width:0"><div class="nm">'+esc(a.filename)+'</div><div class="sz">'+fmtSize(a.size_bytes)+'</div></div>'+del+'</div></div>';
