@@ -352,7 +352,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
                 <option value="published">Gepubliceerd</option>
               </select>
             </div>
-            <button class="btn btn-primary" id="newPostBtn" onclick="openNewPost()">+ Nieuwe post</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost" id="shareLinkBtn" onclick="shareApprovalLink()">Goedkeuringslink</button>
+              <button class="btn btn-primary" id="newPostBtn" onclick="openNewPost()">+ Nieuwe post</button>
+            </div>
           </div>
           <div id="postsMsg" class="inline-msg"></div>
           <div id="postsBody"><div class="empty">Laden...</div></div>
@@ -644,7 +647,7 @@ function dTabShow(which){
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   if(which==='integrations'){loadIntegrations();}
-  if(which==='content'){document.getElementById('newPostBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadPosts();}
+  if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
   if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
 }
 
@@ -768,6 +771,33 @@ var POST_STATUS_LABEL={idea:'Idee',draft:'Concept',scheduled:'Ingepland',approve
 var POST_CHAN_LABEL={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',tiktok:'TikTok',youtube:'YouTube',blog:'Blog',other:'Overig'};
 function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function toLocalInput(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
+var APPROVAL_BADGE={pending:{cls:'scheduled',txt:'Wacht op klant'},approved:{cls:'approved',txt:'Goedgekeurd'},changes:{cls:'draft',txt:'Wijzigingen gevraagd'}};
+function approvalBadge(a){var m=APPROVAL_BADGE[a];if(!m)return '';return '<span class="status '+m.cls+'">'+m.txt+'</span>';}
+async function setApproval(id,val){
+  try{
+    var r=await fetch('/api/mkt/posts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({approval:val})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadPosts();} else {showMsg('postsMsg',false,d.error||'Actie mislukt.');}
+  }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
+}
+async function shareApprovalLink(){
+  if(!CURRENT_CLIENT)return; hideMsg('postsMsg');
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/portal-token',{method:'POST',credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){showMsg('postsMsg',false,d.error||'Kon link niet maken.');return;}
+    var link=location.origin+'/portal.html?t='+d.approval_token;
+    var box=document.getElementById('viewerBox');
+    box.innerHTML='<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;max-width:560px;margin:0 auto">'+
+      '<h3 style="margin-bottom:6px">Goedkeuringslink</h3>'+
+      '<p style="color:var(--muted);font-size:13px;margin-bottom:14px">Deel deze link met de klant. Wie de link heeft, ziet de content die op \'ter goedkeuring\' staat en kan goedkeuren of wijzigingen vragen. Een nieuwe link maken trekt de oude in.</p>'+
+      '<input id="shareLinkIn" readonly value="'+esc(link)+'" style="margin-bottom:12px" onclick="this.select()">'+
+      '<div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn btn-ghost" onclick="closeViewer()">Sluiten</button>'+
+      '<button class="btn btn-primary" onclick="copyShareLink()">Kopieer link</button></div></div>';
+    document.getElementById('viewerModal').classList.add('open');
+  }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
+}
+function copyShareLink(){var el=document.getElementById('shareLinkIn');if(!el)return;el.select();try{navigator.clipboard.writeText(el.value);el.nextElementSibling;}catch(e){document.execCommand('copy');}var b=event.target;var t=b.textContent;b.textContent='Gekopieerd';setTimeout(function(){b.textContent=t;},1400);}
 async function loadPosts(){
   if(!CURRENT_CLIENT)return;
   var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
@@ -783,14 +813,21 @@ async function loadPosts(){
     var canManage=ME.role!=='client';
     body.innerHTML='<div class="post-list">'+d.posts.map(function(p){
       var when=p.scheduled_at?('<span class="when">'+esc(fmtWhen(p.scheduled_at))+'</span>'):'';
-      var acts=canManage?('<div class="post-acts">'+
+      var appBadge=approvalBadge(p.approval);
+      var appBtn='';
+      if(canManage){
+        if(p.approval==='none'){appBtn='<button class="icon-btn" title="Ter goedkeuring sturen" onclick="setApproval('+p.id+',\'pending\')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>';}
+        else if(p.approval==='pending'){appBtn='<button class="icon-btn" title="Goedkeuring intrekken" onclick="setApproval('+p.id+',\'none\')"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>';}
+      }
+      var acts=canManage?('<div class="post-acts">'+appBtn+
         '<button class="icon-btn" title="Bewerken" onclick=\'openEditPost('+p.id+')\'><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></button>'+
         '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'+
         '</div>'):'';
+      var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">Klantfeedback: '+esc(p.approval_note)+'</div>'):'';
       return '<div class="post-row"><div class="post-main"><h5>'+esc(p.title)+'</h5>'+
         (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
         '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
-        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+when+'</div></div>'+acts+'</div>';
+        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+when+'</div>'+note+'</div>'+acts+'</div>';
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }

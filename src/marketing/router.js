@@ -459,7 +459,7 @@ router.post('/api/mkt/platform/exit', requireMktPlatform, (req, res) => {
 });
 
 // =======================================================================
-// STAP 2 — CLIENT SPACES (klanten binnen een workspace)
+// STAP 2 - CLIENT SPACES (klanten binnen een workspace)
 // Alles strikt gescopet op req.session.mkt.workspaceId.
 // =======================================================================
 const CLIENT_STATUS = ['active', 'paused', 'archived'];
@@ -582,7 +582,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const status = String(req.query.status || '');
     const filterStatus = POST_STATUS.includes(status) ? status : null;
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at
+      `SELECT id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at
          FROM marketing.content_posts
         WHERE workspace_id=$1 AND client_id=$2
           ${filterStatus ? 'AND status=$3' : ''}
@@ -614,7 +614,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     const row = await withWriteConnection(async (c) => (await c.query(
       `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at`,
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at`,
       [wsId, okClient, String(title).trim(), body || null, ch, st, when, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, post: row });
@@ -635,6 +635,11 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    // Marketeer mag alleen 'ter goedkeuring' zetten of intrekken; goedkeuren doet de klant via de portal.
+    if (b.approval !== undefined && (b.approval === 'pending' || b.approval === 'none')) {
+      sets.push(`approval=$${i++}`); vals.push(b.approval);
+      sets.push(`approval_note=NULL`); sets.push(`approval_at=NULL`);
+    }
     if (b.scheduled_at !== undefined) {
       if (b.scheduled_at === '' || b.scheduled_at === null) { sets.push(`scheduled_at=$${i++}`); vals.push(null); }
       else {
@@ -649,7 +654,7 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     const row = await withWriteConnection(async (c) => (await c.query(
       `UPDATE marketing.content_posts SET ${sets.join(', ')}
         WHERE id=$${i++} AND workspace_id=$${i}
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, created_at, updated_at`, vals
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
     res.json({ success: true, post: row });
@@ -874,6 +879,71 @@ router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
        RETURNING *`, params
     )).rows[0]);
     res.json({ success: true, integrations: integrationsView(row) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
+// STAP 5 - GOEDKEURINGSPORTAAL
+// Marketeer zet posts 'ter goedkeuring' en deelt een token-link per klant.
+// De klant keurt goed of vraagt wijzigingen, zonder account.
+// =======================================================================
+const APPROVAL = ['none', 'pending', 'approved', 'changes'];
+
+// Genereer (of vernieuw) de deel-token voor de goedkeuringslink van een klant.
+router.post('/api/mkt/clients/:clientId/portal-token', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = crypto.randomBytes(24).toString('hex');
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.clients SET approval_token=$1 WHERE id=$2 AND workspace_id=$3 RETURNING approval_token`,
+      [token, okClient, wsId]
+    )).rows[0]);
+    res.json({ success: true, approval_token: row.approval_token });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Publiek: haal de te beoordelen content op via het token (geen login).
+router.get('/api/mkt/portal/:token', async (req, res) => {
+  try {
+    const token = String(req.params.token || '');
+    if (token.length < 20) return res.status(404).json({ error: 'Ongeldige link' });
+    const client = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, name, brand_color FROM marketing.clients WHERE approval_token=$1`, [token]
+    )).rows[0]);
+    if (!client) return res.status(404).json({ error: 'Link niet gevonden of ingetrokken' });
+    const posts = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, title, body, channel, scheduled_at, approval, approval_note, approval_at
+         FROM marketing.content_posts
+        WHERE client_id=$1 AND approval <> 'none'
+        ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`, [client.id]
+    )).rows);
+    res.json({ success: true, client: { name: client.name, brand_color: client.brand_color }, posts });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Publiek: klant keurt een post goed of vraagt wijzigingen.
+router.post('/api/mkt/portal/:token/decision', async (req, res) => {
+  try {
+    const token = String(req.params.token || '');
+    if (token.length < 20) return res.status(404).json({ error: 'Ongeldige link' });
+    const { postId, decision, note } = req.body || {};
+    if (decision !== 'approved' && decision !== 'changes') return res.status(400).json({ error: 'Ongeldige keuze' });
+    const client = await withReadConnection(async (c) => (await c.query(
+      `SELECT id FROM marketing.clients WHERE approval_token=$1`, [token]
+    )).rows[0]);
+    if (!client) return res.status(404).json({ error: 'Link niet gevonden' });
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.content_posts
+          SET approval=$1, approval_note=$2, approval_at=now(), updated_at=now()
+        WHERE id=$3 AND client_id=$4 AND approval <> 'none'
+       RETURNING id, approval, approval_note, approval_at`,
+      [decision, (note && String(note).trim().slice(0, 1000)) || null, postId, client.id]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

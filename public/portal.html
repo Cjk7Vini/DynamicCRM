@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content goedkeuren - Marketing Studio</title>
+<style>
+:root{
+  --bg:#0a0c12;--panel:#121622;--panel-2:#171c2a;--line:#232a3a;--line-2:#2c3448;
+  --ink:#eef1f8;--ink-2:#c3cad9;--muted:#828da5;--faint:#5b647c;
+  --accent:#6366f1;--accent-2:#22d3ee;--accent-soft:rgba(99,102,241,.14);
+  --ok:#34d399;--ok-soft:rgba(52,211,153,.12);--warn:#f59e0b;--warn-soft:rgba(245,158,11,.14);
+  --err:#f87171;--err-soft:rgba(248,113,113,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:34px 20px 60px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:#fff}
+.top h1{font-size:22px;letter-spacing:-.02em}
+.lead{color:var(--muted);font-size:14px;margin:2px 0 24px}
+.post{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-bottom:16px}
+.post h3{font-size:17px;letter-spacing:-.01em;margin-bottom:6px}
+.cap{color:var(--ink-2);font-size:14px;white-space:pre-wrap;margin-bottom:12px}
+.meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--panel-2);color:var(--ink-2)}
+.st{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:700}
+.st.pending{background:var(--warn-soft);color:var(--warn)}
+.st.approved{background:var(--ok-soft);color:var(--ok)}
+.st.changes{background:var(--err-soft);color:var(--err)}
+.when{font-size:12px;color:var(--muted)}
+.acts{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:none;border-radius:10px;font-weight:650;font-size:13.5px;cursor:pointer;font-family:inherit}
+.btn-ok{background:var(--ok);color:#04120c}
+.btn-changes{background:var(--err-soft);border:1px solid rgba(248,113,113,.3);color:var(--err)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.note{margin-top:10px;font-size:13px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+textarea{width:100%;padding:10px 12px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;font-family:inherit;margin-top:10px;outline:none}
+textarea:focus{border-color:var(--accent)}
+.empty,.state{text-align:center;color:var(--muted);padding:60px 20px;font-size:15px}
+.done{background:var(--ok-soft);border:1px solid rgba(52,211,153,.3);color:var(--ok);font-size:13px;padding:10px 13px;border-radius:9px;margin-top:12px}
+.foot{text-align:center;color:var(--faint);font-size:12px;margin-top:30px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="head"></div>
+  <div id="list"><div class="state">Laden...</div></div>
+  <div class="foot">Marketing Studio - Goedkeuringsportaal</div>
+</div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
+function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
+function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+var CHAN={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',tiktok:'TikTok',youtube:'YouTube',blog:'Blog',other:'Overig'};
+var ST={pending:'Wacht op jou',approved:'Goedgekeurd',changes:'Wijzigingen gevraagd'};
+function token(){var m=location.search.match(/[?&]t=([^&]+)/);return m?decodeURIComponent(m[1]):'';}
+var T=token();
+
+async function load(){
+  var head=document.getElementById('head'), list=document.getElementById('list');
+  if(!T){list.innerHTML='<div class="state">Geen geldige link.</div>';return;}
+  try{
+    var r=await fetch('/api/mkt/portal/'+encodeURIComponent(T));
+    var d=await r.json();
+    if(!r.ok||!d.success){head.innerHTML='';list.innerHTML='<div class="state">'+esc(d.error||'Link niet gevonden.')+'</div>';return;}
+    var col=d.client.brand_color||'#6366f1';
+    head.innerHTML='<div class="top"><div class="badge" style="background:'+esc(col)+'">'+esc(initials(d.client.name))+'</div>'+
+      '<div><h1>'+esc(d.client.name)+'</h1></div></div>'+
+      '<div class="lead">Bekijk de geplande content en keur goed of vraag wijzigingen.</div>';
+    if(!d.posts.length){list.innerHTML='<div class="empty">Er staat op dit moment niets klaar om te beoordelen.</div>';return;}
+    list.innerHTML=d.posts.map(function(p){return postHtml(p);}).join('');
+  }catch(e){list.innerHTML='<div class="state">Netwerkfout. Probeer de pagina te herladen.</div>';}
+}
+function postHtml(p){
+  var when=p.scheduled_at?('<span class="when">Gepland: '+esc(fmtWhen(p.scheduled_at))+'</span>'):'';
+  var decided=(p.approval==='approved'||p.approval==='changes');
+  var acts;
+  if(decided){
+    acts='<div class="done">Je hebt dit '+(p.approval==='approved'?'goedgekeurd':'teruggestuurd met wijzigingen')+
+      (p.approval_note?(': '+esc(p.approval_note)):'')+'. Je kunt je keuze hieronder aanpassen.</div>';
+  } else { acts=''; }
+  return '<div class="post" id="post'+p.id+'">'+
+    '<h3>'+esc(p.title)+'</h3>'+
+    (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
+    '<div class="meta"><span class="chip">'+esc(CHAN[p.channel]||p.channel)+'</span>'+
+    '<span class="st '+esc(p.approval)+'">'+esc(ST[p.approval]||p.approval)+'</span>'+when+'</div>'+
+    acts+
+    '<div class="acts">'+
+      '<button class="btn btn-ok" onclick="decide('+p.id+',\'approved\')">Goedkeuren</button>'+
+      '<button class="btn btn-changes" onclick="toggleChanges('+p.id+')">Wijzigingen vragen</button>'+
+    '</div>'+
+    '<div id="cf'+p.id+'" style="display:none"><textarea id="ta'+p.id+'" rows="2" placeholder="Wat moet er anders?"></textarea>'+
+      '<div style="text-align:right;margin-top:8px"><button class="btn btn-changes" onclick="decide('+p.id+',\'changes\')">Verstuur wijzigingen</button></div></div>'+
+    '</div>';
+}
+function toggleChanges(id){var el=document.getElementById('cf'+id);el.style.display=el.style.display==='none'?'block':'none';if(el.style.display==='block')document.getElementById('ta'+id).focus();}
+async function decide(id,decision){
+  var note=decision==='changes'?(document.getElementById('ta'+id).value.trim()):'';
+  if(decision==='changes'&&!note){document.getElementById('ta'+id).focus();return;}
+  var card=document.getElementById('post'+id);
+  card.querySelectorAll('button').forEach(function(b){b.disabled=true;});
+  try{
+    var r=await fetch('/api/mkt/portal/'+encodeURIComponent(T)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({postId:id,decision:decision,note:note})});
+    var d=await r.json();
+    if(r.ok&&d.success){load();} else {alert(d.error||'Mislukt.');card.querySelectorAll('button').forEach(function(b){b.disabled=false;});}
+  }catch(e){alert('Netwerkfout.');card.querySelectorAll('button').forEach(function(b){b.disabled=false;});}
+}
+load();
+</script>
+</body>
+</html>
