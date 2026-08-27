@@ -244,13 +244,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         Klanten
       </a>
     </nav>
+    <div class="nav-label">Per klant</div>
+    <nav class="nav">
+      <a onclick="navTo('clients')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Contentkalender</a>
+      <a onclick="navTo('clients')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Assets</a>
+      <a onclick="navTo('clients')"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Goedkeuringen</a>
+      <a onclick="navTo('clients')"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Rapportage</a>
+    </nav>
     <div class="nav-label">Binnenkort</div>
     <nav class="nav">
-      <a class="disabled"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Contentkalender <span class="soon">3</span></a>
-      <a class="disabled"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Assets <span class="soon">3</span></a>
-      <a class="disabled"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Goedkeuringen <span class="soon">5</span></a>
-      <a class="disabled"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Analytics <span class="soon">6</span></a>
-      <a class="disabled"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Rapportages <span class="soon">6</span></a>
+      <a class="disabled"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Live publiceren <span class="soon">Meta</span></a>
     </nav>
     <div class="side-foot">
       <div class="user-chip">
@@ -276,7 +279,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="hero">
           <div>
             <h3>Je workspace staat klaar</h3>
-            <p>Beheer je klanten, plan content, laat goedkeuren en rapporteer - straks allemaal op één plek. We bouwen het stap voor stap uit.</p>
+            <p>Beheer je klanten, plan content, laat goedkeuren en rapporteer, allemaal op één plek per klant.</p>
           </div>
           <button class="btn btn-primary" onclick="navTo('clients')">Naar klanten</button>
         </div>
@@ -288,10 +291,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="section-h"><h4>Modules</h4></div>
         <div class="grid">
           <div class="mod live" onclick="navTo('clients')"><h5>Klanten</h5><p>Beheer per klant een eigen space.</p><span class="tag on">Actief</span></div>
-          <div class="mod"><h5>Contentkalender</h5><p>Plan en plan posts in, per klant.</p><span class="tag">Stap 3</span></div>
-          <div class="mod"><h5>Assets</h5><p>Beeldmateriaal uploaden en organiseren.</p><span class="tag">Stap 3</span></div>
-          <div class="mod"><h5>Goedkeuringen</h5><p>Klant bekijkt en keurt content goed.</p><span class="tag">Stap 5</span></div>
-          <div class="mod"><h5>Rapportages</h5><p>Automatische rapporten naar de klant.</p><span class="tag">Stap 6</span></div>
+          <div class="mod live" onclick="navTo('clients')"><h5>Contentkalender</h5><p>Plan en plan posts in, per klant.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="navTo('clients')"><h5>Assets</h5><p>Foto en video uploaden en organiseren.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="navTo('clients')"><h5>Goedkeuringen</h5><p>Klant bekijkt en keurt content goed.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="navTo('clients')"><h5>Koppelingen</h5><p>API's, pixels en tokens per klant.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="navTo('clients')"><h5>Rapportage</h5><p>Cijfers per klant uit je workspace.</p><span class="tag on">Actief</span></div>
+          <div class="mod"><h5>Live publiceren</h5><p>Rechtstreeks posten naar Meta en Google.</p><span class="tag">Binnenkort</span></div>
         </div>
       </section>
 
@@ -407,7 +412,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
         </div>
-        <div id="dReport" style="display:none"><div class="empty"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h4>Rapportage</h4><p>Automatische rapporten voor deze klant komen in Stap 6.</p></div></div>
+        <div id="dReport" style="display:none">
+          <div id="reportMsg" class="inline-msg"></div>
+          <div id="reportBody"><div class="empty">Laden...</div></div>
+        </div>
       </section>
     </div>
   </main>
@@ -647,6 +655,7 @@ function dTabShow(which){
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   if(which==='integrations'){loadIntegrations();}
+  if(which==='report'){loadReport();}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
   if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
 }
@@ -732,6 +741,30 @@ async function delAsset(id){
     var r=await fetch('/api/mkt/assets/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
     if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Verwijderen mislukt.');}
   }catch(e){showMsg('assetsMsg',false,'Netwerkfout.');}
+}
+
+// ---- Rapportage ----
+async function loadReport(){
+  if(!CURRENT_CLIENT)return; var body=document.getElementById('reportBody'); hideMsg('reportMsg');
+  body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/stats',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('reportMsg',false,d.error||'Kon rapportage niet laden.');return;}
+    var p=d.stats.posts, a=d.stats.assets, nx=d.stats.next;
+    function tile(k,v,acc){return '<div class="stat"><div class="k">'+k+'</div><div class="v'+(acc?' accent':'')+'">'+v+'</div></div>';}
+    var mb=(Number(a.bytes)||0)/1048576;
+    var next=nx?('<div class="card" style="margin-top:20px"><div class="k" style="font-size:12px;color:var(--muted);font-weight:600">Eerstvolgende geplande post</div><div style="font-size:16px;font-weight:700;margin-top:6px">'+esc(nx.title)+'</div><div class="mut" style="color:var(--muted);font-size:13px;margin-top:2px">'+esc(fmtWhen(nx.scheduled_at))+'</div></div>')
+      :'<div class="card" style="margin-top:20px;color:var(--muted);font-size:14px">Geen toekomstige posts ingepland.</div>';
+    body.innerHTML=
+      '<div class="section-h"><h4>Content</h4></div>'+
+      '<div class="stats">'+tile('Posts totaal',p.total,true)+tile('Ingepland',p.scheduled)+tile('Gepubliceerd',p.published)+tile('Nog te komen',p.upcoming)+'</div>'+
+      '<div class="section-h"><h4>Goedkeuringen</h4></div>'+
+      '<div class="stats">'+tile('Wacht op klant',p.pending)+tile('Goedgekeurd',p.approved,true)+tile('Wijzigingen gevraagd',p.changes)+'</div>'+
+      '<div class="section-h"><h4>Assets</h4></div>'+
+      '<div class="stats">'+tile('Bestanden',a.total,true)+tile('Video\'s',a.videos)+tile('Opslag',mb.toFixed(1)+' MB')+'</div>'+
+      next+
+      '<div style="margin-top:20px;font-size:12.5px;color:var(--faint)">Deze cijfers komen uit je eigen workspace. Statistieken van Meta en Google Ads (bereik, klikken, kosten) komen erbij zodra de platform-koppelingen live zijn.</div>';
+  }catch(e){body.innerHTML='';showMsg('reportMsg',false,'Netwerkfout.');}
 }
 
 // ---- Koppelingen (integraties) ----

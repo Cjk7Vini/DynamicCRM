@@ -883,6 +883,47 @@ router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
 });
 
 // =======================================================================
+// STAP 6 - RAPPORTAGE per klant (cijfers uit eigen data)
+// =======================================================================
+router.get('/api/mkt/clients/:clientId/stats', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const stats = await withReadConnection(async (c) => {
+      const posts = (await c.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE status='published')::int AS published,
+           COUNT(*) FILTER (WHERE status='scheduled')::int AS scheduled,
+           COUNT(*) FILTER (WHERE approval='pending')::int AS pending,
+           COUNT(*) FILTER (WHERE approval='approved')::int AS approved,
+           COUNT(*) FILTER (WHERE approval='changes')::int AS changes,
+           COUNT(*) FILTER (WHERE scheduled_at >= now())::int AS upcoming
+         FROM marketing.content_posts WHERE workspace_id=$1 AND client_id=$2`,
+        [wsId, okClient]
+      )).rows[0];
+      const assets = (await c.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE resource_type='video')::int AS videos,
+           COALESCE(SUM(size_bytes),0)::bigint AS bytes
+         FROM marketing.assets WHERE workspace_id=$1 AND client_id=$2`,
+        [wsId, okClient]
+      )).rows[0];
+      const next = (await c.query(
+        `SELECT title, scheduled_at FROM marketing.content_posts
+          WHERE workspace_id=$1 AND client_id=$2 AND scheduled_at >= now()
+          ORDER BY scheduled_at ASC LIMIT 1`,
+        [wsId, okClient]
+      )).rows[0] || null;
+      return { posts, assets, next };
+    });
+    res.json({ success: true, stats });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 5 - GOEDKEURINGSPORTAAL
 // Marketeer zet posts 'ter goedkeuring' en deelt een token-link per klant.
 // De klant keurt goed of vraagt wijzigingen, zonder account.
