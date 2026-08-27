@@ -151,6 +151,145 @@ router.patch('/api/mkt/admin/workspaces/:id/license', requireDhcAdmin, async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ---- BEHEERDERSCONSOLE: detail, accounts, resets --------------------------
+function validPassword(p) { return typeof p === 'string' && p.length >= 8 && /[A-Z]/.test(p) && /[a-z]/.test(p) && /[0-9]/.test(p); }
+async function activeOwnerCount(client, workspaceId, exceptId) {
+  return (await client.query(
+    `SELECT COUNT(*)::int AS n FROM marketing.accounts
+      WHERE workspace_id=$1 AND role='owner' AND active=true AND (banned IS NULL OR banned=false)
+        ${exceptId ? 'AND id <> $2' : ''}`,
+    exceptId ? [workspaceId, exceptId] : [workspaceId]
+  )).rows[0].n;
+}
+
+// Detail van één workspace incl. accounts + aantal klanten.
+router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) => {
+  try {
+    const data = await withReadConnection(async (c) => {
+      const ws = (await c.query('SELECT * FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0];
+      if (!ws) return null;
+      const accounts = (await c.query(
+        `SELECT id, email, full_name, role, active, banned, last_login_at, created_at
+           FROM marketing.accounts WHERE workspace_id=$1 ORDER BY (role='owner') DESC, created_at ASC`, [req.params.id]
+      )).rows;
+      const clients = (await c.query('SELECT COUNT(*)::int AS n FROM marketing.clients WHERE workspace_id=$1', [req.params.id])).rows[0].n;
+      return { ws, accounts, clients };
+    });
+    if (!data) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    res.json({ success: true, workspace: data.ws, accounts: data.accounts, client_count: data.clients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Account toevoegen aan een workspace.
+router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, async (req, res) => {
+  try {
+    const { email, full_name, role, password } = req.body || {};
+    const VALID_ROLE = ['owner', 'manager', 'member', 'client'];
+    if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord verplicht' });
+    if (!validPassword(password)) return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
+    const r = VALID_ROLE.includes(role) ? role : 'member';
+    const em = String(email).toLowerCase().trim();
+    const ws = await withReadConnection(async (c) => (await c.query('SELECT id FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0]);
+    if (!ws) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    const dup = await withReadConnection(async (c) => (await c.query('SELECT 1 FROM marketing.accounts WHERE email=$1', [em])).rows[0]);
+    if (dup) return res.status(400).json({ error: 'Dit e-mailadres bestaat al binnen marketing' });
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, email, full_name, role, active, banned`,
+      [req.params.id, em, hash, full_name || null, r]
+    )).rows[0]);
+    res.json({ success: true, account: row, temp_password: password });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Wachtwoord van een account resetten (support).
+router.post('/api/mkt/admin/accounts/:id/reset-password', requireDhcAdmin, async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!validPassword(password)) return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const done = await withWriteConnection(async (c) => (await c.query(
+      'UPDATE marketing.accounts SET password_hash=$1 WHERE id=$2 RETURNING id', [hash, req.params.id]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Account niet gevonden' });
+    res.json({ success: true, temp_password: password });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Account bijwerken: rol, actief, banned. Beschermt de laatste eigenaar.
+router.patch('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) => {
+  try {
+    const { role, active, banned } = req.body || {};
+    const VALID_ROLE = ['owner', 'manager', 'member', 'client'];
+    const row = await withWriteConnection(async (c) => {
+      const acc = (await c.query('SELECT id, workspace_id, role FROM marketing.accounts WHERE id=$1', [req.params.id])).rows[0];
+      if (!acc) return { notfound: true };
+      // Zou dit de laatste actieve eigenaar uitschakelen/degraderen?
+      const demoting = (role && role !== 'owner') || active === false || banned === true;
+      if (acc.role === 'owner' && demoting) {
+        const others = await activeOwnerCount(c, acc.workspace_id, acc.id);
+        if (others < 1) return { lastOwner: true };
+      }
+      const sets = [], vals = []; let i = 1;
+      if (role && VALID_ROLE.includes(role)) { sets.push(`role=$${i++}`); vals.push(role); }
+      if (typeof active === 'boolean') { sets.push(`active=$${i++}`); vals.push(active); }
+      if (typeof banned === 'boolean') { sets.push(`banned=$${i++}`); vals.push(banned); }
+      if (!sets.length) return { nochange: true };
+      vals.push(req.params.id);
+      return { row: (await c.query(`UPDATE marketing.accounts SET ${sets.join(', ')} WHERE id=$${i} RETURNING id, email, role, active, banned`, vals)).rows[0] };
+    });
+    if (row.notfound) return res.status(404).json({ error: 'Account niet gevonden' });
+    if (row.lastOwner) return res.status(400).json({ error: 'Dit is de laatste actieve eigenaar. Wijs eerst een andere eigenaar aan.' });
+    if (row.nochange) return res.status(400).json({ error: 'Niets om bij te werken' });
+    res.json({ success: true, account: row.row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Account verwijderen (beschermt de laatste eigenaar).
+router.delete('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) => {
+  try {
+    const result = await withWriteConnection(async (c) => {
+      const acc = (await c.query('SELECT id, workspace_id, role FROM marketing.accounts WHERE id=$1', [req.params.id])).rows[0];
+      if (!acc) return { notfound: true };
+      if (acc.role === 'owner') {
+        const others = await activeOwnerCount(c, acc.workspace_id, acc.id);
+        if (others < 1) return { lastOwner: true };
+      }
+      await c.query('DELETE FROM marketing.accounts WHERE id=$1', [req.params.id]);
+      return { ok: true };
+    });
+    if (result.notfound) return res.status(404).json({ error: 'Account niet gevonden' });
+    if (result.lastOwner) return res.status(400).json({ error: 'Dit is de laatste eigenaar en kan niet verwijderd worden.' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Workspace resetten: verwijdert alle klanten (troubleshoot). Accounts blijven.
+router.post('/api/mkt/admin/workspaces/:id/reset', requireDhcAdmin, async (req, res) => {
+  try {
+    const n = await withWriteConnection(async (c) => {
+      const ws = (await c.query('SELECT id FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0];
+      if (!ws) return null;
+      const del = await c.query('DELETE FROM marketing.clients WHERE workspace_id=$1', [req.params.id]);
+      return del.rowCount;
+    });
+    if (n === null) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    res.json({ success: true, deleted_clients: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Workspace volledig verwijderen (cascade: accounts, klanten, licentie-events).
+router.delete('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) => {
+  try {
+    const done = await withWriteConnection(async (c) => (await c.query(
+      'DELETE FROM marketing.workspaces WHERE id=$1 RETURNING id', [req.params.id]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // =======================================================================
 // MARKETING AUTH (eigen accounts, eigen sessie-namespace)
 // =======================================================================

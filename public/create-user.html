@@ -200,6 +200,16 @@
   .mkt-tabbar{max-width:1200px;margin:0 auto 6px;padding:0 4px;display:flex;gap:8px}
   .mkt-tab{padding:9px 18px;border:1px solid var(--border);background:#fff;border-radius:10px 10px 0 0;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer}
   .mkt-tab.mkt-tab-active{color:var(--text-1);border-bottom-color:#fff;box-shadow:0 -2px 0 #6d5efc inset}
+  .ws-modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto}
+  .ws-modal-ov.open{display:flex}
+  .ws-modal{width:100%;max-width:660px;background:#fff;border-radius:16px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+  .ws-modal label{display:block;font-size:12px;color:var(--text-3);margin-bottom:5px;font-weight:600}
+  .ws-sec{margin:20px 0 8px;font-weight:700;font-size:13px}
+  .acc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .acc-tbl td{padding:9px 8px;border-bottom:1px solid var(--border-light);vertical-align:middle}
+  .acc-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .acc-on{background:#ecfdf5;color:#065f46}.acc-off{background:#fef2f2;color:#991b1b}
+  .mini{padding:5px 9px;font-size:11px;border-radius:7px;border:1px solid var(--border);background:#fff;cursor:pointer;margin-right:4px}
 </style>
 <div class="mkt-tabbar">
   <button id="tabBtnDHC" class="mkt-tab mkt-tab-active" onclick="mktTab('dhc')">DHC-accounts</button>
@@ -248,6 +258,45 @@
       <div class="card-subtitle">Bestaande workspaces en hun licentie</div>
     </div></div>
     <div class="card-body"><div id="mktList"><div style="color:var(--text-3);font-size:13px;">Laden...</div></div></div>
+  </div>
+</div>
+
+<!-- WORKSPACE BEHEER MODAL -->
+<div class="ws-modal-ov" id="wsModal">
+  <div class="ws-modal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div><div class="card-title" id="wsmName">Workspace</div><div class="card-subtitle" id="wsmSlug"></div></div>
+      <button class="btn-gen" onclick="closeWorkspace()">Sluiten</button>
+    </div>
+    <div id="wsmMsg"></div>
+
+    <div class="ws-sec">Licentie</div>
+    <div class="form-row">
+      <div><label>Type</label><select id="wsmLicense"><option value="trial">Trial</option><option value="1m">1 maand</option><option value="3m">3 maanden</option><option value="6m">6 maanden</option><option value="12m">12 maanden</option><option value="24m">24 maanden</option><option value="unlimited">Onbeperkt</option></select></div>
+      <div><label>Seats</label><input type="number" id="wsmSeats" min="1"></div>
+      <div><label>Max. klanten</label><input type="number" id="wsmClients" min="1"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveWsLicense()" style="margin-top:6px">Licentie opslaan</button>
+
+    <div class="ws-sec">Accounts <span id="wsmClientCount" style="color:var(--text-3);font-weight:400"></span></div>
+    <div id="wsmAccounts"></div>
+
+    <div class="ws-sec">Account toevoegen</div>
+    <div class="form-row">
+      <div><label>E-mail</label><input type="email" id="waEmail" placeholder="naam@bureau.nl"></div>
+      <div><label>Naam</label><input type="text" id="waName"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Rol</label><select id="waRole"><option value="owner">Eigenaar</option><option value="manager">Manager</option><option value="member" selected>Member</option><option value="client">Client (kijker)</option></select></div>
+      <div><label>Wachtwoord</label><div class="password-row"><input type="text" id="waPass" value="Marketing2026!"><button class="btn-gen" onclick="document.getElementById('waPass').value=mktPwd()">Genereer</button></div></div>
+    </div>
+    <button class="btn btn-primary" onclick="addAccount()" style="margin-top:6px">Account toevoegen</button>
+
+    <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-weight:700;font-size:13px;color:#991b1b;margin-bottom:8px">Danger zone</div>
+      <button class="btn btn-ghost" onclick="resetWorkspace()" style="border-color:#fecaca;color:#991b1b">Reset workspace (verwijder alle klanten)</button>
+      <button class="btn btn-ghost" onclick="deleteWorkspace()" style="border-color:#fecaca;color:#991b1b;margin-left:8px">Workspace verwijderen</button>
+    </div>
   </div>
 </div>
 
@@ -1183,7 +1232,7 @@ async function loadMarketingWorkspaces(){
     el.innerHTML='<table class="users-table"><thead><tr><th>Workspace</th><th>Eigenaar</th><th>Licentie</th><th>Seats/Klanten</th><th>Accounts</th></tr></thead><tbody>'+
       d.workspaces.map(function(w){
         var end=w.license_end?(' <span style="color:var(--text-3)">tot '+new Date(w.license_end).toLocaleDateString('nl-NL')+'</span>'):'';
-        return '<tr><td style="font-weight:600;">'+esc(w.name)+' <span style="color:var(--text-3);font-family:monospace;font-size:11px;">'+esc(w.slug)+'</span></td>'+
+        return '<tr style="cursor:pointer" onclick="openWorkspace('+w.id+')"><td style="font-weight:600;">'+esc(w.name)+' <span style="color:var(--text-3);font-family:monospace;font-size:11px;">'+esc(w.slug)+'</span></td>'+
           '<td>'+esc(w.owner_email||'—')+'</td>'+
           '<td>'+esc(w.license_type)+end+'</td>'+
           '<td>'+w.max_seats+' / '+w.max_clients+'</td>'+
@@ -1192,6 +1241,113 @@ async function loadMarketingWorkspaces(){
   }catch(e){ el.innerHTML='<div style="color:#991b1b;font-size:13px;">Netwerkfout.</div>'; }
 }
 function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+
+// ==================== WORKSPACE BEHEERCONSOLE ====================
+var CURRENT_WS=null;
+function mktPwd(){ var cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',p='Mk'; for(var i=0;i<9;i++)p+=cs[Math.floor(Math.random()*cs.length)]; return p+'7!'; }
+function wsmMsg(ok,msg){ var el=document.getElementById('wsmMsg'); el.innerHTML='<div style="padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0;background:'+(ok?'#ecfdf5':'#fef2f2')+';color:'+(ok?'#065f46':'#991b1b')+';border:1px solid '+(ok?'#a7f3d0':'#fecaca')+'">'+esc(msg)+'</div>'; }
+function closeWorkspace(){ document.getElementById('wsModal').classList.remove('open'); CURRENT_WS=null; }
+
+async function openWorkspace(id){
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+id,{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){ alert(d.error||'Kon workspace niet laden.'); return; }
+    CURRENT_WS=d.workspace; document.getElementById('wsmMsg').innerHTML='';
+    document.getElementById('wsmName').textContent=d.workspace.name;
+    document.getElementById('wsmSlug').textContent=d.workspace.slug;
+    document.getElementById('wsmLicense').value=d.workspace.license_type||'trial';
+    document.getElementById('wsmSeats').value=d.workspace.max_seats;
+    document.getElementById('wsmClients').value=d.workspace.max_clients;
+    document.getElementById('wsmClientCount').textContent='· '+d.client_count+' klant'+(d.client_count===1?'':'en');
+    renderAccounts(d.accounts);
+    document.getElementById('wsModal').classList.add('open');
+  }catch(e){ alert('Netwerkfout.'); }
+}
+function renderAccounts(accs){
+  var roles=['owner','manager','member','client'];
+  document.getElementById('wsmAccounts').innerHTML='<table class="acc-tbl"><tbody>'+accs.map(function(a){
+    var status=a.banned?'<span class="acc-badge acc-off">geband</span>':(a.active?'<span class="acc-badge acc-on">actief</span>':'<span class="acc-badge acc-off">inactief</span>');
+    var last=a.last_login_at?new Date(a.last_login_at).toLocaleDateString('nl-NL'):'nooit';
+    var roleSel='<select onchange="changeRole('+a.id+',this.value)" style="padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">'+roles.map(function(r){return '<option value="'+r+'" '+(a.role===r?'selected':'')+'>'+r+'</option>';}).join('')+'</select>';
+    return '<tr><td><div style="font-weight:600">'+esc(a.email)+'</div><div style="color:var(--text-3);font-size:11px">laatste login: '+last+'</div></td>'+
+      '<td>'+roleSel+'</td><td>'+status+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+
+        '<button class="mini" onclick="resetPw('+a.id+')">Reset ww</button>'+
+        '<button class="mini" onclick="toggleAcc('+a.id+','+(a.active?'false':'true')+')">'+(a.active?'Deactiveer':'Activeer')+'</button>'+
+        '<button class="mini" style="color:#991b1b;border-color:#fecaca" onclick="delAcc('+a.id+",'"+esc(a.email).replace(/'/g,"")+"')\">Verwijder</button>"+
+      '</td></tr>';
+  }).join('')+'</tbody></table>';
+}
+async function saveWsLicense(){
+  if(!CURRENT_WS)return;
+  var body={licenseType:document.getElementById('wsmLicense').value,maxSeats:document.getElementById('wsmSeats').value,maxClients:document.getElementById('wsmClients').value};
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id+'/license',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,'Licentie opgeslagen.'); loadMarketingWorkspaces(); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function addAccount(){
+  if(!CURRENT_WS)return;
+  var body={email:document.getElementById('waEmail').value.trim(),full_name:document.getElementById('waName').value.trim(),role:document.getElementById('waRole').value,password:document.getElementById('waPass').value};
+  if(!body.email||!body.password){ wsmMsg(false,'E-mail en wachtwoord verplicht.'); return; }
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id+'/accounts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,'Account aangemaakt ('+d.account.email+'). Wachtwoord: '+d.temp_password); document.getElementById('waEmail').value=''; document.getElementById('waName').value=''; openWorkspace(CURRENT_WS.id); }
+    else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function resetPw(id){
+  var np=mktPwd();
+  if(!confirm('Nieuw wachtwoord instellen? Het wordt: '+np))return;
+  try{
+    var r=await fetch('/api/mkt/admin/accounts/'+id+'/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({password:np})});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,'Nieuw wachtwoord: '+d.temp_password); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function toggleAcc(id,active){
+  try{
+    var r=await fetch('/api/mkt/admin/accounts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({active:active})});
+    var d=await r.json();
+    if(r.ok&&d.success){ openWorkspace(CURRENT_WS.id); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function changeRole(id,role){
+  try{
+    var r=await fetch('/api/mkt/admin/accounts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({role:role})});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,'Rol bijgewerkt.'); } else { wsmMsg(false,d.error||'Mislukt.'); openWorkspace(CURRENT_WS.id); }
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function delAcc(id,email){
+  if(!confirm('Account '+email+' verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/admin/accounts/'+id,{method:'DELETE',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){ openWorkspace(CURRENT_WS.id); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function resetWorkspace(){
+  if(!CURRENT_WS)return;
+  if(!confirm('Alle klanten van "'+CURRENT_WS.name+'" verwijderen? Dit kan niet ongedaan worden gemaakt.'))return;
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id+'/reset',{method:'POST',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,d.deleted_clients+' klant(en) verwijderd.'); openWorkspace(CURRENT_WS.id); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+async function deleteWorkspace(){
+  if(!CURRENT_WS)return;
+  if(!confirm('Workspace "'+CURRENT_WS.name+'" VOLLEDIG verwijderen (incl. accounts en klanten)? Dit kan niet ongedaan worden gemaakt.'))return;
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id,{method:'DELETE',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){ closeWorkspace(); loadMarketingWorkspaces(); } else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
 </script>
 <script src="/js/heartbeat.js"></script>
 </body>
