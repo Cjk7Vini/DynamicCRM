@@ -940,18 +940,40 @@ async function loadCampaigns(){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('campMsg',false,d.error||'Kon campagnes niet laden.');return;}
     document.getElementById('campInfo').textContent=d.campaigns.length+' campagne'+(d.campaigns.length===1?'':'s');
+    var own;
     if(!d.campaigns.length){
-      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><h4>Nog geen campagnes</h4><p>Maak een gepauzeerde advertentiecampagne aan bij Meta.</p><button class="btn btn-primary" onclick="openCampaign()">+ Nieuwe campagne</button></div>';
-      return;
+      own='<div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><h4>Nog geen eigen campagnes</h4><p>Maak een gepauzeerde advertentiecampagne aan bij Meta.</p><button class="btn btn-primary" onclick="openCampaign()">+ Nieuwe campagne</button></div>';
+    } else {
+      own='<div class="section-h"><h4>Via de workspace aangemaakt</h4></div><div class="post-list">'+d.campaigns.map(function(c){
+        return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
+          '<div class="post-meta"><span class="chan">'+esc(CAMP_OBJ_LABEL[c.objective]||c.objective)+'</span>'+
+          '<span class="status scheduled">'+esc(c.status)+'</span>'+
+          '<span class="when">'+(c.daily_budget_cents/100).toFixed(0)+' euro/dag</span></div>'+
+          '<div class="cap" style="margin-top:8px">Campagne-ID: '+esc(c.meta_campaign_id)+'. Activeer in Meta Ads Manager.</div></div></div>';
+      }).join('')+'</div>';
     }
-    body.innerHTML='<div class="post-list">'+d.campaigns.map(function(c){
-      return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
-        '<div class="post-meta"><span class="chan">'+esc(CAMP_OBJ_LABEL[c.objective]||c.objective)+'</span>'+
-        '<span class="status scheduled">'+esc(c.status)+'</span>'+
-        '<span class="when">'+(c.daily_budget_cents/100).toFixed(0)+' euro/dag</span></div>'+
-        '<div class="cap" style="margin-top:8px">Campagne-ID: '+esc(c.meta_campaign_id)+'. Activeer in Meta Ads Manager.</div></div></div>';
-    }).join('')+'</div>';
+    body.innerHTML=own+'<div id="metaCampaigns" style="margin-top:24px"><div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Bestaande campagnes ophalen...</div></div>';
+    loadMetaCampaigns();
   }catch(e){body.innerHTML='';showMsg('campMsg',false,'Netwerkfout.');}
+}
+async function loadMetaCampaigns(){
+  var box=document.getElementById('metaCampaigns'); if(!box)return;
+  var STAT={ACTIVE:{cls:'approved',txt:'Actief'},PAUSED:{cls:'scheduled',txt:'Gepauzeerd'},ARCHIVED:{cls:'archived',txt:'Gearchiveerd'}};
+  function badge(s){var m=STAT[s]||{cls:'archived',txt:s};return '<span class="status '+m.cls+'">'+esc(m.txt)+'</span>';}
+  function num(v){return v!=null?v:'-';}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Kon Meta-campagnes niet laden.</div>';return;}
+    if(!d.configured){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Vul in de Koppelingen-tab het access token en Ad Account ID in om de al lopende campagnes te zien.</div>';return;}
+    if(d.error){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:13px">Niet beschikbaar: '+esc(d.error)+'</div>';return;}
+    if(!d.campaigns.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Geen bestaande campagnes gevonden op dit ad account.</div>';return;}
+    box.innerHTML='<div class="section-h"><h4>Live op Meta ('+d.campaigns.length+')</h4></div><div class="post-list">'+d.campaigns.map(function(c){
+      var b=c.budget!=null?(' · &euro; '+c.budget.toFixed(2)+'/'+esc(c.budget_type||'')):'';
+      var stats=(c.spend!=null||c.impressions!=null)?('<div class="cap" style="margin-top:8px">Laatste 30 dagen: &euro; '+num(c.spend)+' uitgegeven · '+num(c.impressions)+' impressies · '+num(c.clicks)+' klikken · CTR '+num(c.ctr)+'%</div>'):'';
+      return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
+        '<div class="post-meta"><span class="chan">'+esc(c.objective||'')+'</span>'+badge(c.status)+b+'</div>'+stats+'</div></div>';
+    }).join('')+'</div>';
+  }catch(e){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het ophalen van Meta-campagnes.</div>';}
 }
 async function openCampaign(){
   hideMsg('campModalMsg');

@@ -1256,6 +1256,57 @@ router.post('/api/mkt/portal/:token/decision', async (req, res) => {
 });
 
 // =======================================================================
+// STAP 10 - BESTAANDE META-CAMPAGNES ophalen (read-only)
+// Toont wat er al draait op het ad account, zodra de koppeling is ingevuld.
+// =======================================================================
+router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const intg = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_access_token, meta_ad_account_id FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    const token = intg ? decryptSecret(intg.meta_access_token) : null;
+    const adAccount = intg ? normalizeAdAccount(intg.meta_ad_account_id) : '';
+    if (!token || !adAccount) return res.json({ success: true, configured: false });
+
+    const out = { configured: true, campaigns: [], error: null };
+    try {
+      const list = await graphGet(`${adAccount}/campaigns`, {
+        fields: 'name,objective,status,effective_status,daily_budget,lifetime_budget,start_time',
+        limit: '50', access_token: token,
+      });
+      // Cijfers per campagne (laatste 30 dagen), gebundeld opgehaald.
+      const stats = {};
+      try {
+        const ins = await graphGet(`${adAccount}/insights`, {
+          level: 'campaign', fields: 'campaign_id,spend,impressions,reach,clicks,ctr',
+          date_preset: 'last_30d', limit: '200', access_token: token,
+        });
+        (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
+      } catch (_) { /* cijfers optioneel */ }
+
+      out.campaigns = (list.data || []).map((c) => {
+        const s = stats[c.id] || {};
+        const budget = c.daily_budget ? (Number(c.daily_budget) / 100) : (c.lifetime_budget ? (Number(c.lifetime_budget) / 100) : null);
+        return {
+          id: c.id, name: c.name, objective: c.objective,
+          status: c.effective_status || c.status,
+          budget, budget_type: c.daily_budget ? 'dag' : (c.lifetime_budget ? 'totaal' : null),
+          start_time: c.start_time || null,
+          spend: s.spend ?? null, impressions: s.impressions ?? null, reach: s.reach ?? null,
+          clicks: s.clicks ?? null, ctr: s.ctr ?? null,
+        };
+      });
+    } catch (e) { out.error = e.message; }
+
+    res.json({ success: true, ...out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 9 - META INSIGHTS in de rapportage (organic + ads)
 // Defensief: elk onderdeel apart afgeschermd. Faalt een deel, dan blijft
 // de rest werken en toont dat onderdeel gewoon geen data.
