@@ -106,10 +106,30 @@ function requireMktSession(req, res, next) {
   return res.status(401).json({ error: 'Niet ingelogd' });
 }
 // Mag in een workspace werken: gewoon account, of platform-admin MET gekozen workspace.
-function requireMkt(req, res, next) {
+// Hercontroleert bij elke aanvraag of het account/de workspace nog actief is, zodat een
+// ingetrokken trial direct wordt afgesloten (niet pas als de sessie verloopt).
+// Fail-open bij een infrafout (geen onterechte uitsluiting), fail-closed bij een echte blokkade.
+async function requireMkt(req, res, next) {
   const m = req.session && req.session.mkt;
-  if (m && (m.accountId || (m.platformAdmin && m.workspaceId))) return next();
-  return res.status(401).json({ error: 'Niet ingelogd' });
+  if (!m) return res.status(401).json({ error: 'Niet ingelogd' });
+  if (m.platformAdmin) {
+    if (m.workspaceId) return next();
+    return res.status(401).json({ error: 'Niet ingelogd' });
+  }
+  if (!m.accountId) return res.status(401).json({ error: 'Niet ingelogd' });
+  try {
+    const row = await withReadConnection(async (c) => (await c.query(
+      `SELECT a.active AS a_active, a.banned AS a_banned, w.active AS w_active, w.license_end
+         FROM marketing.accounts a JOIN marketing.workspaces w ON w.id = a.workspace_id
+        WHERE a.id = $1`, [m.accountId]
+    )).rows[0]);
+    if (row) {
+      const blocked = row.a_active === false || row.a_banned === true || row.w_active === false ||
+        (row.license_end && new Date(row.license_end) < new Date());
+      if (blocked) { delete req.session.mkt; return res.status(403).json({ error: 'Toegang ingetrokken' }); }
+    }
+  } catch (_) { /* infrafout: doorlaten zodat legitieme gebruikers niet worden uitgesloten */ }
+  return next();
 }
 function requireMktPlatform(req, res, next) {
   if (req.session && req.session.mkt && req.session.mkt.platformAdmin) return next();
