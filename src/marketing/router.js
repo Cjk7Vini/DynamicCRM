@@ -582,11 +582,14 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const status = String(req.query.status || '');
     const filterStatus = POST_STATUS.includes(status) ? status : null;
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at
-         FROM marketing.content_posts
-        WHERE workspace_id=$1 AND client_id=$2
-          ${filterStatus ? 'AND status=$3' : ''}
-        ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`,
+      `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
+              p.approval, p.approval_note, p.approval_at, p.created_at, p.updated_at,
+              p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
+         FROM marketing.content_posts p
+         LEFT JOIN marketing.assets a ON a.id = p.asset_id
+        WHERE p.workspace_id=$1 AND p.client_id=$2
+          ${filterStatus ? 'AND p.status=$3' : ''}
+        ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
     res.json({ success: true, posts: rows });
@@ -601,7 +604,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const { title, body, channel, status, scheduled_at } = req.body || {};
+    const { title, body, channel, status, scheduled_at, asset_id } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'Titel is verplicht' });
     const ch = POST_CHANNELS.includes(channel) ? channel : 'other';
     const st = POST_STATUS.includes(status) ? status : 'idea';
@@ -611,11 +614,19 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
       if (isNaN(d.getTime())) return res.status(400).json({ error: 'Ongeldige planningsdatum' });
       when = d;
     }
+    // Optionele koppeling aan een asset: moet bij dezelfde klant horen.
+    let assetId = null;
+    if (asset_id) {
+      const ok = await withReadConnection(async (c) => (await c.query(
+        'SELECT id FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3', [asset_id, okClient, wsId]
+      )).rows[0]);
+      if (ok) assetId = ok.id;
+    }
     const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at`,
-      [wsId, okClient, String(title).trim(), body || null, ch, st, when, req.session.mkt.accountId || null]
+      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, approval, approval_note, approval_at, created_at, updated_at`,
+      [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -648,13 +659,25 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
         sets.push(`scheduled_at=$${i++}`); vals.push(d);
       }
     }
+    // Asset koppelen of loskoppelen. Alleen een asset van dezelfde klant is toegestaan.
+    if (b.asset_id !== undefined) {
+      if (!b.asset_id) { sets.push(`asset_id=$${i++}`); vals.push(null); }
+      else {
+        const ok = await withReadConnection(async (c) => (await c.query(
+          `SELECT a.id FROM marketing.assets a
+             JOIN marketing.content_posts p ON p.client_id = a.client_id
+            WHERE a.id=$1 AND p.id=$2 AND a.workspace_id=$3`, [b.asset_id, req.params.id, wsId]
+        )).rows[0]);
+        if (ok) { sets.push(`asset_id=$${i++}`); vals.push(ok.id); }
+      }
+    }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     sets.push(`updated_at=now()`);
     vals.push(req.params.id, wsId);
     const row = await withWriteConnection(async (c) => (await c.query(
       `UPDATE marketing.content_posts SET ${sets.join(', ')}
         WHERE id=$${i++} AND workspace_id=$${i}
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, approval, approval_note, approval_at, created_at, updated_at`, vals
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, approval, approval_note, approval_at, created_at, updated_at`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
     res.json({ success: true, post: row });
@@ -1178,10 +1201,12 @@ router.get('/api/mkt/portal/:token', async (req, res) => {
     )).rows[0]);
     if (!client) return res.status(404).json({ error: 'Link niet gevonden of ingetrokken' });
     const posts = await withReadConnection(async (c) => (await c.query(
-      `SELECT id, title, body, channel, scheduled_at, approval, approval_note, approval_at
-         FROM marketing.content_posts
-        WHERE client_id=$1 AND approval <> 'none'
-        ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`, [client.id]
+      `SELECT p.id, p.title, p.body, p.channel, p.scheduled_at, p.approval, p.approval_note, p.approval_at,
+              a.url AS asset_url, a.resource_type AS asset_type
+         FROM marketing.content_posts p
+         LEFT JOIN marketing.assets a ON a.id = p.asset_id
+        WHERE p.client_id=$1 AND p.approval <> 'none'
+        ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`, [client.id]
     )).rows);
     res.json({ success: true, client: { name: client.name, brand_color: client.brand_color }, posts });
   } catch (e) { res.status(500).json({ error: e.message }); }

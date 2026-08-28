@@ -131,6 +131,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .post-row{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 17px;display:flex;align-items:flex-start;gap:14px;transition:border-color .12s}
 .post-row:hover{border-color:var(--line-2)}
 .post-main{min-width:0;flex:1}
+.post-thumb{width:54px;height:54px;border-radius:9px;object-fit:cover;flex-shrink:0;background:var(--panel-2)}
 .post-main h5{font-size:14.5px;margin-bottom:4px;letter-spacing:-.01em}
 .post-main .cap{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .post-meta{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
@@ -559,6 +560,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
+    <div class="field"><label>Beeld (afbeelding of video)</label>
+      <select id="pfAsset"><option value="">Geen beeld</option></select>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
+    </div>
     <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="4" placeholder="De post-tekst..."></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePost()">Annuleren</button>
@@ -1044,12 +1049,25 @@ async function loadPosts(){
         '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'+
         '</div>'):'';
       var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">Klantfeedback: '+esc(p.approval_note)+'</div>'):'';
-      return '<div class="post-row"><div class="post-main"><h5>'+esc(p.title)+'</h5>'+
+      var thumb='';
+      if(p.asset_url){
+        thumb=(p.asset_type==='video')
+          ? '<img class="post-thumb" src="'+esc(videoPoster(p.asset_url))+'" alt="" title="Video">'
+          : '<img class="post-thumb" src="'+esc(p.asset_url)+'" alt="">';
+      }
+      return '<div class="post-row">'+thumb+'<div class="post-main"><h5>'+esc(p.title)+'</h5>'+
         (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
         '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
         '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+when+'</div>'+note+'</div>'+acts+'</div>';
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
+}
+async function fillPostAssetSelect(selectedId){
+  var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>';
+  try{
+    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var o=document.createElement('option');o.value=a.id;o.textContent=a.filename+' ('+(a.resource_type==='video'?'video':'foto')+')';if(String(a.id)===String(selectedId))o.selected=true;sel.appendChild(o); } });
+  }catch(e){}
 }
 function openNewPost(){
   EDIT_POST=null; hideMsg('postMsg');
@@ -1057,6 +1075,7 @@ function openNewPost(){
   document.getElementById('pfTitle').value='';document.getElementById('pfBody').value='';
   document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
   document.getElementById('pfWhen').value='';
+  fillPostAssetSelect('');
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
 }
 function openEditPost(id){
@@ -1069,6 +1088,7 @@ function openEditPost(id){
     document.getElementById('pfTitle').value=p.title||'';document.getElementById('pfBody').value=p.body||'';
     document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
+    fillPostAssetSelect(p.asset_id||'');
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
   });
 }
@@ -1078,7 +1098,7 @@ async function savePost(){
   var title=document.getElementById('pfTitle').value.trim();
   if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
   var when=document.getElementById('pfWhen').value;
-  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():''};
+  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||''};
   btn.disabled=true; btn.textContent='Bezig...';
   try{
     var url=EDIT_POST?('/api/mkt/posts/'+EDIT_POST.id):('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts');
