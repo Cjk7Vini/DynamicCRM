@@ -320,6 +320,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button class="active" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'content')">Content</button>
           <button onclick="dTab(this,'assets')">Assets</button>
+          <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnes</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button onclick="dTab(this,'report')">Rapportage</button>
         </div>
@@ -376,6 +377,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div id="assetsMsg" class="inline-msg"></div>
           <div id="assetsBody"><div class="empty">Laden...</div></div>
         </div>
+        <div id="dCampaigns" style="display:none">
+          <div class="section-h">
+            <span class="pill" id="campInfo">Advertentiecampagnes</span>
+            <button class="btn btn-primary" id="newCampBtn" onclick="openCampaign()">+ Nieuwe campagne</button>
+          </div>
+          <div id="campMsg" class="inline-msg"></div>
+          <div id="campBody"><div class="empty">Laden...</div></div>
+        </div>
         <div id="dIntegrations" style="display:none">
           <div id="intMsg" class="inline-msg"></div>
           <div class="card" style="max-width:640px">
@@ -389,8 +398,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
             <div class="row2">
               <div class="field"><label>Meta Pixel ID</label><input id="int_meta_pixel_id"></div>
-              <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
+              <div class="field"><label>Ad Account ID</label><input id="int_meta_ad_account_id" placeholder="act_1234567890"></div>
             </div>
+            <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
 
             <div class="nav-label" style="padding-left:0;margin-top:10px">Google</div>
             <div class="row2">
@@ -447,6 +457,52 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <!-- MODAL: media-viewer (lightbox) -->
 <div class="modal-ov" id="viewerModal" onclick="if(event.target===this)closeViewer()">
   <div class="viewer-box" id="viewerBox"></div>
+</div>
+
+<!-- MODAL: nieuwe campagne -->
+<div class="modal-ov" id="campModal">
+  <div class="modal">
+    <h3>Nieuwe advertentiecampagne</h3>
+    <div class="sub">Wordt gepauzeerd aangemaakt bij Meta. Er wordt niets uitgegeven tot jij hem in Meta activeert.</div>
+    <div id="campModalMsg" class="inline-msg"></div>
+    <div class="field"><label>Campagnenaam *</label><input id="cpName" placeholder="Bijv. Zomeractie juli"></div>
+    <div class="row2">
+      <div class="field"><label>Doel</label>
+        <select id="cpObjective">
+          <option value="OUTCOME_TRAFFIC">Verkeer (klikken naar site)</option>
+          <option value="OUTCOME_AWARENESS">Naamsbekendheid (bereik)</option>
+          <option value="OUTCOME_ENGAGEMENT">Betrokkenheid</option>
+        </select>
+      </div>
+      <div class="field"><label>Dagbudget (euro) *</label><input id="cpBudget" type="number" min="1" step="1" value="10"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Land</label><input id="cpCountry" value="NL" maxlength="2" style="text-transform:uppercase"></div>
+      <div class="field"><label>Call-to-action</label>
+        <select id="cpCta">
+          <option value="LEARN_MORE">Meer informatie</option>
+          <option value="SHOP_NOW">Nu shoppen</option>
+          <option value="SIGN_UP">Aanmelden</option>
+          <option value="CONTACT_US">Neem contact op</option>
+          <option value="GET_OFFER">Bekijk aanbod</option>
+          <option value="SUBSCRIBE">Abonneren</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Leeftijd van</label><input id="cpAgeMin" type="number" min="13" max="65" value="18"></div>
+      <div class="field"><label>Leeftijd tot</label><input id="cpAgeMax" type="number" min="13" max="65" value="65"></div>
+    </div>
+    <div class="field"><label>Bestemmings-URL *</label><input id="cpLink" placeholder="https://..."></div>
+    <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
+      <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
+    </div>
+    <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCampaign()">Annuleren</button>
+      <button class="btn btn-primary" id="cpBtn" onclick="createCampaign2()">Campagne aanmaken (gepauzeerd)</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: publiceren naar Meta -->
@@ -670,15 +726,18 @@ function renderClientDetail(c){
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
   document.getElementById('dDeleteBtn').style.display=isOwnerMgr?'':'none';
   document.getElementById('tabIntegrations').style.display=isOwnerMgr?'':'none';
+  document.getElementById('tabCampaigns').style.display=isOwnerMgr?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
 function dTabShow(which){
   document.getElementById('dInfo').style.display=which==='info'?'':'none';
   document.getElementById('dContent').style.display=which==='content'?'':'none';
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
+  document.getElementById('dCampaigns').style.display=which==='campaigns'?'':'none';
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   if(which==='integrations'){loadIntegrations();}
+  if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
   if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
@@ -792,7 +851,7 @@ async function loadReport(){
 }
 
 // ---- Koppelingen (integraties) ----
-var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
+var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
 var INT_SECRET=['meta_access_token','google_ads_developer_token','tiktok_access_token'];
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
@@ -820,6 +879,69 @@ async function saveIntegrations(){
     else {showMsg('intMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Koppelingen opslaan';
+}
+
+// ---- Campagnes ----
+var CAMP_OBJ_LABEL={OUTCOME_TRAFFIC:'Verkeer',OUTCOME_AWARENESS:'Naamsbekendheid',OUTCOME_ENGAGEMENT:'Betrokkenheid'};
+async function loadCampaigns(){
+  if(!CURRENT_CLIENT)return; var body=document.getElementById('campBody'); hideMsg('campMsg');
+  body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('campMsg',false,d.error||'Kon campagnes niet laden.');return;}
+    document.getElementById('campInfo').textContent=d.campaigns.length+' campagne'+(d.campaigns.length===1?'':'s');
+    if(!d.campaigns.length){
+      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><h4>Nog geen campagnes</h4><p>Maak een gepauzeerde advertentiecampagne aan bij Meta.</p><button class="btn btn-primary" onclick="openCampaign()">+ Nieuwe campagne</button></div>';
+      return;
+    }
+    body.innerHTML='<div class="post-list">'+d.campaigns.map(function(c){
+      return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
+        '<div class="post-meta"><span class="chan">'+esc(CAMP_OBJ_LABEL[c.objective]||c.objective)+'</span>'+
+        '<span class="status scheduled">'+esc(c.status)+'</span>'+
+        '<span class="when">'+(c.daily_budget_cents/100).toFixed(0)+' euro/dag</span></div>'+
+        '<div class="cap" style="margin-top:8px">Campagne-ID: '+esc(c.meta_campaign_id)+'. Activeer in Meta Ads Manager.</div></div></div>';
+    }).join('')+'</div>';
+  }catch(e){body.innerHTML='';showMsg('campMsg',false,'Netwerkfout.');}
+}
+async function openCampaign(){
+  hideMsg('campModalMsg');
+  document.getElementById('cpName').value='';document.getElementById('cpBudget').value='10';
+  document.getElementById('cpCountry').value='NL';document.getElementById('cpAgeMin').value='18';document.getElementById('cpAgeMax').value='65';
+  document.getElementById('cpLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('cpCaption').value='';
+  try{
+    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
+    var sel=document.getElementById('cpAsset');var opts='<option value="">Kies een afbeelding</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
+    sel.innerHTML=opts;
+  }catch(e){}
+  document.getElementById('campModal').classList.add('open');document.getElementById('cpName').focus();
+}
+function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
+async function createCampaign2(){
+  var btn=document.getElementById('cpBtn'); hideMsg('campModalMsg');
+  var payload={
+    name:document.getElementById('cpName').value.trim(),
+    objective:document.getElementById('cpObjective').value,
+    dailyBudget:document.getElementById('cpBudget').value,
+    country:document.getElementById('cpCountry').value.trim(),
+    cta:document.getElementById('cpCta').value,
+    ageMin:document.getElementById('cpAgeMin').value,
+    ageMax:document.getElementById('cpAgeMax').value,
+    link:document.getElementById('cpLink').value.trim(),
+    assetId:document.getElementById('cpAsset').value||null,
+    caption:document.getElementById('cpCaption').value
+  };
+  if(!payload.name){showMsg('campModalMsg',false,'Campagnenaam is verplicht.');return;}
+  if(!payload.assetId){showMsg('campModalMsg',false,'Kies een afbeelding.');return;}
+  if(!/^https?:\/\//i.test(payload.link)){showMsg('campModalMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  btn.disabled=true; btn.textContent='Aanmaken...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('campModalMsg',true,'Campagne aangemaakt (gepauzeerd).');setTimeout(function(){closeCampaign();loadCampaigns();},1400);}
+    else {showMsg('campModalMsg',false,d.error||'Aanmaken mislukt.');}
+  }catch(e){showMsg('campModalMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Campagne aanmaken (gepauzeerd)';
 }
 
 // ---- Contentkalender ----

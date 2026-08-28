@@ -820,7 +820,7 @@ router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
 // Eén rij per klant. Gevoelige tokens worden versleuteld opgeslagen en
 // nooit volledig teruggegeven (alleen gemaskeerd).
 // =======================================================================
-const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
+const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
 const INT_SECRET = ['meta_access_token', 'google_ads_developer_token', 'tiktok_access_token'];
 
 function integrationsView(row) {
@@ -987,6 +987,120 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
       } catch (_) { /* niet blokkerend */ }
     }
     res.json({ success: true, result });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
+// STAP 8 - ADVERTENTIECAMPAGNES (Meta Marketing API)
+// Bouwt campagne + advertentieset + creatief + advertentie, altijd PAUSED.
+// Er wordt nooit automatisch budget uitgegeven; activeren doe je in Meta zelf.
+// =======================================================================
+const CAMPAIGN_OBJECTIVES = {
+  OUTCOME_TRAFFIC: 'LINK_CLICKS',
+  OUTCOME_AWARENESS: 'REACH',
+  OUTCOME_ENGAGEMENT: 'POST_ENGAGEMENT',
+};
+const CTA_TYPES = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'BOOK_TRAVEL', 'CONTACT_US', 'GET_OFFER', 'SUBSCRIBE'];
+
+function normalizeAdAccount(id) {
+  const s = String(id || '').trim().replace(/^act_/, '');
+  return s ? ('act_' + s) : '';
+}
+
+// Lijst eerder aangemaakte campagnes (uit onze database).
+router.get('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, name, objective, daily_budget_cents, status, meta_campaign_id, link, created_at
+         FROM marketing.campaigns WHERE workspace_id=$1 AND client_id=$2 ORDER BY created_at DESC`,
+      [wsId, okClient]
+    )).rows);
+    res.json({ success: true, campaigns: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Maak een nieuwe (gepauzeerde) campagne aan bij Meta.
+router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan campagnes aanmaken' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Campagnenaam is verplicht' });
+    const objective = CAMPAIGN_OBJECTIVES[b.objective] ? b.objective : null;
+    if (!objective) return res.status(400).json({ error: 'Kies een geldig campagnedoel' });
+    const euros = Number(b.dailyBudget);
+    if (!Number.isFinite(euros) || euros < 1) return res.status(400).json({ error: 'Vul een dagbudget in van minimaal 1 euro' });
+    const budgetCents = Math.round(euros * 100);
+    const country = String(b.country || 'NL').trim().toUpperCase().slice(0, 2);
+    const ageMin = Math.min(65, Math.max(13, parseInt(b.ageMin, 10) || 18));
+    const ageMax = Math.min(65, Math.max(ageMin, parseInt(b.ageMax, 10) || 65));
+    const link = String(b.link || '').trim();
+    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
+    const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
+    const caption = String(b.caption || '').slice(0, 2000);
+
+    // Koppelingen ophalen
+    const intg = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld voor deze klant' });
+    const token = decryptSecret(intg.meta_access_token);
+    const adAccount = normalizeAdAccount(intg.meta_ad_account_id);
+    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt in de koppelingen' });
+    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt in de koppelingen' });
+    if (!intg.meta_page_id) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen' });
+
+    // Creatief-beeld ophalen
+    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding voor de advertentie' });
+    const asset = await withReadConnection(async (c) => (await c.query(
+      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+      [b.assetId, okClient, wsId]
+    )).rows[0]);
+    if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
+    if (asset.resource_type === 'video') return res.status(400).json({ error: 'Video-advertenties komen later. Kies voor nu een afbeelding.' });
+
+    // 1) Campagne (PAUSED)
+    const campaign = await graphPost(`${adAccount}/campaigns`, {
+      name, objective, status: 'PAUSED', special_ad_categories: '[]', access_token: token,
+    });
+    // 2) Advertentieset (PAUSED)
+    const targeting = JSON.stringify({ geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax });
+    const adsetParams = {
+      name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
+      billing_event: 'IMPRESSIONS', optimization_goal: CAMPAIGN_OBJECTIVES[objective],
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP', targeting, status: 'PAUSED',
+      start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
+    };
+    const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
+    // 3) Creatief (afbeelding-link-advertentie)
+    const storySpec = JSON.stringify({
+      page_id: intg.meta_page_id,
+      link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
+    });
+    const creative = await graphPost(`${adAccount}/adcreatives`, {
+      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
+    });
+    // 4) Advertentie (PAUSED)
+    const ad = await graphPost(`${adAccount}/ads`, {
+      name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
+      status: 'PAUSED', access_token: token,
+    });
+
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.campaigns
+         (workspace_id, client_id, name, objective, daily_budget_cents, status, meta_campaign_id, meta_adset_id, meta_creative_id, meta_ad_id, asset_id, link, created_by)
+       VALUES ($1,$2,$3,$4,$5,'PAUSED',$6,$7,$8,$9,$10,$11,$12)
+       RETURNING id, name, objective, daily_budget_cents, status, meta_campaign_id, link, created_at`,
+      [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
+    )).rows[0]);
+    res.json({ success: true, campaign: row });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
