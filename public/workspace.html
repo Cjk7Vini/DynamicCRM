@@ -434,6 +434,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
         </div>
         <div id="dReport" style="display:none">
+          <div class="section-h">
+            <span class="pill">Rapportage</span>
+            <button class="btn btn-primary" onclick="openReportPdf()">Rapport openen (PDF)</button>
+          </div>
           <div id="reportMsg" class="inline-msg"></div>
           <div id="reportBody"><div class="empty">Laden...</div></div>
         </div>
@@ -885,6 +889,7 @@ async function delAsset(id){
 }
 
 // ---- Rapportage ----
+function openReportPdf(){ if(CURRENT_CLIENT) window.open('/report.html?client='+CURRENT_CLIENT.id,'_blank'); }
 async function loadReport(){
   if(!CURRENT_CLIENT)return; var body=document.getElementById('reportBody'); hideMsg('reportMsg');
   body.innerHTML='<div class="empty">Laden...</div>';

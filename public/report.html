@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapportage - Marketing Studio</title>
+<style>
+:root{--ink:#1a1d27;--mid:#565b6b;--muted:#8a8f9e;--line:#e5e7ee;--soft:#f6f7fa;--brand:#6366f1;}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;background:#eceef3;color:var(--ink);line-height:1.55}
+.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.bar .t{font-size:14px;color:var(--mid)}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:650;cursor:pointer;font-family:inherit}
+.btn-print{background:var(--brand);color:#fff}
+.page{max-width:820px;margin:24px auto;background:#fff;padding:48px 52px;box-shadow:0 6px 30px rgba(0,0,0,.10);border-radius:6px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--brand);padding-bottom:20px;margin-bottom:28px}
+.head .badge{width:54px;height:54px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px}
+.head h1{font-size:26px;letter-spacing:-.02em}
+.head .sub{color:var(--muted);font-size:13px;margin-top:4px}
+.head .right{text-align:right;font-size:12px;color:var(--muted)}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin:30px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid.g3{grid-template-columns:repeat(3,1fr)}
+.grid.g2{grid-template-columns:repeat(2,1fr)}
+.kpi{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .k{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:24px;font-weight:800;margin-top:5px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.row img{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--soft);flex-shrink:0}
+.row .m{min-width:0;flex:1}
+.row .m h4{font-size:14px;margin-bottom:2px}
+.row .m .s{font-size:12px;color:var(--muted)}
+.chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--soft);color:var(--mid)}
+.note{color:var(--muted);font-size:12px;margin-top:8px}
+.foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:11px}
+.empty{color:var(--muted);font-size:13px;padding:10px 0}
+@media print{
+  body{background:#fff}
+  .bar{display:none}
+  .page{box-shadow:none;margin:0;max-width:none;padding:0 10px}
+  h2{break-after:avoid}
+  .row,.kpi{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="t">Rapportage</div>
+  <button class="btn btn-print" onclick="window.print()">Download als PDF</button>
+</div>
+<div class="page" id="page"><div class="empty" style="padding:40px">Rapport laden...</div></div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
+function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
+function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function num(v){return v!=null?v:'-';}
+function param(k){var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):'';}
+var CID=param('client');
+
+function kpi(k,v){return '<div class="kpi"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>';}
+
+async function jget(url){try{var r=await fetch(url,{credentials:'include'});if(!r.ok)return null;return await r.json();}catch(e){return null;}}
+
+async function build(){
+  var page=document.getElementById('page');
+  if(!CID){page.innerHTML='<div class="empty" style="padding:40px">Geen klant opgegeven.</div>';return;}
+  var cd=await jget('/api/mkt/clients/'+CID);
+  if(!cd||!cd.success){page.innerHTML='<div class="empty" style="padding:40px">Kon dit rapport niet laden. Ben je ingelogd?</div>';return;}
+  var c=cd.client, col=c.brand_color||'#6366f1';
+  document.documentElement.style.setProperty('--brand',col);
+
+  var stats=await jget('/api/mkt/clients/'+CID+'/stats');
+  var meta=await jget('/api/mkt/clients/'+CID+'/meta-insights');
+  var camps=await jget('/api/mkt/clients/'+CID+'/meta-campaigns');
+
+  var html='';
+  html+='<div class="head"><div style="display:flex;gap:16px;align-items:center">'+
+    '<div class="badge" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
+    '<div><h1>'+esc(c.name)+'</h1><div class="sub">Marketingrapportage</div></div></div>'+
+    '<div class="right">Gegenereerd op<br>'+esc(new Date().toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}))+'</div></div>';
+
+  // Content + goedkeuringen + assets
+  if(stats&&stats.success){
+    var p=stats.stats.posts, a=stats.stats.assets;
+    html+='<h2>Content</h2><div class="grid">'+kpi('Posts totaal',p.total)+kpi('Ingepland',p.scheduled)+kpi('Gepubliceerd',p.published)+kpi('Nog te komen',p.upcoming)+'</div>';
+    html+='<h2>Goedkeuringen</h2><div class="grid g3">'+kpi('Wacht op klant',p.pending)+kpi('Goedgekeurd',p.approved)+kpi('Wijzigingen',p.changes)+'</div>';
+    var mb=(Number(a.bytes)||0)/1048576;
+    html+='<h2>Assets</h2><div class="grid g3">'+kpi('Bestanden',a.total)+kpi('Video\'s',a.videos)+kpi('Opslag',mb.toFixed(1)+' MB')+'</div>';
+  }
+
+  // Meta account + top posts
+  if(meta&&meta.success&&meta.configured){
+    if(meta.account){
+      html+='<h2>Instagram</h2><div class="grid g3">'+kpi('Volgers',num(meta.account.followers))+kpi('Berichten',num(meta.account.media))+kpi('Account',meta.account.username?('@'+meta.account.username):'-')+'</div>';
+    }
+    if(meta.topPosts&&meta.topPosts.length){
+      html+='<h2>Best presterende posts</h2>';
+      html+=meta.topPosts.map(function(t){
+        var img=t.thumb?('<img src="'+esc(t.thumb)+'" alt="">'):'<img alt="">';
+        return '<div class="row">'+img+'<div class="m"><h4>'+esc(t.caption||'(geen tekst)')+'</h4><div class="s">'+esc(fmtWhen(t.timestamp))+'</div></div><span class="chip">'+esc(t.likes)+' likes · '+esc(t.comments)+' reacties</span></div>';
+      }).join('');
+    }
+    if(meta.ads&&!meta.ads.empty){
+      html+='<h2>Advertenties (laatste 30 dagen)</h2><div class="grid g3">'+kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',num(meta.ads.impressions))+kpi('Bereik',num(meta.ads.reach))+kpi('Klikken',num(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc))+'</div>';
+    }
+  }
+
+  // Campagnes
+  if(camps&&camps.success&&camps.configured&&camps.campaigns&&camps.campaigns.length){
+    html+='<h2>Campagnes op Meta</h2>';
+    html+=camps.campaigns.map(function(c2){
+      var b=c2.budget!=null?(' · € '+c2.budget.toFixed(2)+'/'+(c2.budget_type||'')):'';
+      var st=(c2.spend!=null)?('<span class="chip">€ '+num(c2.spend)+' · '+num(c2.clicks)+' klikken</span>'):'';
+      return '<div class="row"><div class="m"><h4>'+esc(c2.name)+'</h4><div class="s">'+esc(c2.objective||'')+' · '+esc(c2.status||'')+b+'</div></div>'+st+'</div>';
+    }).join('');
+  }
+
+  html+='<div class="foot">Marketing Studio · Powered by Dynamic Health Consultancy</div>';
+  page.innerHTML=html;
+}
+build();
+</script>
+</body>
+</html>
