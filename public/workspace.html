@@ -412,6 +412,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               <div class="field"><label>Ad Account ID</label><input id="int_meta_ad_account_id" placeholder="act_1234567890"></div>
             </div>
             <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
+            <div class="row2">
+              <div class="field"><label>Meta App ID</label><input id="int_meta_app_id" placeholder="Voor het verlengen van het token"></div>
+              <div class="field"><label>Meta App Secret</label><input id="int_meta_app_secret" type="password"></div>
+            </div>
+            <div style="margin:-2px 0 4px"><button class="btn btn-ghost" onclick="extendMetaToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button>
+              <span id="extendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
 
             <div class="nav-label" style="padding-left:0;margin-top:10px">Google</div>
             <div class="row2">
@@ -970,8 +976,17 @@ async function loadMetaInsights(){
 }
 
 // ---- Koppelingen (integraties) ----
-var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
-var INT_SECRET=['meta_access_token','google_ads_developer_token','tiktok_access_token'];
+var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','meta_app_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
+var INT_SECRET=['meta_access_token','meta_app_secret','google_ads_developer_token','tiktok_access_token'];
+async function extendMetaToken(){
+  if(!CURRENT_CLIENT)return; var el=document.getElementById('extendMsg'); el.textContent='Bezig...'; el.style.color='var(--muted)';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/extend-token',{method:'POST',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){el.style.color='var(--ok)';el.textContent='Gelukt: token is nu ~'+d.days+' dagen geldig.';loadIntegrations();}
+    else {el.style.color='var(--err)';el.textContent=d.error||'Verlengen mislukt.';}
+  }catch(e){el.style.color='var(--err)';el.textContent='Netwerkfout.';}
+}
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
   try{

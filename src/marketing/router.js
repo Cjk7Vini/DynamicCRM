@@ -894,8 +894,8 @@ router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
 // Eén rij per klant. Gevoelige tokens worden versleuteld opgeslagen en
 // nooit volledig teruggegeven (alleen gemaskeerd).
 // =======================================================================
-const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
-const INT_SECRET = ['meta_access_token', 'google_ads_developer_token', 'tiktok_access_token'];
+const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'meta_app_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
+const INT_SECRET = ['meta_access_token', 'meta_app_secret', 'google_ads_developer_token', 'tiktok_access_token'];
 
 function integrationsView(row) {
   const out = {};
@@ -1531,5 +1531,40 @@ if (!global.__mktScheduler) {
   global.__mktScheduler = setInterval(runScheduler, 60 * 1000);
   setTimeout(runScheduler, 20 * 1000);
 }
+
+// =======================================================================
+// STAP 13 - LANGLEVEND META-TOKEN (kort token omruilen naar ~60 dagen)
+// Nodig voor geplande posts: het opgeslagen token moet nog geldig zijn op
+// het moment van publiceren. Vereist Meta App ID + App Secret in Koppelingen.
+// =======================================================================
+router.post('/api/mkt/clients/:clientId/meta/extend-token', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const intg = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld' });
+    const appId = intg.meta_app_id;
+    const appSecret = decryptSecret(intg.meta_app_secret);
+    const shortTok = decryptSecret(intg.meta_access_token);
+    if (!appId || !appSecret) return res.status(400).json({ error: 'Vul eerst Meta App ID en App Secret in bij de koppelingen' });
+    if (!shortTok) return res.status(400).json({ error: 'Er is nog geen access token ingevuld om te verlengen' });
+
+    const r = await graphGet('oauth/access_token', {
+      grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: shortTok,
+    });
+    if (!r.access_token) return res.status(400).json({ error: 'Meta gaf geen langlevend token terug' });
+    await withWriteConnection(async (c) => c.query(
+      'UPDATE marketing.client_integrations SET meta_access_token=$1, updated_at=now() WHERE client_id=$2 AND workspace_id=$3',
+      [encryptSecret(r.access_token), okClient, wsId]
+    ));
+    const days = r.expires_in ? Math.round(r.expires_in / 86400) : 60;
+    res.json({ success: true, days });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
 
 export default router;
