@@ -112,6 +112,34 @@
             stroke-linejoin: round;
         }
 
+        /* Tijdelijke aanbieding: opvallend blok in de huisstijl. */
+        .promo-block {
+            background: #fff;
+            border: 2px solid var(--magenta);
+            border-radius: 10px;
+            padding: 20px 22px;
+            margin-bottom: 28px;
+            position: relative;
+        }
+        .promo-badge {
+            display: inline-block;
+            background: var(--magenta);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        .promo-text {
+            font-size: 14px;
+            color: var(--text-dark);
+            line-height: 1.65;
+        }
+        .promo-text strong { color: var(--magenta); }
+
         .form-group { margin-bottom: 18px; }
 
         label {
@@ -338,21 +366,25 @@
                 <div class="benefit-icon">
                     <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
                 </div>
-                <span>Gratis en vrijblijvende kennismaking</span>
+                <span>Gratis vrijblijvende kennismaking, rondleiding en uitleg over het concept</span>
             </div>
             <div class="benefit-item">
                 <div class="benefit-icon">
                     <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
                 </div>
-                <span>Persoonlijk advies over jouw huidige fitheid en doelen</span>
-            </div>
-            <div class="benefit-item">
-                <div class="benefit-icon">
-                    <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
-                </div>
-                <span>Ontdek hoe SMC Tilburg bij jou past</span>
+                <span>Ontdek hoe het SMC Health Membership bij jou past</span>
             </div>
         </div>
+    </div>
+
+    <div class="promo-block">
+        <div class="promo-badge">Tijdelijke aanbieding</div>
+        <p class="promo-text">
+            Schrijf je vóór <strong>1 oktober</strong> in voor het jaarabonnement en jouw persoonlijke intake
+            (t.w.v. <strong>&euro;50</strong>) is <strong>gratis</strong>! Daarnaast krijg je korting op het
+            maandtarief: je betaalt <strong>&euro;56,99</strong> per maand in plaats van &euro;64,99,
+            zolang je je vóór de opening inschrijft.
+        </p>
     </div>
 
     <div id="msg"></div>
