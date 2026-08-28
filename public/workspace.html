@@ -318,12 +318,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div><div class="tt" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)">Klant-space</div><h2 id="dName">Klant</h2></div>
         </div>
         <div class="tabs" id="dTabs">
-          <button class="active" onclick="dTab(this,'info')">Gegevens</button>
+          <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'content')">Content</button>
           <button onclick="dTab(this,'assets')">Assets</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnes</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
-          <button onclick="dTab(this,'report')">Rapportage</button>
+          <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
         <div id="dInfo">
           <div id="dEditMsg" class="inline-msg"></div>
@@ -345,6 +345,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               <button class="btn btn-danger" id="dDeleteBtn" onclick="deleteClient()">Verwijderen</button>
               <button class="btn btn-primary" onclick="saveClient()">Wijzigingen opslaan</button>
             </div>
+          </div>
+          <div class="card" id="clientLoginCard" style="max-width:580px;margin-top:16px">
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px">Klant-login</div>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Geef de klant een eigen inlog. Die ziet alleen de eigen content, kan goedkeuren, wijzigingen vragen en notities plaatsen.</p>
+            <div id="clientLoginMsg" class="inline-msg"></div>
+            <div class="row2">
+              <div class="field"><label>E-mail van de klant</label><input id="clEmail" type="email" placeholder="klant@bedrijf.nl"></div>
+              <div class="field"><label>Wachtwoord</label><input id="clPass" type="text" placeholder="Min. 8 tekens, hoofdletter + cijfer"></div>
+            </div>
+            <div style="text-align:right"><button class="btn btn-ghost" onclick="createClientLogin()">Klant-login aanmaken</button></div>
           </div>
         </div>
         <div id="dContent" style="display:none">
@@ -506,6 +516,20 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: klant-notitie / wijzigingen -->
+<div class="modal-ov" id="clientNoteModal">
+  <div class="modal" style="max-width:460px">
+    <h3 id="cnTitle">Notitie</h3>
+    <div class="sub" id="cnSub">Laat een bericht achter voor je marketeer.</div>
+    <div id="cnMsg" class="inline-msg"></div>
+    <div class="field"><textarea id="cnText" rows="4" placeholder="Typ hier..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeClientNote()">Annuleren</button>
+      <button class="btn btn-primary" id="cnBtn" onclick="submitClientNote()">Versturen</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: publiceren naar Meta -->
 <div class="modal-ov" id="publishModal">
   <div class="modal">
@@ -628,7 +652,29 @@ async function bootstrap(){
   document.getElementById('stSeats').textContent=(ME.max_seats||'-');
   var canManage=ME.role!=='client';
   document.getElementById('topNewClient').style.display=canManage?'':'none';
+  CLIENT_MODE = (ME.role==='client');
+  if(CLIENT_MODE){ enterClientMode(); return; }
   navTo('overzicht');
+}
+var CLIENT_MODE=false;
+async function enterClientMode(){
+  // Verberg alle beheer-navigatie: de klant ziet alleen de eigen content.
+  document.querySelectorAll('.side .nav, .side .nav-label').forEach(function(el){el.style.display='none';});
+  document.getElementById('platformBar').style.display='none';
+  document.getElementById('wsName').textContent=ME.client_name||ME.workspace_name||'Workspace';
+  document.getElementById('wsAva').textContent=initials(ME.client_name||'K');
+  document.getElementById('wsPlan').textContent='Klantportaal';
+  try{
+    var r=await fetch('/api/mkt/clients',{credentials:'include'}); var d=await r.json();
+    var c=(d.clients||[])[0];
+    if(c){ openClient(c.id); }
+    else { document.getElementById('viewClientDetail').innerHTML='<div class="empty"><h4>Geen content</h4><p>Er is nog geen content voor je klaargezet.</p></div>'; navTo('clientDetail'); }
+  }catch(e){}
+}
+function applyClientMode(){
+  ['tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  var back=document.querySelector('#viewClientDetail .back'); if(back)back.style.display='none';
+  var login=document.getElementById('clientLoginCard'); if(login)login.style.display='none';
 }
 function showPicker(email){
   loginView.classList.add('hidden'); appView.classList.add('hidden');
@@ -713,8 +759,15 @@ async function openClient(id){
     var r=await fetch('/api/mkt/clients/'+id,{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){alert(d.error||'Kon klant niet laden.');return;}
     CURRENT_CLIENT=d.client; renderClientDetail(d.client); navTo('clientDetail');
-    document.querySelectorAll('#dTabs button').forEach(function(b,i){b.classList.toggle('active',i===0);});
-    dTabShow('info');
+    if(CLIENT_MODE){
+      applyClientMode();
+      document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});
+      var ct=document.querySelector('#dTabs button[onclick*="content"]'); if(ct)ct.classList.add('active');
+      dTabShow('content');
+    } else {
+      document.querySelectorAll('#dTabs button').forEach(function(b,i){b.classList.toggle('active',i===0);});
+      dTabShow('info');
+    }
   }catch(e){alert('Netwerkfout.');}
 }
 function renderClientDetail(c){
@@ -1115,7 +1168,18 @@ async function loadPosts(){
         '<button class="icon-btn" title="Bewerken" onclick=\'openEditPost('+p.id+')\'><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></button>'+
         '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'+
         '</div>'):'';
-      var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">Klantfeedback: '+esc(p.approval_note)+'</div>'):'';
+      // Klant-modus: goedkeuren / wijzigingen / notitie.
+      var clientActs='';
+      if(CLIENT_MODE){
+        var apprBtns=(p.approval==='pending')?(
+          '<button class="btn btn-primary" style="padding:7px 12px;font-size:12.5px" onclick="clientDecide('+p.id+',\'approved\')">Goedkeuren</button>'+
+          '<button class="btn btn-danger" style="padding:7px 12px;font-size:12.5px" onclick="clientChanges('+p.id+')">Wijzigingen vragen</button>'):'';
+        clientActs='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+apprBtns+
+          '<button class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px" onclick="clientNoteOpen('+p.id+')">Notitie</button></div>';
+      }
+      var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">'+(CLIENT_MODE?'Jouw feedback: ':'Klantfeedback: ')+esc(p.approval_note)+'</div>'):'';
+      if(p.client_note){ note+='<div class="cap" style="margin-top:6px;color:var(--accent-2)">'+(CLIENT_MODE?'Jouw notitie: ':'Notitie klant: ')+esc(p.client_note)+'</div>'; }
+      note+=clientActs;
       var thumb='';
       if(p.asset_url){
         thumb=(p.asset_type==='video')
@@ -1182,6 +1246,49 @@ async function delPost(id){
     var r=await fetch('/api/mkt/posts/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
     if(r.ok&&d.success){loadPosts();} else {showMsg('postsMsg',false,d.error||'Verwijderen mislukt.');}
   }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
+}
+
+// ---- Klant-acties (klant-modus) ----
+var CN_STATE={mode:'note',postId:null};
+async function clientDecide(id,decision){
+  if(decision==='approved'&&!confirm('Deze content goedkeuren?'))return;
+  try{
+    var r=await fetch('/api/mkt/posts/'+id+'/client-decision',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({decision:decision})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadPosts();} else {showMsg('postsMsg',false,d.error||'Actie mislukt.');}
+  }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
+}
+function clientChanges(id){CN_STATE={mode:'changes',postId:id};document.getElementById('cnTitle').textContent='Wijzigingen vragen';document.getElementById('cnSub').textContent='Beschrijf wat er anders moet. De marketeer ziet dit direct.';openClientNote();}
+function clientNoteOpen(id){CN_STATE={mode:'note',postId:id};document.getElementById('cnTitle').textContent='Notitie';document.getElementById('cnSub').textContent='Laat een bericht achter voor je marketeer.';openClientNote();}
+function openClientNote(){hideMsg('cnMsg');document.getElementById('cnText').value='';document.getElementById('clientNoteModal').classList.add('open');document.getElementById('cnText').focus();}
+function closeClientNote(){document.getElementById('clientNoteModal').classList.remove('open');}
+async function submitClientNote(){
+  var btn=document.getElementById('cnBtn'); hideMsg('cnMsg');
+  var text=document.getElementById('cnText').value.trim();
+  if(CN_STATE.mode==='changes'&&!text){showMsg('cnMsg',false,'Beschrijf kort wat er anders moet.');return;}
+  btn.disabled=true; btn.textContent='Versturen...';
+  try{
+    var url,payload;
+    if(CN_STATE.mode==='changes'){url='/api/mkt/posts/'+CN_STATE.postId+'/client-decision';payload={decision:'changes',note:text};}
+    else {url='/api/mkt/posts/'+CN_STATE.postId+'/client-note';payload={note:text};}
+    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){closeClientNote();loadPosts();} else {showMsg('cnMsg',false,d.error||'Versturen mislukt.');}
+  }catch(e){showMsg('cnMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Versturen';
+}
+async function createClientLogin(){
+  if(!CURRENT_CLIENT)return; hideMsg('clientLoginMsg');
+  var email=document.getElementById('clEmail').value.trim();
+  var pass=document.getElementById('clPass').value;
+  if(!email||!email.includes('@')){showMsg('clientLoginMsg',false,'Vul een geldig e-mailadres in.');return;}
+  if(pass.length<8){showMsg('clientLoginMsg',false,'Wachtwoord minstens 8 tekens, met hoofdletter en cijfer.');return;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:pass})});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('clientLoginMsg',true,'Klant-login aangemaakt voor '+email+'. Deel de inloglink /workspace.html met de klant.');document.getElementById('clPass').value='';}
+    else {showMsg('clientLoginMsg',false,d.error||'Aanmaken mislukt.');}
+  }catch(e){showMsg('clientLoginMsg',false,'Netwerkfout.');}
 }
 async function saveClient(){
   if(!CURRENT_CLIENT)return; hideMsg('dEditMsg');

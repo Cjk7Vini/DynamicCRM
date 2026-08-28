@@ -398,7 +398,7 @@ router.post('/api/mkt/auth/login', async (req, res) => {
       if (!acc.ws_active) return res.status(403).json({ error: 'Deze workspace is niet actief' });
       if (acc.license_end && new Date(acc.license_end) < new Date())
         return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
-      req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email };
+      req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email, clientId: acc.client_id || null };
       await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
       return req.session.save(() => res.json({
         success: true, platformAdmin: false,
@@ -440,11 +440,13 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
       return res.json({ success: true, platformAdmin: true, email: m.email, workspace });
     }
     const data = await withReadConnection(async (c) => (await c.query(
-      `SELECT a.id, a.email, a.full_name, a.role,
+      `SELECT a.id, a.email, a.full_name, a.role, a.client_id,
+              cl.name AS client_name,
               w.id AS workspace_id, w.name AS workspace_name, w.slug, w.modules,
               w.license_type, w.license_end, w.max_seats, w.max_clients
          FROM marketing.accounts a
          JOIN marketing.workspaces w ON w.id=a.workspace_id
+         LEFT JOIN marketing.clients cl ON cl.id=a.client_id
         WHERE a.id=$1`, [m.accountId]
     )).rows[0]);
     if (!data) { delete req.session.mkt; return res.status(401).json({ error: 'Sessie verlopen' }); }
@@ -485,17 +487,28 @@ router.post('/api/mkt/platform/exit', requireMktPlatform, (req, res) => {
 const CLIENT_STATUS = ['active', 'paused', 'archived'];
 function mktCanManage(req) { const m = req.session?.mkt; return m && (m.platformAdmin || m.role !== 'client'); }
 function mktIsOwnerOrManager(req) { const m = req.session?.mkt; return m && (m.platformAdmin || m.role === 'owner' || m.role === 'manager'); }
+// Een klant-account is opgesloten in de eigen klant-brand.
+function mktClientLocked(req) { const m = req.session?.mkt; return !!(m && m.role === 'client'); }
+function mktLockedClientId(req) { const m = req.session?.mkt; return m ? m.clientId : null; }
+// Geeft true als deze (evt. klant-)gebruiker bij deze klant mag.
+function mktClientAllowed(req, clientId) {
+  if (!mktClientLocked(req)) return true;
+  return String(clientId) === String(mktLockedClientId(req));
+}
 
 // Lijst klanten van de eigen workspace (standaard zonder gearchiveerde).
 router.get('/api/mkt/clients', requireMkt, async (req, res) => {
   try {
     const includeArchived = String(req.query.archived || '') === '1';
+    // Klant-account ziet uitsluitend de eigen klant-brand.
+    const lock = mktClientLocked(req) ? mktLockedClientId(req) : null;
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT id, name, contact_name, contact_email, website, brand_color, status, archived, created_at
          FROM marketing.clients
         WHERE workspace_id = $1 ${includeArchived ? '' : 'AND archived = false'}
+          ${lock ? 'AND id = $2' : ''}
         ORDER BY name ASC`,
-      [req.session.mkt.workspaceId]
+      lock ? [req.session.mkt.workspaceId, lock] : [req.session.mkt.workspaceId]
     )).rows);
     res.json({ success: true, clients: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -531,6 +544,7 @@ router.post('/api/mkt/clients', requireMkt, async (req, res) => {
 // Eén klant ophalen (alleen binnen eigen workspace).
 router.get('/api/mkt/clients/:id', requireMkt, async (req, res) => {
   try {
+    if (!mktClientAllowed(req, req.params.id)) return res.status(403).json({ error: 'Geen toegang' });
     const row = await withReadConnection(async (c) => (await c.query(
       `SELECT * FROM marketing.clients WHERE id=$1 AND workspace_id=$2`,
       [req.params.id, req.session.mkt.workspaceId]
@@ -597,18 +611,22 @@ async function clientInWorkspace(clientId, wsId) {
 router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
   try {
     const wsId = req.session.mkt.workspaceId;
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const status = String(req.query.status || '');
     const filterStatus = POST_STATUS.includes(status) ? status : null;
+    // Klant-account ziet alleen wat gedeeld is (ter goedkeuring, goedgekeurd of wijzigingen).
+    const clientOnly = mktClientLocked(req);
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
-              p.approval, p.approval_note, p.approval_at, p.created_at, p.updated_at,
+              p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
          LEFT JOIN marketing.assets a ON a.id = p.asset_id
         WHERE p.workspace_id=$1 AND p.client_id=$2
           ${filterStatus ? 'AND p.status=$3' : ''}
+          ${clientOnly ? "AND p.approval <> 'none'" : ''}
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
@@ -729,6 +747,7 @@ const assetUploadParser = express.json({ limit: '12mb' });
 router.get('/api/mkt/clients/:clientId/assets', requireMkt, async (req, res) => {
   try {
     const wsId = req.session.mkt.workspaceId;
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const rows = await withReadConnection(async (c) => (await c.query(
@@ -1375,6 +1394,74 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     }
 
     res.json({ success: true, ...out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
+// STAP 11 - KLANT-LOGIN (klant ziet eigen content, keurt goed, laat notitie na)
+// =======================================================================
+
+// Marketeer maakt een klant-login aan voor een specifieke klant.
+router.post('/api/mkt/clients/:clientId/login', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan een klant-login aanmaken' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const { email, password, full_name } = req.body || {};
+    const em = String(email || '').toLowerCase().trim();
+    if (!em || !em.includes('@')) return res.status(400).json({ error: 'Geldig e-mailadres verplicht' });
+    if (!password || password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
+    }
+    const dup = await withReadConnection(async (c) => (await c.query('SELECT 1 FROM marketing.accounts WHERE email=$1', [em])).rows[0]);
+    if (dup) return res.status(409).json({ error: 'Er bestaat al een account met dit e-mailadres' });
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role, client_id, active)
+       VALUES ($1,$2,$3,$4,'client',$5,true)
+       RETURNING id, email, full_name, role`,
+      [wsId, em, hash, (full_name && String(full_name).trim()) || null, okClient]
+    )).rows[0]);
+    res.json({ success: true, account: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Klant keurt een eigen post goed of vraagt wijzigingen (ingelogd).
+router.post('/api/mkt/posts/:id/client-decision', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientLocked(req)) return res.status(403).json({ error: 'Alleen een klant-account' });
+    const { decision, note } = req.body || {};
+    if (decision !== 'approved' && decision !== 'changes') return res.status(400).json({ error: 'Ongeldige keuze' });
+    const wsId = req.session.mkt.workspaceId;
+    const cid = mktLockedClientId(req);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.content_posts
+          SET approval=$1, approval_note=$2, approval_at=now(), updated_at=now()
+        WHERE id=$3 AND workspace_id=$4 AND client_id=$5 AND approval <> 'none'
+       RETURNING id, approval, approval_note`,
+      [decision, (note && String(note).trim().slice(0, 1000)) || null, req.params.id, wsId, cid]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true, post: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Klant laat een vrije notitie achter bij een eigen post.
+router.post('/api/mkt/posts/:id/client-note', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientLocked(req)) return res.status(403).json({ error: 'Alleen een klant-account' });
+    const wsId = req.session.mkt.workspaceId;
+    const cid = mktLockedClientId(req);
+    const note = (req.body && req.body.note != null) ? String(req.body.note).trim().slice(0, 1000) : '';
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.content_posts SET client_note=$1, updated_at=now()
+        WHERE id=$2 AND workspace_id=$3 AND client_id=$4
+       RETURNING id, client_note`,
+      [note || null, req.params.id, wsId, cid]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
