@@ -588,6 +588,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
+    <div class="field" style="background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin:0">
+        <input type="checkbox" id="pfAuto" style="width:auto" onchange="document.getElementById('pfAutoCh').style.display=this.checked?'block':'none'">
+        <span>Automatisch publiceren op het geplande tijdstip</span>
+      </label>
+      <div id="pfAutoCh" style="display:none;margin-top:10px">
+        <label style="margin-bottom:6px">Naar welk kanaal?</label>
+        <select id="pfPublishChannel"><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">Vereist een gekoppeld account en een beeld (voor Instagram). Post gaat automatisch de deur uit.</div>
+      </div>
+    </div>
     <div class="field"><label>Beeld (afbeelding of video)</label>
       <select id="pfAsset"><option value="">Geen beeld</option></select>
       <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
@@ -1163,6 +1174,9 @@ async function loadPosts(){
     body.innerHTML='<div class="post-list">'+d.posts.map(function(p){
       var when=p.scheduled_at?('<span class="when">'+esc(fmtWhen(p.scheduled_at))+'</span>'):'';
       var appBadge=approvalBadge(p.approval);
+      var autoBadge='';
+      if(p.published_at){autoBadge='<span class="status published">Auto-gepubliceerd</span>';}
+      else if(p.auto_publish){autoBadge='<span class="status scheduled">Auto: '+esc((p.publish_channel==='facebook')?'Facebook':'Instagram')+'</span>';}
       var appBtn='';
       if(canManage){
         if(p.approval==='none'){appBtn='<button class="icon-btn" title="Ter goedkeuring sturen" onclick="setApproval('+p.id+',\'pending\')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>';}
@@ -1184,6 +1198,7 @@ async function loadPosts(){
       }
       var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">'+(CLIENT_MODE?'Jouw feedback: ':'Klantfeedback: ')+esc(p.approval_note)+'</div>'):'';
       if(p.client_note){ note+='<div class="cap" style="margin-top:6px;color:var(--accent-2)">'+(CLIENT_MODE?'Jouw notitie: ':'Notitie klant: ')+esc(p.client_note)+'</div>'; }
+      if(!CLIENT_MODE&&p.publish_error){ note+='<div class="cap" style="margin-top:6px;color:var(--warn)">Auto-publiceren mislukt: '+esc(p.publish_error)+'</div>'; }
       note+=clientActs;
       var thumb='';
       if(p.asset_url){
@@ -1194,7 +1209,7 @@ async function loadPosts(){
       return '<div class="post-row">'+thumb+'<div class="post-main"><h5>'+esc(p.title)+'</h5>'+
         (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
         '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
-        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+when+'</div>'+note+'</div>'+acts+'</div>';
+        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+autoBadge+when+'</div>'+note+'</div>'+acts+'</div>';
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
@@ -1211,6 +1226,7 @@ function openNewPost(){
   document.getElementById('pfTitle').value='';document.getElementById('pfBody').value='';
   document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
   document.getElementById('pfWhen').value='';
+  document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   fillPostAssetSelect('');
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
 }
@@ -1224,6 +1240,7 @@ function openEditPost(id){
     document.getElementById('pfTitle').value=p.title||'';document.getElementById('pfBody').value=p.body||'';
     document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
+    document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     fillPostAssetSelect(p.asset_id||'');
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
   });
@@ -1234,7 +1251,9 @@ async function savePost(){
   var title=document.getElementById('pfTitle').value.trim();
   if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
   var when=document.getElementById('pfWhen').value;
-  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||''};
+  var auto=document.getElementById('pfAuto').checked;
+  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value};
+  if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
     var url=EDIT_POST?('/api/mkt/posts/'+EDIT_POST.id):('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts');

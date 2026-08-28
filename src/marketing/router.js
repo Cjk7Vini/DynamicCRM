@@ -621,6 +621,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
+              p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
          LEFT JOIN marketing.assets a ON a.id = p.asset_id
@@ -642,7 +643,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const { title, body, channel, status, scheduled_at, asset_id } = req.body || {};
+    const { title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'Titel is verplicht' });
     const ch = POST_CHANNELS.includes(channel) ? channel : 'other';
     const st = POST_STATUS.includes(status) ? status : 'idea';
@@ -660,11 +661,13 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
       )).rows[0]);
       if (ok) assetId = ok.id;
     }
+    const autoPub = auto_publish === true && !!when;
+    const pubCh = (publish_channel === 'facebook') ? 'facebook' : 'instagram';
     const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, approval, approval_note, approval_at, created_at, updated_at`,
-      [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, req.session.mkt.accountId || null]
+      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, approval, approval_note, approval_at, created_at, updated_at`,
+      [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -709,13 +712,22 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
         if (ok) { sets.push(`asset_id=$${i++}`); vals.push(ok.id); }
       }
     }
+    if (b.publish_channel !== undefined && (b.publish_channel === 'instagram' || b.publish_channel === 'facebook')) {
+      sets.push(`publish_channel=$${i++}`); vals.push(b.publish_channel);
+    }
+    // Automatisch publiceren aan/uit. Bij aanzetten: teller en status resetten zodat de planner opnieuw kan afvuren.
+    if (b.auto_publish !== undefined) {
+      const on = b.auto_publish === true;
+      sets.push(`auto_publish=$${i++}`); vals.push(on);
+      if (on) { sets.push(`publish_attempts=0`); sets.push(`published_at=NULL`); sets.push(`publish_error=NULL`); }
+    }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     sets.push(`updated_at=now()`);
     vals.push(req.params.id, wsId);
     const row = await withWriteConnection(async (c) => (await c.query(
       `UPDATE marketing.content_posts SET ${sets.join(', ')}
         WHERE id=$${i++} AND workspace_id=$${i}
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, approval, approval_note, approval_at, created_at, updated_at`, vals
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, published_at, publish_error, approval, approval_note, approval_at, created_at, updated_at`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
     res.json({ success: true, post: row });
@@ -966,6 +978,43 @@ async function graphGet(pathAndId, params) {
   return j;
 }
 
+// Publiceert naar Meta. Gebruikt door de handmatige knop en de planner.
+// Gooit een fout met een leesbare melding als er iets misgaat.
+async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption) {
+  const cap = (caption != null) ? String(caption) : '';
+  if (channel === 'instagram') {
+    if (!intg.meta_ig_user_id) throw new Error('Instagram user ID ontbreekt in de koppelingen');
+    if (!mediaUrl) throw new Error('Instagram vereist een afbeelding of video');
+    const igId = intg.meta_ig_user_id;
+    const createParams = mediaType === 'video'
+      ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: token }
+      : { image_url: mediaUrl, caption: cap, access_token: token };
+    const created = await graphPost(`${igId}/media`, createParams);
+    if (mediaType === 'video') {
+      let ready = false;
+      for (let i = 0; i < 20 && !ready; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const st = await graphGet(`${created.id}`, { fields: 'status_code', access_token: token });
+        if (st.status_code === 'FINISHED') ready = true;
+        else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
+      }
+      if (!ready) throw new Error('Video-verwerking duurt te lang');
+    }
+    const pub = await graphPost(`${igId}/media_publish`, { creation_id: created.id, access_token: token });
+    return { id: pub.id, channel: 'instagram' };
+  }
+  if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
+  const pageId = intg.meta_page_id;
+  let pageToken = token;
+  try { const pg = await graphGet(`${pageId}`, { fields: 'access_token', access_token: token }); if (pg.access_token) pageToken = pg.access_token; } catch (_) { /* val terug op het meegegeven token */ }
+  if (mediaUrl && mediaType === 'image') {
+    const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
+    return { id: pub.post_id || pub.id, channel: 'facebook' };
+  }
+  const pub = await graphPost(`${pageId}/feed`, { message: cap, access_token: pageToken });
+  return { id: pub.id, channel: 'facebook' };
+}
+
 router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) => {
   try {
     if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om te publiceren' });
@@ -997,47 +1046,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     }
     const cap = (caption != null) ? String(caption) : '';
 
-    let result = {};
-    if (channel === 'instagram') {
-      if (!intg.meta_ig_user_id) return res.status(400).json({ error: 'Instagram user ID ontbreekt in de koppelingen' });
-      if (!mediaUrl) return res.status(400).json({ error: 'Instagram vereist een afbeelding of video. Kies een bestand.' });
-      const igId = intg.meta_ig_user_id;
-      // 1) media-container aanmaken
-      const createParams = mediaType === 'video'
-        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: token }
-        : { image_url: mediaUrl, caption: cap, access_token: token };
-      const created = await graphPost(`${igId}/media`, createParams);
-      // 2) video-container moet klaar zijn voor publish
-      if (mediaType === 'video') {
-        let ready = false;
-        for (let i = 0; i < 20 && !ready; i++) {
-          await new Promise((r) => setTimeout(r, 3000));
-          const st = await graphGet(`${created.id}`, { fields: 'status_code', access_token: token });
-          if (st.status_code === 'FINISHED') ready = true;
-          else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
-        }
-        if (!ready) throw new Error('Video-verwerking duurt te lang, probeer het later opnieuw');
-      }
-      // 3) publiceren
-      const pub = await graphPost(`${igId}/media_publish`, { creation_id: created.id, access_token: token });
-      result = { id: pub.id, channel: 'instagram' };
-    } else {
-      if (!intg.meta_page_id) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen' });
-      const pageId = intg.meta_page_id;
-      // Pagina-token ophalen via het gebruikers-token.
-      let pageToken = token;
-      try {
-        const pg = await graphGet(`${pageId}`, { fields: 'access_token', access_token: token });
-        if (pg.access_token) pageToken = pg.access_token;
-      } catch (_) { /* val terug op het meegegeven token */ }
-      if (mediaUrl && mediaType === 'image') {
-        const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
-        result = { id: pub.post_id || pub.id, channel: 'facebook' };
-      } else {
-        const pub = await graphPost(`${pageId}/feed`, { message: cap, access_token: pageToken });
-        result = { id: pub.id, channel: 'facebook' };
-      }
-    }
+    const result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap);
 
     // Post markeren als gepubliceerd.
     if (postId) {
@@ -1464,5 +1473,63 @@ router.post('/api/mkt/posts/:id/client-note', requireMkt, async (req, res) => {
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// =======================================================================
+// STAP 12 - PLANNER: automatisch posten op het geplande tijdstip
+// Draait in de server, elke minuut. Alleen posts met auto_publish=true en
+// een verstreken scheduled_at worden gepubliceerd. Attempt-limiet + lock.
+// =======================================================================
+let schedulerBusy = false;
+async function runScheduler() {
+  if (schedulerBusy) return;
+  schedulerBusy = true;
+  try {
+    const due = await withReadConnection(async (c) => (await c.query(
+      `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel,
+              a.url AS asset_url, a.resource_type AS asset_type, a.provider AS asset_provider,
+              i.meta_access_token, i.meta_ig_user_id, i.meta_page_id
+         FROM marketing.content_posts p
+         LEFT JOIN marketing.assets a ON a.id = p.asset_id
+         LEFT JOIN marketing.client_integrations i ON i.client_id = p.client_id
+        WHERE p.auto_publish = true AND p.published_at IS NULL
+          AND p.scheduled_at IS NOT NULL AND p.scheduled_at <= now()
+          AND p.publish_attempts < 5
+        ORDER BY p.scheduled_at ASC
+        LIMIT 5`
+    )).rows);
+
+    for (const post of due) {
+      // Direct de poging tellen zodat een mislukking niet oneindig herhaalt.
+      await withWriteConnection(async (c) => c.query(
+        'UPDATE marketing.content_posts SET publish_attempts = publish_attempts + 1 WHERE id=$1', [post.id]
+      ));
+      try {
+        const channel = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
+        const token = decryptSecret(post.meta_access_token);
+        if (!token) throw new Error('Geen Meta access token in de koppelingen');
+        let mediaUrl = null, mediaType = 'image';
+        if (post.asset_url && post.asset_provider === 'cloudinary') {
+          mediaUrl = post.asset_url;
+          mediaType = post.asset_type === 'video' ? 'video' : 'image';
+        }
+        const caption = post.body || post.title || '';
+        await publishToMeta({ meta_ig_user_id: post.meta_ig_user_id, meta_page_id: post.meta_page_id }, token, channel, mediaUrl, mediaType, caption);
+        await withWriteConnection(async (c) => c.query(
+          `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
+        ));
+      } catch (e) {
+        await withWriteConnection(async (c) => c.query(
+          `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [String(e.message).slice(0, 500), post.id]
+        ));
+      }
+    }
+  } catch (_) { /* infrafout: volgende minuut opnieuw */ }
+  finally { schedulerBusy = false; }
+}
+// Start de planner (eenmalig per proces). Eerste run na 20s, daarna elke 60s.
+if (!global.__mktScheduler) {
+  global.__mktScheduler = setInterval(runScheduler, 60 * 1000);
+  setTimeout(runScheduler, 20 * 1000);
+}
 
 export default router;
