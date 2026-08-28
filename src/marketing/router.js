@@ -1235,4 +1235,76 @@ router.post('/api/mkt/portal/:token/decision', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// STAP 9 - META INSIGHTS in de rapportage (organic + ads)
+// Defensief: elk onderdeel apart afgeschermd. Faalt een deel, dan blijft
+// de rest werken en toont dat onderdeel gewoon geen data.
+// =======================================================================
+router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const intg = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    const token = intg ? decryptSecret(intg.meta_access_token) : null;
+    if (!intg || !token) {
+      return res.json({ success: true, configured: false });
+    }
+
+    const out = { configured: true, account: null, topPosts: null, ads: null, errors: {} };
+
+    // --- Instagram account: volgers + aantal media ---
+    if (intg.meta_ig_user_id) {
+      try {
+        const a = await graphGet(`${intg.meta_ig_user_id}`, {
+          fields: 'username,followers_count,media_count', access_token: token,
+        });
+        out.account = { username: a.username || null, followers: a.followers_count ?? null, media: a.media_count ?? null };
+      } catch (e) { out.errors.account = e.message; }
+
+      // --- Recente posts (top op likes) ---
+      try {
+        const m = await graphGet(`${intg.meta_ig_user_id}/media`, {
+          fields: 'caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
+          limit: '12', access_token: token,
+        });
+        const posts = (m.data || []).map((p) => ({
+          caption: (p.caption || '').slice(0, 120),
+          media_type: p.media_type,
+          timestamp: p.timestamp,
+          permalink: p.permalink,
+          likes: p.like_count ?? 0,
+          comments: p.comments_count ?? 0,
+          thumb: p.thumbnail_url || p.media_url || null,
+        }));
+        posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
+        out.topPosts = posts.slice(0, 5);
+      } catch (e) { out.errors.topPosts = e.message; }
+    } else {
+      out.errors.account = 'Geen Instagram user ID ingesteld';
+    }
+
+    // --- Advertentiecijfers (laatste 30 dagen) ---
+    if (intg.meta_ad_account_id) {
+      try {
+        const acct = normalizeAdAccount(intg.meta_ad_account_id);
+        const ins = await graphGet(`${acct}/insights`, {
+          fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
+          date_preset: 'last_30d', access_token: token,
+        });
+        const row = (ins.data && ins.data[0]) || null;
+        out.ads = row ? {
+          spend: row.spend ?? null, impressions: row.impressions ?? null, reach: row.reach ?? null,
+          clicks: row.clicks ?? null, ctr: row.ctr ?? null, cpc: row.cpc ?? null, cpm: row.cpm ?? null,
+        } : { empty: true };
+      } catch (e) { out.errors.ads = e.message; }
+    }
+
+    res.json({ success: true, ...out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;

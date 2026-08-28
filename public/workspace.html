@@ -851,8 +851,53 @@ async function loadReport(){
       '<div class="section-h"><h4>Assets</h4></div>'+
       '<div class="stats">'+tile('Bestanden',a.total,true)+tile('Video\'s',a.videos)+tile('Opslag',mb.toFixed(1)+' MB')+'</div>'+
       next+
-      '<div style="margin-top:20px;font-size:12.5px;color:var(--faint)">Deze cijfers komen uit je eigen workspace. Statistieken van Meta en Google Ads (bereik, klikken, kosten) komen erbij zodra de platform-koppelingen live zijn.</div>';
+      '<div id="metaReport" style="margin-top:26px"><div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Meta-cijfers laden...</div></div>';
+    loadMetaInsights();
   }catch(e){body.innerHTML='';showMsg('reportMsg',false,'Netwerkfout.');}
+}
+async function loadMetaInsights(){
+  var box=document.getElementById('metaReport'); if(!box)return;
+  function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Kon Meta-cijfers niet laden.</div>';return;}
+    if(!d.configured){
+      box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Nog geen Meta-koppeling ingesteld. Vul in de Koppelingen-tab het access token en Instagram user ID in om cijfers te zien.</div>';
+      return;
+    }
+    var html='';
+    // Account
+    html+='<div class="section-h"><h4>Meta (Instagram)</h4></div>';
+    if(d.account){
+      html+='<div class="stats">'+tile('Volgers',d.account.followers!=null?d.account.followers:'-',true)+tile('Berichten',d.account.media!=null?d.account.media:'-')+(d.account.username?tile('Account','@'+d.account.username):'')+'</div>';
+    } else {
+      html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
+    }
+    // Top posts
+    if(d.topPosts&&d.topPosts.length){
+      html+='<div class="section-h" style="margin-top:16px"><h4>Best presterende posts</h4></div><div class="post-list">';
+      html+=d.topPosts.map(function(p){
+        var t=p.thumb?('<img class="post-thumb" src="'+esc(p.thumb)+'" alt="">'):'';
+        var when=p.timestamp?('<span class="when">'+esc(fmtWhen(p.timestamp))+'</span>'):'';
+        var link=p.permalink?(' · <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2)">bekijk</a>'):'';
+        return '<div class="post-row">'+t+'<div class="post-main"><h5>'+esc(p.caption||'(geen tekst)')+'</h5>'+
+          '<div class="post-meta"><span class="chan">'+esc(p.likes)+' likes</span><span class="chan">'+esc(p.comments)+' reacties</span>'+when+'</div>'+
+          '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+esc(p.media_type||'')+link+'</div></div></div>';
+      }).join('')+'</div>';
+    }
+    // Ads
+    if(d.ads&&!d.ads.empty){
+      var num=function(v){return v!=null?v:'-';};
+      html+='<div class="section-h" style="margin-top:18px"><h4>Advertenties (laatste 30 dagen)</h4></div>';
+      html+='<div class="stats">'+tile('Uitgaven','€ '+num(d.ads.spend),true)+tile('Impressies',num(d.ads.impressions))+tile('Bereik',num(d.ads.reach))+tile('Klikken',num(d.ads.clicks))+tile('CTR',num(d.ads.ctr)+'%')+tile('CPC','€ '+num(d.ads.cpc))+'</div>';
+    } else if(d.ads&&d.ads.empty){
+      html+='<div class="section-h" style="margin-top:18px"><h4>Advertenties</h4></div><div class="card" style="color:var(--muted);font-size:13px">Geen advertentiedata in de laatste 30 dagen.</div>';
+    }
+    if(d.errors&&d.errors.ads){
+      html+='<div style="margin-top:10px;font-size:12px;color:var(--faint)">Advertentiecijfers niet beschikbaar: '+esc(d.errors.ads)+'</div>';
+    }
+    box.innerHTML=html;
+  }catch(e){box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
 }
 
 // ---- Koppelingen (integraties) ----
