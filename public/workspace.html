@@ -1040,6 +1040,24 @@ async function loadCampaigns(){
     loadMetaCampaigns();
   }catch(e){body.innerHTML='';showMsg('campMsg',false,'Netwerkfout.');}
 }
+async function campStatus(id,status){
+  if(!confirm(status==='PAUSED'?'Campagne pauzeren?':'Campagne activeren? Deze gaat dan geld uitgeven.'))return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+id+'/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadCampaigns();} else {showMsg('campMsg',false,d.error||'Actie mislukt.');}
+  }catch(e){showMsg('campMsg',false,'Netwerkfout.');}
+}
+async function campBudget(id){
+  var v=prompt('Nieuw dagbudget in euro:');
+  if(v===null)return; var n=parseFloat(String(v).replace(',','.'));
+  if(!(n>=1)){showMsg('campMsg',false,'Vul een bedrag van minimaal 1 euro in.');return;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+id+'/budget',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({daily:n})});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('campMsg',true,'Budget aangepast.');loadCampaigns();} else {showMsg('campMsg',false,d.error||'Budget aanpassen mislukt.');}
+  }catch(e){showMsg('campMsg',false,'Netwerkfout.');}
+}
 async function loadMetaCampaigns(){
   var box=document.getElementById('metaCampaigns'); if(!box)return;
   var STAT={ACTIVE:{cls:'approved',txt:'Actief'},PAUSED:{cls:'scheduled',txt:'Gepauzeerd'},ARCHIVED:{cls:'archived',txt:'Gearchiveerd'}};
@@ -1051,11 +1069,19 @@ async function loadMetaCampaigns(){
     if(!d.configured){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Vul in de Koppelingen-tab het access token en Ad Account ID in om de al lopende campagnes te zien.</div>';return;}
     if(d.error){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:13px">Niet beschikbaar: '+esc(d.error)+'</div>';return;}
     if(!d.campaigns.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Geen bestaande campagnes gevonden op dit ad account.</div>';return;}
+    var canManage=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
     box.innerHTML='<div class="section-h"><h4>Live op Meta ('+d.campaigns.length+')</h4></div><div class="post-list">'+d.campaigns.map(function(c){
       var b=c.budget!=null?(' · &euro; '+c.budget.toFixed(2)+'/'+esc(c.budget_type||'')):'';
       var stats=(c.spend!=null||c.impressions!=null)?('<div class="cap" style="margin-top:8px">Laatste 30 dagen: &euro; '+num(c.spend)+' uitgegeven · '+num(c.impressions)+' impressies · '+num(c.clicks)+' klikken · CTR '+num(c.ctr)+'%</div>'):'';
+      var ctrls='';
+      if(canManage){
+        var isActive=(c.status==='ACTIVE');
+        ctrls='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+          '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campStatus(\''+c.id+'\',\''+(isActive?'PAUSED':'ACTIVE')+'\')">'+(isActive?'Pauzeren':'Activeren')+'</button>'+
+          '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campBudget(\''+c.id+'\')">Budget aanpassen</button></div>';
+      }
       return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
-        '<div class="post-meta"><span class="chan">'+esc(c.objective||'')+'</span>'+badge(c.status)+b+'</div>'+stats+'</div></div>';
+        '<div class="post-meta"><span class="chan">'+esc(c.objective||'')+'</span>'+badge(c.status)+b+'</div>'+stats+ctrls+'</div></div>';
     }).join('')+'</div>';
   }catch(e){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het ophalen van Meta-campagnes.</div>';}
 }

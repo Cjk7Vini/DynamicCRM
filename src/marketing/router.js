@@ -1533,6 +1533,55 @@ if (!global.__mktScheduler) {
 }
 
 // =======================================================================
+// STAP 14 - CAMPAGNES BEHEREN op Meta (pauzeren/activeren + budget)
+// Hergebruikt het opgeslagen token. Vereist ads_management in het token.
+// =======================================================================
+async function metaTokenForClient(wsId, clientId) {
+  const intg = await withReadConnection(async (c) => (await c.query(
+    'SELECT meta_access_token FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [clientId, wsId]
+  )).rows[0]);
+  return intg ? decryptSecret(intg.meta_access_token) : null;
+}
+
+// Campagne pauzeren of activeren.
+router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/status', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const status = (req.body && req.body.status === 'ACTIVE') ? 'ACTIVE' : (req.body && req.body.status === 'PAUSED') ? 'PAUSED' : null;
+    if (!status) return res.status(400).json({ error: 'Kies pauzeren of activeren' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.campaignId}`, { status, access_token: token });
+    res.json({ success: true, status });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Dagbudget van een campagne aanpassen (op alle advertentiesets eronder).
+router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/budget', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const euros = Number(req.body && req.body.daily);
+    if (!Number.isFinite(euros) || euros < 1) return res.status(400).json({ error: 'Vul een dagbudget in van minimaal 1 euro' });
+    const cents = String(Math.round(euros * 100));
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const sets = await graphGet(`${req.params.campaignId}/adsets`, { fields: 'id', limit: '50', access_token: token });
+    const ids = (sets.data || []).map((s) => s.id);
+    if (!ids.length) return res.status(400).json({ error: 'Deze campagne heeft geen advertentiesets om het budget op te zetten' });
+    let done = 0;
+    for (const id of ids) { try { await graphPost(`${id}`, { daily_budget: cents, access_token: token }); done++; } catch (_) { /* ga door */ } }
+    if (!done) return res.status(400).json({ error: 'Budget aanpassen is niet gelukt (mogelijk CBO of geen rechten)' });
+    res.json({ success: true, updated: done });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 13 - LANGLEVEND META-TOKEN (kort token omruilen naar ~60 dagen)
 // Nodig voor geplande posts: het opgeslagen token moet nog geldig zijn op
 // het moment van publiceren. Vereist Meta App ID + App Secret in Koppelingen.
