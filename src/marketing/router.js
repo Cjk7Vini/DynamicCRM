@@ -256,8 +256,11 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
       const ws = (await c.query('SELECT * FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0];
       if (!ws) return null;
       const accounts = (await c.query(
-        `SELECT id, email, full_name, role, active, banned, last_login_at, created_at
-           FROM marketing.accounts WHERE workspace_id=$1 ORDER BY (role='owner') DESC, created_at ASC`, [req.params.id]
+        `SELECT a.id, a.email, a.full_name, a.role, a.active, a.banned, a.last_login_at, a.created_at,
+                a.client_id, cl.name AS client_name
+           FROM marketing.accounts a
+           LEFT JOIN marketing.clients cl ON cl.id = a.client_id
+          WHERE a.workspace_id=$1 ORDER BY (a.role='owner') DESC, a.created_at ASC`, [req.params.id]
       )).rows;
       const clients = (await c.query('SELECT COUNT(*)::int AS n FROM marketing.clients WHERE workspace_id=$1', [req.params.id])).rows[0].n;
       return { ws, accounts, clients };
@@ -267,10 +270,46 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Klanten van een workspace incl. koppelingen/ID's en tellingen (voor beheer op afstand).
+router.get('/api/mkt/admin/workspaces/:id/clients', requireDhcAdmin, async (req, res) => {
+  try {
+    const wsId = req.params.id;
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT cl.id, cl.name, cl.contact_name, cl.contact_email, cl.website, cl.brand_color, cl.status,
+              i.meta_page_id, i.meta_ig_user_id, i.meta_pixel_id, i.meta_ad_account_id, i.meta_app_id,
+              i.google_ads_customer_id, i.ga4_measurement_id, i.tiktok_pixel_id, i.notes,
+              i.meta_access_token, i.meta_app_secret, i.google_ads_developer_token, i.tiktok_access_token,
+              (SELECT COUNT(*)::int FROM marketing.campaign_links cll WHERE cll.client_id=cl.id) AS linked_campaigns,
+              (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id) AS posts,
+              (SELECT COUNT(*)::int FROM marketing.assets a WHERE a.client_id=cl.id) AS assets,
+              (SELECT COUNT(*)::int FROM marketing.accounts ac WHERE ac.client_id=cl.id) AS logins
+         FROM marketing.clients cl
+         LEFT JOIN marketing.client_integrations i ON i.client_id = cl.id
+        WHERE cl.workspace_id=$1
+        ORDER BY cl.name ASC`, [wsId]
+    )).rows);
+    // ID's volledig zichtbaar voor de admin; tokens gemaskeerd.
+    const clients = rows.map((r) => ({
+      id: r.id, name: r.name, contact_name: r.contact_name, contact_email: r.contact_email,
+      website: r.website, brand_color: r.brand_color, status: r.status,
+      linked_campaigns: r.linked_campaigns, posts: r.posts, assets: r.assets, logins: r.logins,
+      integrations: {
+        meta_page_id: r.meta_page_id || '', meta_ig_user_id: r.meta_ig_user_id || '',
+        meta_pixel_id: r.meta_pixel_id || '', meta_ad_account_id: r.meta_ad_account_id || '', meta_app_id: r.meta_app_id || '',
+        google_ads_customer_id: r.google_ads_customer_id || '', ga4_measurement_id: r.ga4_measurement_id || '',
+        tiktok_pixel_id: r.tiktok_pixel_id || '', notes: r.notes || '',
+        meta_access_token: maskSecret(r.meta_access_token), meta_app_secret: maskSecret(r.meta_app_secret),
+        google_ads_developer_token: maskSecret(r.google_ads_developer_token), tiktok_access_token: maskSecret(r.tiktok_access_token),
+      },
+    }));
+    res.json({ success: true, clients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Account toevoegen aan een workspace.
 router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, async (req, res) => {
   try {
-    const { email, full_name, role, password } = req.body || {};
+    const { email, full_name, role, password, client_id } = req.body || {};
     const VALID_ROLE = ['owner', 'manager', 'member', 'client'];
     if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord verplicht' });
     if (!validPassword(password)) return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
@@ -278,13 +317,23 @@ router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, async (re
     const em = String(email).toLowerCase().trim();
     const ws = await withReadConnection(async (c) => (await c.query('SELECT id FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0]);
     if (!ws) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    // Klant-login moet aan een klant van deze workspace gekoppeld zijn.
+    let cid = null;
+    if (r === 'client') {
+      if (!client_id) return res.status(400).json({ error: 'Kies een klant om deze klant-login aan te koppelen' });
+      const okc = await withReadConnection(async (c) => (await c.query(
+        'SELECT id FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [client_id, req.params.id]
+      )).rows[0]);
+      if (!okc) return res.status(400).json({ error: 'Gekozen klant hoort niet bij deze workspace' });
+      cid = okc.id;
+    }
     const dup = await withReadConnection(async (c) => (await c.query('SELECT 1 FROM marketing.accounts WHERE email=$1', [em])).rows[0]);
     if (dup) return res.status(400).json({ error: 'Dit e-mailadres bestaat al binnen marketing' });
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id, email, full_name, role, active, banned`,
-      [req.params.id, em, hash, full_name || null, r]
+      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role, client_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, email, full_name, role, active, banned`,
+      [req.params.id, em, hash, full_name || null, r, cid]
     )).rows[0]);
     res.json({ success: true, account: row, temp_password: password });
   } catch (e) { res.status(500).json({ error: e.message }); }

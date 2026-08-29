@@ -287,10 +287,16 @@
       <div><label>Naam</label><input type="text" id="waName"></div>
     </div>
     <div class="form-row">
-      <div><label>Rol</label><select id="waRole"><option value="owner">Eigenaar</option><option value="manager">Manager</option><option value="member" selected>Member</option><option value="client">Client (kijker)</option></select></div>
+      <div><label>Rol</label><select id="waRole" onchange="waRoleChange()"><option value="owner">Eigenaar</option><option value="manager">Manager</option><option value="member" selected>Member</option><option value="client">Client (kijker)</option></select></div>
       <div><label>Wachtwoord</label><div class="password-row"><input type="text" id="waPass" value="Marketing2026!"><button class="btn-gen" onclick="document.getElementById('waPass').value=mktPwd()">Genereer</button></div></div>
     </div>
+    <div class="form-row" id="waClientRow" style="display:none">
+      <div style="flex:1"><label>Koppel aan klant (verplicht voor een client-login)</label><select id="waClient"></select></div>
+    </div>
     <button class="btn btn-primary" onclick="addAccount()" style="margin-top:6px">Account toevoegen</button>
+
+    <div class="ws-sec">Klanten &amp; koppelingen</div>
+    <div id="wsmClientPanel" style="font-size:13px;color:var(--text-3)">Laden...</div>
 
     <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border)">
       <div style="font-weight:700;font-size:13px;color:#991b1b;margin-bottom:8px">Danger zone</div>
@@ -339,10 +345,10 @@
           <div class="form-group" id="roleLabelGroup">
             <label>Functie-rol (rechten in dashboard)</label>
             <select id="roleLabel">
-              <option value="Eigenaar">Eigenaar — volledige toegang</option>
-              <option value="Manager">Manager — volledige toegang</option>
-              <option value="Marketing">Marketing — geen eClub/omzet</option>
-              <option value="Medewerker">Medewerker — geen eClub, geen Meta</option>
+              <option value="Eigenaar">Eigenaar - volledige toegang</option>
+              <option value="Manager">Manager - volledige toegang</option>
+              <option value="Marketing">Marketing - geen eClub/omzet</option>
+              <option value="Medewerker">Medewerker - geen eClub, geen Meta</option>
             </select>
             <div class="form-help">Bepaalt wat dit account ziet. Eigenaar kan rollen van teamleden later zelf aanpassen.</div>
           </div>
@@ -436,11 +442,11 @@
         <div id="createSuccess" style="display:none;">
           <div class="alert alert-success">Account aangemaakt. Welkomstmail is verstuurd.</div>
           <div class="cred-box">
-            <div class="cred-row"><span class="cred-label">E-mail</span><span class="cred-value" id="dispEmail">—</span></div>
-            <div class="cred-row"><span class="cred-label">Wachtwoord</span><span class="cred-value" id="dispPwd">—</span></div>
-            <div class="cred-row"><span class="cred-label">Dashboard licentie</span><span class="cred-value" id="dispLicense">—</span></div>
-            <div class="cred-row" id="dispEndRow"><span class="cred-label">Geldig tot</span><span class="cred-value" id="dispEnd">—</span></div>
-            <div class="cred-row" id="dispNazorgRow" style="display:none;"><span class="cred-label">Nazorg portaal</span><span class="cred-value" id="dispNazorg">—</span></div>
+            <div class="cred-row"><span class="cred-label">E-mail</span><span class="cred-value" id="dispEmail">-</span></div>
+            <div class="cred-row"><span class="cred-label">Wachtwoord</span><span class="cred-value" id="dispPwd">-</span></div>
+            <div class="cred-row"><span class="cred-label">Dashboard licentie</span><span class="cred-value" id="dispLicense">-</span></div>
+            <div class="cred-row" id="dispEndRow"><span class="cred-label">Geldig tot</span><span class="cred-value" id="dispEnd">-</span></div>
+            <div class="cred-row" id="dispNazorgRow" style="display:none;"><span class="cred-label">Nazorg portaal</span><span class="cred-value" id="dispNazorg">-</span></div>
             <div class="cred-warn">Kopieer deze gegevens nu. Het wachtwoord is hierna niet meer zichtbaar.</div>
           </div>
           <button class="btn btn-primary" style="margin-top:14px;" onclick="resetForm()">Nieuw account aanmaken</button>
@@ -595,11 +601,11 @@ document.addEventListener('click', function(e) {
 });
 
 function licenseLabel(type) {
-  return type === '12m' ? '12 maanden' : type === '24m' ? '24 maanden' : type === 'unlimited' ? 'Onbeperkt' : '—';
+  return type === '12m' ? '12 maanden' : type === '24m' ? '24 maanden' : type === 'unlimited' ? 'Onbeperkt' : '-';
 }
 
 function formatDate(d) {
-  if (!d) return '—';
+  if (!d) return '-';
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
@@ -683,7 +689,7 @@ function updateLocatieVelden() {
   for (let i = 0; i < aantal; i++) {
     const div = document.createElement('div');
     div.className = 'form-group';
-    div.innerHTML = `<label>Locatie ${i+1} — praktijkcode</label>
+    div.innerHTML = `<label>Locatie ${i+1} - praktijkcode</label>
       <input type="text" class="locatie-code" placeholder="Bijv. 77C34D" maxlength="10" style="text-transform:uppercase;" value="${bestaand[i]||''}">`;
     container.appendChild(div);
   }
@@ -975,7 +981,7 @@ function renderUsers(users) {
           <div class="user-avatar" style="background:${bgColor};color:${fgColor};">${initials}</div>
           <div>
             <div class="user-email">${u.email}</div>
-            <div class="user-name">${u.praktijk_naam || u.practice_code || (u.role === 'admin' ? 'Admin' : '—')}</div>
+            <div class="user-name">${u.praktijk_naam || u.practice_code || (u.role === 'admin' ? 'Admin' : '-')}</div>
           </div>
         </div>
       </td>
@@ -1022,8 +1028,8 @@ function openUserModal(id) {
     <div class="modal-section-title">Accountinfo</div>
     <div class="modal-info-grid">
       <div class="modal-info-item"><div class="modal-info-label">Rol</div><div class="modal-info-value">${u.role}</div></div>
-      <div class="modal-info-item"><div class="modal-info-label">Praktijkcode</div><div class="modal-info-value">${u.practice_code || u.organisation_codes || '—'}</div></div>
-      <div class="modal-info-item"><div class="modal-info-label">Dashboard</div><div class="modal-info-value">${u.license_type ? licenseLabel(u.license_type) + (u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : '') : '—'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Praktijkcode</div><div class="modal-info-value">${u.practice_code || u.organisation_codes || '-'}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Dashboard</div><div class="modal-info-value">${u.license_type ? licenseLabel(u.license_type) + (u.license_end_date ? ' · tot ' + formatDate(u.license_end_date) : '') : '-'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Nazorg</div><div class="modal-info-value">${u.nazorg_enabled ? (u.nazorg_license_type === 'unlimited' ? 'Onbeperkt' : 'Actief') : 'Niet actief'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Laatst ingelogd</div><div class="modal-info-value">${u.last_login_at ? formatDateTime(u.last_login_at) : 'Nog nooit'}</div></div>
       <div class="modal-info-item"><div class="modal-info-label">Laatst actief</div><div class="modal-info-value">${u.last_seen_at ? formatDateTime(u.last_seen_at) : 'Onbekend'}</div></div>
@@ -1233,7 +1239,7 @@ async function loadMarketingWorkspaces(){
       d.workspaces.map(function(w){
         var end=w.license_end?(' <span style="color:var(--text-3)">tot '+new Date(w.license_end).toLocaleDateString('nl-NL')+'</span>'):'';
         return '<tr style="cursor:pointer" onclick="openWorkspace('+w.id+')"><td style="font-weight:600;">'+esc(w.name)+' <span style="color:var(--text-3);font-family:monospace;font-size:11px;">'+esc(w.slug)+'</span></td>'+
-          '<td>'+esc(w.owner_email||'—')+'</td>'+
+          '<td>'+esc(w.owner_email||'-')+'</td>'+
           '<td>'+esc(w.license_type)+end+'</td>'+
           '<td>'+w.max_seats+' / '+w.max_clients+'</td>'+
           '<td>'+w.accounts+'</td></tr>';
@@ -1261,8 +1267,40 @@ async function openWorkspace(id){
     document.getElementById('wsmClients').value=d.workspace.max_clients;
     document.getElementById('wsmClientCount').textContent='· '+d.client_count+' klant'+(d.client_count===1?'':'en');
     renderAccounts(d.accounts);
+    loadWsClients(id);
+    waRoleChange();
     document.getElementById('wsModal').classList.add('open');
   }catch(e){ alert('Netwerkfout.'); }
+}
+var CURRENT_WS_CLIENTS=[];
+function waRoleChange(){
+  var isClient=document.getElementById('waRole').value==='client';
+  document.getElementById('waClientRow').style.display=isClient?'':'none';
+}
+async function loadWsClients(id){
+  var panel=document.getElementById('wsmClientPanel'); panel.textContent='Laden...';
+  try{
+    var r=await fetch('/api/mkt/admin/workspaces/'+id+'/clients',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ panel.textContent='Kon klanten niet laden.'; CURRENT_WS_CLIENTS=[]; return; }
+    CURRENT_WS_CLIENTS=d.clients||[];
+    // vul de koppel-dropdown
+    var sel=document.getElementById('waClient');
+    sel.innerHTML=CURRENT_WS_CLIENTS.length?CURRENT_WS_CLIENTS.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join(''):'<option value="">Nog geen klanten</option>';
+    // render het overzicht
+    if(!CURRENT_WS_CLIENTS.length){ panel.innerHTML='<div style="color:var(--text-3)">Nog geen klanten in deze workspace.</div>'; return; }
+    panel.innerHTML=CURRENT_WS_CLIENTS.map(function(c){
+      var g=c.integrations||{};
+      function row(k,v){ return v?('<div><span style="color:var(--text-3)">'+k+':</span> <span style="font-family:monospace">'+esc(v)+'</span></div>'):''; }
+      function sec(k,s){ return (s&&s.set)?('<div><span style="color:var(--text-3)">'+k+':</span> '+esc(s.hint)+' <span style="color:#0f9d6b">(ingesteld)</span></div>'):''; }
+      var ids=[row('Page ID',g.meta_page_id),row('Instagram ID',g.meta_ig_user_id),row('Ad Account',g.meta_ad_account_id),row('Pixel',g.meta_pixel_id),row('App ID',g.meta_app_id),row('Google Ads',g.google_ads_customer_id),row('GA4',g.ga4_measurement_id),row('TikTok Pixel',g.tiktok_pixel_id),sec('Meta token',g.meta_access_token),sec('App secret',g.meta_app_secret)].filter(Boolean).join('');
+      if(!ids)ids='<div style="color:var(--text-3)">Nog geen koppelingen ingevuld.</div>';
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
+          '<div style="font-weight:700">'+esc(c.name)+'</div>'+
+          '<div style="color:var(--text-3);font-size:12px">'+c.linked_campaigns+' campagnes · '+c.posts+' posts · '+c.assets+' assets · '+c.logins+' login(s)</div>'+
+        '</div>'+ids+'</div>';
+    }).join('');
+  }catch(e){ panel.textContent='Netwerkfout.'; }
 }
 function renderAccounts(accs){
   var roles=['owner','manager','member','client'];
@@ -1270,7 +1308,8 @@ function renderAccounts(accs){
     var status=a.banned?'<span class="acc-badge acc-off">geband</span>':(a.active?'<span class="acc-badge acc-on">actief</span>':'<span class="acc-badge acc-off">inactief</span>');
     var last=a.last_login_at?new Date(a.last_login_at).toLocaleDateString('nl-NL'):'nooit';
     var roleSel='<select onchange="changeRole('+a.id+',this.value)" style="padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">'+roles.map(function(r){return '<option value="'+r+'" '+(a.role===r?'selected':'')+'>'+r+'</option>';}).join('')+'</select>';
-    return '<tr><td><div style="font-weight:600">'+esc(a.email)+'</div><div style="color:var(--text-3);font-size:11px">laatste login: '+last+'</div></td>'+
+    var koppel=(a.role==='client'&&a.client_name)?('<div style="color:var(--text-3);font-size:11px">klant: '+esc(a.client_name)+'</div>'):'';
+    return '<tr><td><div style="font-weight:600">'+esc(a.email)+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">laatste login: '+last+'</div></td>'+
       '<td>'+roleSel+'</td><td>'+status+'</td>'+
       '<td style="text-align:right;white-space:nowrap">'+
         '<button class="mini" onclick="resetPw('+a.id+')">Reset ww</button>'+
@@ -1292,6 +1331,7 @@ async function addAccount(){
   if(!CURRENT_WS)return;
   var body={email:document.getElementById('waEmail').value.trim(),full_name:document.getElementById('waName').value.trim(),role:document.getElementById('waRole').value,password:document.getElementById('waPass').value};
   if(!body.email||!body.password){ wsmMsg(false,'E-mail en wachtwoord verplicht.'); return; }
+  if(body.role==='client'){ var cv=document.getElementById('waClient').value; if(!cv){ wsmMsg(false,'Kies een klant om de client-login aan te koppelen.'); return; } body.client_id=cv; }
   try{
     var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id+'/accounts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
