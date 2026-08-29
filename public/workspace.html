@@ -516,6 +516,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: campagne-detail (ad sets + advertenties) -->
+<div class="modal-ov" id="campDetailModal">
+  <div class="modal" style="max-width:600px">
+    <h3 id="cdTitle">Campagne</h3>
+    <div class="sub">Beheer de advertentiesets en advertenties. Wijzigingen gaan direct naar Meta.</div>
+    <div id="cdMsg" class="inline-msg"></div>
+    <div id="cdBody" style="max-height:60vh;overflow:auto"><div class="empty">Laden...</div></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeCampDetail()">Sluiten</button></div>
+  </div>
+</div>
+
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
   <div class="modal">
@@ -1157,6 +1168,66 @@ async function campBudget(id){
     if(r.ok&&d.success){showMsg('campMsg',true,'Budget aangepast.');loadCampaigns();} else {showMsg('campMsg',false,d.error||'Budget aanpassen mislukt.');}
   }catch(e){showMsg('campMsg',false,'Netwerkfout.');}
 }
+var CD_CAMP=null;
+function closeCampDetail(){document.getElementById('campDetailModal').classList.remove('open');}
+async function openCampDetail(id,name){
+  CD_CAMP=id; hideMsg('cdMsg');
+  document.getElementById('cdTitle').textContent=name||'Campagne';
+  document.getElementById('cdBody').innerHTML='<div class="empty">Laden...</div>';
+  document.getElementById('campDetailModal').classList.add('open');
+  renderCampDetail();
+}
+async function renderCampDetail(){
+  var body=document.getElementById('cdBody');
+  var ST={ACTIVE:{cls:'approved',txt:'Actief'},PAUSED:{cls:'scheduled',txt:'Gepauzeerd'}};
+  function badge(s){var m=ST[s]||{cls:'archived',txt:s};return '<span class="status '+m.cls+'">'+esc(m.txt)+'</span>';}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/detail',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('cdMsg',false,d.error||'Kon detail niet laden.');return;}
+    if(!d.adsets.length){body.innerHTML='<div class="empty">Geen advertentiesets gevonden.</div>';return;}
+    body.innerHTML=d.adsets.map(function(s){
+      var sActive=(s.status==='ACTIVE');
+      var ads=(s.ads&&s.ads.length)?s.ads.map(function(a){
+        var aActive=(a.status==='ACTIVE');
+        return '<div class="post-row" style="padding:10px 12px"><div class="post-main"><h5 style="font-size:13.5px">'+esc(a.name||'Advertentie')+'</h5>'+
+          '<div class="post-meta">'+badge(a.status)+'</div></div><div class="post-acts">'+
+          '<button class="icon-btn" title="'+(aActive?'Pauzeren':'Activeren')+'" onclick="adStatus(\''+a.id+'\',\''+(aActive?'PAUSED':'ACTIVE')+'\')">'+(aActive?'&#10073;&#10073;':'&#9658;')+'</button>'+
+          '<button class="icon-btn del" title="Verwijderen" onclick="adDelete(\''+a.id+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
+          '</div></div>';
+      }).join(''):'<div style="color:var(--muted);font-size:12.5px;padding:6px 0">Geen advertenties in deze set.</div>';
+      return '<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
+          '<div><div style="font-weight:700">'+esc(s.name||'Ad set')+'</div><div style="font-size:12px;color:var(--muted)">'+badge(s.status)+(s.budget!=null?(' · &euro; '+s.budget.toFixed(2)+'/dag'):'')+(s.optimization_goal?(' · '+esc(s.optimization_goal)):'')+'</div></div>'+
+          '<div style="display:flex;gap:6px">'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetStatus(\''+s.id+'\',\''+(sActive?'PAUSED':'ACTIVE')+'\')">'+(sActive?'Pauzeren':'Activeren')+'</button>'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetBudget(\''+s.id+'\')">Budget</button>'+
+          '</div>'+
+        '</div>'+
+        '<div style="margin-top:10px">'+ads+'</div></div>';
+    }).join('');
+  }catch(e){body.innerHTML='';showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function adsetStatus(id,status){
+  if(status==='ACTIVE'&&!confirm('Advertentieset activeren? Deze gaat dan geld uitgeven.'))return;
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+id+'/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})}); var d=await r.json();
+    if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function adsetBudget(id){
+  var v=prompt('Nieuw dagbudget voor deze ad set (euro):'); if(v===null)return; var n=parseFloat(String(v).replace(',','.'));
+  if(!(n>=1)){showMsg('cdMsg',false,'Minimaal 1 euro.');return;}
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+id+'/budget',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({daily:n})}); var d=await r.json();
+    if(r.ok&&d.success){showMsg('cdMsg',true,'Budget aangepast.');renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function adStatus(id,status){
+  if(status==='ACTIVE'&&!confirm('Advertentie activeren? Deze gaat dan geld uitgeven.'))return;
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+id+'/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})}); var d=await r.json();
+    if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function adDelete(id){
+  if(!confirm('Deze advertentie verwijderen?'))return;
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
 async function loadMetaCampaigns(){
   var box=document.getElementById('metaCampaigns'); if(!box)return;
   var STAT={ACTIVE:{cls:'approved',txt:'Actief'},PAUSED:{cls:'scheduled',txt:'Gepauzeerd'},ARCHIVED:{cls:'archived',txt:'Gearchiveerd'}};
@@ -1181,6 +1252,7 @@ async function loadMetaCampaigns(){
       if(canManage){
         var isActive=(c.status==='ACTIVE');
         ctrls='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+          '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="openCampDetail(\''+c.id+'\',\''+esc(String(c.name).replace(/"/g,"").replace(/\x27/g,""))+'\')">Details / ad sets</button>'+
           '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campStatus(\''+c.id+'\',\''+(isActive?'PAUSED':'ACTIVE')+'\')">'+(isActive?'Pauzeren':'Activeren')+'</button>'+
           '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campBudget(\''+c.id+'\')">Budget aanpassen</button></div>';
       }

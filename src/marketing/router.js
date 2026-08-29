@@ -1796,6 +1796,102 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/budget', requ
 });
 
 // =======================================================================
+// STAP 17 - CAMPAGNE-DETAIL: advertentiesets + advertenties beheren
+// =======================================================================
+// Detail van een campagne: ad sets met hun advertenties.
+router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const cid = req.params.campaignId;
+    const setsRes = await graphGet(`${cid}/adsets`, {
+      fields: 'name,effective_status,daily_budget,optimization_goal,billing_event', limit: '50', access_token: token,
+    });
+    const adsRes = await graphGet(`${cid}/ads`, {
+      fields: 'name,effective_status,adset_id', limit: '100', access_token: token,
+    });
+    const adsBySet = {};
+    (adsRes.data || []).forEach((a) => { (adsBySet[a.adset_id] = adsBySet[a.adset_id] || []).push({ id: a.id, name: a.name, status: a.effective_status }); });
+    const adsets = (setsRes.data || []).map((s) => ({
+      id: s.id, name: s.name, status: s.effective_status,
+      budget: s.daily_budget ? (Number(s.daily_budget) / 100) : null,
+      optimization_goal: s.optimization_goal || null,
+      ads: adsBySet[s.id] || [],
+    }));
+    res.json({ success: true, adsets });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Advertentieset pauzeren/activeren.
+router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/status', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const status = (req.body && (req.body.status === 'ACTIVE' || req.body.status === 'PAUSED')) ? req.body.status : null;
+    if (!status) return res.status(400).json({ error: 'Kies pauzeren of activeren' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.adsetId}`, { status, access_token: token });
+    res.json({ success: true, status });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Advertentieset-budget aanpassen.
+router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/budget', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const euros = Number(req.body && req.body.daily);
+    if (!Number.isFinite(euros) || euros < 1) return res.status(400).json({ error: 'Vul een dagbudget in van minimaal 1 euro' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.adsetId}`, { daily_budget: String(Math.round(euros * 100)), access_token: token });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Advertentie pauzeren/activeren.
+router.post('/api/mkt/clients/:clientId/meta-ads/:adId/status', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const status = (req.body && (req.body.status === 'ACTIVE' || req.body.status === 'PAUSED')) ? req.body.status : null;
+    if (!status) return res.status(400).json({ error: 'Kies pauzeren of activeren' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.adId}`, { status, access_token: token });
+    res.json({ success: true, status });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Advertentie verwijderen.
+router.delete('/api/mkt/clients/:clientId/meta-ads/:adId', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const body = new URLSearchParams({ access_token: token });
+    const r = await fetch(`${GRAPH}/${req.params.adId}`, { method: 'DELETE', body });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Verwijderen mislukt');
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 13 - LANGLEVEND META-TOKEN (kort token omruilen naar ~60 dagen)
 // Nodig voor geplande posts: het opgeslagen token moet nog geldig zijn op
 // het moment van publiceren. Vereist Meta App ID + App Secret in Koppelingen.
