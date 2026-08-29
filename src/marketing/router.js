@@ -948,10 +948,21 @@ router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
 // =======================================================================
 const INT_PLAIN = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'meta_app_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id', 'notes'];
 const INT_SECRET = ['meta_access_token', 'meta_app_secret', 'google_ads_developer_token', 'tiktok_access_token'];
+// ID's die in de workspace gemaskeerd worden (wel volledig in create-user voor de admin).
+const INT_MASKED_IDS = ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'meta_app_id', 'google_ads_customer_id', 'ga4_measurement_id', 'tiktok_pixel_id'];
+
+// Maskeer een gewone (niet-versleutelde) waarde: alleen of hij is gezet + laatste 4 tekens.
+function maskPlain(v) {
+  if (!v) return { set: false, hint: '' };
+  const s = String(v);
+  const tail = s.length > 4 ? s.slice(-4) : s;
+  return { set: true, hint: '••••' + tail };
+}
 
 function integrationsView(row) {
   const out = {};
-  for (const f of INT_PLAIN) out[f] = row ? (row[f] || '') : '';
+  for (const f of INT_MASKED_IDS) out[f] = maskPlain(row ? row[f] : null);
+  out.notes = row ? (row.notes || '') : '';
   for (const f of INT_SECRET) out[f] = maskSecret(row ? row[f] : null);
   out.encrypted = !!mktKey();
   return out;

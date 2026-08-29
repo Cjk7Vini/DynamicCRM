@@ -990,7 +990,8 @@ async function loadMetaInsights(){
 }
 
 // ---- Koppelingen (integraties) ----
-var INT_PLAIN=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','meta_app_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id','notes'];
+var INT_PLAIN=['notes'];
+var INT_MASKED=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','meta_app_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id'];
 var INT_SECRET=['meta_access_token','meta_app_secret','google_ads_developer_token','tiktok_access_token'];
 async function extendMetaToken(){
   if(!CURRENT_CLIENT)return; var el=document.getElementById('extendMsg'); el.textContent='Bezig...'; el.style.color='var(--muted)';
@@ -1008,7 +1009,8 @@ async function loadIntegrations(){
     if(!r.ok||!d.success){showMsg('intMsg',false,d.error||'Kon koppelingen niet laden.');return;}
     var g=d.integrations;
     INT_PLAIN.forEach(function(f){var el=document.getElementById('int_'+f);if(el)el.value=g[f]||'';});
-    INT_SECRET.forEach(function(f){var el=document.getElementById('int_'+f);if(el){var s=g[f]||{};el.value='';el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';}});
+    // ID's en tokens worden gemaskeerd getoond (leeg veld + hint). Overschrijf om te wijzigen.
+    INT_MASKED.concat(INT_SECRET).forEach(function(f){var el=document.getElementById('int_'+f);if(el){var s=g[f]||{};el.value='';el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';}});
     var warn=document.getElementById('intEncWarn');
     if(!g.encrypted){warn.style.display='block';warn.textContent='Let op: er is nog geen MKT_SECRET_KEY ingesteld in Render, dus tokens worden nu onversleuteld opgeslagen. Stel die sleutel in voor versleuteling.';}
     else {warn.style.display='none';}
@@ -1018,7 +1020,8 @@ async function saveIntegrations(){
   if(!CURRENT_CLIENT)return; var btn=document.getElementById('intSaveBtn'); hideMsg('intMsg');
   var payload={};
   INT_PLAIN.forEach(function(f){payload[f]=document.getElementById('int_'+f).value.trim();});
-  INT_SECRET.forEach(function(f){var v=document.getElementById('int_'+f).value.trim();if(v)payload[f]=v;});
+  // Gemaskeerde ID's en tokens: alleen versturen als er iets nieuws is ingetypt (anders blijft de opgeslagen waarde staan).
+  INT_MASKED.concat(INT_SECRET).forEach(function(f){var v=document.getElementById('int_'+f).value.trim();if(v)payload[f]=v;});
   btn.disabled=true; btn.textContent='Opslaan...';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
