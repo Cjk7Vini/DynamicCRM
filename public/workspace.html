@@ -1184,8 +1184,8 @@ async function renderCampDetail(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/detail',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('cdMsg',false,d.error||'Kon detail niet laden.');return;}
-    if(!d.adsets.length){body.innerHTML='<div class="empty">Geen advertentiesets gevonden.</div>';return;}
-    body.innerHTML=d.adsets.map(function(s){
+    if(!d.adsets.length&&!(d.breakdown&&d.breakdown.length)){body.innerHTML='<div class="empty">Geen advertentiesets gevonden.</div>';return;}
+    var setsHtml=d.adsets.map(function(s){
       var sActive=(s.status==='ACTIVE');
       var ads=(s.ads&&s.ads.length)?s.ads.map(function(a){
         var aActive=(a.status==='ACTIVE');
@@ -1205,6 +1205,16 @@ async function renderCampDetail(){
         '</div>'+
         '<div style="margin-top:10px">'+ads+'</div></div>';
     }).join('');
+    var bd='';
+    if(d.breakdown&&d.breakdown.length){
+      var gl={male:'Man',female:'Vrouw',unknown:'Onbekend'};
+      bd='<div class="section-h" style="margin-top:6px"><h4>Publiek (laatste 30 dagen)</h4></div>'+
+        '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'+
+        '<tr style="color:var(--muted);text-align:left"><th style="padding:6px 8px">Leeftijd</th><th style="padding:6px 8px">Geslacht</th><th style="padding:6px 8px">Impressies</th><th style="padding:6px 8px">Klikken</th><th style="padding:6px 8px">Uitgaven</th></tr>'+
+        d.breakdown.map(function(r){return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px 8px">'+esc(r.age||'-')+'</td><td style="padding:6px 8px">'+esc(gl[r.gender]||r.gender||'-')+'</td><td style="padding:6px 8px">'+esc(r.impressions!=null?r.impressions:'-')+'</td><td style="padding:6px 8px">'+esc(r.clicks!=null?r.clicks:'-')+'</td><td style="padding:6px 8px">&euro; '+esc(r.spend!=null?r.spend:'-')+'</td></tr>';}).join('')+
+        '</table></div>';
+    }
+    body.innerHTML=(setsHtml||'')+bd;
   }catch(e){body.innerHTML='';showMsg('cdMsg',false,'Netwerkfout.');}
 }
 async function adsetStatus(id,status){

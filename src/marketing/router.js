@@ -1822,7 +1822,17 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
       optimization_goal: s.optimization_goal || null,
       ads: adsBySet[s.id] || [],
     }));
-    res.json({ success: true, adsets });
+    // Publieksverdeling van de resultaten (leeftijd/geslacht), defensief.
+    let breakdown = null;
+    try {
+      const ins = await graphGet(`${cid}/insights`, {
+        fields: 'impressions,clicks,spend', breakdowns: 'age,gender', date_preset: 'last_30d', limit: '100', access_token: token,
+      });
+      breakdown = (ins.data || []).map((r) => ({
+        age: r.age, gender: r.gender, impressions: r.impressions ?? null, clicks: r.clicks ?? null, spend: r.spend ?? null,
+      }));
+    } catch (_) { breakdown = null; }
+    res.json({ success: true, adsets, breakdown });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
