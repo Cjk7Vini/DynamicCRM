@@ -627,7 +627,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
          LEFT JOIN marketing.assets a ON a.id = p.asset_id
         WHERE p.workspace_id=$1 AND p.client_id=$2
           ${filterStatus ? 'AND p.status=$3' : ''}
-          ${clientOnly ? "AND p.approval <> 'none'" : ''}
+          ${clientOnly ? "AND (p.approval <> 'none' OR p.status='published')" : ''}
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
@@ -850,9 +850,12 @@ router.post('/api/mkt/clients/:clientId/assets', assetUploadParser, requireMkt, 
 // Serveer de bytes van een asset (voor <img> en download). Gescopet op workspace.
 router.get('/api/mkt/assets/:id', requireMkt, async (req, res) => {
   try {
+    // Klant-account mag alleen de eigen assets ophalen.
+    const lockCid = mktClientLocked(req) ? mktLockedClientId(req) : null;
     const row = await withReadConnection(async (c) => (await c.query(
-      `SELECT filename, mime, data FROM marketing.assets WHERE id=$1 AND workspace_id=$2`,
-      [req.params.id, req.session.mkt.workspaceId]
+      `SELECT filename, mime, data FROM marketing.assets
+        WHERE id=$1 AND workspace_id=$2 ${lockCid ? 'AND client_id=$3' : ''}`,
+      lockCid ? [req.params.id, req.session.mkt.workspaceId, lockCid] : [req.params.id, req.session.mkt.workspaceId]
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Asset niet gevonden' });
     res.setHeader('Content-Type', row.mime || 'application/octet-stream');
@@ -1081,6 +1084,7 @@ function normalizeAdAccount(id) {
 // Lijst eerder aangemaakte campagnes (uit onze database).
 router.get('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res) => {
   try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -1180,6 +1184,7 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/stats', requireMkt, async (req, res) => {
   try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -1289,6 +1294,7 @@ router.post('/api/mkt/portal/:token/decision', async (req, res) => {
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, res) => {
   try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -1341,6 +1347,7 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, res) => {
   try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
