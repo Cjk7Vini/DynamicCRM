@@ -1295,18 +1295,43 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
     if (asset.resource_type === 'video') return res.status(400).json({ error: 'Video-advertenties komen later. Kies voor nu een afbeelding.' });
 
+    // Detailtargeting + bieden (fase 1).
+    const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
+    const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
+    const audienceIds = Array.isArray(b.audiences) ? b.audiences.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 20) : [];
+    const bidStrategy = ['LOWEST_COST_WITHOUT_CAP', 'LOWEST_COST_WITH_BID_CAP'].includes(b.bidStrategy) ? b.bidStrategy : 'LOWEST_COST_WITHOUT_CAP';
+    let bidCapCents = null;
+    if (bidStrategy === 'LOWEST_COST_WITH_BID_CAP') {
+      const cap = Number(b.bidCap);
+      if (!Number.isFinite(cap) || cap < 0.5) return res.status(400).json({ error: 'Vul een biedlimiet in van minimaal 0,50 euro' });
+      bidCapCents = Math.round(cap * 100);
+    }
+    const placement = (b.placement === 'manual') ? 'manual' : 'automatic';
+
+    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    if (genders === 'men') targetingObj.genders = [1];
+    else if (genders === 'women') targetingObj.genders = [2];
+    if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
+    if (audienceIds.length) targetingObj.custom_audiences = audienceIds.map((id) => ({ id }));
+    if (placement === 'manual') {
+      targetingObj.publisher_platforms = ['facebook', 'instagram'];
+      targetingObj.facebook_positions = ['feed'];
+      targetingObj.instagram_positions = ['stream'];
+    }
+    const targeting = JSON.stringify(targetingObj);
+
     // 1) Campagne (PAUSED)
     const campaign = await graphPost(`${adAccount}/campaigns`, {
       name, objective, status: 'PAUSED', special_ad_categories: '[]', access_token: token,
     });
     // 2) Advertentieset (PAUSED)
-    const targeting = JSON.stringify({ geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax });
     const adsetParams = {
       name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
       billing_event: 'IMPRESSIONS', optimization_goal: CAMPAIGN_OBJECTIVES[objective],
-      bid_strategy: 'LOWEST_COST_WITHOUT_CAP', targeting, status: 'PAUSED',
+      bid_strategy: bidStrategy, targeting, status: 'PAUSED',
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
+    if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
     // 3) Creatief (afbeelding-link-advertentie)
     const storySpec = JSON.stringify({
@@ -1330,6 +1355,38 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, campaign: row });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Interesses zoeken voor targeting (Meta targeting search).
+router.get('/api/mkt/clients/:clientId/meta/interests', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.json({ success: true, interests: [] });
+    const creds = await resolveClientMeta(wsId, okClient);
+    if (!creds.token) return res.json({ success: true, interests: [], configured: false });
+    const r = await graphGet('search', { type: 'adinterest', q, limit: '20', access_token: creds.token });
+    const interests = (r.data || []).map((i) => ({ id: i.id, name: i.name, audience_size: i.audience_size_lower_bound || i.audience_size || null }));
+    res.json({ success: true, interests });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Custom/lookalike audiences van het ad account.
+router.get('/api/mkt/clients/:clientId/meta/audiences', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    if (!creds.token || !creds.adAccount) return res.json({ success: true, audiences: [], configured: false });
+    const r = await graphGet(`${creds.adAccount}/customaudiences`, { fields: 'id,name,subtype', limit: '50', access_token: creds.token });
+    const audiences = (r.data || []).map((a) => ({ id: a.id, name: a.name, subtype: a.subtype || null }));
+    res.json({ success: true, audiences });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

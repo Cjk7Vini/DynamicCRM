@@ -550,6 +550,32 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div class="field"><label>Leeftijd van</label><input id="cpAgeMin" type="number" min="13" max="65" value="18"></div>
       <div class="field"><label>Leeftijd tot</label><input id="cpAgeMax" type="number" min="13" max="65" value="65"></div>
     </div>
+    <div class="row2">
+      <div class="field"><label>Geslacht</label>
+        <select id="cpGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
+      </div>
+      <div class="field"><label>Plaatsingen</label>
+        <select id="cpPlacement"><option value="automatic">Automatisch (aanrader)</option><option value="manual">Alleen Facebook + Instagram feed</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Biedstrategie</label>
+        <select id="cpBidStrategy" onchange="document.getElementById('cpBidCapWrap').style.display=this.value==='LOWEST_COST_WITH_BID_CAP'?'':'none'">
+          <option value="LOWEST_COST_WITHOUT_CAP">Laagste kosten (automatisch)</option>
+          <option value="LOWEST_COST_WITH_BID_CAP">Met biedlimiet</option>
+        </select>
+      </div>
+      <div class="field" id="cpBidCapWrap" style="display:none"><label>Biedlimiet (euro)</label><input id="cpBidCap" type="number" min="0.5" step="0.5" value="2"></div>
+    </div>
+    <div class="field"><label>Interesses (targeting)</label>
+      <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
+      <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
+    <div class="field"><label>Custom audiences (optioneel)</label>
+      <select id="cpAudiences" multiple size="3" style="height:auto"></select>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Houd Ctrl/Cmd ingedrukt om meerdere te kiezen.</div>
+    </div>
     <div class="field"><label>Bestemmings-URL *</label><input id="cpLink" placeholder="https://..."></div>
     <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
       <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
@@ -1190,18 +1216,57 @@ async function saveCampLinks(){
   }catch(e){showMsg('clkMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Koppeling opslaan';
 }
+var CP_INTERESTS=[];
 async function openCampaign(){
   hideMsg('campModalMsg');
   document.getElementById('cpName').value='';document.getElementById('cpBudget').value='10';
   document.getElementById('cpCountry').value='NL';document.getElementById('cpAgeMin').value='18';document.getElementById('cpAgeMax').value='65';
   document.getElementById('cpLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('cpCaption').value='';
+  document.getElementById('cpGenders').value='all';document.getElementById('cpPlacement').value='automatic';
+  document.getElementById('cpBidStrategy').value='LOWEST_COST_WITHOUT_CAP';document.getElementById('cpBidCapWrap').style.display='none';
+  document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
+  CP_INTERESTS=[]; renderInterestChips();
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
     var sel=document.getElementById('cpAsset');var opts='<option value="">Kies een afbeelding</option>';
     (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
     sel.innerHTML=opts;
   }catch(e){}
+  // audiences laden
+  var aud=document.getElementById('cpAudiences'); aud.innerHTML='';
+  try{
+    var au=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/audiences',{credentials:'include'}); var aud2=await au.json();
+    if(aud2.success&&aud2.audiences&&aud2.audiences.length){ aud.innerHTML=aud2.audiences.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>';}).join(''); }
+    else { aud.innerHTML='<option disabled>Geen custom audiences gevonden</option>'; }
+  }catch(e){ aud.innerHTML='<option disabled>Kon audiences niet laden</option>'; }
   document.getElementById('campModal').classList.add('open');document.getElementById('cpName').focus();
+}
+var CP_INT_TIMER=null;
+function searchInterests(){
+  clearTimeout(CP_INT_TIMER);
+  var q=document.getElementById('cpInterestSearch').value.trim();
+  var box=document.getElementById('cpInterestResults');
+  if(q.length<2){box.style.display='none';return;}
+  CP_INT_TIMER=setTimeout(async function(){
+    try{
+      var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/interests?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
+      if(!d.success||!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden.</div>';box.style.display='block';return;}
+      box.innerHTML=d.interests.map(function(i){return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'addInterest("'+esc(i.id)+'","'+esc(String(i.name).replace(/"/g,""))+'")\'>'+esc(i.name)+'</div>';}).join('');
+      box.style.display='block';
+    }catch(e){box.style.display='none';}
+  },350);
+}
+function addInterest(id,name){
+  if(!CP_INTERESTS.some(function(x){return x.id===id;}))CP_INTERESTS.push({id:id,name:name});
+  document.getElementById('cpInterestResults').style.display='none';
+  document.getElementById('cpInterestSearch').value='';
+  renderInterestChips();
+}
+function removeInterest(id){CP_INTERESTS=CP_INTERESTS.filter(function(x){return x.id!==id;});renderInterestChips();}
+function renderInterestChips(){
+  document.getElementById('cpInterestChips').innerHTML=CP_INTERESTS.map(function(i){
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="removeInterest(\''+esc(i.id)+'\')">×</span></span>';
+  }).join('');
 }
 function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
 async function createCampaign2(){
@@ -1216,7 +1281,13 @@ async function createCampaign2(){
     ageMax:document.getElementById('cpAgeMax').value,
     link:document.getElementById('cpLink').value.trim(),
     assetId:document.getElementById('cpAsset').value||null,
-    caption:document.getElementById('cpCaption').value
+    caption:document.getElementById('cpCaption').value,
+    genders:document.getElementById('cpGenders').value,
+    placement:document.getElementById('cpPlacement').value,
+    bidStrategy:document.getElementById('cpBidStrategy').value,
+    bidCap:document.getElementById('cpBidCap').value,
+    interests:CP_INTERESTS,
+    audiences:Array.prototype.slice.call(document.getElementById('cpAudiences').selectedOptions||[]).map(function(o){return o.value;}).filter(function(v){return v;})
   };
   if(!payload.name){showMsg('campModalMsg',false,'Campagnenaam is verplicht.');return;}
   if(!payload.assetId){showMsg('campModalMsg',false,'Kies een afbeelding.');return;}
