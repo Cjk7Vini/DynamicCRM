@@ -244,6 +244,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3.2"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Klanten
       </a>
+      <a data-view="wssettings" id="navWsSettings" style="display:none" onclick="navTo('wssettings')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Werkplek-koppeling
+      </a>
     </nav>
     <div class="nav-label">Per klant</div>
     <nav class="nav">
@@ -298,6 +302,24 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="mod live" onclick="navTo('clients')"><h5>Koppelingen</h5><p>API's, pixels en tokens per klant.</p><span class="tag on">Actief</span></div>
           <div class="mod live" onclick="navTo('clients')"><h5>Rapportage</h5><p>Cijfers per klant uit je workspace.</p><span class="tag on">Actief</span></div>
           <div class="mod"><h5>Live publiceren</h5><p>Rechtstreeks posten naar Meta en Google.</p><span class="tag">Binnenkort</span></div>
+        </div>
+      </section>
+
+      <!-- WERKPLEK-KOPPELING (workspace-niveau) -->
+      <section class="view" id="viewWsSettings">
+        <div id="wsiMsg" class="inline-msg"></div>
+        <div class="card" style="max-width:640px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta-koppeling van de werkplek</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Vul hier je gedeelde Meta-gegevens één keer in. Alle klanten van deze werkplek vallen hierop terug. Bij een klant vul je dan alleen nog de Page ID en Instagram user ID van die specifieke brand in. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
+          <div id="wsiEncWarn" style="display:none;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border:1px solid rgba(245,158,11,.28);padding:9px 12px;border-radius:9px;margin-bottom:14px"></div>
+          <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
+          <div class="row2">
+            <div class="field"><label>Ad Account ID</label><input id="wsi_meta_ad_account_id" placeholder="act_1234567890"></div>
+            <div class="field"><label>Meta App ID</label><input id="wsi_meta_app_id"></div>
+          </div>
+          <div class="field"><label>Meta App Secret</label><input id="wsi_meta_app_secret" type="password"></div>
+          <div style="margin:-2px 0 10px"><button class="btn btn-ghost" onclick="extendWsToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button><span id="wsiExtendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
+          <div style="text-align:right"><button class="btn btn-primary" onclick="saveWsIntegrations()">Werkplek-koppeling opslaan</button></div>
         </div>
       </section>
 
@@ -634,7 +656,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <script>
 var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
 var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false;
-var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space'};
+var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling'};
 
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
@@ -687,6 +709,8 @@ async function bootstrap(){
   document.getElementById('stSeats').textContent=(ME.max_seats||'-');
   var canManage=ME.role!=='client';
   document.getElementById('topNewClient').style.display=canManage?'':'none';
+  var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
+  document.getElementById('navWsSettings').style.display=isOwnerMgr?'':'none';
   CLIENT_MODE = (ME.role==='client');
   if(CLIENT_MODE){ enterClientMode(); return; }
   navTo('overzicht');
@@ -750,7 +774,39 @@ function navTo(view){
   document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
+  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();}
   else {document.getElementById('viewOverzicht').classList.add('active');}
+}
+async function loadWsIntegrations(){
+  hideMsg('wsiMsg');
+  try{
+    var r=await fetch('/api/mkt/workspace/integrations',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){showMsg('wsiMsg',false,d.error||'Kon werkplek-koppeling niet laden.');return;}
+    var g=d.integrations;
+    [['meta_ad_account_id',g.meta_ad_account_id],['meta_app_id',g.meta_app_id],['meta_access_token',g.meta_access_token],['meta_app_secret',g.meta_app_secret]].forEach(function(p){
+      var el=document.getElementById('wsi_'+p[0]); if(!el)return; var s=p[1]||{}; el.value=''; el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';
+    });
+    var warn=document.getElementById('wsiEncWarn');
+    if(!g.encrypted){warn.style.display='block';warn.textContent='Let op: er is nog geen MKT_SECRET_KEY ingesteld in Render, dus tokens worden onversleuteld opgeslagen.';}else{warn.style.display='none';}
+  }catch(e){showMsg('wsiMsg',false,'Netwerkfout.');}
+}
+async function saveWsIntegrations(){
+  hideMsg('wsiMsg');
+  var payload={};
+  ['meta_ad_account_id','meta_app_id','meta_access_token','meta_app_secret'].forEach(function(f){var v=document.getElementById('wsi_'+f).value.trim();if(v)payload[f]=v;});
+  try{
+    var r=await fetch('/api/mkt/workspace/integrations',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('wsiMsg',true,'Werkplek-koppeling opgeslagen.');loadWsIntegrations();}else{showMsg('wsiMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('wsiMsg',false,'Netwerkfout.');}
+}
+async function extendWsToken(){
+  var el=document.getElementById('wsiExtendMsg'); el.textContent='Bezig...'; el.style.color='var(--muted)';
+  try{
+    var r=await fetch('/api/mkt/workspace/meta/extend-token',{method:'POST',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){el.style.color='var(--ok)';el.textContent='Gelukt: token is nu ~'+d.days+' dagen geldig.';loadWsIntegrations();}
+    else{el.style.color='var(--err)';el.textContent=d.error||'Verlengen mislukt.';}
+  }catch(e){el.style.color='var(--err)';el.textContent='Netwerkfout.';}
 }
 
 // ---- Klanten ----

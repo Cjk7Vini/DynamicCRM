@@ -1020,6 +1020,104 @@ router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
 });
 
 // =======================================================================
+// STAP 16 - WORKSPACE-KOPPELING (gedeelde Meta-basis voor alle klanten)
+// De eigenaar vult token + App ID/Secret + Ad Account eenmalig in op
+// workspace-niveau. Klanten vallen hierop terug (client-waarde wint als die
+// is ingevuld). Page ID / Instagram ID blijven per klant.
+// =======================================================================
+const WS_INT_SECRET = ['meta_access_token', 'meta_app_secret'];
+const WS_INT_IDS = ['meta_ad_account_id', 'meta_app_id'];
+
+function workspaceIntegrationsView(row) {
+  return {
+    meta_ad_account_id: maskPlain(row ? row.meta_ad_account_id : null),
+    meta_app_id: maskPlain(row ? row.meta_app_id : null),
+    meta_access_token: maskSecret(row ? row.meta_access_token : null),
+    meta_app_secret: maskSecret(row ? row.meta_app_secret : null),
+    encrypted: !!mktKey(),
+  };
+}
+
+router.get('/api/mkt/workspace/integrations', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]);
+    res.json({ success: true, integrations: workspaceIntegrationsView(row) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.put('/api/mkt/workspace/integrations', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {};
+    const existing = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]) || {};
+    const vals = {};
+    for (const f of WS_INT_IDS) vals[f] = (b[f] !== undefined && String(b[f]).trim() !== '') ? String(b[f]).trim() : (existing[f] || null);
+    for (const f of WS_INT_SECRET) vals[f] = (b[f] !== undefined && String(b[f]).trim() !== '') ? encryptSecret(String(b[f]).trim()) : (existing[f] || null);
+    const cols = [...WS_INT_IDS, ...WS_INT_SECRET];
+    const params = [wsId, ...cols.map((f) => vals[f])];
+    const placeholders = params.map((_, i) => `$${i + 1}`).join(',') + ',now()';
+    const updates = cols.map((f) => `${f}=EXCLUDED.${f}`).join(', ') + ', updated_at=now()';
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.workspace_integrations (workspace_id, ${cols.join(',')}, updated_at)
+       VALUES (${placeholders})
+       ON CONFLICT (workspace_id) DO UPDATE SET ${updates}
+       RETURNING *`, params
+    )).rows[0]);
+    res.json({ success: true, integrations: workspaceIntegrationsView(row) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Verleng het workspace-token naar ~60 dagen.
+router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const wi = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_app_id, meta_app_secret, meta_access_token FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]);
+    if (!wi) return res.status(400).json({ error: 'Geen workspace-koppeling ingesteld' });
+    const appId = wi.meta_app_id || process.env.META_APP_ID || null;
+    const appSecret = decryptSecret(wi.meta_app_secret) || process.env.META_APP_SECRET || null;
+    const shortTok = decryptSecret(wi.meta_access_token);
+    if (!appId || !appSecret) return res.status(400).json({ error: 'Vul App ID en App Secret in (of centraal via env)' });
+    if (!shortTok) return res.status(400).json({ error: 'Er is nog geen access token ingevuld om te verlengen' });
+    const r = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: shortTok });
+    if (!r.access_token) return res.status(400).json({ error: 'Meta gaf geen langlevend token terug' });
+    await withWriteConnection(async (c) => c.query(
+      'UPDATE marketing.workspace_integrations SET meta_access_token=$1, updated_at=now() WHERE workspace_id=$2',
+      [encryptSecret(r.access_token), wsId]
+    ));
+    res.json({ success: true, days: r.expires_in ? Math.round(r.expires_in / 86400) : 60 });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Meta-gegevens voor een klant: client-waarde wint, anders terugval op de workspace-koppeling.
+async function resolveClientMeta(wsId, clientId) {
+  const ci = await withReadConnection(async (c) => (await c.query(
+    'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [clientId, wsId]
+  )).rows[0]) || {};
+  const wi = await withReadConnection(async (c) => (await c.query(
+    'SELECT * FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+  )).rows[0]) || {};
+  return {
+    token: decryptSecret(ci.meta_access_token) || decryptSecret(wi.meta_access_token) || null,
+    appId: ci.meta_app_id || wi.meta_app_id || process.env.META_APP_ID || null,
+    appSecret: decryptSecret(ci.meta_app_secret) || decryptSecret(wi.meta_app_secret) || process.env.META_APP_SECRET || null,
+    adAccount: normalizeAdAccount(ci.meta_ad_account_id || wi.meta_ad_account_id),
+    pageId: ci.meta_page_id || null,
+    igUserId: ci.meta_ig_user_id || null,
+    pixelId: ci.meta_pixel_id || null,
+  };
+}
+
+// =======================================================================
 // STAP 7 - PUBLICEREN naar Meta (Instagram / Facebook) via Graph API
 // Werkt met een access token dat per klant is opgeslagen (Koppelingen-tab).
 // In dev-modus van de Meta-app kun je op je eigen accounts posten.
@@ -1088,12 +1186,11 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     const { channel, caption, assetId, postId } = req.body || {};
     if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
 
-    const intg = await withReadConnection(async (c) => (await c.query(
-      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld voor deze klant' });
-    const token = decryptSecret(intg.meta_access_token);
-    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    // Client-koppeling met terugval op de workspace-koppeling.
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token (niet bij de klant en niet op de workspace)' });
+    const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
 
     // Media-URL (moet publiek zijn: Cloudinary).
     let mediaUrl = null, mediaType = 'image';
@@ -1181,16 +1278,13 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
     const caption = String(b.caption || '').slice(0, 2000);
 
-    // Koppelingen ophalen
-    const intg = await withReadConnection(async (c) => (await c.query(
-      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld voor deze klant' });
-    const token = decryptSecret(intg.meta_access_token);
-    const adAccount = normalizeAdAccount(intg.meta_ad_account_id);
-    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt in de koppelingen' });
-    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt in de koppelingen' });
-    if (!intg.meta_page_id) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen' });
+    // Koppelingen ophalen (client met terugval op workspace).
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const adAccount = creds.adAccount;
+    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
+    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
+    if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
 
     // Creatief-beeld ophalen
     if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding voor de advertentie' });
@@ -1216,7 +1310,7 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
     // 3) Creatief (afbeelding-link-advertentie)
     const storySpec = JSON.stringify({
-      page_id: intg.meta_page_id,
+      page_id: creds.pageId,
       link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
     });
     const creative = await graphPost(`${adAccount}/adcreatives`, {
@@ -1359,11 +1453,9 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const intg = await withReadConnection(async (c) => (await c.query(
-      'SELECT meta_access_token, meta_ad_account_id FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    const token = intg ? decryptSecret(intg.meta_access_token) : null;
-    const adAccount = intg ? normalizeAdAccount(intg.meta_ad_account_id) : '';
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const adAccount = creds.adAccount;
     if (!token || !adAccount) return res.json({ success: true, configured: false });
 
     const out = { configured: true, campaigns: [], error: null };
@@ -1412,20 +1504,18 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const intg = await withReadConnection(async (c) => (await c.query(
-      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    const token = intg ? decryptSecret(intg.meta_access_token) : null;
-    if (!intg || !token) {
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    if (!token) {
       return res.json({ success: true, configured: false });
     }
 
     const out = { configured: true, account: null, topPosts: null, ads: null, errors: {} };
 
     // --- Instagram account: volgers + aantal media ---
-    if (intg.meta_ig_user_id) {
+    if (creds.igUserId) {
       try {
-        const a = await graphGet(`${intg.meta_ig_user_id}`, {
+        const a = await graphGet(`${creds.igUserId}`, {
           fields: 'username,followers_count,media_count', access_token: token,
         });
         out.account = { username: a.username || null, followers: a.followers_count ?? null, media: a.media_count ?? null };
@@ -1433,7 +1523,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 
       // --- Recente posts (top op likes) ---
       try {
-        const m = await graphGet(`${intg.meta_ig_user_id}/media`, {
+        const m = await graphGet(`${creds.igUserId}/media`, {
           fields: 'caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
           limit: '12', access_token: token,
         });
@@ -1454,9 +1544,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     }
 
     // --- Advertentiecijfers (laatste 30 dagen) ---
-    if (intg.meta_ad_account_id) {
+    if (creds.adAccount) {
       try {
-        const acct = normalizeAdAccount(intg.meta_ad_account_id);
+        const acct = creds.adAccount;
         const ins = await graphGet(`${acct}/insights`, {
           fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
           date_preset: 'last_30d', access_token: token,
@@ -1572,7 +1662,9 @@ async function runScheduler() {
       ));
       try {
         const channel = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
-        const token = decryptSecret(post.meta_access_token);
+        // Client-koppeling met terugval op de workspace-koppeling.
+        const creds = await resolveClientMeta(post.workspace_id, post.client_id);
+        const token = creds.token;
         if (!token) throw new Error('Geen Meta access token in de koppelingen');
         let mediaUrl = null, mediaType = 'image';
         if (post.asset_url && post.asset_provider === 'cloudinary') {
@@ -1580,7 +1672,7 @@ async function runScheduler() {
           mediaType = post.asset_type === 'video' ? 'video' : 'image';
         }
         const caption = post.body || post.title || '';
-        await publishToMeta({ meta_ig_user_id: post.meta_ig_user_id, meta_page_id: post.meta_page_id }, token, channel, mediaUrl, mediaType, caption);
+        await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption);
         await withWriteConnection(async (c) => c.query(
           `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
         ));
@@ -1604,10 +1696,8 @@ if (!global.__mktScheduler) {
 // Hergebruikt het opgeslagen token. Vereist ads_management in het token.
 // =======================================================================
 async function metaTokenForClient(wsId, clientId) {
-  const intg = await withReadConnection(async (c) => (await c.query(
-    'SELECT meta_access_token FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [clientId, wsId]
-  )).rows[0]);
-  return intg ? decryptSecret(intg.meta_access_token) : null;
+  const creds = await resolveClientMeta(wsId, clientId);
+  return creds.token;
 }
 
 // Campagne pauzeren of activeren.
