@@ -480,6 +480,20 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   <div class="viewer-box" id="viewerBox"></div>
 </div>
 
+<!-- MODAL: campagnes koppelen aan klant -->
+<div class="modal-ov" id="campLinkModal">
+  <div class="modal">
+    <h3>Campagnes koppelen</h3>
+    <div class="sub">Vink aan welke campagnes van het ad account bij deze klant horen. Alleen deze zie je bij de klant.</div>
+    <div id="clkMsg" class="inline-msg"></div>
+    <div id="clkList" style="max-height:52vh;overflow:auto;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCampLinks()">Annuleren</button>
+      <button class="btn btn-primary" id="clkBtn" onclick="saveCampLinks()">Koppeling opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
   <div class="modal">
@@ -1063,14 +1077,19 @@ async function loadMetaCampaigns(){
   var STAT={ACTIVE:{cls:'approved',txt:'Actief'},PAUSED:{cls:'scheduled',txt:'Gepauzeerd'},ARCHIVED:{cls:'archived',txt:'Gearchiveerd'}};
   function badge(s){var m=STAT[s]||{cls:'archived',txt:s};return '<span class="status '+m.cls+'">'+esc(m.txt)+'</span>';}
   function num(v){return v!=null?v:'-';}
+  var canManage=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
+  var linkBtn=canManage?'<button class="btn btn-ghost" onclick="openCampLinks()">Campagnes koppelen</button>':'';
   try{
+    var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
+    var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var d=await r.json();
-    if(!r.ok||!d.success){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Kon Meta-campagnes niet laden.</div>';return;}
+    if(!r.ok||!d.success){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4>'+linkBtn+'</div><div class="card" style="color:var(--muted);font-size:14px">Kon Meta-campagnes niet laden.</div>';return;}
     if(!d.configured){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Vul in de Koppelingen-tab het access token en Ad Account ID in om de al lopende campagnes te zien.</div>';return;}
-    if(d.error){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:13px">Niet beschikbaar: '+esc(d.error)+'</div>';return;}
-    if(!d.campaigns.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Geen bestaande campagnes gevonden op dit ad account.</div>';return;}
-    var canManage=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
-    box.innerHTML='<div class="section-h"><h4>Live op Meta ('+d.campaigns.length+')</h4></div><div class="post-list">'+d.campaigns.map(function(c){
+    if(d.error){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4>'+linkBtn+'</div><div class="card" style="color:var(--muted);font-size:13px">Niet beschikbaar: '+esc(d.error)+'</div>';return;}
+    ALL_META_CAMPAIGNS=d.campaigns||[]; LINKED_CAMP_IDS=linked;
+    var shown=ALL_META_CAMPAIGNS.filter(function(c){return linked.indexOf(String(c.id))>=0;});
+    if(!shown.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4>'+linkBtn+'</div><div class="card" style="color:var(--muted);font-size:14px">Nog geen campagnes aan deze klant gekoppeld. Klik op "Campagnes koppelen" om te kiezen welke campagnes bij deze klant horen.</div>';return;}
+    box.innerHTML='<div class="section-h"><h4>Live op Meta ('+shown.length+')</h4>'+linkBtn+'</div><div class="post-list">'+shown.map(function(c){
       var b=c.budget!=null?(' · &euro; '+c.budget.toFixed(2)+'/'+esc(c.budget_type||'')):'';
       var stats=(c.spend!=null||c.impressions!=null)?('<div class="cap" style="margin-top:8px">Laatste 30 dagen: &euro; '+num(c.spend)+' uitgegeven · '+num(c.impressions)+' impressies · '+num(c.clicks)+' klikken · CTR '+num(c.ctr)+'%</div>'):'';
       var ctrls='';
@@ -1084,6 +1103,33 @@ async function loadMetaCampaigns(){
         '<div class="post-meta"><span class="chan">'+esc(c.objective||'')+'</span>'+badge(c.status)+b+'</div>'+stats+ctrls+'</div></div>';
     }).join('')+'</div>';
   }catch(e){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het ophalen van Meta-campagnes.</div>';}
+}
+var ALL_META_CAMPAIGNS=[], LINKED_CAMP_IDS=[];
+function openCampLinks(){
+  var box=document.getElementById('clkList'); hideMsg('clkMsg');
+  if(!ALL_META_CAMPAIGNS.length){box.innerHTML='<div style="color:var(--muted);font-size:14px">Geen campagnes gevonden op het ad account. Zorg dat token + Ad Account ID zijn ingevuld.</div>';}
+  else{
+    box.innerHTML=ALL_META_CAMPAIGNS.map(function(c){
+      var checked=LINKED_CAMP_IDS.indexOf(String(c.id))>=0?' checked':'';
+      return '<label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer">'+
+        '<input type="checkbox" class="clk-cb" value="'+esc(c.id)+'" data-name="'+esc(c.name||'')+'" style="width:auto"'+checked+'>'+
+        '<span style="min-width:0"><span style="font-size:14px">'+esc(c.name||c.id)+'</span> <span style="color:var(--muted);font-size:12px">('+esc(c.status||'')+')</span></span></label>';
+    }).join('');
+  }
+  document.getElementById('campLinkModal').classList.add('open');
+}
+function closeCampLinks(){document.getElementById('campLinkModal').classList.remove('open');}
+async function saveCampLinks(){
+  var btn=document.getElementById('clkBtn'); hideMsg('clkMsg');
+  var items=[];
+  document.querySelectorAll('#clkList .clk-cb:checked').forEach(function(cb){items.push({id:cb.value,name:cb.getAttribute('data-name')});});
+  btn.disabled=true; btn.textContent='Opslaan...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({campaigns:items})});
+    var d=await r.json();
+    if(r.ok&&d.success){closeCampLinks();loadMetaCampaigns();} else {showMsg('clkMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('clkMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Koppeling opslaan';
 }
 async function openCampaign(){
   hideMsg('campModalMsg');

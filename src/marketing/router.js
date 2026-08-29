@@ -1623,4 +1623,49 @@ router.post('/api/mkt/clients/:clientId/meta/extend-token', requireMkt, async (r
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// =======================================================================
+// STAP 15 - CAMPAGNES KOPPELEN aan een klant (bij een gedeeld ad account)
+// =======================================================================
+// Welke campagne-ID's zijn aan deze klant gekoppeld.
+router.get('/api/mkt/clients/:clientId/campaign-links', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_campaign_id FROM marketing.campaign_links WHERE workspace_id=$1 AND client_id=$2', [wsId, okClient]
+    )).rows);
+    res.json({ success: true, links: rows.map((r) => r.meta_campaign_id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Stel de gekoppelde campagnes van deze klant in (vervangt de bestaande set).
+// Een campagne die aan een andere klant hing, verhuist mee naar deze klant.
+router.put('/api/mkt/clients/:clientId/campaign-links', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const items = Array.isArray(req.body && req.body.campaigns) ? req.body.campaigns : [];
+    await withWriteConnection(async (c) => {
+      await c.query('DELETE FROM marketing.campaign_links WHERE workspace_id=$1 AND client_id=$2', [wsId, okClient]);
+      for (const it of items) {
+        const cid = String((it && it.id) || '').trim();
+        if (!cid) continue;
+        const nm = (it && it.name != null) ? String(it.name).slice(0, 300) : null;
+        await c.query(
+          `INSERT INTO marketing.campaign_links (workspace_id, client_id, meta_campaign_id, campaign_name)
+           VALUES ($1,$2,$3,$4)
+           ON CONFLICT (workspace_id, meta_campaign_id)
+           DO UPDATE SET client_id=EXCLUDED.client_id, campaign_name=EXCLUDED.campaign_name`,
+          [wsId, okClient, cid, nm]
+        );
+      }
+    });
+    res.json({ success: true, count: items.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
