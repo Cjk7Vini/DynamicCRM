@@ -260,6 +260,14 @@
             border-top: 1px solid #f0f0f4;
         }
     </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
 </head>
 <body>
 
@@ -399,6 +407,9 @@
             btn.disabled = true;
             btn.textContent = 'Bezig met verzenden...';
 
+            // event_id voor deduplicatie tussen browser-pixel en Conversions API (server)
+            const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
             try {
                 const res = await fetch('/leads', {
                     method: 'POST',
@@ -410,14 +421,20 @@
                         doel,
                         bron,
                         toestemming: toestemming ? 'true' : 'false',
-                        praktijk_code
+                        praktijk_code,
+                        meta_event_id: eventId,
+                        event_source_url: window.location.href
                     })
                 });
 
                 if (res.ok) {
-                    document.getElementById('formBody').style.display = 'none';
-                    document.getElementById('successScreen').style.display = 'block';
-                    window.location.href = '/thankyou.html?s=76095F';
+                    const data = await res.json().catch(() => ({}));
+                    const submitToken = data.submit_token || '';
+                    const leadId = (data.lead && data.lead.id) ? String(data.lead.id) : '';
+                    window.location.href = '/thankyou.html?s=76095F'
+                        + '&eid=' + encodeURIComponent(eventId)
+                        + '&st=' + encodeURIComponent(submitToken)
+                        + '&lid=' + encodeURIComponent(leadId);
                 } else {
                     const data = await res.json().catch(() => ({}));
                     alertBox.innerHTML = `<div class="alert alert-error">${data.error || 'Er is iets misgegaan. Probeer het opnieuw.'}</div>`;
