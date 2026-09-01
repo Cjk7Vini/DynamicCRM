@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aanmelden - De Blaeij Goes</title>
+    <style>
+        :root {
+            --blue:      #2CA9E1;
+            --blue-dark: #1c8fc4;
+            --grey:      #58595B;
+            --light:     #eaf6fc;
+            --line:      #d6e9f5;
+            --text-dark: #3a3b3d;
+            --text-mid:  #6c6d70;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f4fafd;
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 580px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 40px 40px 44px;
+            border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(44,169,225,0.14);
+            border: 1px solid var(--line);
+        }
+        .logo { text-align: center; margin-bottom: 26px; }
+        .logo img { max-width: 300px; width: 100%; height: auto; }
+        .hero-block {
+            background: var(--blue);
+            border-radius: 10px;
+            padding: 28px 30px 26px;
+            margin-bottom: 28px;
+        }
+        h1 {
+            font-weight: 700;
+            color: #fff;
+            font-size: 25px;
+            line-height: 1.18;
+            margin-bottom: 8px;
+        }
+        .tagline { font-size: 14px; color: #e6f5fd; font-weight: 500; margin-bottom: 18px; }
+        .benefits { display: flex; flex-direction: column; gap: 10px; }
+        .benefit-item { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #fff; font-weight: 500; }
+        .benefit-icon {
+            width: 22px; height: 22px; background: rgba(255,255,255,0.25);
+            border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .benefit-icon svg { width: 12px; height: 12px; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-weight: 700; font-size: 13px; color: var(--grey); letter-spacing: 0.3px; }
+        .required { color: var(--blue); }
+        input, select, textarea {
+            width: 100%; padding: 12px 14px; border: 2px solid var(--line); border-radius: 8px;
+            font-size: 14px; font-family: inherit; color: var(--text-dark); background: #fbfdff;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); background: #fff; }
+        .checkbox-group { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 22px; }
+        .checkbox-group input[type="checkbox"] { width: auto; margin-top: 3px; accent-color: var(--blue); }
+        .checkbox-label { font-size: 13px; color: var(--text-mid); line-height: 1.6; }
+        .checkbox-label a { color: var(--blue); text-decoration: none; font-weight: 700; }
+        .submit-btn {
+            width: 100%; background: var(--blue); color: #fff; padding: 15px; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; letter-spacing: 0.4px;
+            transition: all 0.25s; box-shadow: 0 4px 18px rgba(44,169,225,0.32);
+        }
+        .submit-btn:hover { background: var(--blue-dark); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(28,143,196,0.32); }
+        .submit-btn:disabled { background: #a9d8ef; cursor: not-allowed; transform: none; box-shadow: none; }
+        .security-note { text-align: center; font-size: 12px; color: #9fb8c6; margin-top: 14px; }
+        #msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; display: none; }
+        #msg.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+        #msg.success { background: #eaf6fc; color: #1c6a8f; border: 1px solid #bfe3f5; display: block; }
+        footer { text-align: center; padding: 16px; font-size: 12px; color: #9fb8c6; margin-top: 8px; }
+        @media (max-width: 640px) { .container { padding: 28px 22px 32px; } h1 { font-size: 21px; } }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+
+<div class="container">
+
+    <div class="logo">
+        <img src="/images/deblaeij-logo.jpg" alt="De Blaeij Goes" onerror="this.style.display='none';">
+    </div>
+
+    <div class="hero-block">
+        <h1>Plan hier jouw gratis kennismaking bij De Blaeij Goes</h1>
+        <p class="tagline">Binnen 1 werkdag nemen we contact op om een afspraak in te plannen.</p>
+        <div class="benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></div>
+                <span>Gratis en vrijblijvende kennismaking</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></div>
+                <span>Persoonlijk advies over jouw klachten en doelen</span>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></div>
+                <span>Ontdek wat De Blaeij voor jou kan betekenen</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="msg"></div>
+
+    <form id="leadForm">
+        <input type="hidden" id="praktijk_code" name="praktijk_code" value="D32DAF">
+
+        <div class="form-group">
+            <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+            <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+        </div>
+
+        <div class="form-group">
+            <label for="emailadres">E-mailadres <span class="required">*</span></label>
+            <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
+        </div>
+
+        <div class="form-group">
+            <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+            <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+        </div>
+
+        <div class="form-group">
+            <label for="doel">Wat is je voornaamste doel? <span class="required">*</span></label>
+            <select id="doel" name="doel">
+                <option value="">Selecteer je doel</option>
+                <option value="Klachten verminderen of herstellen">Klachten verminderen of herstellen</option>
+                <option value="Fitter en actiever worden">Fitter en actiever worden</option>
+                <option value="Sterker worden">Sterker worden</option>
+                <option value="Blessure voorkomen">Blessure voorkomen</option>
+                <option value="Anders">Anders</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="bron">Hoe heb je ons gevonden?</label>
+            <select id="bron" name="bron">
+                <option value="">Selecteer...</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Google">Google</option>
+                <option value="Website">Website</option>
+                <option value="Vrienden/Familie">Vrienden/Familie</option>
+                <option value="Voucher">Voucher</option>
+            </select>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+            <label for="toestemming" class="checkbox-label">
+                Ik ga akkoord met de <a href="/voorwaarden.html" target="_blank">privacyverklaring</a> en geef toestemming om contact met mij op te nemen. <span class="required">*</span>
+            </label>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Plan mijn gratis kennismaking</button>
+
+        <p class="security-note">Je gegevens worden veilig verwerkt en nooit gedeeld met derden</p>
+    </form>
+</div>
+
+<footer>Copyright &copy; Dynamic Health Consultancy</footer>
+
+<script>
+    var PRACTICE_CODE = 'D32DAF';
+    var API_URL = 'https://dynamiccrm.onrender.com';
+
+    document.getElementById('praktijk_code').value = PRACTICE_CODE;
+
+    document.getElementById('leadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('msg');
+        var origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Bezig met verzenden...';
+        msg.style.display = 'none';
+
+        var email = document.getElementById('emailadres').value.trim();
+        var phone = document.getElementById('telefoon').value.trim();
+
+        if (!email || !email.includes('@') || !email.includes('.')) {
+            msg.textContent = 'Vul een geldig e-mailadres in.';
+            msg.className = 'error'; btn.disabled = false; btn.textContent = origText; return;
+        }
+        var phoneDigits = phone.replace(/\D/g, '');
+        if (!phone || phoneDigits.length < 10) {
+            msg.textContent = 'Vul een geldig telefoonnummer in (minimaal 10 cijfers).';
+            msg.className = 'error'; btn.disabled = false; btn.textContent = origText; return;
+        }
+
+        var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        var formData = {
+            praktijk_code: PRACTICE_CODE,
+            volledige_naam: document.getElementById('volledige_naam').value.trim(),
+            emailadres: email,
+            telefoon: phoneDigits,
+            bron: document.getElementById('bron') ? document.getElementById('bron').value : null,
+            doel: document.getElementById('doel').value || null,
+            toestemming: document.getElementById('toestemming').checked,
+            meta_event_id: eventId,
+            event_source_url: window.location.href
+        };
+
+        try {
+            var response = await fetch(API_URL + '/leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            var resData = await response.json().catch(function() { return {}; });
+            if (response.ok) {
+                var st = resData.submit_token || '';
+                var lid = (resData.lead && resData.lead.id) ? String(resData.lead.id) : '';
+                window.location.href = 'thankyou.html?s=' + PRACTICE_CODE +
+                    '&eid=' + encodeURIComponent(eventId) +
+                    '&st=' + encodeURIComponent(st) +
+                    '&lid=' + encodeURIComponent(lid);
+                return;
+            } else {
+                msg.textContent = resData.error || 'Er ging iets mis. Probeer het opnieuw.';
+                msg.className = 'error';
+            }
+        } catch (err) {
+            msg.textContent = 'Kan geen verbinding maken. Controleer je internetverbinding.';
+            msg.className = 'error';
+        }
+        btn.disabled = false; btn.textContent = origText;
+    });
+</script>
+
+</body>
+</html>
