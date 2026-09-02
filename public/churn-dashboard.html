@@ -3153,6 +3153,14 @@
                     params.append('practice', practiceFilter.value);
                 }
                 // If no filter selected, show ALL (don't add practice param)
+            } else if (currentUser && currentUser.role === 'organisation') {
+                // Organisatie: gebruik de in de dropdown gekozen locatie voor het
+                // hoofdscherm. Bij "Alle locaties" (leeg) toont de UI het aparte
+                // organisatieoverzicht, dus daar hoeft hier geen code mee.
+                const practiceFilter = document.getElementById('practiceFilter');
+                if (practiceFilter && practiceFilter.value) {
+                    params.append('practice', practiceFilter.value);
+                }
             }
             
             const source = document.getElementById('sourceFilter').value;
