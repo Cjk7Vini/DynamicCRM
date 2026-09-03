@@ -464,9 +464,13 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div id="dReport" style="display:none">
           <div class="section-h">
             <span class="pill">Rapportage</span>
-            <button class="btn btn-primary" onclick="openReportPdf()">Rapport openen (PDF)</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost" id="aiAnalyseBtn" onclick="runAiAnalysis()">AI-analyse</button>
+              <button class="btn btn-primary" onclick="openReportPdf()">Rapport openen (PDF)</button>
+            </div>
           </div>
           <div id="reportMsg" class="inline-msg"></div>
+          <div id="aiAnalyseBox" style="display:none"></div>
           <div id="reportBody"><div class="empty">Laden...</div></div>
         </div>
       </section>
@@ -533,6 +537,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3>Nieuwe advertentiecampagne</h3>
     <div class="sub">Wordt gepauzeerd aangemaakt bij Meta. Er wordt niets uitgegeven tot jij hem in Meta activeert.</div>
     <div id="campModalMsg" class="inline-msg"></div>
+    <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:6px">AI-assistent <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></label>
+      <div style="font-size:12.5px;color:var(--muted);margin:2px 0 8px">Beschrijf kort wat je wilt adverteren. De AI vult tekst, doel en targeting alvast in. Het beeld kies je zelf.</div>
+      <textarea id="cpAiPrompt" rows="2" placeholder="Bijv. Gratis intake voor fysiotherapie in Goes, gericht op mensen met rugklachten van 30 tot 55 jaar"></textarea>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn btn-primary" id="cpAiBtn" onclick="aiSuggestCampaign()" style="padding:8px 14px;font-size:13px">Genereer voorstel</button>
+        <span id="cpAiHint" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
     <div class="field"><label>Campagnenaam *</label><input id="cpName" placeholder="Bijv. Zomeractie juli"></div>
     <div class="row2">
       <div class="field"><label>Doel</label>
@@ -1082,6 +1095,25 @@ async function loadMetaInsights(){
   }catch(e){box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
 }
 
+async function runAiAnalysis(){
+  if(!CURRENT_CLIENT)return;
+  var box=document.getElementById('aiAnalyseBox'); var btn=document.getElementById('aiAnalyseBtn');
+  box.style.display='block';
+  box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">AI leest de cijfers en schrijft een verslag...</div>';
+  btn.disabled=true; var orig=btn.textContent; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">'+esc(d.error||'AI-analyse mislukt.')+'</div>';btn.disabled=false;btn.textContent=orig;return;}
+    var safe=esc(d.report).replace(/\n/g,'<br>');
+    box.innerHTML='<div class="card" style="margin-bottom:18px">'+
+      '<div class="section-h" style="margin-top:0"><h4 style="display:flex;align-items:center;gap:6px">AI-analyse <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></h4></div>'+
+      '<div style="font-size:14px;line-height:1.7">'+safe+'</div>'+
+      '<div style="font-size:11.5px;color:var(--faint);margin-top:12px">Gebaseerd op de Meta-cijfers van de laatste 30 dagen. Controleer altijd zelf voor je dit met de klant deelt.</div></div>';
+  }catch(e){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">Netwerkfout.</div>';}
+  btn.disabled=false; btn.textContent=orig;
+}
+
 // ---- Koppelingen (integraties) ----
 var INT_PLAIN=['notes'];
 var INT_MASKED=['meta_page_id','meta_ig_user_id','meta_pixel_id','meta_ad_account_id','meta_app_id','google_ads_customer_id','ga4_measurement_id','tiktok_pixel_id'];
@@ -1308,6 +1340,7 @@ async function openCampaign(){
   document.getElementById('cpBidStrategy').value='LOWEST_COST_WITHOUT_CAP';document.getElementById('cpBidCapWrap').style.display='none';
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
+  var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
     var sel=document.getElementById('cpAsset');var opts='<option value="">Kies een afbeelding</option>';
@@ -1351,6 +1384,33 @@ function renderInterestChips(){
   }).join('');
 }
 function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
+async function aiSuggestCampaign(){
+  var brief=document.getElementById('cpAiPrompt').value.trim();
+  var hint=document.getElementById('cpAiHint');
+  var btn=document.getElementById('cpAiBtn');
+  if(brief.length<5){hint.style.color='#b91c1c';hint.textContent='Beschrijf eerst kort wat je wilt adverteren.';return;}
+  btn.disabled=true; btn.textContent='Bezig...'; hint.style.color='var(--muted)'; hint.textContent='AI denkt na...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/ad-suggestion',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({prompt:brief})});
+    var d=await r.json();
+    if(!r.ok||!d.success){hint.style.color='#b91c1c';hint.textContent=d.error||'AI-voorstel mislukt.';btn.disabled=false;btn.textContent='Genereer voorstel';return;}
+    var s=d.suggestion;
+    if(s.name)document.getElementById('cpName').value=s.name;
+    if(s.objective)document.getElementById('cpObjective').value=s.objective;
+    if(s.cta)document.getElementById('cpCta').value=s.cta;
+    if(s.ageMin)document.getElementById('cpAgeMin').value=s.ageMin;
+    if(s.ageMax)document.getElementById('cpAgeMax').value=s.ageMax;
+    if(s.genders)document.getElementById('cpGenders').value=s.genders;
+    if(s.caption)document.getElementById('cpCaption').value=s.caption;
+    if(Array.isArray(s.interests)){ s.interests.forEach(function(i){ if(i&&i.id&&!CP_INTERESTS.some(function(x){return x.id===i.id;}))CP_INTERESTS.push({id:i.id,name:i.name}); }); renderInterestChips(); }
+    var extra='';
+    var unresolved=(s.interestWords||[]).filter(function(w){ return !(s.interests||[]).some(function(i){ return String(i.name||'').toLowerCase()===String(w).toLowerCase(); }); });
+    if(unresolved.length)extra=' Zoek eventueel zelf nog: '+unresolved.join(', ')+'.';
+    hint.style.color='var(--accent-2)';
+    hint.textContent='Voorstel ingevuld. '+(s.rationale||'')+extra+' Controleer alles en kies een afbeelding.';
+  }catch(e){hint.style.color='#b91c1c';hint.textContent='Netwerkfout.';}
+  btn.disabled=false; btn.textContent='Genereer voorstel';
+}
 async function createCampaign2(){
   var btn=document.getElementById('cpBtn'); hideMsg('campModalMsg');
   var payload={

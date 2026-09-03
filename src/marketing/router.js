@@ -1238,6 +1238,59 @@ function normalizeAdAccount(id) {
   return s ? ('act_' + s) : '';
 }
 
+// =======================================================================
+// AI-HULP (Claude) - copy/targeting-suggestie + analyse in gewone taal.
+//  - Praat rechtstreeks met de officiele Anthropic Messages API via fetch.
+//  - Sleutel staat in Render (ANTHROPIC_API_KEY), nooit in de code.
+//  - Zonder sleutel valt alles netjes terug met een duidelijke melding.
+// =======================================================================
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_MODEL = 'claude-opus-5';
+
+function aiConfigured() {
+  return !!(process.env.ANTHROPIC_API_KEY && String(process.env.ANTHROPIC_API_KEY).trim());
+}
+
+// Roept Claude aan en geeft de platte tekst van het antwoord terug.
+async function callClaude(system, userText, maxTokens = 1500) {
+  const key = String(process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) throw new Error('AI is niet geconfigureerd (ANTHROPIC_API_KEY ontbreekt in Render)');
+  const resp = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      thinking: { type: 'adaptive' },
+      system,
+      messages: [{ role: 'user', content: userText }],
+    }),
+  });
+  if (!resp.ok) {
+    let detail = '';
+    try { const j = await resp.json(); detail = (j && j.error && j.error.message) || ''; } catch (_) { /* geen json */ }
+    throw new Error('AI-verzoek mislukt (' + resp.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const data = await resp.json();
+  const parts = Array.isArray(data.content) ? data.content : [];
+  const text = parts.filter((p) => p && p.type === 'text').map((p) => p.text).join('\n').trim();
+  if (!text) throw new Error('AI gaf een leeg antwoord terug');
+  return text;
+}
+
+// Haalt het eerste JSON-object uit een tekst (Claude zet er soms uitleg omheen).
+function extractJson(text) {
+  const s = String(text || '');
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) throw new Error('AI gaf geen bruikbaar JSON-antwoord');
+  return JSON.parse(s.slice(start, end + 1));
+}
+
 // Lijst eerder aangemaakte campagnes (uit onze database).
 router.get('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res) => {
   try {
@@ -1387,6 +1440,166 @@ router.get('/api/mkt/clients/:clientId/meta/audiences', requireMkt, async (req, 
     const r = await graphGet(`${creds.adAccount}/customaudiences`, { fields: 'id,name,subtype', limit: '50', access_token: creds.token });
     const audiences = (r.data || []).map((a) => ({ id: a.id, name: a.name, subtype: a.subtype || null }));
     res.json({ success: true, audiences });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
+// AI-ADVERTENTIE-ASSISTENT - prompt in, copy + targeting-voorstel uit.
+//  De marketeer levert een korte briefing; Claude stelt advertentietekst,
+//  call-to-action, doel, leeftijd/geslacht en interessewoorden voor.
+//  Het beeld kiest de marketeer zelf; de campagne blijft altijd PAUSED.
+// =======================================================================
+router.post('/api/mkt/clients/:clientId/ai/ad-suggestion', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const brief = String((req.body && req.body.prompt) || '').trim();
+    if (brief.length < 5) return res.status(400).json({ error: 'Geef een korte briefing van minimaal een paar woorden' });
+
+    const client = await withReadConnection(async (c) => (await c.query(
+      'SELECT name, website, notes, brand_color FROM marketing.clients WHERE id=$1 AND workspace_id=$2',
+      [okClient, wsId]
+    )).rows[0]) || {};
+
+    const system = [
+      'Je bent een ervaren Nederlandse Meta-advertentiespecialist.',
+      'Je schrijft advertentieteksten en stelt targeting voor op basis van een korte briefing.',
+      'Schrijf altijd in het Nederlands. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Antwoord UITSLUITEND met een geldig JSON-object, zonder uitleg eromheen, met exact deze velden:',
+      '{',
+      '  "name": "korte campagnenaam (max 60 tekens)",',
+      '  "caption": "advertentietekst, pakkend, max 500 tekens, mag emoji bevatten",',
+      '  "objective": "een van OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_ENGAGEMENT",',
+      '  "cta": "een van LEARN_MORE, SHOP_NOW, SIGN_UP, BOOK_TRAVEL, CONTACT_US, GET_OFFER, SUBSCRIBE",',
+      '  "ageMin": getal 13 t/m 65,',
+      '  "ageMax": getal 13 t/m 65,',
+      '  "genders": "een van all, men, women",',
+      '  "interests": ["max 5 losse interessewoorden in het Nederlands of Engels voor Meta targeting"],',
+      '  "rationale": "1 tot 2 korte zinnen waarom deze keuzes passen"',
+      '}',
+    ].join('\n');
+
+    const ctx = [
+      'Briefing van de marketeer: ' + brief,
+      'Klantnaam: ' + (client.name || 'onbekend'),
+      client.website ? ('Website: ' + client.website) : '',
+      client.notes ? ('Notities over de klant: ' + String(client.notes).slice(0, 500)) : '',
+    ].filter(Boolean).join('\n');
+
+    const raw = await callClaude(system, ctx, 1200);
+    const j = extractJson(raw);
+
+    // Opschonen en binnen veilige grenzen houden.
+    const objective = CAMPAIGN_OBJECTIVES[j.objective] ? j.objective : 'OUTCOME_TRAFFIC';
+    const cta = CTA_TYPES.includes(j.cta) ? j.cta : 'LEARN_MORE';
+    const genders = ['all', 'men', 'women'].includes(j.genders) ? j.genders : 'all';
+    let ageMin = Math.min(65, Math.max(13, parseInt(j.ageMin, 10) || 18));
+    let ageMax = Math.min(65, Math.max(ageMin, parseInt(j.ageMax, 10) || 65));
+    const interestWords = Array.isArray(j.interests)
+      ? j.interests.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5)
+      : [];
+
+    // Interessewoorden best-effort omzetten naar echte Meta-interesses.
+    let resolvedInterests = [];
+    try {
+      const creds = await resolveClientMeta(wsId, okClient);
+      if (creds.token && interestWords.length) {
+        for (const w of interestWords) {
+          if (w.length < 2) continue;
+          try {
+            const r = await graphGet('search', { type: 'adinterest', q: w, limit: '1', access_token: creds.token });
+            const hit = (r.data || [])[0];
+            if (hit && hit.id && !resolvedInterests.some((i) => i.id === hit.id)) {
+              resolvedInterests.push({ id: hit.id, name: hit.name });
+            }
+          } catch (_) { /* dit woord overslaan */ }
+        }
+      }
+    } catch (_) { /* geen koppeling: alleen woorden teruggeven */ }
+
+    res.json({
+      success: true,
+      suggestion: {
+        name: String(j.name || '').slice(0, 60),
+        caption: String(j.caption || '').slice(0, 500),
+        objective, cta, ageMin, ageMax, genders,
+        interestWords,
+        interests: resolvedInterests,
+        rationale: String(j.rationale || '').slice(0, 400),
+      },
+    });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
+// AI-ANALYSE - leest de advertentie- en accountcijfers en geeft een
+// verslag in gewone taal terug (wat gaat goed, wat kan beter, tips).
+// =======================================================================
+router.post('/api/mkt/clients/:clientId/ai/analysis', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const client = await withReadConnection(async (c) => (await c.query(
+      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+
+    const creds = await resolveClientMeta(wsId, okClient);
+    if (!creds.token) return res.status(400).json({ error: 'Geen Meta-koppeling voor deze klant. Analyse is niet mogelijk.' });
+
+    // Cijfers ophalen (zelfde bronnen als de rapportage).
+    const figures = { account: null, ads: null, topPosts: [] };
+    if (creds.igUserId) {
+      try {
+        const a = await graphGet(`${creds.igUserId}`, { fields: 'username,followers_count,media_count', access_token: creds.token });
+        figures.account = { username: a.username || null, followers: a.followers_count ?? null, media: a.media_count ?? null };
+      } catch (_) { /* overslaan */ }
+      try {
+        const m = await graphGet(`${creds.igUserId}/media`, {
+          fields: 'caption,media_type,like_count,comments_count', limit: '10', access_token: creds.token,
+        });
+        const posts = (m.data || []).map((p) => ({
+          caption: (p.caption || '').slice(0, 80), type: p.media_type, likes: p.like_count ?? 0, comments: p.comments_count ?? 0,
+        }));
+        posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
+        figures.topPosts = posts.slice(0, 5);
+      } catch (_) { /* overslaan */ }
+    }
+    if (creds.adAccount) {
+      try {
+        const ins = await graphGet(`${creds.adAccount}/insights`, {
+          fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm', date_preset: 'last_30d', access_token: creds.token,
+        });
+        figures.ads = (ins.data && ins.data[0]) || { empty: true };
+      } catch (_) { /* overslaan */ }
+    }
+
+    const hasData = figures.account || (figures.ads && !figures.ads.empty) || figures.topPosts.length;
+    if (!hasData) return res.status(400).json({ error: 'Geen cijfers beschikbaar om te analyseren' });
+
+    const system = [
+      'Je bent een ervaren Nederlandse Meta-advertentiespecialist die cijfers uitlegt aan een klant zonder marketingkennis.',
+      'Schrijf in het Nederlands, in gewone taal, kort en concreet. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Geef je verslag met deze kopjes (gewone tekst, geen JSON):',
+      'Samenvatting: 2 tot 3 zinnen over hoe het ervoor staat.',
+      'Wat gaat goed: 2 tot 4 punten.',
+      'Wat kan beter: 2 tot 4 punten.',
+      'Concrete tips: 2 tot 4 acties voor de komende maand.',
+      'Baseer alles alleen op de aangeleverde cijfers. Verzin geen getallen.',
+    ].join('\n');
+
+    const userText = 'Klant: ' + (client.name || 'onbekend') + '\n'
+      + 'Cijfers laatste 30 dagen (Meta):\n' + JSON.stringify(figures, null, 2);
+
+    const report = await callClaude(system, userText, 1600);
+    res.json({ success: true, report, figures });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
