@@ -6092,7 +6092,8 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
           ) ORDER BY b.poging_nummer) as pogingen
         FROM belpogingen b
         JOIN public.leads l ON l.id = b.lead_id
-        WHERE l.funnel_stage NOT IN ('won', 'lost')`;
+        WHERE l.funnel_stage NOT IN ('won', 'lost')
+          AND l.appointment_date IS NULL`;
 
       const params = [];
       if (role !== 'admin') {
