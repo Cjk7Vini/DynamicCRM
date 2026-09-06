@@ -2170,12 +2170,28 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
       });
     } catch (_) { /* geen cijfers beschikbaar */ }
 
+    // Publieksverdeling (leeftijd/geslacht) per advertentieset, hele looptijd.
+    const audienceBySet = {};
+    try {
+      const ai = await graphGet(`${cid}/insights`, {
+        level: 'adset', fields: 'adset_id,impressions,clicks,spend', breakdowns: 'age,gender',
+        date_preset: 'maximum', limit: '500', access_token: token,
+      });
+      (ai.data || []).forEach((r) => {
+        if (!r.adset_id) return;
+        (audienceBySet[r.adset_id] = audienceBySet[r.adset_id] || []).push({
+          age: r.age, gender: r.gender, impressions: r.impressions ?? null, clicks: r.clicks ?? null, spend: r.spend ?? null,
+        });
+      });
+    } catch (_) { /* geen verdeling beschikbaar */ }
+
     const adsets = (setsRes.data || []).map((s) => ({
       id: s.id, name: s.name, status: s.effective_status,
       budget: s.daily_budget ? (Number(s.daily_budget) / 100) : null,
       optimization_goal: s.optimization_goal || null,
       ads: adsBySet[s.id] || [],
       stats: statsBySet[s.id] || null,
+      audience: audienceBySet[s.id] || null,
     }));
 
     // Campagnetotaal (hele looptijd), defensief.
@@ -2191,17 +2207,7 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
       } : null;
     } catch (_) { totals = null; }
 
-    // Publieksverdeling van de hele campagne (leeftijd/geslacht), hele looptijd.
-    let breakdown = null;
-    try {
-      const ins = await graphGet(`${cid}/insights`, {
-        fields: 'impressions,clicks,spend', breakdowns: 'age,gender', date_preset: 'maximum', limit: '100', access_token: token,
-      });
-      breakdown = (ins.data || []).map((r) => ({
-        age: r.age, gender: r.gender, impressions: r.impressions ?? null, clicks: r.clicks ?? null, spend: r.spend ?? null,
-      }));
-    } catch (_) { breakdown = null; }
-    res.json({ success: true, adsets, totals, breakdown });
+    res.json({ success: true, adsets, totals });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
