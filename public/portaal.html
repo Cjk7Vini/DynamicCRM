@@ -442,13 +442,13 @@
     <div class="header-user" id="headerUser" style="position:relative;">
       <button onclick="togglePortaalMenu()" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.9);font-size:13px;transition:background 0.2s;" id="portaalMenuBtn">
         <div style="width:26px;height:26px;border-radius:50%;background:#333399;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;" id="headerAvatar">?</div>
-        <span id="headerUserName">—</span>
+        <span id="headerUserName">-</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div id="portaalMenu" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:260px;background:white;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;overflow:hidden;">
         <!-- Profiel info -->
         <div style="padding:16px;border-bottom:1px solid #f3f4f6;">
-          <div style="font-size:13px;font-weight:600;color:#111827;" id="menuEmail">—</div>
+          <div style="font-size:13px;font-weight:600;color:#111827;" id="menuEmail">-</div>
           <div style="font-size:12px;color:#9ca3af;margin-top:3px;" id="menuPraktijkCode"></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;" id="menuLicenties"></div>
         </div>
@@ -1294,8 +1294,8 @@
             html += `<tr style="border-bottom:1px solid #f9fafb;">
               <td style="padding:8px 12px;font-size:13px;color:#374151;">${MAAND_NAMEN[r.maand-1]}</td>
               <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${r.doel_leden}</td>
-              <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${werkelijk !== null ? werkelijk : '—'}</td>
-              <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:600;color:${kleur};">${verschil !== null ? (verschil >= 0 ? '+' : '') + verschil : '—'}</td>
+              <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${werkelijk !== null ? werkelijk : '-'}</td>
+              <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:600;color:${kleur};">${verschil !== null ? (verschil >= 0 ? '+' : '') + verschil : '-'}</td>
               <td style="padding:8px 12px;text-align:right;"><button onclick="verwijderMaand('${code}',${jaar},${r.maand})" style="padding:3px 8px;background:none;border:1px solid #fecaca;border-radius:5px;font-size:11px;color:#dc2626;cursor:pointer;">✕</button></td>
             </tr>`;
           });
@@ -1315,11 +1315,11 @@
             </div>
             <div>
               <label style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Prognose doel</label>
-              <input type="number" id="invoer-prognose" placeholder="—" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#333399'" onblur="this.style.borderColor='#e5e7eb'">
+              <input type="number" id="invoer-prognose" placeholder="-" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#333399'" onblur="this.style.borderColor='#e5e7eb'">
             </div>
             <div>
               <label style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Werkelijk leden</label>
-              <input type="number" id="invoer-leden" placeholder="—" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#99CC33'" onblur="this.style.borderColor='#e5e7eb'">
+              <input type="number" id="invoer-leden" placeholder="-" style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#99CC33'" onblur="this.style.borderColor='#e5e7eb'">
             </div>
             <button onclick="slaInvoerOp('${code}', ${jaar})" style="padding:9px 16px;background:#111827;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">Opslaan</button>
           </div>
