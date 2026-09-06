@@ -2029,23 +2029,53 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
     });
     const adsBySet = {};
     (adsRes.data || []).forEach((a) => { (adsBySet[a.adset_id] = adsBySet[a.adset_id] || []).push({ id: a.id, name: a.name, status: a.effective_status }); });
+    // Resultaten per advertentieset (hele looptijd), defensief opgehaald.
+    const statsBySet = {};
+    try {
+      const si = await graphGet(`${cid}/insights`, {
+        level: 'adset', fields: 'adset_id,spend,impressions,reach,clicks,ctr,cpc',
+        date_preset: 'maximum', limit: '100', access_token: token,
+      });
+      (si.data || []).forEach((r) => {
+        statsBySet[r.adset_id] = {
+          spend: r.spend ?? null, impressions: r.impressions ?? null, reach: r.reach ?? null,
+          clicks: r.clicks ?? null, ctr: r.ctr ?? null, cpc: r.cpc ?? null,
+        };
+      });
+    } catch (_) { /* geen cijfers beschikbaar */ }
+
     const adsets = (setsRes.data || []).map((s) => ({
       id: s.id, name: s.name, status: s.effective_status,
       budget: s.daily_budget ? (Number(s.daily_budget) / 100) : null,
       optimization_goal: s.optimization_goal || null,
       ads: adsBySet[s.id] || [],
+      stats: statsBySet[s.id] || null,
     }));
-    // Publieksverdeling van de resultaten (leeftijd/geslacht), defensief.
+
+    // Campagnetotaal (hele looptijd), defensief.
+    let totals = null;
+    try {
+      const ti = await graphGet(`${cid}/insights`, {
+        fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm', date_preset: 'maximum', access_token: token,
+      });
+      const row = (ti.data && ti.data[0]) || null;
+      totals = row ? {
+        spend: row.spend ?? null, impressions: row.impressions ?? null, reach: row.reach ?? null,
+        clicks: row.clicks ?? null, ctr: row.ctr ?? null, cpc: row.cpc ?? null, cpm: row.cpm ?? null,
+      } : null;
+    } catch (_) { totals = null; }
+
+    // Publieksverdeling van de hele campagne (leeftijd/geslacht), hele looptijd.
     let breakdown = null;
     try {
       const ins = await graphGet(`${cid}/insights`, {
-        fields: 'impressions,clicks,spend', breakdowns: 'age,gender', date_preset: 'last_30d', limit: '100', access_token: token,
+        fields: 'impressions,clicks,spend', breakdowns: 'age,gender', date_preset: 'maximum', limit: '100', access_token: token,
       });
       breakdown = (ins.data || []).map((r) => ({
         age: r.age, gender: r.gender, impressions: r.impressions ?? null, clicks: r.clicks ?? null, spend: r.spend ?? null,
       }));
     } catch (_) { breakdown = null; }
-    res.json({ success: true, adsets, breakdown });
+    res.json({ success: true, adsets, totals, breakdown });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -2111,6 +2141,46 @@ router.delete('/api/mkt/clients/:clientId/meta-ads/:adId', requireMkt, async (re
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Verwijderen mislukt');
     res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Advertentieset verwijderen.
+router.delete('/api/mkt/clients/:clientId/meta-adsets/:adsetId', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const body = new URLSearchParams({ access_token: token });
+    const r = await fetch(`${GRAPH}/${req.params.adsetId}`, { method: 'DELETE', body });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Verwijderen mislukt');
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Hele campagne in een keer live zetten of pauzeren (campagne + alle sets + alle ads).
+router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/publish', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const status = (req.body && (req.body.status === 'ACTIVE' || req.body.status === 'PAUSED')) ? req.body.status : null;
+    if (!status) return res.status(400).json({ error: 'Kies live zetten of pauzeren' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const cid = req.params.campaignId;
+    const sets = await graphGet(`${cid}/adsets`, { fields: 'id', limit: '50', access_token: token });
+    const ads = await graphGet(`${cid}/ads`, { fields: 'id', limit: '100', access_token: token });
+    // Bij live zetten: eerst de campagne, dan sets, dan ads (ouder actief voor kind).
+    // Bij pauzeren maakt de volgorde niet uit.
+    await graphPost(`${cid}`, { status, access_token: token });
+    for (const s of (sets.data || [])) { await graphPost(`${s.id}`, { status, access_token: token }); }
+    for (const a of (ads.data || [])) { await graphPost(`${a.id}`, { status, access_token: token }); }
+    res.json({ success: true, status });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
