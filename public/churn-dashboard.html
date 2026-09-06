@@ -2860,7 +2860,10 @@
 
                 // Als beide leeg zijn - check leden_historie
                 if (prognose.length === 0 && history.length === 0) {
-                    const ledenKeys = Object.keys(ledenHistorieLookup).sort();
+                    const ledenKeys = Object.keys(ledenHistorieLookup).sort(function(a, b) {
+                        var pa = a.split('-'), pb = b.split('-');
+                        return (parseInt(pa[0]) - parseInt(pb[0])) || (parseInt(pa[1]) - parseInt(pb[1]));
+                    });
                     if (ledenKeys.length > 0) {
                         const nu = new Date();
                         const maandNamenArr = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
@@ -2890,7 +2893,10 @@
 
                 // Als geen prognose maar wel eClub of leden_historie data
                 if (prognose.length === 0) {
-                    const ledenKeys = Object.keys(ledenHistorieLookup).sort();
+                    const ledenKeys = Object.keys(ledenHistorieLookup).sort(function(a, b) {
+                        var pa = a.split('-'), pb = b.split('-');
+                        return (parseInt(pa[0]) - parseInt(pb[0])) || (parseInt(pa[1]) - parseInt(pb[1]));
+                    });
                     const ledenLabels = ledenKeys.map(k => {
                         const [j, m] = k.split('-');
                         return `${maandNamen[parseInt(m)-1]} ${j}`;
