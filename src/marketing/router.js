@@ -1373,15 +1373,19 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     }
     const targeting = JSON.stringify(targetingObj);
 
-    // 1) Campagne (PAUSED)
+    // Standaard gepauzeerd aanmaken (veilig). Wie bewust 'direct live' kiest,
+    // krijgt alles meteen op ACTIVE. launch is strikt begrensd tot deze twee waarden.
+    const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
+
+    // 1) Campagne
     const campaign = await graphPost(`${adAccount}/campaigns`, {
-      name, objective, status: 'PAUSED', special_ad_categories: '[]', access_token: token,
+      name, objective, status: launchStatus, special_ad_categories: '[]', access_token: token,
     });
-    // 2) Advertentieset (PAUSED)
+    // 2) Advertentieset
     const adsetParams = {
       name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
       billing_event: 'IMPRESSIONS', optimization_goal: CAMPAIGN_OBJECTIVES[objective],
-      bid_strategy: bidStrategy, targeting, status: 'PAUSED',
+      bid_strategy: bidStrategy, targeting, status: launchStatus,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
@@ -1394,20 +1398,142 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     const creative = await graphPost(`${adAccount}/adcreatives`, {
       name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
     });
-    // 4) Advertentie (PAUSED)
+    // 4) Advertentie
     const ad = await graphPost(`${adAccount}/ads`, {
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
-      status: 'PAUSED', access_token: token,
+      status: launchStatus, access_token: token,
     });
 
     const row = await withWriteConnection(async (c) => (await c.query(
       `INSERT INTO marketing.campaigns
          (workspace_id, client_id, name, objective, daily_budget_cents, status, meta_campaign_id, meta_adset_id, meta_creative_id, meta_ad_id, asset_id, link, created_by)
-       VALUES ($1,$2,$3,$4,$5,'PAUSED',$6,$7,$8,$9,$10,$11,$12)
+       VALUES ($1,$2,$3,$4,$5,'${launchStatus}',$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, name, objective, daily_budget_cents, status, meta_campaign_id, link, created_at`,
       [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, campaign: row });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Extra advertentieset (met 1 advertentie) toevoegen aan een bestaande campagne.
+router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Naam van de advertentieset is verplicht' });
+    const euros = Number(b.dailyBudget);
+    if (!Number.isFinite(euros) || euros < 1) return res.status(400).json({ error: 'Vul een dagbudget in van minimaal 1 euro' });
+    const budgetCents = Math.round(euros * 100);
+    const country = String(b.country || 'NL').trim().toUpperCase().slice(0, 2);
+    const ageMin = Math.min(65, Math.max(13, parseInt(b.ageMin, 10) || 18));
+    const ageMax = Math.min(65, Math.max(ageMin, parseInt(b.ageMax, 10) || 65));
+    const link = String(b.link || '').trim();
+    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
+    const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
+    const caption = String(b.caption || '').slice(0, 2000);
+
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const adAccount = creds.adAccount;
+    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
+    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
+    if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
+
+    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding voor de advertentie' });
+    const asset = await withReadConnection(async (c) => (await c.query(
+      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+      [b.assetId, okClient, wsId]
+    )).rows[0]);
+    if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
+    if (asset.resource_type === 'video') return res.status(400).json({ error: 'Video-advertenties komen later. Kies voor nu een afbeelding.' });
+
+    // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen.
+    let optimizationGoal = 'LINK_CLICKS';
+    try {
+      const camp = await graphGet(`${req.params.campaignId}`, { fields: 'objective', access_token: token });
+      if (camp && camp.objective && CAMPAIGN_OBJECTIVES[camp.objective]) optimizationGoal = CAMPAIGN_OBJECTIVES[camp.objective];
+    } catch (_) { /* val terug op LINK_CLICKS */ }
+
+    const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
+    const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
+    const audienceIds = Array.isArray(b.audiences) ? b.audiences.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 20) : [];
+    const bidStrategy = ['LOWEST_COST_WITHOUT_CAP', 'LOWEST_COST_WITH_BID_CAP'].includes(b.bidStrategy) ? b.bidStrategy : 'LOWEST_COST_WITHOUT_CAP';
+    let bidCapCents = null;
+    if (bidStrategy === 'LOWEST_COST_WITH_BID_CAP') {
+      const cap = Number(b.bidCap);
+      if (!Number.isFinite(cap) || cap < 0.5) return res.status(400).json({ error: 'Vul een biedlimiet in van minimaal 0,50 euro' });
+      bidCapCents = Math.round(cap * 100);
+    }
+    const placement = (b.placement === 'manual') ? 'manual' : 'automatic';
+
+    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    if (genders === 'men') targetingObj.genders = [1];
+    else if (genders === 'women') targetingObj.genders = [2];
+    if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
+    if (audienceIds.length) targetingObj.custom_audiences = audienceIds.map((id) => ({ id }));
+    if (placement === 'manual') {
+      targetingObj.publisher_platforms = ['facebook', 'instagram'];
+      targetingObj.facebook_positions = ['feed'];
+      targetingObj.instagram_positions = ['stream'];
+    }
+    const targeting = JSON.stringify(targetingObj);
+    const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
+
+    const adsetParams = {
+      name, campaign_id: req.params.campaignId, daily_budget: String(budgetCents),
+      billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
+      bid_strategy: bidStrategy, targeting, status: launchStatus,
+      start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
+    };
+    if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
+    const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
+    const storySpec = JSON.stringify({
+      page_id: creds.pageId,
+      link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
+    });
+    const creative = await graphPost(`${adAccount}/adcreatives`, {
+      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
+    });
+    const ad = await graphPost(`${adAccount}/ads`, {
+      name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
+      status: launchStatus, access_token: token,
+    });
+    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Targeting van een advertentieset bewerken (land, leeftijd, geslacht, interesses, naam).
+router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/targeting', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+
+    const b = req.body || {};
+    const country = String(b.country || 'NL').trim().toUpperCase().slice(0, 2);
+    const ageMin = Math.min(65, Math.max(13, parseInt(b.ageMin, 10) || 18));
+    const ageMax = Math.min(65, Math.max(ageMin, parseInt(b.ageMax, 10) || 65));
+    const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
+    const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
+
+    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    if (genders === 'men') targetingObj.genders = [1];
+    else if (genders === 'women') targetingObj.genders = [2];
+    if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
+
+    const params = { targeting: JSON.stringify(targetingObj), access_token: token };
+    const nm = b.name != null ? String(b.name).trim().slice(0, 200) : '';
+    if (nm) params.name = nm;
+    await graphPost(`${req.params.adsetId}`, params);
+    res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

@@ -531,6 +531,89 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: nieuwe ad set toevoegen aan een bestaande campagne -->
+<div class="modal-ov" id="asModal">
+  <div class="modal">
+    <h3>Nieuwe advertentieset</h3>
+    <div class="sub">Voegt een extra ad set met een advertentie toe aan deze campagne.</div>
+    <div id="asMsg" class="inline-msg"></div>
+    <div class="field"><label>Naam ad set *</label><input id="asName" placeholder="Bijv. Vrouwen 25-34"></div>
+    <div class="row2">
+      <div class="field"><label>Dagbudget (euro) *</label><input id="asBudget" type="number" min="1" step="1" value="10"></div>
+      <div class="field"><label>Land</label><input id="asCountry" value="NL" maxlength="2" style="text-transform:uppercase"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Leeftijd van</label><input id="asAgeMin" type="number" min="13" max="65" value="18"></div>
+      <div class="field"><label>Leeftijd tot</label><input id="asAgeMax" type="number" min="13" max="65" value="65"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Geslacht</label>
+        <select id="asGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
+      </div>
+      <div class="field"><label>Call-to-action</label>
+        <select id="asCta">
+          <option value="LEARN_MORE">Meer informatie</option>
+          <option value="SHOP_NOW">Nu shoppen</option>
+          <option value="SIGN_UP">Aanmelden</option>
+          <option value="CONTACT_US">Neem contact op</option>
+          <option value="GET_OFFER">Bekijk aanbod</option>
+          <option value="SUBSCRIBE">Abonneren</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Interesses (targeting)</label>
+      <input id="asIntSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="intSearch('as')">
+      <div id="asIntResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="asIntChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
+    <div class="field"><label>Bestemmings-URL *</label><input id="asLink" placeholder="https://..."></div>
+    <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
+      <select id="asAsset"><option value="">Kies een afbeelding</option></select>
+    </div>
+    <div class="field"><label>Advertentietekst</label><textarea id="asCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="field"><label>Status na aanmaken</label>
+      <select id="asLaunch">
+        <option value="paused">Gepauzeerd aanmaken (aanrader)</option>
+        <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAsModal()">Annuleren</button>
+      <button class="btn btn-primary" id="asBtn" onclick="submitAsModal()">Ad set toevoegen</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: targeting van een ad set bewerken -->
+<div class="modal-ov" id="etModal">
+  <div class="modal">
+    <h3>Targeting bewerken</h3>
+    <div class="sub">Past land, leeftijd, geslacht en interesses van deze ad set aan bij Meta.</div>
+    <div id="etMsg" class="inline-msg"></div>
+    <div class="field"><label>Naam ad set</label><input id="etName" placeholder="Naam"></div>
+    <div class="row2">
+      <div class="field"><label>Land</label><input id="etCountry" value="NL" maxlength="2" style="text-transform:uppercase"></div>
+      <div class="field"><label>Geslacht</label>
+        <select id="etGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Leeftijd van</label><input id="etAgeMin" type="number" min="13" max="65" value="18"></div>
+      <div class="field"><label>Leeftijd tot</label><input id="etAgeMax" type="number" min="13" max="65" value="65"></div>
+    </div>
+    <div class="field"><label>Interesses (targeting)</label>
+      <input id="etIntSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="intSearch('et')">
+      <div id="etIntResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="etIntChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Let op: dit vervangt de bestaande interesses van deze ad set. Bestaande interesses worden niet automatisch ingeladen.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEtModal()">Annuleren</button>
+      <button class="btn btn-primary" id="etBtn" onclick="submitEtModal()">Targeting opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
   <div class="modal">
@@ -605,9 +688,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
     </div>
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="field"><label>Status na aanmaken</label>
+      <select id="cpLaunch">
+        <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
+        <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCampaign()">Annuleren</button>
-      <button class="btn btn-primary" id="cpBtn" onclick="createCampaign2()">Campagne aanmaken (gepauzeerd)</button>
+      <button class="btn btn-primary" id="cpBtn" onclick="createCampaign2()">Campagne aanmaken</button>
     </div>
   </div>
 </div>
@@ -1233,7 +1322,8 @@ async function renderCampDetail(){
     var totalsHtml='<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
         '<div style="font-weight:700">Campagnetotaal <span style="font-size:12px;color:var(--muted);font-weight:500">hele looptijd</span></div>'+
-        '<div style="display:flex;gap:6px">'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+          '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="openAsModal()">Nieuwe ad set</button>'+
           '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="campaignPublish(\'ACTIVE\')">Campagne live zetten</button>'+
           '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="campaignPublish(\'PAUSED\')">Alles pauzeren</button>'+
         '</div>'+
@@ -1254,6 +1344,7 @@ async function renderCampDetail(){
           '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetStatus(\''+s.id+'\',\''+(sActive?'PAUSED':'ACTIVE')+'\')">'+(sActive?'Pauzeren':'Activeren')+'</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetBudget(\''+s.id+'\')">Budget</button>'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openEtModal(\''+s.id+'\',\''+esc(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Targeting</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;color:#dc2626" onclick="adsetDelete(\''+s.id+'\')">Verwijderen</button>'+
           '</div>'+
         '</div>'+
@@ -1282,6 +1373,105 @@ async function campaignPublish(status){
   showMsg('cdMsg',true,status==='ACTIVE'?'Bezig met live zetten...':'Bezig met pauzeren...');
   try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})}); var d=await r.json();
     if(r.ok&&d.success){showMsg('cdMsg',true,status==='ACTIVE'?'Campagne staat live.':'Campagne is gepauzeerd.');renderCampDetail();if(typeof loadMetaCampaigns==='function')loadMetaCampaigns();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+// Generieke interesse-widget voor de ad-set modals (sleutels 'as' en 'et').
+var MKT_INT={as:[],et:[]};
+var MKT_INT_TIMER={};
+function intSearch(key){
+  clearTimeout(MKT_INT_TIMER[key]);
+  var q=document.getElementById(key+'IntSearch').value.trim();
+  var box=document.getElementById(key+'IntResults');
+  if(q.length<2){box.style.display='none';return;}
+  MKT_INT_TIMER[key]=setTimeout(async function(){
+    try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/interests?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
+      if(!d.success||!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden.</div>';box.style.display='block';return;}
+      box.innerHTML=d.interests.map(function(i){return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'intAdd("'+key+'","'+esc(i.id)+'","'+esc(String(i.name).replace(/"/g,""))+'")\'>'+esc(i.name)+'</div>';}).join('');
+      box.style.display='block';
+    }catch(e){box.style.display='none';}
+  },350);
+}
+function intAdd(key,id,name){ if(!MKT_INT[key].some(function(x){return x.id===id;}))MKT_INT[key].push({id:id,name:name}); document.getElementById(key+'IntResults').style.display='none'; document.getElementById(key+'IntSearch').value=''; intChips(key); }
+function intRemove(key,id){ MKT_INT[key]=MKT_INT[key].filter(function(x){return x.id!==id;}); intChips(key); }
+function intChips(key){ document.getElementById(key+'IntChips').innerHTML=MKT_INT[key].map(function(i){return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="intRemove(\''+key+'\',\''+esc(i.id)+'\')">×</span></span>';}).join(''); }
+// ---- Nieuwe ad set toevoegen ----
+async function openAsModal(){
+  hideMsg('asMsg');
+  document.getElementById('asName').value='';document.getElementById('asBudget').value='10';
+  document.getElementById('asCountry').value='NL';document.getElementById('asAgeMin').value='18';document.getElementById('asAgeMax').value='65';
+  document.getElementById('asGenders').value='all';document.getElementById('asCta').value='LEARN_MORE';
+  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('asCaption').value='';
+  document.getElementById('asLaunch').value='paused';
+  document.getElementById('asIntSearch').value='';document.getElementById('asIntResults').style.display='none';
+  MKT_INT.as=[]; intChips('as');
+  try{
+    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
+    var sel=document.getElementById('asAsset');var opts='<option value="">Kies een afbeelding</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
+    sel.innerHTML=opts;
+  }catch(e){}
+  document.getElementById('asModal').classList.add('open');document.getElementById('asName').focus();
+}
+function closeAsModal(){document.getElementById('asModal').classList.remove('open');}
+async function submitAsModal(){
+  var btn=document.getElementById('asBtn'); hideMsg('asMsg');
+  var payload={
+    name:document.getElementById('asName').value.trim(),
+    dailyBudget:document.getElementById('asBudget').value,
+    country:document.getElementById('asCountry').value.trim(),
+    ageMin:document.getElementById('asAgeMin').value,
+    ageMax:document.getElementById('asAgeMax').value,
+    genders:document.getElementById('asGenders').value,
+    cta:document.getElementById('asCta').value,
+    link:document.getElementById('asLink').value.trim(),
+    assetId:document.getElementById('asAsset').value||null,
+    caption:document.getElementById('asCaption').value,
+    interests:MKT_INT.as,
+    launch:document.getElementById('asLaunch').value
+  };
+  if(!payload.name){showMsg('asMsg',false,'Naam is verplicht.');return;}
+  if(!payload.assetId){showMsg('asMsg',false,'Kies een afbeelding.');return;}
+  if(!/^https?:\/\//i.test(payload.link)){showMsg('asMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  if(payload.launch==='active'&&!confirm('Deze ad set direct live zetten? Gaat meteen geld uitgeven.'))return;
+  btn.disabled=true; btn.textContent='Toevoegen...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/adsets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('asMsg',true,'Ad set toegevoegd.');setTimeout(function(){closeAsModal();renderCampDetail();},1100);}
+    else {showMsg('asMsg',false,d.error||'Toevoegen mislukt.');}
+  }catch(e){showMsg('asMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Ad set toevoegen';
+}
+// ---- Targeting van een ad set bewerken ----
+var ET_ADSET=null;
+function openEtModal(id,name){
+  ET_ADSET=id; hideMsg('etMsg');
+  document.getElementById('etName').value=name||'';
+  document.getElementById('etCountry').value='NL';document.getElementById('etGenders').value='all';
+  document.getElementById('etAgeMin').value='18';document.getElementById('etAgeMax').value='65';
+  document.getElementById('etIntSearch').value='';document.getElementById('etIntResults').style.display='none';
+  MKT_INT.et=[]; intChips('et');
+  document.getElementById('etModal').classList.add('open');
+}
+function closeEtModal(){document.getElementById('etModal').classList.remove('open');}
+async function submitEtModal(){
+  if(!ET_ADSET)return;
+  var btn=document.getElementById('etBtn'); hideMsg('etMsg');
+  var payload={
+    name:document.getElementById('etName').value.trim(),
+    country:document.getElementById('etCountry').value.trim(),
+    genders:document.getElementById('etGenders').value,
+    ageMin:document.getElementById('etAgeMin').value,
+    ageMax:document.getElementById('etAgeMax').value,
+    interests:MKT_INT.et
+  };
+  btn.disabled=true; btn.textContent='Opslaan...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+ET_ADSET+'/targeting',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('etMsg',true,'Targeting opgeslagen.');setTimeout(function(){closeEtModal();renderCampDetail();},1100);}
+    else {showMsg('etMsg',false,d.error||'Opslaan mislukt.');}
+  }catch(e){showMsg('etMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Targeting opslaan';
 }
 async function adsetStatus(id,status){
   if(status==='ACTIVE'&&!confirm('Advertentieset activeren? Deze gaat dan geld uitgeven.'))return;
@@ -1372,6 +1562,7 @@ async function openCampaign(){
   document.getElementById('cpLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('cpCaption').value='';
   document.getElementById('cpGenders').value='all';document.getElementById('cpPlacement').value='automatic';
   document.getElementById('cpBidStrategy').value='LOWEST_COST_WITHOUT_CAP';document.getElementById('cpBidCapWrap').style.display='none';
+  var cpl=document.getElementById('cpLaunch'); if(cpl)cpl.value='paused';
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
   var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
@@ -1463,19 +1654,21 @@ async function createCampaign2(){
     bidStrategy:document.getElementById('cpBidStrategy').value,
     bidCap:document.getElementById('cpBidCap').value,
     interests:CP_INTERESTS,
-    audiences:Array.prototype.slice.call(document.getElementById('cpAudiences').selectedOptions||[]).map(function(o){return o.value;}).filter(function(v){return v;})
+    audiences:Array.prototype.slice.call(document.getElementById('cpAudiences').selectedOptions||[]).map(function(o){return o.value;}).filter(function(v){return v;}),
+    launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
   };
   if(!payload.name){showMsg('campModalMsg',false,'Campagnenaam is verplicht.');return;}
   if(!payload.assetId){showMsg('campModalMsg',false,'Kies een afbeelding.');return;}
   if(!/^https?:\/\//i.test(payload.link)){showMsg('campModalMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  if(payload.launch==='active'&&!confirm('De campagne direct live zetten? Deze gaat meteen geld uitgeven bij Meta.'))return;
   btn.disabled=true; btn.textContent='Aanmaken...';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('campModalMsg',true,'Campagne aangemaakt (gepauzeerd).');setTimeout(function(){closeCampaign();loadCampaigns();},1400);}
+    if(r.ok&&d.success){showMsg('campModalMsg',true,payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).');setTimeout(function(){closeCampaign();loadCampaigns();},1400);}
     else {showMsg('campModalMsg',false,d.error||'Aanmaken mislukt.');}
   }catch(e){showMsg('campModalMsg',false,'Netwerkfout.');}
-  btn.disabled=false; btn.textContent='Campagne aanmaken (gepauzeerd)';
+  btn.disabled=false; btn.textContent='Campagne aanmaken';
 }
 
 // ---- Contentkalender ----
