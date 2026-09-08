@@ -175,6 +175,7 @@ router.post('/api/mkt/admin/workspaces', requireDhcAdmin, async (req, res) => {
     const mods = Array.isArray(modules) ? modules.filter(m => VALID_MODULES.includes(m)) : ['planner', 'reporting'];
     const seats = Math.max(1, parseInt(maxSeats, 10) || 3);
     const clients = Math.max(1, parseInt(maxClients, 10) || 5);
+    const storageMb = Math.max(256, parseInt(req.body && req.body.storageMb, 10) || DEFAULT_STORAGE_MB);
     const email = String(ownerEmail).toLowerCase().trim();
 
     const dup = await withReadConnection(async (c) =>
@@ -209,6 +210,12 @@ router.post('/api/mkt/admin/workspaces', requireDhcAdmin, async (req, res) => {
       return { ws, acc };
     });
 
+    // Opslagquota apart en best-effort zetten (breekt niet als kolom nog niet bestaat).
+    try {
+      await withWriteConnection(async (c) => c.query('UPDATE marketing.workspaces SET storage_quota_mb=$1 WHERE id=$2', [storageMb, result.ws.id]));
+      result.ws.storage_quota_mb = storageMb;
+    } catch (_) { /* kolom bestaat nog niet: standaard 10 GB blijft gelden */ }
+
     res.json({ success: true, workspace: result.ws, owner: result.acc, temp_password: ownerPassword });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -225,7 +232,15 @@ router.patch('/api/mkt/admin/workspaces/:id/license', requireDhcAdmin, async (re
     if (maxClients != null) { sets.push(`max_clients=$${i++}`); vals.push(Math.max(1, parseInt(maxClients, 10) || 1)); }
     if (Array.isArray(modules)) { sets.push(`modules=$${i++}`); vals.push(modules.filter(m => VALID_MODULES.includes(m))); }
     if (typeof active === 'boolean') { sets.push(`active=$${i++}`); vals.push(active); }
-    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    // Opslagquota apart en best-effort (breekt niet als de kolom nog niet bestaat).
+    const storageMb = (req.body && req.body.storageMb != null) ? Math.max(256, parseInt(req.body.storageMb, 10) || DEFAULT_STORAGE_MB) : null;
+    if (storageMb != null) {
+      try { await withWriteConnection(async (c) => c.query('UPDATE marketing.workspaces SET storage_quota_mb=$1 WHERE id=$2', [storageMb, id])); } catch (_) { /* kolom nog niet aanwezig */ }
+    }
+    if (!sets.length) {
+      if (storageMb != null) return res.json({ success: true, storageMb });
+      return res.status(400).json({ error: 'Niets om bij te werken' });
+    }
     vals.push(id);
     const row = await withWriteConnection(async (c) => {
       const r = (await c.query(`UPDATE marketing.workspaces SET ${sets.join(', ')} WHERE id=$${i} RETURNING *`, vals)).rows[0];
@@ -840,6 +855,35 @@ router.post('/api/mkt/clients/:clientId/assets/sign', requireMkt, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Opslaginfo van een werkplek. Deploy-veilig: als de kolom storage_quota_mb nog
+// niet bestaat (migratie nog niet gedraaid), vallen we terug op 10 GB standaard.
+const DEFAULT_STORAGE_MB = 10240; // 10 GB
+async function workspaceStorageInfo(wsId) {
+  let quotaMb = DEFAULT_STORAGE_MB;
+  try {
+    const q = await withReadConnection(async (c) => c.query('SELECT storage_quota_mb FROM marketing.workspaces WHERE id=$1', [wsId]));
+    const v = q.rows[0] && q.rows[0].storage_quota_mb;
+    if (v != null && Number.isFinite(Number(v)) && Number(v) > 0) quotaMb = Number(v);
+  } catch (_) { /* kolom bestaat nog niet: standaard 10 GB */ }
+  let usedBytes = 0;
+  try {
+    const u = await withReadConnection(async (c) => c.query('SELECT COALESCE(SUM(size_bytes),0)::bigint AS b FROM marketing.assets WHERE workspace_id=$1', [wsId]));
+    usedBytes = Number((u.rows[0] && u.rows[0].b) || 0);
+  } catch (_) { usedBytes = 0; }
+  return { quotaMb, quotaBytes: quotaMb * 1024 * 1024, usedBytes };
+}
+function storageFullError(info) {
+  return 'Opslag van de werkplek is vol (limiet ' + Math.round(info.quotaBytes / 1048576) + ' MB). Verwijder oude bestanden of vraag meer opslag aan.';
+}
+
+// Huidig opslaggebruik van de werkplek.
+router.get('/api/mkt/workspace/storage', requireMkt, async (req, res) => {
+  try {
+    const info = await workspaceStorageInfo(req.session.mkt.workspaceId);
+    res.json({ success: true, quotaMb: info.quotaMb, quotaBytes: info.quotaBytes, usedBytes: info.usedBytes });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Registreer een geuploade Cloudinary-asset in de database.
 // Body: { public_id, url, resource_type, format, bytes, filename, mime }.
 router.post('/api/mkt/clients/:clientId/assets/register', requireMkt, async (req, res) => {
@@ -854,6 +898,10 @@ router.post('/api/mkt/clients/:clientId/assets/register', requireMkt, async (req
     const rtype = (b.resource_type === 'video' || b.resource_type === 'image') ? b.resource_type : 'image';
     const name = (b.filename && String(b.filename).trim().slice(0, 200)) || 'bestand';
     const size = Number.isFinite(Number(b.bytes)) ? Math.max(0, Math.floor(Number(b.bytes))) : 0;
+    const stor = await workspaceStorageInfo(wsId);
+    if (size > 0 && stor.usedBytes + size > stor.quotaBytes) {
+      return res.status(413).json({ error: storageFullError(stor) });
+    }
     const row = await withWriteConnection(async (c) => (await c.query(
       `INSERT INTO marketing.assets (workspace_id, client_id, filename, mime, size_bytes, provider, public_id, url, resource_type, format, created_by)
        VALUES ($1,$2,$3,$4,$5,'cloudinary',$6,$7,$8,$9,$10)
@@ -884,6 +932,10 @@ router.post('/api/mkt/clients/:clientId/assets', assetUploadParser, requireMkt, 
     if (!buf || !buf.length) return res.status(400).json({ error: 'Bestand kon niet worden gelezen' });
     if (buf.length > ASSET_MAX_BYTES) {
       return res.status(413).json({ error: 'Bestand is te groot (max 8 MB)' });
+    }
+    const storU = await workspaceStorageInfo(wsId);
+    if (storU.usedBytes + buf.length > storU.quotaBytes) {
+      return res.status(413).json({ error: storageFullError(storU) });
     }
     const name = (filename && String(filename).trim().slice(0, 200)) || 'afbeelding';
     const row = await withWriteConnection(async (c) => (await c.query(

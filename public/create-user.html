@@ -248,6 +248,7 @@
         </div>
         <div><label>Max. seats</label><input type="number" id="mktSeats" value="3" min="1"></div>
         <div><label>Max. klanten</label><input type="number" id="mktClients" value="5" min="1"></div>
+        <div><label>Opslag (MB)</label><input type="number" id="mktStorage" value="10240" min="256" step="256"></div>
       </div>
       <button class="btn btn-primary" id="mktCreateBtn" onclick="mktCreate()" style="margin-top:8px;">Workspace aanmaken</button>
     </div>
@@ -275,6 +276,7 @@
       <div><label>Type</label><select id="wsmLicense"><option value="trial">Trial</option><option value="1m">1 maand</option><option value="3m">3 maanden</option><option value="6m">6 maanden</option><option value="12m">12 maanden</option><option value="24m">24 maanden</option><option value="unlimited">Onbeperkt</option></select></div>
       <div><label>Seats</label><input type="number" id="wsmSeats" min="1"></div>
       <div><label>Max. klanten</label><input type="number" id="wsmClients" min="1"></div>
+      <div><label>Opslag (MB)</label><input type="number" id="wsmStorage" min="256" step="256"></div>
     </div>
     <button class="btn btn-primary" onclick="saveWsLicense()" style="margin-top:6px">Licentie opslaan</button>
 
@@ -1213,6 +1215,7 @@ async function mktCreate(){
     licenseType: document.getElementById('mktLicense').value,
     maxSeats: document.getElementById('mktSeats').value,
     maxClients: document.getElementById('mktClients').value,
+    storageMb: document.getElementById('mktStorage').value,
     modules: ['planner','reporting']
   };
   if(!body.name || !body.ownerEmail || !body.ownerPassword){ mktAlert(false,'Naam, eigenaar e-mail en wachtwoord zijn verplicht.'); return; }
@@ -1265,6 +1268,7 @@ async function openWorkspace(id){
     document.getElementById('wsmLicense').value=d.workspace.license_type||'trial';
     document.getElementById('wsmSeats').value=d.workspace.max_seats;
     document.getElementById('wsmClients').value=d.workspace.max_clients;
+    document.getElementById('wsmStorage').value=(d.workspace.storage_quota_mb!=null?d.workspace.storage_quota_mb:10240);
     document.getElementById('wsmClientCount').textContent='· '+d.client_count+' klant'+(d.client_count===1?'':'en');
     renderAccounts(d.accounts);
     loadWsClients(id);
@@ -1320,7 +1324,7 @@ function renderAccounts(accs){
 }
 async function saveWsLicense(){
   if(!CURRENT_WS)return;
-  var body={licenseType:document.getElementById('wsmLicense').value,maxSeats:document.getElementById('wsmSeats').value,maxClients:document.getElementById('wsmClients').value};
+  var body={licenseType:document.getElementById('wsmLicense').value,maxSeats:document.getElementById('wsmSeats').value,maxClients:document.getElementById('wsmClients').value,storageMb:document.getElementById('wsmStorage').value};
   try{
     var r=await fetch('/api/mkt/admin/workspaces/'+CURRENT_WS.id+'/license',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
