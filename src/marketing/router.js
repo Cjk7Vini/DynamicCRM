@@ -2413,7 +2413,7 @@ router.get('/api/mkt/reporting/overview', requireMkt, async (req, res) => {
          (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1 AND p.published_at IS NOT NULL) AS published,
          (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1 AND p.approval='approved') AS approved,
          (SELECT COUNT(*)::int FROM marketing.assets a WHERE a.client_id=cl.id AND a.workspace_id=$1) AS assets,
-         (SELECT COALESCE(SUM(a.bytes),0)::bigint FROM marketing.assets a WHERE a.client_id=cl.id AND a.workspace_id=$1) AS asset_bytes,
+         (SELECT COALESCE(SUM(a.size_bytes),0)::bigint FROM marketing.assets a WHERE a.client_id=cl.id AND a.workspace_id=$1) AS asset_bytes,
          (SELECT COUNT(*)::int FROM marketing.campaigns k WHERE k.client_id=cl.id AND k.workspace_id=$1) AS campaigns
        FROM marketing.clients cl
        WHERE cl.workspace_id=$1 AND cl.archived=false
