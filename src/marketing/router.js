@@ -879,6 +879,7 @@ function storageFullError(info) {
 // Huidig opslaggebruik van de werkplek.
 router.get('/api/mkt/workspace/storage', requireMkt, async (req, res) => {
   try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     const info = await workspaceStorageInfo(req.session.mkt.workspaceId);
     res.json({ success: true, quotaMb: info.quotaMb, quotaBytes: info.quotaBytes, usedBytes: info.usedBytes });
   } catch (e) { res.status(500).json({ error: e.message }); }
