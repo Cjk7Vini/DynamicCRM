@@ -2130,8 +2130,39 @@ async function runScheduler() {
         ));
       }
     }
+    try { await runAssetRetentionIfDue(); } catch (_) { /* opruimen niet kritisch */ }
   } catch (_) { /* infrafout: volgende minuut opnieuw */ }
   finally { schedulerBusy = false; }
+}
+
+// Ruimt hooguit eens per 24 uur assets op die ouder zijn dan de bewaartermijn
+// van hun werkplek (standaard 60 dagen) EN nergens meer aan gekoppeld zijn
+// (geen post, geen campagne). Deploy-veilig: valt terug op 60 dagen als de
+// kolom retention_days nog niet bestaat.
+async function runAssetRetentionIfDue() {
+  const now = Date.now();
+  if (global.__mktLastRetention && (now - global.__mktLastRetention) < 24 * 60 * 60 * 1000) return;
+  global.__mktLastRetention = now;
+  try {
+    await withWriteConnection(async (c) => c.query(
+      `DELETE FROM marketing.assets a USING marketing.workspaces w
+        WHERE a.workspace_id = w.id
+          AND a.created_at < now() - (COALESCE(w.retention_days, 60) || ' days')::interval
+          AND NOT EXISTS (SELECT 1 FROM marketing.content_posts p WHERE p.asset_id = a.id)
+          AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)`
+    ));
+  } catch (_) {
+    // Kolom retention_days bestaat nog niet: vaste 60 dagen.
+    try {
+      await withWriteConnection(async (c) => c.query(
+        `DELETE FROM marketing.assets a
+          WHERE a.created_at < now() - ($1 || ' days')::interval
+            AND NOT EXISTS (SELECT 1 FROM marketing.content_posts p WHERE p.asset_id = a.id)
+            AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)`,
+        ['60']
+      ));
+    } catch (_) { /* laat staan tot volgende keer */ }
+  }
 }
 // Start de planner (eenmalig per proces). Eerste run na 20s, daarna elke 60s.
 if (!global.__mktScheduler) {
