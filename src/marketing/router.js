@@ -2144,26 +2144,40 @@ async function runAssetRetentionIfDue() {
   const now = Date.now();
   if (global.__mktLastRetention && (now - global.__mktLastRetention) < 24 * 60 * 60 * 1000) return;
   global.__mktLastRetention = now;
+  const cond = `a.created_at < now() - (COALESCE(w.retention_days, 60) || ' days')::interval
+     AND NOT EXISTS (SELECT 1 FROM marketing.content_posts p WHERE p.asset_id = a.id)
+     AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)`;
+  // Kandidaten ophalen (met join op retention_days; terugval op vaste 60 dagen als de kolom er nog niet is).
+  let rows = [];
   try {
-    await withWriteConnection(async (c) => c.query(
-      `DELETE FROM marketing.assets a USING marketing.workspaces w
-        WHERE a.workspace_id = w.id
-          AND a.created_at < now() - (COALESCE(w.retention_days, 60) || ' days')::interval
-          AND NOT EXISTS (SELECT 1 FROM marketing.content_posts p WHERE p.asset_id = a.id)
-          AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)`
-    ));
+    rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT a.id, a.provider, a.public_id, a.resource_type
+         FROM marketing.assets a JOIN marketing.workspaces w ON w.id = a.workspace_id
+        WHERE ${cond} LIMIT 200`
+    )).rows);
   } catch (_) {
-    // Kolom retention_days bestaat nog niet: vaste 60 dagen.
     try {
-      await withWriteConnection(async (c) => c.query(
-        `DELETE FROM marketing.assets a
+      rows = await withReadConnection(async (c) => (await c.query(
+        `SELECT a.id, a.provider, a.public_id, a.resource_type
+           FROM marketing.assets a
           WHERE a.created_at < now() - ($1 || ' days')::interval
             AND NOT EXISTS (SELECT 1 FROM marketing.content_posts p WHERE p.asset_id = a.id)
-            AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)`,
-        ['60']
-      ));
-    } catch (_) { /* laat staan tot volgende keer */ }
+            AND NOT EXISTS (SELECT 1 FROM marketing.campaigns k WHERE k.asset_id = a.id)
+          LIMIT 200`, ['60']
+      )).rows);
+    } catch (_) { rows = []; }
   }
+  if (!rows.length) return;
+  // Eerst de echte bestanden bij Cloudinary opruimen, dan pas de databaserijen.
+  for (const a of rows) {
+    if (a.provider === 'cloudinary' && a.public_id) {
+      try { await cloudinaryDestroy(a.public_id, a.resource_type); } catch (_) { /* best-effort */ }
+    }
+  }
+  const ids = rows.map((r) => r.id);
+  try {
+    await withWriteConnection(async (c) => c.query('DELETE FROM marketing.assets WHERE id = ANY($1::bigint[])', [ids]));
+  } catch (_) { /* volgende keer opnieuw */ }
 }
 // Start de planner (eenmalig per proces). Eerste run na 20s, daarna elke 60s.
 if (!global.__mktScheduler) {
