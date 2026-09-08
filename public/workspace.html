@@ -244,6 +244,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3.2"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Klanten
       </a>
+      <a data-view="reporting" onclick="navTo('reporting')">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Rapportage
+      </a>
+      <a data-view="koppelingen" onclick="navTo('koppelingen')">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        Koppelingen
+      </a>
       <a data-view="wssettings" id="navWsSettings" style="display:none" onclick="navTo('wssettings')">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         Werkplek-koppeling
@@ -323,6 +331,22 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
       </section>
 
+      <!-- RAPPORTAGE (werkplek-breed, alleen seats) -->
+      <section class="view" id="viewReporting">
+        <div class="section-h"><span class="pill">Rapportage over alle klanten</span></div>
+        <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Overzicht van de eigen werkplek-data per klant. Meta-cijfers per klant staan in de Rapportage-tab van die klant.</div>
+        <div id="repOverviewMsg" class="inline-msg"></div>
+        <div id="repOverviewBody"><div class="empty">Laden...</div></div>
+      </section>
+
+      <!-- KOPPELINGEN (werkplek-breed live-overzicht, alleen seats) -->
+      <section class="view" id="viewKoppelingen">
+        <div class="section-h"><span class="pill">Koppelingen die live staan</span></div>
+        <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Per klant zie je welke Meta-kanalen gekoppeld zijn. Een nieuwe koppeling zet je in de Koppelingen-tab van de betreffende klant.</div>
+        <div id="koppOverviewMsg" class="inline-msg"></div>
+        <div id="koppOverviewBody"><div class="empty">Laden...</div></div>
+      </section>
+
       <!-- KLANTEN -->
       <section class="view" id="viewClients">
         <div class="section-h">
@@ -341,8 +365,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
         <div class="tabs" id="dTabs">
           <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
-          <button onclick="dTab(this,'content')">Content</button>
           <button onclick="dTab(this,'assets')">Assets</button>
+          <button onclick="dTab(this,'content')">Content</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnes</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
@@ -795,7 +819,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <script>
 var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
 var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false;
-var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling'};
+var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling',reporting:'Rapportage',koppelingen:'Koppelingen'};
 
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
@@ -914,6 +938,8 @@ function navTo(view){
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
   else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();}
+  else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
+  else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else {document.getElementById('viewOverzicht').classList.add('active');}
 }
 async function loadWsIntegrations(){
@@ -948,6 +974,67 @@ async function extendWsToken(){
   }catch(e){el.style.color='var(--err)';el.textContent='Netwerkfout.';}
 }
 
+// ---- Rapportage (werkplek-breed, seats) ----
+async function loadReportingOverview(){
+  var body=document.getElementById('repOverviewBody'); hideMsg('repOverviewMsg');
+  body.innerHTML='<div class="empty">Laden...</div>';
+  function mb(b){return ((Number(b)||0)/1048576).toFixed(1)+' MB';}
+  try{
+    var r=await fetch('/api/mkt/reporting/overview',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('repOverviewMsg',false,d.error||'Kon rapportage niet laden.');return;}
+    if(!d.clients.length){body.innerHTML='<div class="empty"><h4>Geen klanten</h4><p>Maak eerst klanten aan.</p></div>';return;}
+    var t=d.totals||{};
+    var tiles='<div class="stats" style="margin-bottom:18px">'+
+      '<div class="stat"><div class="k">Klanten</div><div class="v accent">'+d.clients.length+'</div></div>'+
+      '<div class="stat"><div class="k">Posts totaal</div><div class="v">'+(t.posts||0)+'</div></div>'+
+      '<div class="stat"><div class="k">Ingepland</div><div class="v">'+(t.scheduled||0)+'</div></div>'+
+      '<div class="stat"><div class="k">Gepubliceerd</div><div class="v">'+(t.published||0)+'</div></div>'+
+      '<div class="stat"><div class="k">Campagnes</div><div class="v">'+(t.campaigns||0)+'</div></div>'+
+      '<div class="stat"><div class="k">Opslag</div><div class="v" style="font-size:20px">'+mb(t.asset_bytes)+'</div></div>'+
+      '</div>';
+    var rows=d.clients.map(function(c){
+      return '<tr style="border-top:1px solid var(--line)">'+
+        '<td style="padding:8px 10px;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+esc(c.brand_color||'#6366f1')+';margin-right:8px"></span>'+esc(c.name)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.posts||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.scheduled||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.published||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.approved||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.assets||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+mb(c.asset_bytes)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right">'+(c.campaigns||0)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="openClient('+c.id+')">Open</button></td>'+
+      '</tr>';
+    }).join('');
+    body.innerHTML=tiles+'<div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<tr style="color:var(--muted);text-align:left"><th style="padding:8px 10px">Klant</th><th style="padding:8px 10px;text-align:right">Posts</th><th style="padding:8px 10px;text-align:right">Ingepland</th><th style="padding:8px 10px;text-align:right">Gepubliceerd</th><th style="padding:8px 10px;text-align:right">Goedgekeurd</th><th style="padding:8px 10px;text-align:right">Assets</th><th style="padding:8px 10px;text-align:right">Opslag</th><th style="padding:8px 10px;text-align:right">Campagnes</th><th></th></tr>'+
+      rows+'</table></div>';
+  }catch(e){body.innerHTML='';showMsg('repOverviewMsg',false,'Netwerkfout.');}
+}
+// ---- Koppelingen (werkplek-breed live-overzicht, seats) ----
+async function loadKoppelingenOverview(){
+  var body=document.getElementById('koppOverviewBody'); hideMsg('koppOverviewMsg');
+  body.innerHTML='<div class="empty">Laden...</div>';
+  function dot(on){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#16a34a':'var(--line)')+'"></span>'+(on?'live':'-')+'</span>';}
+  try{
+    var r=await fetch('/api/mkt/koppelingen/overview',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('koppOverviewMsg',false,d.error||'Kon koppelingen niet laden.');return;}
+    if(!d.clients.length){body.innerHTML='<div class="empty"><h4>Geen klanten</h4></div>';return;}
+    var rows=d.clients.map(function(c){
+      return '<tr style="border-top:1px solid var(--line)">'+
+        '<td style="padding:8px 10px;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+esc(c.brand_color||'#6366f1')+';margin-right:8px"></span>'+esc(c.name)+'</td>'+
+        '<td style="padding:8px 10px">'+dot(c.token)+'</td>'+
+        '<td style="padding:8px 10px">'+dot(c.adAccount)+'</td>'+
+        '<td style="padding:8px 10px">'+dot(c.pageId)+'</td>'+
+        '<td style="padding:8px 10px">'+dot(c.igUserId)+'</td>'+
+        '<td style="padding:8px 10px">'+dot(c.pixelId)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="openClient('+c.id+')">Koppelen</button></td>'+
+      '</tr>';
+    }).join('');
+    body.innerHTML='<div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<tr style="color:var(--muted);text-align:left"><th style="padding:8px 10px">Klant</th><th style="padding:8px 10px">Token</th><th style="padding:8px 10px">Ad account</th><th style="padding:8px 10px">Page</th><th style="padding:8px 10px">Instagram</th><th style="padding:8px 10px">Pixel</th><th></th></tr>'+
+      rows+'</table></div>';
+  }catch(e){body.innerHTML='';showMsg('koppOverviewMsg',false,'Netwerkfout.');}
+}
 // ---- Klanten ----
 async function loadClients(){
   var body=document.getElementById('clientsBody'); hideMsg('clientsMsg'); body.innerHTML='<div class="empty">Laden...</div>';

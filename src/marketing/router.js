@@ -2396,4 +2396,63 @@ router.put('/api/mkt/clients/:clientId/campaign-links', requireMkt, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// WERKPLEK-BREDE OVERZICHTEN (alleen voor seats, nooit voor klant-accounts)
+// =======================================================================
+
+// Rapportage-overzicht van alle klanten in de werkplek (eigen data uit Neon).
+router.get('/api/mkt/reporting/overview', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT
+         cl.id, cl.name, cl.brand_color,
+         (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1) AS posts,
+         (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1 AND p.status='scheduled') AS scheduled,
+         (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1 AND p.published_at IS NOT NULL) AS published,
+         (SELECT COUNT(*)::int FROM marketing.content_posts p WHERE p.client_id=cl.id AND p.workspace_id=$1 AND p.approval='approved') AS approved,
+         (SELECT COUNT(*)::int FROM marketing.assets a WHERE a.client_id=cl.id AND a.workspace_id=$1) AS assets,
+         (SELECT COALESCE(SUM(a.bytes),0)::bigint FROM marketing.assets a WHERE a.client_id=cl.id AND a.workspace_id=$1) AS asset_bytes,
+         (SELECT COUNT(*)::int FROM marketing.campaigns k WHERE k.client_id=cl.id AND k.workspace_id=$1) AS campaigns
+       FROM marketing.clients cl
+       WHERE cl.workspace_id=$1 AND cl.archived=false
+       ORDER BY cl.name ASC`,
+      [wsId]
+    )).rows);
+    const totals = rows.reduce((t, r) => ({
+      posts: t.posts + (r.posts || 0),
+      scheduled: t.scheduled + (r.scheduled || 0),
+      published: t.published + (r.published || 0),
+      assets: t.assets + (r.assets || 0),
+      asset_bytes: t.asset_bytes + Number(r.asset_bytes || 0),
+      campaigns: t.campaigns + (r.campaigns || 0),
+    }), { posts: 0, scheduled: 0, published: 0, assets: 0, asset_bytes: 0, campaigns: 0 });
+    res.json({ success: true, clients: rows, totals });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Koppelingen-overzicht: per klant welke Meta-kanalen live staan (gemaskeerd).
+router.get('/api/mkt/koppelingen/overview', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const clients = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, name, brand_color FROM marketing.clients WHERE workspace_id=$1 AND archived=false ORDER BY name ASC',
+      [wsId]
+    )).rows);
+    const out = [];
+    for (const cl of clients) {
+      let creds = {};
+      try { creds = await resolveClientMeta(wsId, cl.id); } catch (_) { creds = {}; }
+      out.push({
+        id: cl.id, name: cl.name, brand_color: cl.brand_color,
+        token: !!creds.token, adAccount: !!creds.adAccount, pageId: !!creds.pageId,
+        igUserId: !!creds.igUserId, pixelId: !!creds.pixelId,
+      });
+    }
+    res.json({ success: true, clients: out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
