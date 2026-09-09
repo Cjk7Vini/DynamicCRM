@@ -1413,8 +1413,9 @@ async function renderCampDetail(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/detail',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('cdMsg',false,d.error||'Kon detail niet laden.');return;}
-    if(!d.adsets.length){body.innerHTML='<div class="empty">Geen advertentiesets gevonden.</div>';return;}
-    // Campagnetotaal + live/pauze-knoppen bovenaan.
+    d.adsets=d.adsets||[];
+    // Campagnetotaal + live/pauze-knoppen bovenaan (ook bij een lege campagne,
+    // zodat je altijd een ad set kunt toevoegen).
     var anyActive=d.adsets.some(function(s){return s.status==='ACTIVE';});
     var totalsHtml='<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
@@ -1449,7 +1450,7 @@ async function renderCampDetail(){
         cdAudienceTable(s.audience)+
         '<div style="margin-top:12px">'+ads+'</div></div>';
     }).join('');
-    body.innerHTML=totalsHtml+(setsHtml||'');
+    body.innerHTML=totalsHtml+(setsHtml||'<div class="empty" style="margin-top:6px">Nog geen advertentiesets. Voeg er een toe met de knop "Nieuwe ad set".</div>');
   }catch(e){body.innerHTML='';showMsg('cdMsg',false,'Netwerkfout.');}
 }
 async function adsetDelete(id){
