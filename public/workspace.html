@@ -640,7 +640,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
-  <div class="modal">
+  <div class="modal" style="max-width:900px">
     <h3>Nieuwe advertentiecampagne</h3>
     <div class="sub">Wordt gepauzeerd aangemaakt bij Meta. Er wordt niets uitgegeven tot jij hem in Meta activeert.</div>
     <div id="campModalMsg" class="inline-msg"></div>
@@ -713,7 +713,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
       <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
     </div>
-    <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
     <div class="field"><label>Status na aanmaken</label>
       <select id="cpLaunch">
         <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
