@@ -1484,10 +1484,11 @@ function intSearch(key){
   if(q.length<2){box.style.display='none';return;}
   MKT_INT_TIMER[key]=setTimeout(async function(){
     try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/interests?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
-      if(!d.success||!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden.</div>';box.style.display='block';return;}
+      if(!r.ok||d.error){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">'+esc(d.error||('Fout '+r.status))+'</div>';box.style.display='block';return;}
+      if(!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden voor deze term. Probeer breder of Engels (bijv. "physical therapy").</div>';box.style.display='block';return;}
       box.innerHTML=d.interests.map(function(i){return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'intAdd("'+key+'","'+esc(i.id)+'","'+esc(String(i.name).replace(/"/g,""))+'")\'>'+esc(i.name)+'</div>';}).join('');
       box.style.display='block';
-    }catch(e){box.style.display='none';}
+    }catch(e){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">Netwerkfout bij zoeken.</div>';box.style.display='block';}
   },350);
 }
 function intAdd(key,id,name){ if(!MKT_INT[key].some(function(x){return x.id===id;}))MKT_INT[key].push({id:id,name:name}); document.getElementById(key+'IntResults').style.display='none'; document.getElementById(key+'IntSearch').value=''; intChips(key); }
@@ -1690,10 +1691,11 @@ function searchInterests(){
   CP_INT_TIMER=setTimeout(async function(){
     try{
       var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/interests?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
-      if(!d.success||!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden.</div>';box.style.display='block';return;}
+      if(!r.ok||d.error){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">'+esc(d.error||('Fout '+r.status))+'</div>';box.style.display='block';return;}
+      if(!d.interests||!d.interests.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen interesses gevonden voor deze term. Probeer een bredere of Engelse term (bijv. "physical therapy").</div>';box.style.display='block';return;}
       box.innerHTML=d.interests.map(function(i){return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'addInterest("'+esc(i.id)+'","'+esc(String(i.name).replace(/"/g,""))+'")\'>'+esc(i.name)+'</div>';}).join('');
       box.style.display='block';
-    }catch(e){box.style.display='none';}
+    }catch(e){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">Netwerkfout bij zoeken.</div>';box.style.display='block';}
   },350);
 }
 function addInterest(id,name){
