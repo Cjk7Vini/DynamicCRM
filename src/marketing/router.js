@@ -1177,18 +1177,35 @@ async function resolveClientMeta(wsId, clientId) {
 // =======================================================================
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
+// Bouwt een leesbare foutmelding uit een Meta-foutobject. Meta stopt de nuttige
+// uitleg vaak in error_user_title/error_user_msg in plaats van in message.
+function metaErrorMessage(j) {
+  const e = j && j.error;
+  if (!e) return 'Meta API-fout';
+  const parts = [];
+  if (e.error_user_title || e.error_user_msg) {
+    parts.push([e.error_user_title, e.error_user_msg].filter(Boolean).join(': '));
+  }
+  if (!parts.length && e.message) parts.push(e.message);
+  let msg = parts.join(' ') || 'Meta API-fout';
+  const codes = [];
+  if (e.code) codes.push('code ' + e.code);
+  if (e.error_subcode) codes.push('subcode ' + e.error_subcode);
+  if (codes.length) msg += ' (' + codes.join(', ') + ')';
+  return msg;
+}
 async function graphPost(pathAndId, params) {
   const body = new URLSearchParams(params);
   const r = await fetch(`${GRAPH}/${pathAndId}`, { method: 'POST', body });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Meta API-fout');
+  if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
   return j;
 }
 async function graphGet(pathAndId, params) {
   const qs = new URLSearchParams(params).toString();
   const r = await fetch(`${GRAPH}/${pathAndId}?${qs}`);
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new Error(j.error ? j.error.message : 'Meta API-fout');
+  if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
   return j;
 }
 
