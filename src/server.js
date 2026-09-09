@@ -6040,21 +6040,210 @@ app.patch('/api/leads/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// DELETE /api/leads/:id — verwijder lead vanuit dashboard
+// DELETE /api/leads/:id — verwijder lead vanuit dashboard (incl. bijbehorende
+// belpogingen, events en notities zodat er geen weesrijen achterblijven)
 app.delete('/api/leads/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const practiceCode = req.session.practiceCode;
     const role = req.session.role;
     await withWriteConnection(async (client) => {
-      const q = role === 'admin'
-        ? 'DELETE FROM public.leads WHERE id=$1'
-        : 'DELETE FROM public.leads WHERE id=$1 AND praktijk_code=$2';
-      const params = role === 'admin' ? [id] : [id, practiceCode];
-      await client.query(q, params);
+      // Eerst controleren of deze gebruiker de lead mag verwijderen.
+      const owns = role === 'admin'
+        ? (await client.query('SELECT 1 FROM public.leads WHERE id=$1', [id])).rowCount
+        : (await client.query('SELECT 1 FROM public.leads WHERE id=$1 AND praktijk_code=$2', [id, practiceCode])).rowCount;
+      if (!owns) return;
+      // Kinderen opruimen (best-effort; tabel kan ontbreken vóór migratie).
+      await client.query('DELETE FROM belpogingen WHERE lead_id=$1', [id]).catch(() => {});
+      await client.query('DELETE FROM lead_events WHERE lead_id=$1', [id]).catch(() => {});
+      await client.query('DELETE FROM public.lead_notes WHERE lead_id=$1', [id]).catch(() => {});
+      await client.query('DELETE FROM public.leads WHERE id=$1', [id]);
     });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /api/leads/overzicht — volledig leadoverzicht voor het leadscherm (tabbladen)
+app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
+  try {
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    const q = (req.query.q || '').toString().trim().slice(0, 100);
+
+    const rows = await withReadConnection(async (client) => {
+      const bucketExpr = `
+        CASE
+          WHEN l.funnel_stage = 'won' THEN 'lid'
+          WHEN l.funnel_stage = 'lost' THEN 'geen_interesse'
+          WHEN l.status = 'Bedenktijd' THEN 'bedenktijd'
+          WHEN (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL) THEN 'benaderd'
+          WHEN EXISTS (SELECT 1 FROM belpogingen bp WHERE bp.lead_id = l.id) THEN 'benaderd'
+          ELSE 'nieuw'
+        END`;
+
+      // full=true gebruikt de nieuwe kolommen/tabel; bij ontbreken (vóór migratie)
+      // valt de query terug op veilige defaults zodat het scherm nooit omvalt.
+      const build = (full) => {
+        const apptType = full ? `COALESCE(l.appointment_type, 'vitaliteitscheck')` : `'vitaliteitscheck'`;
+        const gezien = full ? `l.gezien_op` : `NULL::timestamptz`;
+        const notes = full ? `(SELECT COUNT(*) FROM public.lead_notes n WHERE n.lead_id = l.id)::int` : `0`;
+        let sql = `
+          SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
+                 l.aangemaakt_op, l.appointment_date, l.appointment_time, l.appointment_datetime,
+                 COALESCE(l.appointment_datetime,
+                   CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
+                     THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
+                     WHEN l.appointment_date IS NOT NULL
+                     THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
+                     ELSE NULL END) AS appt_dt,
+                 l.funnel_stage, l.status,
+                 ${apptType} AS appointment_type,
+                 ${gezien} AS gezien_op,
+                 (SELECT COUNT(*) FROM belpogingen bp WHERE bp.lead_id = l.id)::int AS aantal_pogingen,
+                 ${notes} AS aantal_notities,
+                 ${bucketExpr} AS bucket
+          FROM public.leads l
+          WHERE 1=1`;
+        const params = [];
+        if (practice) { params.push(practice); sql += ` AND l.praktijk_code = $${params.length}`; }
+        if (q) {
+          params.push('%' + q + '%');
+          const p = '$' + params.length;
+          sql += ` AND (l.volledige_naam ILIKE ${p} OR l.emailadres ILIKE ${p} OR l.telefoon ILIKE ${p})`;
+        }
+        sql += ` ORDER BY l.aangemaakt_op DESC LIMIT 1000`;
+        return { sql, params };
+      };
+
+      try {
+        const { sql, params } = build(true);
+        return (await client.query(sql, params)).rows;
+      } catch (e) {
+        if (/(appointment_type|gezien_op|lead_notes)/i.test(e.message) && /(column|relation|does not exist)/i.test(e.message)) {
+          const { sql, params } = build(false);
+          return (await client.query(sql, params)).rows;
+        }
+        throw e;
+      }
+    });
+
+    const leads = rows.map(r => ({ ...r, appointment_datetime: r.appt_dt || r.appointment_datetime }));
+    res.json({ success: true, leads });
+  } catch (e) {
+    console.error('Leads overzicht error:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/leads/nieuw-count — aantal nieuwe, nog niet geziene leads (sidebar-badge)
+app.get('/api/leads/nieuw-count', requireAuth, async (req, res) => {
+  try {
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    const count = await withReadConnection(async (client) => {
+      let sql = `
+        SELECT COUNT(*)::int AS c
+        FROM public.leads l
+        WHERE l.gezien_op IS NULL
+          AND l.funnel_stage NOT IN ('won','lost')
+          AND (l.status IS DISTINCT FROM 'Bedenktijd')
+          AND l.appointment_datetime IS NULL
+          AND l.appointment_date IS NULL
+          AND NOT EXISTS (SELECT 1 FROM belpogingen bp WHERE bp.lead_id = l.id)`;
+      const params = [];
+      if (practice) { params.push(practice); sql += ` AND l.praktijk_code = $${params.length}`; }
+      try {
+        return (await client.query(sql, params)).rows[0].c;
+      } catch (e) {
+        if (/gezien_op/i.test(e.message) && /(column|does not exist)/i.test(e.message)) return 0;
+        throw e;
+      }
+    });
+    res.json({ success: true, count });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/leads/:id/notities — notities-tijdlijn van een lead
+app.get('/api/leads/:id/notities', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    const notes = await withReadConnection(async (client) => {
+      const scoped = practice ? ' AND praktijk_code=$2' : '';
+      const params = practice ? [id, practice] : [id];
+      const owns = (await client.query(`SELECT 1 FROM public.leads WHERE id=$1${scoped}`, params)).rowCount;
+      if (!owns) return null;
+      try {
+        return (await client.query(
+          `SELECT id, auteur, tekst, aangemaakt_op FROM public.lead_notes WHERE lead_id=$1 ORDER BY aangemaakt_op DESC`,
+          [id]
+        )).rows;
+      } catch (e) {
+        if (/lead_notes/i.test(e.message) && /(relation|does not exist)/i.test(e.message)) return [];
+        throw e;
+      }
+    });
+    if (notes === null) return res.status(404).json({ success: false, error: 'Lead niet gevonden' });
+    res.json({ success: true, notities: notes });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/leads/:id/notities — nieuwe notitie toevoegen (auteur = ingelogde gebruiker)
+app.post('/api/leads/:id/notities', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tekst = ((req.body && req.body.tekst) || '').toString().trim();
+    if (!tekst) return res.status(400).json({ success: false, error: 'Lege notitie' });
+    if (tekst.length > 4000) return res.status(400).json({ success: false, error: 'Notitie te lang' });
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    const auteur = req.session.email || 'Onbekend';
+    const note = await withWriteConnection(async (client) => {
+      const scoped = practice ? ' AND praktijk_code=$2' : '';
+      const params = practice ? [id, practice] : [id];
+      const leadRow = (await client.query(`SELECT praktijk_code FROM public.leads WHERE id=$1${scoped}`, params)).rows[0];
+      if (!leadRow) return null;
+      return (await client.query(
+        `INSERT INTO public.lead_notes (lead_id, praktijk_code, auteur, tekst)
+         VALUES ($1,$2,$3,$4) RETURNING id, auteur, tekst, aangemaakt_op`,
+        [id, leadRow.praktijk_code, auteur, tekst]
+      )).rows[0];
+    });
+    if (note === null) return res.status(404).json({ success: false, error: 'Lead niet gevonden' });
+    res.json({ success: true, notitie: note });
+  } catch (e) {
+    if (/lead_notes/i.test(e.message) && /(relation|does not exist)/i.test(e.message)) {
+      return res.status(503).json({ success: false, error: 'Notities nog niet beschikbaar (migratie vereist)' });
+    }
+    console.error('Notitie toevoegen error:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/leads/:id/gezien — markeer lead als gezien (nieuwe-lead-badge verdwijnt)
+app.post('/api/leads/:id/gezien', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const practice = enforcePracticeAccess(req, res);
+    if (practice === false) return;
+    await withWriteConnection(async (client) => {
+      const scoped = practice ? ' AND praktijk_code=$2' : '';
+      const params = practice ? [id, practice] : [id];
+      try {
+        await client.query(`UPDATE public.leads SET gezien_op = COALESCE(gezien_op, NOW()) WHERE id=$1${scoped}`, params);
+      } catch (e) {
+        if (!(/gezien_op/i.test(e.message) && /(column|does not exist)/i.test(e.message))) throw e;
+      }
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ==================== BELPOGINGEN ====================

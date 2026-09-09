@@ -972,24 +972,14 @@
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Leads</div>
-        <div class="sidebar-dropdown" id="leadsDropdown">
-            <div class="sidebar-item" onclick="toggleDropdown('leadsDropdown')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-                Leads
-                <svg class="sidebar-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-            </div>
-            <div class="sidebar-dropdown-items">
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('awareness','Leads')">Nieuw (Awareness)</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('intent','Benaderd')">Benaderd</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('won','Lid')">Lid geworden</div>
-                <div class="sidebar-dropdown-item" onclick="showLeadsForStage('lost','Geen interesse')">Geen interesse</div>
-            </div>
+        <div class="sidebar-item" id="navLeads" onclick="showDashboardSection('leads', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            Leads
+            <span id="leadsBadge" style="display:none;margin-left:auto;background:#dc2626;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;line-height:18px;text-align:center;border-radius:9px;padding:0 5px;">0</span>
         </div>
 
         <div class="sidebar-section-label" style="margin-top:8px;">Afspraken</div>
@@ -1570,6 +1560,20 @@
     </div>
 
 </div><!-- einde dash-dashboard -->
+
+<!-- ── LEADS SECTIE ───────────────────────────────────────────────── -->
+<div class="dash-section" id="dash-leads">
+    <div style="padding:20px;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div id="leadsTabs" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            <input type="text" id="leadsSearch" placeholder="Zoek op naam, e-mail of telefoon..." oninput="onLeadsSearch()"
+                style="flex:1;min-width:220px;max-width:340px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+        </div>
+        <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:6px 14px 14px;">
+            <div id="leadsOverzichtBody"></div>
+        </div>
+    </div>
+</div>
 
 <!-- ── AFSPRAKEN SECTIE ───────────────────────────────────────────── -->
 <div class="dash-section" id="dash-belpogingen">
@@ -2318,6 +2322,9 @@
 
             // Functie-rol rechten toepassen (eClub/Meta afschermen)
             applyRolePermissions();
+
+            // Nieuwe-lead-badge in de sidebar bijwerken
+            refreshLeadsBadge();
         }
 
         // Pas zichtbaarheid aan op basis van de functie-rol (role_label).
@@ -3775,6 +3782,245 @@
             }
         }
 
+        // ============================================
+        // LEADSCHERM (tabbladen, profiel, notities, gezien)
+        // ============================================
+        let _leadsData = [];
+        let _leadsTab = 'alle';
+
+        const LEADS_TABS = [
+            { key: 'alle',           label: 'Alle' },
+            { key: 'nieuw',          label: 'Nieuw' },
+            { key: 'benaderd',       label: 'Benaderd' },
+            { key: 'bedenktijd',     label: 'Bedenktijd' },
+            { key: 'lid',            label: 'Lid' },
+            { key: 'geen_interesse', label: 'Geen interesse' }
+        ];
+        const LEAD_BUCKET_LABEL = { nieuw:'Nieuw', benaderd:'Benaderd', bedenktijd:'Bedenktijd', lid:'Lid', geen_interesse:'Geen interesse' };
+        const LEAD_BUCKET_COLOR = { nieuw:'#1a56db', benaderd:'#0891b2', bedenktijd:'#d97706', lid:'#16a34a', geen_interesse:'#dc2626' };
+
+        function setLeadsBadge(n) {
+            const el = document.getElementById('leadsBadge');
+            if (!el) return;
+            const c = parseInt(n) || 0;
+            if (c > 0) { el.textContent = c > 99 ? '99+' : c; el.style.display = 'inline-block'; }
+            else { el.style.display = 'none'; }
+        }
+        function updateLeadsBadge() {
+            setLeadsBadge(_leadsData.filter(l => l.bucket === 'nieuw' && !l.gezien_op).length);
+        }
+        async function refreshLeadsBadge() {
+            try {
+                const pc = getActivePracticeCode();
+                let url = '/api/leads/nieuw-count';
+                if (pc) url += '?practice=' + encodeURIComponent(pc);
+                const r = await fetch(url, { credentials: 'include' });
+                const d = await r.json();
+                if (r.ok && d.success) setLeadsBadge(d.count);
+            } catch (_) {}
+        }
+
+        async function loadLeadsOverzicht() {
+            const body = document.getElementById('leadsOverzichtBody');
+            if (body) body.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:32px;font-size:13px;">Laden...</div>';
+            try {
+                const pc = getActivePracticeCode();
+                let url = '/api/leads/overzicht';
+                if (pc) url += '?practice=' + encodeURIComponent(pc);
+                const res = await fetch(url, { credentials: 'include' });
+                const d = await res.json();
+                if (!res.ok || !d.success) throw new Error(d.error || 'Fout bij laden');
+                _leadsData = d.leads || [];
+                renderLeadsTabs();
+                renderLeadsList();
+                updateLeadsBadge();
+            } catch (e) {
+                if (body) body.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:32px;font-size:13px;">Kon leads niet laden: ' + escHtml(e.message) + '</div>';
+            }
+        }
+
+        function leadsCountFor(key) {
+            if (key === 'alle') return _leadsData.length;
+            return _leadsData.filter(l => l.bucket === key).length;
+        }
+        function renderLeadsTabs() {
+            const el = document.getElementById('leadsTabs');
+            if (!el) return;
+            el.innerHTML = LEADS_TABS.map(t => {
+                const active = _leadsTab === t.key;
+                const n = leadsCountFor(t.key);
+                return `<button onclick="setLeadsTab('${t.key}')" style="padding:8px 14px;border:1px solid ${active ? '#172554' : 'var(--border)'};background:${active ? '#172554' : 'white'};color:${active ? 'white' : 'var(--text-1)'};border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">${t.label} <span style="opacity:.65;font-weight:500;">${n}</span></button>`;
+            }).join('');
+        }
+        function setLeadsTab(key) {
+            _leadsTab = key;
+            renderLeadsTabs();
+            renderLeadsList();
+        }
+        function onLeadsSearch() { renderLeadsList(); }
+
+        function renderLeadsList() {
+            const body = document.getElementById('leadsOverzichtBody');
+            if (!body) return;
+            const q = (document.getElementById('leadsSearch')?.value || '').trim().toLowerCase();
+            let rows = _leadsData;
+            if (_leadsTab !== 'alle') rows = rows.filter(l => l.bucket === _leadsTab);
+            if (q) rows = rows.filter(l =>
+                (l.volledige_naam || '').toLowerCase().includes(q) ||
+                (l.emailadres || '').toLowerCase().includes(q) ||
+                (l.telefoon || '').toLowerCase().includes(q)
+            );
+            if (!rows.length) {
+                body.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:32px;font-size:13px;">Geen leads in deze weergave.</div>';
+                return;
+            }
+            const fmtDate = (s) => { if (!s) return '-'; const d = new Date(s); return isNaN(d) ? '-' : d.toLocaleDateString('nl-NL', { day:'2-digit', month:'short', year:'numeric' }); };
+            const fmtDT = (s) => { if (!s) return ''; const d = new Date(s); return isNaN(d) ? '' : d.toLocaleString('nl-NL', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); };
+            body.innerHTML = `
+              <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="text-align:left;color:var(--text-3);border-bottom:1px solid var(--border);">
+                  <th style="padding:10px 8px;font-weight:600;width:16px;"></th>
+                  <th style="padding:10px 8px;font-weight:600;">Naam</th>
+                  <th style="padding:10px 8px;font-weight:600;">Contact</th>
+                  <th style="padding:10px 8px;font-weight:600;">Bron</th>
+                  <th style="padding:10px 8px;font-weight:600;">Status</th>
+                  <th style="padding:10px 8px;font-weight:600;">Afspraak</th>
+                  <th style="padding:10px 8px;font-weight:600;">Binnengekomen</th>
+                  <th style="padding:10px 8px;font-weight:600;text-align:right;">Notities</th>
+                </tr></thead>
+                <tbody>
+                ${rows.map(l => {
+                    const isNew = l.bucket === 'nieuw' && !l.gezien_op;
+                    const dot = isNew ? '<span title="Nieuw, nog niet bekeken" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dc2626;"></span>' : '';
+                    const col = LEAD_BUCKET_COLOR[l.bucket] || '#6b7280';
+                    const badge = `<span style="display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:${col}1a;color:${col};">${LEAD_BUCKET_LABEL[l.bucket] || l.bucket}</span>`;
+                    const typeTxt = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
+                    const appt = l.appointment_datetime ? (fmtDT(l.appointment_datetime) + ' · ' + typeTxt) : '-';
+                    const notes = (parseInt(l.aantal_notities) || 0) > 0 ? String(l.aantal_notities) : '';
+                    return `<tr onclick="openLeadProfile('${l.id}')" style="border-bottom:1px solid #f0f0f2;cursor:pointer;${isNew ? 'background:#fef5f5;' : ''}">
+                        <td style="padding:10px 8px;">${dot}</td>
+                        <td style="padding:10px 8px;font-weight:600;color:var(--text-1);">${escHtml(l.volledige_naam || '-')}</td>
+                        <td style="padding:10px 8px;color:var(--text-2);">${escHtml(l.emailadres || '')}<br><span style="color:var(--text-3);">${escHtml(l.telefoon || '')}</span></td>
+                        <td style="padding:10px 8px;color:var(--text-2);">${escHtml(l.bron || '-')}</td>
+                        <td style="padding:10px 8px;">${badge}</td>
+                        <td style="padding:10px 8px;color:var(--text-2);">${escHtml(appt)}</td>
+                        <td style="padding:10px 8px;color:var(--text-3);">${fmtDate(l.aangemaakt_op)}</td>
+                        <td style="padding:10px 8px;color:var(--text-3);text-align:right;">${notes}</td>
+                    </tr>`;
+                }).join('')}
+                </tbody>
+              </table></div>`;
+        }
+
+        async function fetchLeadNotes(id) {
+            try {
+                const r = await fetch('/api/leads/' + encodeURIComponent(id) + '/notities', { credentials: 'include' });
+                const d = await r.json();
+                if (r.ok && d.success) return d.notities || [];
+            } catch (_) {}
+            return [];
+        }
+
+        async function openLeadProfile(id) {
+            const l = _leadsData.find(x => String(x.id) === String(id));
+            if (!l) return;
+            openGenericModal('Lead: ' + (l.volledige_naam || ''), '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">Laden...</div>');
+            // Markeer als gezien (badge/indicator verdwijnt zodra een collega opent)
+            fetch('/api/leads/' + encodeURIComponent(id) + '/gezien', { method: 'POST', credentials: 'include' })
+                .then(() => { if (!l.gezien_op) { l.gezien_op = new Date().toISOString(); renderLeadsTabs(); renderLeadsList(); updateLeadsBadge(); } })
+                .catch(() => {});
+            const notities = await fetchLeadNotes(id);
+            renderLeadProfile(l, notities);
+        }
+
+        function renderLeadProfile(l, notities) {
+            const body = document.getElementById('genericBpBody');
+            const titleEl = document.getElementById('genericBpTitle');
+            if (titleEl) titleEl.textContent = 'Lead: ' + (l.volledige_naam || '');
+            if (!body) return;
+            const col = LEAD_BUCKET_COLOR[l.bucket] || '#6b7280';
+            const badge = `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${col}1a;color:${col};">${LEAD_BUCKET_LABEL[l.bucket] || l.bucket}</span>`;
+            const fmtDT = (s) => { if (!s) return '-'; const d = new Date(s); return isNaN(d) ? '-' : d.toLocaleString('nl-NL', { weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); };
+            const typeTxt = l.appointment_type === 'rondleiding' ? 'Rondleiding' : 'Intake/Check-up';
+            const apptLine = l.appointment_datetime ? (fmtDT(l.appointment_datetime) + ' · ' + typeTxt) : 'Geen afspraak';
+            const rij = (label, val) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f4f4f6;font-size:13px;"><span style="color:var(--text-3);">${label}</span><span style="color:var(--text-1);text-align:right;">${val}</span></div>`;
+
+            const notesHtml = (notities && notities.length)
+                ? notities.map(n => {
+                    const t = new Date(n.aangemaakt_op);
+                    const tStr = isNaN(t) ? '' : t.toLocaleString('nl-NL', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                    return `<div style="border-left:2px solid #e4e4e8;padding:0 0 0 12px;margin-bottom:12px;">
+                        <div style="font-size:11px;color:var(--text-3);margin-bottom:3px;">${escHtml(n.auteur || 'Onbekend')} · ${tStr}</div>
+                        <div style="font-size:13px;color:var(--text-1);white-space:pre-wrap;">${escHtml(n.tekst || '')}</div>
+                    </div>`;
+                }).join('')
+                : '<div style="color:var(--text-3);font-size:13px;padding:4px 0 12px;">Nog geen notities.</div>';
+
+            body.innerHTML = `
+                <div style="margin-bottom:14px;">${badge}</div>
+                ${rij('E-mail', escHtml(l.emailadres || '-'))}
+                ${rij('Telefoon', escHtml(l.telefoon || '-'))}
+                ${rij('Bron', escHtml(l.bron || '-'))}
+                ${l.behandelaar ? rij('Behandelaar', escHtml(l.behandelaar)) : ''}
+                ${rij('Afspraak', escHtml(apptLine))}
+                ${rij('Binnengekomen', fmtDT(l.aangemaakt_op))}
+
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin:18px 0 10px;">Notities</div>
+                <div id="lpNotes">${notesHtml}</div>
+
+                <textarea id="lpNoteText" rows="2" placeholder="Nieuwe notitie..." style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;margin-bottom:8px;"></textarea>
+                <div id="lpNoteMsg" style="display:none;font-size:12px;margin-bottom:8px;"></div>
+                <button id="lpNoteBtn" class="btn btn-primary" onclick="leadAddNote('${l.id}')" style="width:100%;margin-bottom:16px;">Notitie toevoegen</button>
+
+                <div style="border-top:1px solid #f0f0f2;padding-top:12px;">
+                    <button onclick="leadDelete('${l.id}')" style="background:#FCEBEB;color:#A32D2D;border:1px solid #F7C1C1;padding:9px 14px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;width:100%;">Lead verwijderen</button>
+                </div>`;
+        }
+
+        async function leadAddNote(id) {
+            const ta = document.getElementById('lpNoteText');
+            const btn = document.getElementById('lpNoteBtn');
+            const tekst = (ta?.value || '').trim();
+            if (!tekst) { if (ta) ta.focus(); return; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Opslaan...'; }
+            try {
+                const r = await fetch('/api/leads/' + encodeURIComponent(id) + '/notities', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                    body: JSON.stringify({ tekst })
+                });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.error || 'Fout');
+                const l = _leadsData.find(x => String(x.id) === String(id));
+                if (l) l.aantal_notities = (parseInt(l.aantal_notities) || 0) + 1;
+                const notities = await fetchLeadNotes(id);
+                if (l) renderLeadProfile(l, notities);
+                renderLeadsList();
+            } catch (e) {
+                const msg = document.getElementById('lpNoteMsg');
+                if (msg) { msg.style.display = 'block'; msg.style.color = '#b91c1c'; msg.textContent = 'Notitie niet opgeslagen: ' + e.message; }
+                if (btn) { btn.disabled = false; btn.textContent = 'Notitie toevoegen'; }
+            }
+        }
+
+        async function leadDelete(id) {
+            const l = _leadsData.find(x => String(x.id) === String(id));
+            const naam = l ? (l.volledige_naam || 'deze lead') : 'deze lead';
+            if (!confirm('Weet je zeker dat je ' + naam + ' definitief wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
+            try {
+                const r = await fetch('/api/leads/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.error || 'Fout');
+                _leadsData = _leadsData.filter(x => String(x.id) !== String(id));
+                sluitBpModal();
+                renderLeadsTabs();
+                renderLeadsList();
+                updateLeadsBadge();
+            } catch (e) {
+                alert('Verwijderen mislukt: ' + e.message);
+            }
+        }
+
         // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
 
@@ -4248,11 +4494,12 @@
                 else el.classList.add('active-sub');
             }
 
-            const titles = { dashboard: 'Analytics', belpogingen: 'Belpogingen', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', tickets: 'Tickets', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
+            const titles = { dashboard: 'Analytics', leads: 'Leads', belpogingen: 'Belpogingen', afspraken: 'Afspraken', seizoen: 'Seizoenspatronen', roi: 'ROI per lead', kwaliteit: 'Lead kwaliteit', tickets: 'Tickets', instellingen: 'Instellingen', allelocaties: 'Alle locaties' };
             const titleEl = document.querySelector('.topbar-title');
             if (titleEl) titleEl.textContent = titles[name] || 'Analytics';
 
             if (name === 'dashboard') applyFilters();
+            if (name === 'leads') { loadLeadsOverzicht(); }
             if (name === 'belpogingen') { loadBelpogingen(); }
             if (name === 'afspraken') { loadAfspraken(); loadLeadsZonderAfspraak(); }
             if (name === 'seizoen') { loadSeizoenData(); }
