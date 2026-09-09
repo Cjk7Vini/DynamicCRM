@@ -6145,7 +6145,7 @@ app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
         const gezien = full ? `l.gezien_op` : `NULL::timestamptz`;
         const notes = full ? `(SELECT COUNT(*) FROM public.lead_notes n WHERE n.lead_id = l.id)::int` : `0`;
         let sql = `
-          SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
+          SELECT l.id, l.praktijk_code, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
                  l.aangemaakt_op, l.appointment_date, l.appointment_time, l.appointment_datetime,
                  COALESCE(l.appointment_datetime,
                    CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
