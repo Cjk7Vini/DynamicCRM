@@ -1300,6 +1300,11 @@ const CAMPAIGN_OBJECTIVES = {
   OUTCOME_TRAFFIC: 'LINK_CLICKS',
   OUTCOME_AWARENESS: 'REACH',
   OUTCOME_ENGAGEMENT: 'POST_ENGAGEMENT',
+  // Leads en Verkoop optimaliseren we voorlopig veilig op linkklikken zodat het
+  // altijd aanmaakt. Echte conversie-optimalisatie (pixel-event op de thank-you)
+  // volgt in de campagne-herbouw.
+  OUTCOME_LEADS: 'LINK_CLICKS',
+  OUTCOME_SALES: 'LINK_CLICKS',
 };
 const CTA_TYPES = ['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'BOOK_TRAVEL', 'CONTACT_US', 'GET_OFFER', 'SUBSCRIBE'];
 
@@ -1683,7 +1688,7 @@ router.post('/api/mkt/clients/:clientId/ai/ad-suggestion', requireMkt, async (re
       '{',
       '  "name": "korte campagnenaam (max 60 tekens)",',
       '  "caption": "advertentietekst, pakkend, max 500 tekens, mag emoji bevatten",',
-      '  "objective": "een van OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_ENGAGEMENT",',
+      '  "objective": "een van OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_ENGAGEMENT, OUTCOME_LEADS, OUTCOME_SALES",',
       '  "cta": "een van LEARN_MORE, SHOP_NOW, SIGN_UP, BOOK_TRAVEL, CONTACT_US, GET_OFFER, SUBSCRIBE",',
       '  "ageMin": getal 13 t/m 65,',
       '  "ageMax": getal 13 t/m 65,',
@@ -2442,6 +2447,31 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/publish', req
     for (const s of (sets.data || [])) { await graphPost(`${s.id}`, { status, access_token: token }); }
     for (const a of (ads.data || [])) { await graphPost(`${a.id}`, { status, access_token: token }); }
     res.json({ success: true, status });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Hele campagne verwijderen (bij Meta en uit onze database + koppelingen).
+router.delete('/api/mkt/clients/:clientId/meta-campaigns/:campaignId', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const cid = req.params.campaignId;
+    const body = new URLSearchParams({ access_token: token });
+    const r = await fetch(`${GRAPH}/${cid}`, { method: 'DELETE', body });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+    // Ook onze eigen sporen opruimen (campagne-rij en eventuele koppeling).
+    try {
+      await withWriteConnection(async (c) => {
+        await c.query('DELETE FROM marketing.campaigns WHERE meta_campaign_id=$1 AND workspace_id=$2', [cid, wsId]);
+        await c.query('DELETE FROM marketing.campaign_links WHERE meta_campaign_id=$1 AND workspace_id=$2', [cid, wsId]);
+      });
+    } catch (_) { /* Meta is leidend; database-opruiming is niet kritisch */ }
+    res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

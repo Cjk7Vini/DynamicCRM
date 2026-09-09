@@ -657,9 +657,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="row2">
       <div class="field"><label>Doel</label>
         <select id="cpObjective">
+          <option value="OUTCOME_AWARENESS">Bekendheid (bereik)</option>
           <option value="OUTCOME_TRAFFIC">Verkeer (klikken naar site)</option>
-          <option value="OUTCOME_AWARENESS">Naamsbekendheid (bereik)</option>
           <option value="OUTCOME_ENGAGEMENT">Betrokkenheid</option>
+          <option value="OUTCOME_LEADS">Leads</option>
+          <option value="OUTCOME_SALES">Verkoop</option>
         </select>
       </div>
       <div class="field"><label>Dagbudget (euro) *</label><input id="cpBudget" type="number" min="1" step="1" value="10"></div>
@@ -1424,6 +1426,7 @@ async function renderCampDetail(){
           '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="openAsModal()">Nieuwe ad set</button>'+
           '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="campaignPublish(\'ACTIVE\')">Campagne live zetten</button>'+
           '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="campaignPublish(\'PAUSED\')">Alles pauzeren</button>'+
+          '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;color:#dc2626" onclick="campaignDelete()">Campagne verwijderen</button>'+
         '</div>'+
       '</div>'+cdStatsStrip(d.totals)+'</div>';
     var setsHtml=d.adsets.map(function(s){
@@ -1463,6 +1466,13 @@ async function campaignPublish(status){
   showMsg('cdMsg',true,status==='ACTIVE'?'Bezig met live zetten...':'Bezig met pauzeren...');
   try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})}); var d=await r.json();
     if(r.ok&&d.success){showMsg('cdMsg',true,status==='ACTIVE'?'Campagne staat live.':'Campagne is gepauzeerd.');renderCampDetail();if(typeof loadMetaCampaigns==='function')loadMetaCampaigns();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function campaignDelete(){
+  if(!CD_CAMP)return;
+  if(!confirm('Deze hele campagne verwijderen bij Meta (met alle ad sets en advertenties)? Dit kan niet ongedaan worden gemaakt.'))return;
+  showMsg('cdMsg',true,'Bezig met verwijderen...');
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'',{method:'DELETE',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){closeCampDetail();if(typeof loadMetaCampaigns==='function')loadMetaCampaigns();if(typeof loadCampaigns==='function')loadCampaigns();}else{showMsg('cdMsg',false,d.error||'Verwijderen mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
 }
 // Generieke interesse-widget voor de ad-set modals (sleutels 'as' en 'et').
 var MKT_INT={as:[],et:[]};
