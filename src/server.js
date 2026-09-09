@@ -907,13 +907,15 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
       const buildParams = () => practice ? [practice] : [];
       const pc = (n) => practice ? `AND l.praktijk_code = $${n}` : '';
 
-      // 1. Afspraken zonder uitkomst: intent, afspraak voorbij, geen outcome
-      const q1 = `
+      // 1. Afspraken zonder uitkomst: intent, afspraak voorbij, geen outcome.
+      // appointment_type kan vóór de migratie nog ontbreken; dan valt de query
+      // terug op de vaste waarde 'vitaliteitscheck' zoals voorheen.
+      const q1 = (apptExpr) => `
         SELECT l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron,
                l.aangemaakt_op, l.appointment_date, l.appointment_time,
                l.appointment_datetime, l.funnel_stage,
                l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
-               'vitaliteitscheck' AS appointment_type
+               ${apptExpr} AS appointment_type
         FROM public.leads l
         WHERE l.funnel_stage = 'intent'
           AND (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
@@ -922,7 +924,16 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
         ORDER BY l.aangemaakt_op DESC
         LIMIT 100
       `;
-      const r1 = await client.query(q1, buildParams());
+      let r1;
+      try {
+        r1 = await client.query(q1(`COALESCE(l.appointment_type, 'vitaliteitscheck')`), buildParams());
+      } catch (e) {
+        if (/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
+          r1 = await client.query(q1(`'vitaliteitscheck'`), buildParams());
+        } else {
+          throw e;
+        }
+      }
 
       // 2. Reminder verstuurd, awareness, geen afspraak
       const q2 = `
@@ -1508,14 +1519,33 @@ app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
            VALUES ($1,$2,$3,$4,$5,TRUE,$6,'awareness'${withBehand ? ', $7' : ''})
            RETURNING id`, params)).rows[0];
       };
+      let row;
       try {
-        return await doInsert(true);
+        row = await doInsert(true);
       } catch (e) {
         if (/behandelaar/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
-          return await doInsert(false);
+          row = await doInsert(false);
+        } else {
+          throw e;
         }
-        throw e;
       }
+
+      // Afspraaktype best-effort opslaan. De kolom appointment_type kan vóór de
+      // migratie nog ontbreken; dan slaan we dit stilletjes over.
+      if (heeftAfspraak && afspraak && afspraak.type) {
+        try {
+          await client.query(
+            `UPDATE public.leads SET appointment_type = $1 WHERE id = $2`,
+            [String(afspraak.type).slice(0, 50), row.id]
+          );
+        } catch (e) {
+          if (!(/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message))) {
+            console.warn('appointment_type (handmatig) niet opgeslagen:', e?.message);
+          }
+        }
+      }
+
+      return row;
     });
 
     recordEvent({
@@ -1536,7 +1566,10 @@ app.get('/api/afspraken', async (req, res) => {
     const practice = enforcePracticeAccess(req, res);
     if (practice === false) return;
     const leads = await withReadConnection(async (client) => {
-      let query = `
+      // appointment_type kan vóór de migratie nog ontbreken; dan valt de query
+      // terug op de vaste waarde 'vitaliteitscheck' zoals voorheen.
+      const buildQuery = (apptExpr) => {
+        let query = `
         SELECT
           l.id, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
           l.aangemaakt_op, l.appointment_date, l.appointment_time,
@@ -1550,17 +1583,25 @@ app.get('/api/afspraken', async (req, res) => {
           ) AS appt_dt,
           l.funnel_stage, l.status,
           l.outcome_sent, l.lead_reminder1_sent, l.lead_reminder2_sent,
-          'vitaliteitscheck' AS appointment_type
+          ${apptExpr} AS appointment_type
         FROM public.leads l
         WHERE (l.appointment_datetime IS NOT NULL OR l.appointment_date IS NOT NULL)
       `;
-      const params = [];
-      if (practice) {
-        query += ` AND l.praktijk_code = $1`;
-        params.push(practice);
+        if (practice) query += ` AND l.praktijk_code = $1`;
+        query += ` ORDER BY COALESCE(l.appointment_datetime, l.appointment_date::timestamp) DESC LIMIT 200`;
+        return query;
+      };
+      const params = practice ? [practice] : [];
+      let result;
+      try {
+        result = await client.query(buildQuery(`COALESCE(l.appointment_type, 'vitaliteitscheck')`), params);
+      } catch (e) {
+        if (/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
+          result = await client.query(buildQuery(`'vitaliteitscheck'`), params);
+        } else {
+          throw e;
+        }
       }
-      query += ` ORDER BY COALESCE(l.appointment_datetime, l.appointment_date::timestamp) DESC LIMIT 200`;
-      const result = await client.query(query, params);
       return result.rows.map(r => ({ ...r, appointment_datetime: r.appt_dt || r.appointment_datetime }));
     });
     res.json({ success: true, leads });
@@ -1609,15 +1650,32 @@ app.post('/api/confirm-appointment', async (req, res) => {
       if (check.rows.length === 0) throw new Error('Lead niet gevonden');
       const lead = check.rows[0];
 
-      await client.query(
-        `UPDATE public.leads 
-         SET appointment_date = $1, 
-             appointment_time = $2, 
-             appointment_datetime = timezone('Europe/Amsterdam', ($1::date + $2::time)::timestamp),
-             status = 'Afspraak Gepland'
-         WHERE id = $3`,
-        [date, time, lead_id]
-      );
+      // Afspraaktype meeschrijven. De kolom appointment_type kan vóór de
+      // migratie nog ontbreken; dan valt de update terug op de variant zonder
+      // type (geen omvallen, precies zoals bij behandelaar elders).
+      const doApptUpdate = async (withType) => {
+        const typeSet = withType ? `, appointment_type = $4` : '';
+        const params = [date, time, lead_id];
+        if (withType) params.push(String(type).slice(0, 50));
+        await client.query(
+          `UPDATE public.leads
+           SET appointment_date = $1,
+               appointment_time = $2,
+               appointment_datetime = timezone('Europe/Amsterdam', ($1::date + $2::time)::timestamp),
+               status = 'Afspraak Gepland'${typeSet}
+           WHERE id = $3`,
+          params
+        );
+      };
+      try {
+        await doApptUpdate(true);
+      } catch (e) {
+        if (/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
+          await doApptUpdate(false);
+        } else {
+          throw e;
+        }
+      }
 
       await client.query(
         `INSERT INTO lead_events (lead_id, practice_code, event_type, actor, metadata)
