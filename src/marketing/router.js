@@ -1453,11 +1453,17 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       name, objective, status: launchStatus, special_ad_categories: '[]',
       is_adset_budget_sharing_enabled: 'false', access_token: token,
     });
-    // 2) Advertentieset
+    // 2) Advertentieset. Voor EU (DSA) is de begunstigde/betaler verplicht:
+    // wie wordt er gepromoot. We vullen dat met de klantnaam.
+    const beneficiaryRow = await withReadConnection(async (c) => (await c.query(
+      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    const beneficiary = String((beneficiaryRow && beneficiaryRow.name) || name).slice(0, 100);
     const adsetParams = {
       name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
       billing_event: 'IMPRESSIONS', optimization_goal: CAMPAIGN_OBJECTIVES[objective],
       bid_strategy: bidStrategy, targeting, status: launchStatus,
+      dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
@@ -1556,10 +1562,16 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     const targeting = JSON.stringify(targetingObj);
     const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
 
+    // Begunstigde/betaler (DSA, verplicht voor EU): de klantnaam.
+    const benRow = await withReadConnection(async (c) => (await c.query(
+      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]);
+    const beneficiary = String((benRow && benRow.name) || name).slice(0, 100);
     const adsetParams = {
       name, campaign_id: req.params.campaignId, daily_budget: String(budgetCents),
       billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
       bid_strategy: bidStrategy, targeting, status: launchStatus,
+      dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
