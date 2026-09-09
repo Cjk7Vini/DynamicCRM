@@ -3362,7 +3362,7 @@
                 // Sheet 1: Funnel - gebruik .stages
                 if (funnelData.success && funnelData.stages && funnelData.stages.length > 0) {
                     // Zelfde cumulatieve Excel-trechter als op het dashboard
-                    const fm = buildFunnelModel(funnelData.stages);
+                    const fm = buildFunnelModel(funnelData.stages, funnelData.buckets);
                     const funnelSheet = XLSX.utils.json_to_sheet(fm.stages.map(d => ({
                         'Stage':        d.name,
                         'Aantal':       d.count,
@@ -3428,7 +3428,31 @@
         //   Benaderd       = totaal - awareness             -> Benaderd / Leads
         //   Lid            = won                            -> Lid / Benaderd
         //   Geen interesse = lost                           -> Lost / Benaderd
-        function buildFunnelModel(stages) {
+        function buildFunnelModel(stages, buckets) {
+            const pct = (num, den) => den > 0 ? (num / den * 100) : 0;
+
+            // Voorkeur: bucket-indeling (identiek aan het leadscherm) zodat leads
+            // met een afspraak of belpoging niet meer als "Leads/nieuw" meetellen.
+            if (buckets) {
+                const nieuw      = parseInt(buckets.nieuw) || 0;
+                const benaderd   = parseInt(buckets.benaderd) || 0;
+                const bedenktijd = parseInt(buckets.bedenktijd) || 0;
+                const lid        = parseInt(buckets.lid) || 0;
+                const lost       = parseInt(buckets.geen_interesse) || 0;
+                const totaal     = parseInt(buckets.totaal) || (nieuw + benaderd + bedenktijd + lid + lost);
+                const benaderdOfMeer = benaderd + bedenktijd + lid + lost;
+                return {
+                    totalLeads: totaal,
+                    stages: [
+                        { color: 'awareness', name: 'Leads',          count: nieuw,    click: 'all_leads',    tab: 'nieuw',          conv: null },
+                        { color: 'intent',    name: 'Benaderd',       count: benaderd, click: 'benaderd_cum', tab: 'benaderd',       conv: pct(benaderdOfMeer, totaal) },
+                        { color: 'won',       name: 'Lid',            count: lid,      click: 'won',          tab: 'lid',            conv: pct(lid, benaderdOfMeer) },
+                        { color: 'lost',      name: 'Geen interesse', count: lost,     click: 'lost',         tab: 'geen_interesse', conv: pct(lost, benaderdOfMeer) }
+                    ]
+                };
+            }
+
+            // Fallback: oude berekening op ruwe funnel_stage (vóór deploy backend).
             const cnt = {};
             let totalLeads = 0;
             (stages || []).forEach(s => {
@@ -3440,7 +3464,6 @@
             const won = cnt['won'] || 0;
             const lost = cnt['lost'] || 0;
             const benaderd = totalLeads - awareness;
-            const pct = (num, den) => den > 0 ? (num / den * 100) : 0;
             return {
                 totalLeads,
                 stages: [
@@ -3536,7 +3559,7 @@
                 }
                 
                 // Cumulatieve trechter (Excel-model) via gedeelde helper
-                const model = buildFunnelModel(data.stages);
+                const model = buildFunnelModel(data.stages, data.buckets);
                 const totalLeads = model.totalLeads;
                 const funnelStages = model.stages;
 
@@ -3544,7 +3567,7 @@
                 funnelStages.forEach((s) => {
                     const ofTotal = totalLeads > 0 ? (s.count / totalLeads * 100) : 0;
                     const width = Math.max(Number(ofTotal.toFixed(1)) || 0, 5); // min 5% voor zichtbaarheid
-                    const onClick = `onclick="showLeadsForStage('${s.click}', '${s.name}')"`;
+                    const onClick = `onclick="funnelBarClick('${s.click}', '${s.name}', '${s.tab || ''}')"`;
 
                     html += `
                         <div class="funnel-stage">
@@ -3859,6 +3882,18 @@
             renderLeadsList();
         }
         function onLeadsSearch() { renderLeadsList(); }
+
+        // Open het leadscherm direct op een bepaald tabblad (vanuit de funnelbalken)
+        function openLeadsTab(tab) {
+            _leadsTab = tab || 'alle';
+            const nav = document.getElementById('navLeads');
+            showDashboardSection('leads', nav);
+        }
+        // Klik op een funnelbalk: nieuwe leadscherm-tab indien bekend, anders de oude modal
+        function funnelBarClick(click, name, tab) {
+            if (tab) openLeadsTab(tab);
+            else showLeadsForStage(click, name);
+        }
 
         function renderLeadsList() {
             const body = document.getElementById('leadsOverzichtBody');
@@ -5931,7 +5966,7 @@
                     const fBody = document.getElementById('kwalFunnelBody');
                     if (fBody) {
                         if (fData.success && fData.stages) {
-                            const fm = buildFunnelModel(fData.stages);
+                            const fm = buildFunnelModel(fData.stages, fData.buckets);
                             fBody.innerHTML = fm.stages.map(s => {
                                 const ofTotal = fm.totalLeads > 0 ? (s.count / fm.totalLeads * 100) : 0;
                                 return `<tr>

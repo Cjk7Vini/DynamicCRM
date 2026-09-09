@@ -3021,7 +3021,38 @@ app.get('/api/funnel', async (req, res) => {
       const result = await client.query(query, params);
       return result.rows;
     });
-    
+
+    // Bucket-tellingen: exact dezelfde indeling als het leadscherm, zodat leads
+    // met een afspraak (of belpoging) niet meer als "Leads/nieuw" meetellen.
+    const buckets = await withReadConnection(async (client) => {
+      const params = [];
+      let where = ' WHERE 1=1';
+      let p = 1;
+      if (practice) { where += ` AND praktijk_code = $${p++}`; params.push(practice); }
+      if (from)     { where += ` AND aangemaakt_op >= $${p++}`; params.push(from); }
+      if (to)       { where += ` AND aangemaakt_op <= $${p++}`; params.push(to); }
+      if (source)   { where += ` AND bron = $${p++}`; params.push(source); }
+      const bucketQ = `
+        SELECT
+          SUM(CASE WHEN funnel_stage='won' THEN 1 ELSE 0 END)::int AS lid,
+          SUM(CASE WHEN funnel_stage='lost' THEN 1 ELSE 0 END)::int AS geen_interesse,
+          SUM(CASE WHEN funnel_stage NOT IN ('won','lost') AND status='Bedenktijd' THEN 1 ELSE 0 END)::int AS bedenktijd,
+          SUM(CASE WHEN funnel_stage NOT IN ('won','lost') AND (status IS DISTINCT FROM 'Bedenktijd')
+                AND (appointment_datetime IS NOT NULL OR appointment_date IS NOT NULL
+                     OR EXISTS (SELECT 1 FROM belpogingen bp WHERE bp.lead_id = leads.id)) THEN 1 ELSE 0 END)::int AS benaderd,
+          SUM(CASE WHEN funnel_stage NOT IN ('won','lost') AND (status IS DISTINCT FROM 'Bedenktijd')
+                AND appointment_datetime IS NULL AND appointment_date IS NULL
+                AND NOT EXISTS (SELECT 1 FROM belpogingen bp WHERE bp.lead_id = leads.id) THEN 1 ELSE 0 END)::int AS nieuw,
+          COUNT(*)::int AS totaal
+        FROM public.leads ${where}`;
+      try {
+        return (await client.query(bucketQ, params)).rows[0];
+      } catch (e) {
+        console.warn('Funnel buckets overgeslagen:', e?.message);
+        return null;
+      }
+    });
+
     // Add stage names and calculate conversion rates
     const stageNames = {
       'awareness': 'Leads',
@@ -3063,9 +3094,10 @@ app.get('/api/funnel', async (req, res) => {
     
     res.json({
       success: true,
-      stages: enrichedStages
+      stages: enrichedStages,
+      buckets
     });
-    
+
   } catch (error) {
     console.error('Funnel API error:', error);
     res.status(500).json({ error: error.message });
