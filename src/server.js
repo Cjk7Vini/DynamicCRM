@@ -897,7 +897,19 @@ app.get('/api/lead-info', async (req, res) => {
   }
 });
 
-// GET /api/lead-kwaliteit — leads buiten normale flow voor dashboard
+// Afspraaktype uit de event-log halen voor leads die hun afspraak kregen vóórdat
+// de kolom appointment_type bestond. Dekt zowel de boekingsflow (metadata.type)
+// als handmatige invoer (metadata.afspraak.type). Pakt het meest recente event.
+const APPT_TYPE_FROM_EVENTS = `(
+  SELECT COALESCE(le.metadata->>'type', le.metadata->'afspraak'->>'type')
+  FROM lead_events le
+  WHERE le.lead_id = l.id
+    AND COALESCE(le.metadata->>'type', le.metadata->'afspraak'->>'type') IS NOT NULL
+  ORDER BY le.occurred_at DESC
+  LIMIT 1
+)`;
+
+// GET /api/lead-kwaliteit - leads buiten normale flow voor dashboard
 app.get('/api/lead-kwaliteit', async (req, res) => {
   try {
     const practice = enforcePracticeAccess(req, res);
@@ -926,10 +938,10 @@ app.get('/api/lead-kwaliteit', async (req, res) => {
       `;
       let r1;
       try {
-        r1 = await client.query(q1(`COALESCE(l.appointment_type, 'vitaliteitscheck')`), buildParams());
+        r1 = await client.query(q1(`COALESCE(NULLIF(l.appointment_type,''), ${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`), buildParams());
       } catch (e) {
         if (/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
-          r1 = await client.query(q1(`'vitaliteitscheck'`), buildParams());
+          r1 = await client.query(q1(`COALESCE(${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`), buildParams());
         } else {
           throw e;
         }
@@ -1605,10 +1617,10 @@ app.get('/api/afspraken', async (req, res) => {
       const params = practice ? [practice] : [];
       let result;
       try {
-        result = await client.query(buildQuery(`COALESCE(l.appointment_type, 'vitaliteitscheck')`), params);
+        result = await client.query(buildQuery(`COALESCE(NULLIF(l.appointment_type,''), ${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`), params);
       } catch (e) {
         if (/appointment_type/i.test(e.message) && /(column|does not exist)/i.test(e.message)) {
-          result = await client.query(buildQuery(`'vitaliteitscheck'`), params);
+          result = await client.query(buildQuery(`COALESCE(${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`), params);
         } else {
           throw e;
         }
@@ -6127,7 +6139,9 @@ app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
       // full=true gebruikt de nieuwe kolommen/tabel; bij ontbreken (vóór migratie)
       // valt de query terug op veilige defaults zodat het scherm nooit omvalt.
       const build = (full) => {
-        const apptType = full ? `COALESCE(l.appointment_type, 'vitaliteitscheck')` : `'vitaliteitscheck'`;
+        const apptType = full
+          ? `COALESCE(NULLIF(l.appointment_type,''), ${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`
+          : `COALESCE(${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`;
         const gezien = full ? `l.gezien_op` : `NULL::timestamptz`;
         const notes = full ? `(SELECT COUNT(*) FROM public.lead_notes n WHERE n.lead_id = l.id)::int` : `0`;
         let sql = `
