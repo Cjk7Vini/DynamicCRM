@@ -1447,9 +1447,11 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     // krijgt alles meteen op ACTIVE. launch is strikt begrensd tot deze twee waarden.
     const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
 
-    // 1) Campagne
+    // 1) Campagne. Meta vereist expliciet is_adset_budget_sharing_enabled;
+    // false = elke advertentieset houdt zijn eigen budget (past bij onze opzet).
     const campaign = await graphPost(`${adAccount}/campaigns`, {
-      name, objective, status: launchStatus, special_ad_categories: '[]', access_token: token,
+      name, objective, status: launchStatus, special_ad_categories: '[]',
+      is_adset_budget_sharing_enabled: 'false', access_token: token,
     });
     // 2) Advertentieset
     const adsetParams = {
