@@ -2161,6 +2161,7 @@
         <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Bron</label><select id="nlBron" onchange="toggleNlBehandelaar()" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option>Walk-in</option><option>Website</option><option>Fysiotherapie</option><option>Anders</option></select></div>
         <div style="flex:1;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Doel (optioneel)</label><input type="text" id="nlDoel" placeholder="bv. afvallen" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"></div>
       </div>
+      <div style="margin-bottom:16px;"><label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Status</label><select id="nlStatus" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;"><option value="">Nieuw</option><option value="Bedenktijd">Bedenktijd</option></select></div>
       <div id="nlBehandelaarBox" style="display:none;margin-bottom:16px;">
         <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Behandelaar <span style="color:#dc2626;">*</span></label>
         <input type="text" id="nlBehandelaar" placeholder="Naam behandelaar" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;">
@@ -4740,7 +4741,8 @@
             if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig e-mailadres in.'; return; }
             if (!/^[0-9]{10,}$/.test(tel.replace(/\s/g, ''))) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig telefoonnummer in (min. 10 cijfers).'; return; }
             if (bron === 'Fysiotherapie' && !behandelaar) { msg.style.color = '#dc2626'; msg.textContent = 'Vul de behandelaar in.'; return; }
-            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, behandelaar: (bron === 'Fysiotherapie' ? behandelaar : null), praktijk_code: getPracticeCode() };
+            const nlStatusEl = document.getElementById('nlStatus');
+            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, behandelaar: (bron === 'Fysiotherapie' ? behandelaar : null), status: (nlStatusEl ? nlStatusEl.value : '') || null, praktijk_code: getPracticeCode() };
             if (metAfspraak) {
                 const date = document.getElementById('nlDatum').value;
                 const time = document.getElementById('nlTijd').value;

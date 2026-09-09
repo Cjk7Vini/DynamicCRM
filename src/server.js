@@ -1473,8 +1473,10 @@ app.get('/api/nazorg-leden', async (req, res) => {
 // Geen online-workflow: verstuurt geen nieuwe-lead-notificatie of Meta-events.
 app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
   try {
-    const { volledige_naam, emailadres, telefoon, bron, doel, afspraak, behandelaar } = req.body;
+    const { volledige_naam, emailadres, telefoon, bron, doel, afspraak, behandelaar, status } = req.body;
     const behand = (behandelaar || '').toString().trim().slice(0, 200) || null;
+    // Alleen expliciet toegestane handmatige statussen; de rest wordt genegeerd.
+    const handmatigeStatus = (status === 'Bedenktijd') ? 'Bedenktijd' : null;
 
     let praktijkCode;
     if (req.session.role === 'admin') {
@@ -1543,6 +1545,15 @@ app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
             console.warn('appointment_type (handmatig) niet opgeslagen:', e?.message);
           }
         }
+      }
+
+      // Handmatig gekozen status (bv. Bedenktijd) toepassen zodat de lead in het
+      // juiste tabblad van het leadscherm terechtkomt.
+      if (handmatigeStatus === 'Bedenktijd') {
+        await client.query(
+          `UPDATE public.leads SET status = 'Bedenktijd', funnel_stage = 'intent' WHERE id = $1`,
+          [row.id]
+        );
       }
 
       return row;
