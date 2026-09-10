@@ -412,6 +412,27 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
 
           <div class="card" style="padding:18px 20px;margin-bottom:16px">
+            <h3 style="margin:0 0 6px;font-size:16px">Je ID's opzoeken (Page ID en Instagram)</h3>
+            <p style="margin:0 0 10px;color:var(--muted);font-size:13px">Je Facebook Page ID en Instagram user ID haal je op in de Graph API Explorer van Meta.</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Eerst: Instagram koppelen aan de pagina</p>
+            <ul style="margin:0 0 10px;padding-left:18px;font-size:14px;line-height:1.7">
+              <li>Het Instagram-account moet een <strong>bedrijfs- of creator-account</strong> zijn (geen prive).</li>
+              <li>Koppel het aan de Facebook-pagina in <strong>Meta Business Suite</strong> (Instellingen, Instagram-accounts) of via de pagina-instellingen, Gekoppelde accounts. Zonder koppeling verschijnt er geen Instagram-ID.</li>
+            </ul>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Daarna: de ID's ophalen</p>
+            <ul style="margin:0 0 10px;padding-left:18px;font-size:14px;line-height:1.7">
+              <li>Open de <strong>Graph API Explorer</strong>, kies je app en <strong>User Token</strong>.</li>
+              <li>Zet de permissies aan: <strong>pages_show_list, instagram_basic, pages_read_engagement, business_management</strong>, en klik <strong>Generate Access Token</strong> (inloggen en goedkeuren).</li>
+              <li>Voer dit in en klik Submit:</li>
+            </ul>
+            <div style="font-family:monospace;font-size:13px;background:var(--surface-2,rgba(120,120,140,.1));border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 10px;overflow-x:auto">me/accounts?fields=name,id,instagram_business_account{id,username}</div>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">
+              <li><strong>Facebook Page ID</strong> = het veld <strong>id</strong> van de pagina.</li>
+              <li><strong>Instagram user ID</strong> = <strong>instagram_business_account.id</strong> (begint meestal met 1784...).</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:18px 20px;margin-bottom:16px">
             <h3 style="margin:0 0 6px;font-size:16px">Zie je of een verbinding live staat</h3>
             <p style="margin:0 0 10px;font-size:14px">Ga naar <strong>Koppelingen</strong> in het menu. Daar staat per klant en voor het hoofdaccount de status.</p>
             <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">
