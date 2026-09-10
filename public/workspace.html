@@ -252,6 +252,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
         Koppelingen
       </a>
+      <a data-view="handleiding" onclick="navTo('handleiding')">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Handleiding
+      </a>
       <a data-view="wssettings" id="navWsSettings" style="display:none" onclick="navTo('wssettings')">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         Werkplek-koppeling
@@ -345,6 +349,63 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Per klant zie je welke Meta-kanalen gekoppeld zijn. Een nieuwe koppeling zet je in de Koppelingen-tab van de betreffende klant.</div>
         <div id="koppOverviewMsg" class="inline-msg"></div>
         <div id="koppOverviewBody"><div class="empty">Laden...</div></div>
+      </section>
+
+      <!-- HANDLEIDING -->
+      <section class="view" id="viewHandleiding">
+        <div class="section-h"><span class="pill">Handleiding en verbinden</span></div>
+        <div style="max-width:820px">
+          <div class="card" style="padding:18px 20px;margin-bottom:16px">
+            <p style="margin:0 0 8px;font-size:14px">Er zijn twee manieren om Meta te verbinden. Kies de opzet die bij jou past. Je kunt ze ook combineren: een hoofdaccount voor de werkplek en per klant een eigen account.</p>
+          </div>
+
+          <div class="card" style="padding:18px 20px;margin-bottom:16px">
+            <h3 style="margin:0 0 6px;font-size:16px">1. Eigen account (hoofdaccount)</h3>
+            <p style="margin:0 0 10px;color:var(--muted);font-size:13px">Voor als jij zelf de campagnes maakt en beheert vanuit je eigen Meta Business-account. Dit account geldt als standaard voor de hele werkplek.</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Waar stel je het in?</p>
+            <p style="margin:0 0 10px;font-size:14px">Ga naar <strong>Werkplek-koppeling</strong> in het menu en vul daar de gegevens in.</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Wat heb je nodig?</p>
+            <ul style="margin:0 0 10px;padding-left:18px;font-size:14px;line-height:1.7">
+              <li><strong>Meta access token</strong> (verleng deze naar 60 dagen in de Graph API Explorer).</li>
+              <li><strong>Ad account ID</strong> (begint met act_, staat in Advertentiebeheer).</li>
+              <li>Optioneel: App ID en App secret (voor langlevende tokens).</li>
+            </ul>
+            <p style="margin:0;font-size:13px;color:var(--muted)">Klanten die geen eigen account hebben, vallen automatisch terug op dit hoofdaccount.</p>
+          </div>
+
+          <div class="card" style="padding:18px 20px;margin-bottom:16px">
+            <h3 style="margin:0 0 6px;font-size:16px">2. Agency met klanten (account per klant)</h3>
+            <p style="margin:0 0 10px;color:var(--muted);font-size:13px">Voor als je een agency bent met meerdere klanten die elk een eigen Meta Business-account hebben. Zo blijven cijfers en campagnes per klant strikt gescheiden.</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Waar stel je het in?</p>
+            <p style="margin:0 0 10px;font-size:14px">Open een klant via <strong>Klanten</strong> en ga naar het tabblad <strong>Koppelingen</strong>. Vul daar de gegevens van die specifieke klant in. Herhaal dit per klant.</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600">Wat vul je per klant in?</p>
+            <ul style="margin:0 0 10px;padding-left:18px;font-size:14px;line-height:1.7">
+              <li><strong>Meta access token</strong> van die klant.</li>
+              <li><strong>Ad account ID</strong> van die klant.</li>
+              <li><strong>Facebook-pagina</strong>, <strong>Instagram</strong> en <strong>Pixel</strong> van die klant (voor posts en conversies).</li>
+            </ul>
+            <p style="margin:0;font-size:13px;color:var(--muted)">De AI-analyse en rapportage per klant gebruiken uitsluitend de campagnes en gegevens van die klant. Er lekt niets tussen klanten.</p>
+          </div>
+
+          <div class="card" style="padding:18px 20px;margin-bottom:16px">
+            <h3 style="margin:0 0 6px;font-size:16px">Zie je of een verbinding live staat</h3>
+            <p style="margin:0 0 10px;font-size:14px">Ga naar <strong>Koppelingen</strong> in het menu. Daar staat per klant en voor het hoofdaccount de status.</p>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">
+              <li><strong>Ingesteld</strong> (groen bolletje): er is iets ingevuld. Dit betekent nog niet dat het werkt.</li>
+              <li>Klik op <strong>Test verbinding</strong> om Meta echt te controleren. Je ziet dan <strong>Verbonden</strong> met de accountnaam, of de precieze foutmelding (bijvoorbeeld een verlopen token).</li>
+              <li>Testen kan ook in het Koppelingen-tabblad van een klant, direct na het opslaan.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:18px 20px">
+            <h3 style="margin:0 0 6px;font-size:16px">Handig om te weten</h3>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">
+              <li>Verleng tokens naar 60 dagen, anders verloopt de verbinding snel en mislukken campagnes.</li>
+              <li>Zorg dat het ad account overeenkomt met het account waarop je adverteert.</li>
+              <li>Rapportage in het menu toont alle klanten netjes verdeeld; klik op een klant om alleen die klant te bekijken.</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <!-- KLANTEN -->
@@ -823,7 +884,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <script>
 var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
 var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false;
-var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling',reporting:'Rapportage',koppelingen:'Koppelingen'};
+var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling',reporting:'Rapportage',koppelingen:'Koppelingen',handleiding:'Handleiding'};
 
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
@@ -944,6 +1005,7 @@ function navTo(view){
   else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();}
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
+  else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
   else {document.getElementById('viewOverzicht').classList.add('active');}
 }
 async function loadWsIntegrations(){
