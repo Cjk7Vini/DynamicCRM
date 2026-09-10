@@ -1095,12 +1095,15 @@ router.delete('/api/mkt/clients/:clientId/integrations', requireMkt, async (req,
 // is ingevuld). Page ID / Instagram ID blijven per klant.
 // =======================================================================
 const WS_INT_SECRET = ['meta_access_token', 'meta_app_secret'];
-const WS_INT_IDS = ['meta_ad_account_id', 'meta_app_id'];
+const WS_INT_IDS = ['meta_ad_account_id', 'meta_app_id', 'meta_page_id', 'meta_ig_user_id', 'meta_pixel_id'];
 
 function workspaceIntegrationsView(row) {
   return {
     meta_ad_account_id: maskPlain(row ? row.meta_ad_account_id : null),
     meta_app_id: maskPlain(row ? row.meta_app_id : null),
+    meta_page_id: maskPlain(row ? row.meta_page_id : null),
+    meta_ig_user_id: maskPlain(row ? row.meta_ig_user_id : null),
+    meta_pixel_id: maskPlain(row ? row.meta_pixel_id : null),
     meta_access_token: maskSecret(row ? row.meta_access_token : null),
     meta_app_secret: maskSecret(row ? row.meta_app_secret : null),
     encrypted: !!mktKey(),
@@ -1123,6 +1126,12 @@ router.put('/api/mkt/workspace/integrations', requireMkt, async (req, res) => {
     if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
     const wsId = req.session.mkt.workspaceId;
     const b = req.body || {};
+    // Werkplek-brede page/ig/pixel zijn later toegevoegd; zorg dat de kolommen bestaan.
+    await withWriteConnection(async (c) => {
+      await c.query('ALTER TABLE marketing.workspace_integrations ADD COLUMN IF NOT EXISTS meta_page_id TEXT').catch(() => {});
+      await c.query('ALTER TABLE marketing.workspace_integrations ADD COLUMN IF NOT EXISTS meta_ig_user_id TEXT').catch(() => {});
+      await c.query('ALTER TABLE marketing.workspace_integrations ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT').catch(() => {});
+    });
     const existing = await withReadConnection(async (c) => (await c.query(
       'SELECT * FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
     )).rows[0]) || {};
@@ -1180,9 +1189,9 @@ async function resolveClientMeta(wsId, clientId) {
     appId: ci.meta_app_id || wi.meta_app_id || process.env.META_APP_ID || null,
     appSecret: decryptSecret(ci.meta_app_secret) || decryptSecret(wi.meta_app_secret) || process.env.META_APP_SECRET || null,
     adAccount: normalizeAdAccount(ci.meta_ad_account_id || wi.meta_ad_account_id),
-    pageId: ci.meta_page_id || null,
-    igUserId: ci.meta_ig_user_id || null,
-    pixelId: ci.meta_pixel_id || null,
+    pageId: ci.meta_page_id || wi.meta_page_id || null,
+    igUserId: ci.meta_ig_user_id || wi.meta_ig_user_id || null,
+    pixelId: ci.meta_pixel_id || wi.meta_pixel_id || null,
   };
 }
 

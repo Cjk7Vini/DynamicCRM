@@ -322,14 +322,21 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div id="wsiMsg" class="inline-msg"></div>
         <div class="card" style="max-width:640px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta-koppeling van de werkplek</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Vul hier je gedeelde Meta-gegevens één keer in. Alle klanten van deze werkplek vallen hierop terug. Bij een klant vul je dan alleen nog de Page ID en Instagram user ID van die specifieke brand in. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Vul hier je gedeelde Meta-gegevens één keer in. Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account of eigen pagina, dan vul je dat bij die klant in (dat wint dan). Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
           <div id="wsiEncWarn" style="display:none;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border:1px solid rgba(245,158,11,.28);padding:9px 12px;border-radius:9px;margin-bottom:14px"></div>
           <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
           <div class="row2">
             <div class="field"><label>Ad Account ID</label><input id="wsi_meta_ad_account_id" placeholder="act_1234567890"></div>
             <div class="field"><label>Meta App ID</label><input id="wsi_meta_app_id"></div>
           </div>
-          <div class="field"><label>Meta App Secret</label><input id="wsi_meta_app_secret" type="password"></div>
+          <div class="row2">
+            <div class="field"><label>Facebook Page ID</label><input id="wsi_meta_page_id" placeholder="Pagina waarmee je adverteert"></div>
+            <div class="field"><label>Instagram user ID (optioneel)</label><input id="wsi_meta_ig_user_id"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Meta Pixel ID (optioneel)</label><input id="wsi_meta_pixel_id"></div>
+            <div class="field"><label>Meta App Secret</label><input id="wsi_meta_app_secret" type="password"></div>
+          </div>
           <div style="margin:-2px 0 10px"><button class="btn btn-ghost" onclick="extendWsToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button><span id="wsiExtendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
           <div style="text-align:right"><button class="btn btn-primary" onclick="saveWsIntegrations()">Werkplek-koppeling opslaan</button></div>
         </div>
@@ -1015,7 +1022,7 @@ async function loadWsIntegrations(){
     var r=await fetch('/api/mkt/workspace/integrations',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){showMsg('wsiMsg',false,d.error||'Kon werkplek-koppeling niet laden.');return;}
     var g=d.integrations;
-    [['meta_ad_account_id',g.meta_ad_account_id],['meta_app_id',g.meta_app_id],['meta_access_token',g.meta_access_token],['meta_app_secret',g.meta_app_secret]].forEach(function(p){
+    [['meta_ad_account_id',g.meta_ad_account_id],['meta_app_id',g.meta_app_id],['meta_page_id',g.meta_page_id],['meta_ig_user_id',g.meta_ig_user_id],['meta_pixel_id',g.meta_pixel_id],['meta_access_token',g.meta_access_token],['meta_app_secret',g.meta_app_secret]].forEach(function(p){
       var el=document.getElementById('wsi_'+p[0]); if(!el)return; var s=p[1]||{}; el.value=''; el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';
     });
     var warn=document.getElementById('wsiEncWarn');
@@ -1025,7 +1032,7 @@ async function loadWsIntegrations(){
 async function saveWsIntegrations(){
   hideMsg('wsiMsg');
   var payload={};
-  ['meta_ad_account_id','meta_app_id','meta_access_token','meta_app_secret'].forEach(function(f){var v=document.getElementById('wsi_'+f).value.trim();if(v)payload[f]=v;});
+  ['meta_ad_account_id','meta_app_id','meta_page_id','meta_ig_user_id','meta_pixel_id','meta_access_token','meta_app_secret'].forEach(function(f){var el=document.getElementById('wsi_'+f);if(!el)return;var v=el.value.trim();if(v)payload[f]=v;});
   try{
     var r=await fetch('/api/mkt/workspace/integrations',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
