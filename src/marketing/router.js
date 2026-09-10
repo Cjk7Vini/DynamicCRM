@@ -1788,12 +1788,52 @@ router.post('/api/mkt/clients/:clientId/ai/analysis', requireMkt, async (req, re
       } catch (_) { /* overslaan */ }
     }
     if (creds.adAccount) {
+      // Alleen de campagnes die aan DEZE klant gekoppeld zijn meenemen, zodat
+      // cijfers van andere klanten op hetzelfde ad-account niet meelekken.
+      let campIds = [];
       try {
-        const ins = await graphGet(`${creds.adAccount}/insights`, {
-          fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm', date_preset: 'last_30d', access_token: creds.token,
-        });
-        figures.ads = (ins.data && ins.data[0]) || { empty: true };
-      } catch (_) { /* overslaan */ }
+        campIds = await withReadConnection(async (c) => (await c.query(
+          `SELECT meta_campaign_id FROM marketing.campaign_links
+             WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id IS NOT NULL
+           UNION
+           SELECT meta_campaign_id FROM marketing.campaigns
+             WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id IS NOT NULL`,
+          [wsId, okClient]
+        )).rows.map((r) => r.meta_campaign_id).filter(Boolean));
+      } catch (_) { campIds = []; }
+
+      if (campIds.length) {
+        try {
+          const ins = await graphGet(`${creds.adAccount}/insights`, {
+            level: 'campaign',
+            fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
+            date_preset: 'last_30d',
+            filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]),
+            access_token: creds.token,
+          });
+          const rows = ins.data || [];
+          if (rows.length) {
+            let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
+            for (const r of rows) {
+              spend += parseFloat(r.spend || 0) || 0;
+              impressions += parseInt(r.impressions || 0, 10) || 0;
+              reach += parseInt(r.reach || 0, 10) || 0;
+              clicks += parseInt(r.clicks || 0, 10) || 0;
+            }
+            figures.ads = {
+              spend: spend.toFixed(2), impressions, reach, clicks,
+              ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
+              cpc: clicks ? (spend / clicks).toFixed(2) : '0.00',
+              cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
+              campagnes: rows.length,
+            };
+          } else {
+            figures.ads = { empty: true };
+          }
+        } catch (_) { /* overslaan */ }
+      } else {
+        figures.adsNote = 'Geen campagnes gekoppeld aan deze klant; advertentiecijfers zijn overgeslagen.';
+      }
     }
 
     const hasData = figures.account || (figures.ads && !figures.ads.empty) || figures.topPosts.length;
@@ -2611,6 +2651,60 @@ router.get('/api/mkt/koppelingen/overview', requireMkt, async (req, res) => {
       });
     }
     res.json({ success: true, clients: out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Live-check van de Meta-koppeling van een klant: echt pingen richting Meta,
+// niet alleen kijken of er iets is ingevuld.
+router.get('/api/mkt/clients/:clientId/meta-status', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const has = {
+      token: !!creds.token, adAccount: !!creds.adAccount, pageId: !!creds.pageId,
+      igUserId: !!creds.igUserId, pixelId: !!creds.pixelId,
+    };
+    if (!creds.token) return res.json({ success: true, connected: false, live: false, has, reason: 'Geen token ingesteld' });
+    try {
+      let detail = {};
+      if (creds.adAccount) {
+        const a = await graphGet(`${creds.adAccount}`, { fields: 'account_status,name,currency', access_token: creds.token });
+        detail = { adAccountName: a.name || null, accountStatus: a.account_status ?? null, currency: a.currency || null };
+      } else {
+        const me = await graphGet('me', { fields: 'id,name', access_token: creds.token });
+        detail = { tokenName: me.name || null };
+      }
+      return res.json({ success: true, connected: true, live: true, has, detail });
+    } catch (e) {
+      return res.json({ success: true, connected: false, live: false, has, error: e.message });
+    }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Live-check van het hoofdaccount van de werkplek (workspace-defaults).
+router.get('/api/mkt/workspace/meta-status', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const creds = await resolveClientMeta(wsId, null); // null -> alleen workspace-defaults
+    const has = { token: !!creds.token, adAccount: !!creds.adAccount };
+    if (!creds.token) return res.json({ success: true, connected: false, live: false, has, reason: 'Geen token ingesteld' });
+    try {
+      let detail = {};
+      if (creds.adAccount) {
+        const a = await graphGet(`${creds.adAccount}`, { fields: 'account_status,name,currency', access_token: creds.token });
+        detail = { adAccountName: a.name || null, accountStatus: a.account_status ?? null, currency: a.currency || null };
+      } else {
+        const me = await graphGet('me', { fields: 'id,name', access_token: creds.token });
+        detail = { tokenName: me.name || null };
+      }
+      return res.json({ success: true, connected: true, live: true, has, detail });
+    } catch (e) {
+      return res.json({ success: true, connected: false, live: false, has, error: e.message });
+    }
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

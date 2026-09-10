@@ -481,6 +481,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div class="field"><label>Notities</label><textarea id="int_notes" rows="2" placeholder="Extra info over de koppelingen"></textarea></div>
             <div class="actions-split">
               <span style="font-size:12px;color:var(--muted);align-self:center">Laat een token leeg om het ongewijzigd te laten.</span>
+              <span id="intStatus" style="font-size:12.5px;align-self:center;color:var(--muted)"></span>
+              <button class="btn btn-ghost" id="intTestBtn" onclick="testClientIntegration(this)">Test verbinding</button>
               <button class="btn btn-primary" id="intSaveBtn" onclick="saveIntegrations()">Koppelingen opslaan</button>
             </div>
           </div>
@@ -1016,11 +1018,17 @@ async function loadReportingOverview(){
 async function loadKoppelingenOverview(){
   var body=document.getElementById('koppOverviewBody'); hideMsg('koppOverviewMsg');
   body.innerHTML='<div class="empty">Laden...</div>';
-  function dot(on){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#16a34a':'var(--line)')+'"></span>'+(on?'live':'-')+'</span>';}
+  // Groen = ingesteld (er staat iets ingevuld). Of de koppeling ook echt werkt,
+  // zie je pas na "Test verbinding" (die pingt Meta live).
+  function dot(on){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#16a34a':'var(--line)')+'"></span>'+(on?'ingesteld':'-')+'</span>';}
   try{
     var r=await fetch('/api/mkt/koppelingen/overview',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('koppOverviewMsg',false,d.error||'Kon koppelingen niet laden.');return;}
-    if(!d.clients.length){body.innerHTML='<div class="empty"><h4>Geen klanten</h4></div>';return;}
+    var wsRow='<div class="card" style="margin-bottom:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
+      '<div><strong>Hoofdaccount (werkplek)</strong><div style="color:var(--muted);font-size:12.5px">Het Meta-account van de werkplek zelf. Dit is de standaard als een klant geen eigen account heeft.</div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px"><span id="kstat-ws" style="font-size:12.5px;color:var(--muted)">Niet getest</span>'+
+      '<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="testWorkspaceKoppeling(this)">Test verbinding</button></div></div>';
+    if(!d.clients.length){body.innerHTML=wsRow+'<div class="empty"><h4>Geen klanten</h4></div>';return;}
     var rows=d.clients.map(function(c){
       return '<tr style="border-top:1px solid var(--line)">'+
         '<td style="padding:8px 10px;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+esc(c.brand_color||'#6366f1')+';margin-right:8px"></span>'+esc(c.name)+'</td>'+
@@ -1029,13 +1037,50 @@ async function loadKoppelingenOverview(){
         '<td style="padding:8px 10px">'+dot(c.pageId)+'</td>'+
         '<td style="padding:8px 10px">'+dot(c.igUserId)+'</td>'+
         '<td style="padding:8px 10px">'+dot(c.pixelId)+'</td>'+
-        '<td style="padding:8px 10px;text-align:right"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="openClient('+c.id+')">Koppelen</button></td>'+
+        '<td style="padding:8px 10px"><span id="kstat-'+c.id+'" style="font-size:12.5px;color:var(--muted)">Niet getest</span></td>'+
+        '<td style="padding:8px 10px;text-align:right;white-space:nowrap">'+
+          '<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="testKoppeling('+c.id+',this)">Test</button> '+
+          '<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="openClient('+c.id+')">Koppelen</button></td>'+
       '</tr>';
     }).join('');
-    body.innerHTML='<div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'+
-      '<tr style="color:var(--muted);text-align:left"><th style="padding:8px 10px">Klant</th><th style="padding:8px 10px">Token</th><th style="padding:8px 10px">Ad account</th><th style="padding:8px 10px">Page</th><th style="padding:8px 10px">Instagram</th><th style="padding:8px 10px">Pixel</th><th></th></tr>'+
+    body.innerHTML=wsRow+'<div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<tr style="color:var(--muted);text-align:left"><th style="padding:8px 10px">Klant</th><th style="padding:8px 10px">Token</th><th style="padding:8px 10px">Ad account</th><th style="padding:8px 10px">Page</th><th style="padding:8px 10px">Instagram</th><th style="padding:8px 10px">Pixel</th><th style="padding:8px 10px">Status</th><th></th></tr>'+
       rows+'</table></div>';
   }catch(e){body.innerHTML='';showMsg('koppOverviewMsg',false,'Netwerkfout.');}
+}
+function renderKoppStatus(el,d){
+  if(!el) return;
+  if(d && d.connected && d.live){
+    var name=d.detail&&(d.detail.adAccountName||d.detail.tokenName);
+    var act=d.detail&&d.detail.accountStatus;
+    var extra=name?(' ('+name+(act===1?', actief':'')+')'):'';
+    el.style.color='#16a34a'; el.textContent='Verbonden'+extra;
+  }else{
+    var why=(d&&(d.reason||d.error))||'Niet verbonden';
+    el.style.color='#dc2626'; el.textContent=why;
+  }
+}
+async function testKoppeling(id,btn){
+  var el=document.getElementById('kstat-'+id);
+  if(el){el.style.color='var(--muted)';el.textContent='Testen...';}
+  if(btn){btn.disabled=true;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+id+'/meta-status',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ if(el){el.style.color='#dc2626';el.textContent=(d&&d.error)||'Fout';} }
+    else renderKoppStatus(el,d);
+  }catch(e){ if(el){el.style.color='#dc2626';el.textContent='Netwerkfout';} }
+  finally{ if(btn) btn.disabled=false; }
+}
+async function testWorkspaceKoppeling(btn){
+  var el=document.getElementById('kstat-ws');
+  if(el){el.style.color='var(--muted)';el.textContent='Testen...';}
+  if(btn){btn.disabled=true;}
+  try{
+    var r=await fetch('/api/mkt/workspace/meta-status',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ if(el){el.style.color='#dc2626';el.textContent=(d&&d.error)||'Fout';} }
+    else renderKoppStatus(el,d);
+  }catch(e){ if(el){el.style.color='#dc2626';el.textContent='Netwerkfout';} }
+  finally{ if(btn) btn.disabled=false; }
 }
 // ---- Klanten ----
 async function loadClients(){
@@ -1333,6 +1378,18 @@ async function saveIntegrations(){
     else {showMsg('intMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Koppelingen opslaan';
+}
+async function testClientIntegration(btn){
+  if(!CURRENT_CLIENT)return;
+  var el=document.getElementById('intStatus');
+  if(el){el.style.color='var(--muted)';el.textContent='Testen...';}
+  if(btn){btn.disabled=true;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-status',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ if(el){el.style.color='#dc2626';el.textContent=(d&&d.error)||'Fout';} }
+    else if(typeof renderKoppStatus==='function') renderKoppStatus(el,d);
+  }catch(e){ if(el){el.style.color='#dc2626';el.textContent='Netwerkfout';} }
+  finally{ if(btn) btn.disabled=false; }
 }
 
 // ---- Campagnes ----
