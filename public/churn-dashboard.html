@@ -3949,9 +3949,16 @@
               </table></div>`;
         }
 
+        // Praktijkcode van de lead meesturen zodat de scope ook klopt voor
+        // organisatie-accounts (meerdere locaties) en admins met een filter.
+        function leadPcParam(id) {
+            const l = _leadsData.find(x => String(x.id) === String(id));
+            return (l && l.praktijk_code) ? ('?practice=' + encodeURIComponent(l.praktijk_code)) : '';
+        }
+
         async function fetchLeadNotes(id) {
             try {
-                const r = await fetch('/api/leads/' + encodeURIComponent(id) + '/notities', { credentials: 'include' });
+                const r = await fetch('/api/leads/' + encodeURIComponent(id) + '/notities' + leadPcParam(id), { credentials: 'include' });
                 const d = await r.json();
                 if (r.ok && d.success) return d.notities || [];
             } catch (_) {}
@@ -3963,7 +3970,7 @@
             if (!l) return;
             openGenericModal('Lead: ' + (l.volledige_naam || ''), '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">Laden...</div>');
             // Markeer als gezien (badge/indicator verdwijnt zodra een collega opent)
-            fetch('/api/leads/' + encodeURIComponent(id) + '/gezien', { method: 'POST', credentials: 'include' })
+            fetch('/api/leads/' + encodeURIComponent(id) + '/gezien' + leadPcParam(id), { method: 'POST', credentials: 'include' })
                 .then(() => { if (!l.gezien_op) { l.gezien_op = new Date().toISOString(); renderLeadsTabs(); renderLeadsList(); updateLeadsBadge(); } })
                 .catch(() => {});
             const notities = await fetchLeadNotes(id);
@@ -4040,9 +4047,10 @@
             if (!tekst) { if (ta) ta.focus(); return; }
             if (btn) { btn.disabled = true; btn.textContent = 'Opslaan...'; }
             try {
+                const lp = _leadsData.find(x => String(x.id) === String(id));
                 const r = await fetch('/api/leads/' + encodeURIComponent(id) + '/notities', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-                    body: JSON.stringify({ tekst })
+                    body: JSON.stringify({ tekst, practice: (lp && lp.praktijk_code) || undefined })
                 });
                 const d = await r.json();
                 if (!r.ok || !d.success) throw new Error(d.error || 'Fout');
