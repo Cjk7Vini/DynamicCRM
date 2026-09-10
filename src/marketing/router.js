@@ -1072,6 +1072,22 @@ router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Wis de volledige Meta-koppeling van een klant, zodat hij terugvalt op het
+// hoofdaccount van de werkplek. Handig als er per ongeluk een verkeerd of
+// verlopen token is ingevoerd en dat niet via het formulier te legen is.
+router.delete('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan koppelingen wijzigen' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    await withWriteConnection(async (c) => c.query(
+      'DELETE FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    ));
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // =======================================================================
 // STAP 16 - WORKSPACE-KOPPELING (gedeelde Meta-basis voor alle klanten)
 // De eigenaar vult token + App ID/Secret + Ad Account eenmalig in op
