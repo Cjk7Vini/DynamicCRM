@@ -1395,7 +1395,7 @@ async function loadMetaInsights(){
     // Account
     html+='<div class="section-h"><h4>Meta (Instagram)</h4></div>';
     if(d.account){
-      html+='<div class="stats">'+tile('Volgers',d.account.followers!=null?d.account.followers:'-',true)+tile('Berichten',d.account.media!=null?d.account.media:'-')+(d.account.username?tile('Account','@'+d.account.username):'')+'</div>';
+      html+='<div class="stats">'+tile('Volgers',d.account.followers!=null?d.account.followers:'-',true)+tile('Berichten',d.account.media!=null?d.account.media:'-')+(d.account.username?('<div class="stat"><div class="k">Account</div><div class="v" style="font-size:15px;line-height:1.3;word-break:break-all">@'+esc(d.account.username)+'</div></div>'):'')+'</div>';
     } else {
       html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
     }

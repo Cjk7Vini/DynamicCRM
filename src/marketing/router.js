@@ -1865,13 +1865,16 @@ router.post('/api/mkt/clients/:clientId/ai/analysis', requireMkt, async (req, re
     if (!hasData) return res.status(400).json({ error: 'Geen cijfers beschikbaar om te analyseren' });
 
     const system = [
-      'Je bent een ervaren Nederlandse Meta-advertentiespecialist die cijfers uitlegt aan een klant zonder marketingkennis.',
+      'Je bent een ervaren Nederlandse Meta-specialist die cijfers uitlegt aan een klant zonder marketingkennis.',
       'Schrijf in het Nederlands, in gewone taal, kort en concreet. Gebruik NOOIT em-dashes of dubbele streepjes.',
-      'Geef je verslag met deze kopjes (gewone tekst, geen JSON):',
+      'Er zijn twee losse onderdelen die je STRIKT gescheiden houdt en nooit door elkaar haalt:',
+      '1. Organisch: het Instagram-account, de volgers en de gewone posts (het veld topPosts en account). Dit zijn GEEN advertenties.',
+      '2. Advertenties: betaalde Meta-campagnes (het veld ads). Bespreek dit ALLEEN als er echte advertentiecijfers in ads staan. Staat er een adsNote of ontbreekt ads, dan lopen er GEEN campagnes: zeg dat in een zin en geef geen advertentie-analyse en geen advertentie-tips.',
+      'Gebruik precies deze kopjes (gewone tekst, geen JSON):',
       'Samenvatting: 2 tot 3 zinnen over hoe het ervoor staat.',
-      'Wat gaat goed: 2 tot 4 punten.',
-      'Wat kan beter: 2 tot 4 punten.',
-      'Concrete tips: 2 tot 4 acties voor de komende maand.',
+      'Organische posts: wat gaat goed en wat kan beter, alleen op basis van de posts en volgers.',
+      'Advertenties: alleen als er advertentiecijfers zijn; anders precies 1 zin dat er nog geen campagnes lopen.',
+      'Concrete tips: 2 tot 4 acties, en zeg per tip duidelijk of het over organische posts of over advertenties gaat.',
       'Baseer alles alleen op de aangeleverde cijfers. Verzin geen getallen.',
     ].join('\n');
 
@@ -2093,20 +2096,51 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.errors.account = 'Geen Instagram user ID ingesteld';
     }
 
-    // --- Advertentiecijfers (laatste 30 dagen) ---
+    // --- Advertentiecijfers (laatste 30 dagen), alleen campagnes van DEZE klant ---
     if (creds.adAccount) {
+      let campIds = [];
       try {
-        const acct = creds.adAccount;
-        const ins = await graphGet(`${acct}/insights`, {
-          fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
-          date_preset: 'last_30d', access_token: token,
-        });
-        const row = (ins.data && ins.data[0]) || null;
-        out.ads = row ? {
-          spend: row.spend ?? null, impressions: row.impressions ?? null, reach: row.reach ?? null,
-          clicks: row.clicks ?? null, ctr: row.ctr ?? null, cpc: row.cpc ?? null, cpm: row.cpm ?? null,
-        } : { empty: true };
-      } catch (e) { out.errors.ads = e.message; }
+        campIds = await withReadConnection(async (c) => (await c.query(
+          `SELECT meta_campaign_id FROM marketing.campaign_links
+             WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id IS NOT NULL
+           UNION
+           SELECT meta_campaign_id FROM marketing.campaigns
+             WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id IS NOT NULL`,
+          [wsId, okClient]
+        )).rows.map((r) => r.meta_campaign_id).filter(Boolean));
+      } catch (_) { campIds = []; }
+
+      if (campIds.length) {
+        try {
+          const ins = await graphGet(`${creds.adAccount}/insights`, {
+            level: 'campaign',
+            fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
+            date_preset: 'last_30d',
+            filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]),
+            access_token: token,
+          });
+          const rows = ins.data || [];
+          if (rows.length) {
+            let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
+            for (const r of rows) {
+              spend += parseFloat(r.spend || 0) || 0;
+              impressions += parseInt(r.impressions || 0, 10) || 0;
+              reach += parseInt(r.reach || 0, 10) || 0;
+              clicks += parseInt(r.clicks || 0, 10) || 0;
+            }
+            out.ads = {
+              spend: spend.toFixed(2), impressions, reach, clicks,
+              ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
+              cpc: clicks ? (spend / clicks).toFixed(2) : '0.00',
+              cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
+            };
+          } else {
+            out.ads = { empty: true };
+          }
+        } catch (e) { out.errors.ads = e.message; }
+      } else {
+        out.ads = { empty: true };
+      }
     }
 
     res.json({ success: true, ...out });
