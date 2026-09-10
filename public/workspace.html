@@ -1892,17 +1892,27 @@ async function createCampaign2(){
     audiences:Array.prototype.slice.call(document.getElementById('cpAudiences').selectedOptions||[]).map(function(o){return o.value;}).filter(function(v){return v;}),
     launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
   };
-  if(!payload.name){showMsg('campModalMsg',false,'Campagnenaam is verplicht.');return;}
-  if(!payload.assetId){showMsg('campModalMsg',false,'Kies een afbeelding.');return;}
-  if(!/^https?:\/\//i.test(payload.link)){showMsg('campModalMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
+  function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
+  if(!payload.name){campShowErr('Campagnenaam is verplicht.');return;}
+  if(!payload.assetId){campShowErr('Kies een afbeelding.');return;}
+  if(!/^https?:\/\//i.test(payload.link)){campShowErr('Vul een geldige bestemmings-URL in (https://...).');return;}
   if(payload.launch==='active'&&!confirm('De campagne direct live zetten? Deze gaat meteen geld uitgeven bij Meta.'))return;
   btn.disabled=true; btn.textContent='Aanmaken...';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('campModalMsg',true,payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).');setTimeout(function(){closeCampaign();loadCampaigns();},1400);}
-    else {showMsg('campModalMsg',false,d.error||'Aanmaken mislukt.');}
-  }catch(e){showMsg('campModalMsg',false,'Netwerkfout.');}
+    if(r.ok&&d.success){
+      showMsg('campModalMsg',true,payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).');
+      var camp=d.campaign||{};
+      setTimeout(function(){
+        closeCampaign();
+        loadCampaigns();
+        // Volgende stap: het ad set-venster van de zojuist gemaakte campagne.
+        if(camp.meta_campaign_id&&typeof openCampDetail==='function'){openCampDetail(camp.meta_campaign_id,camp.name);}
+      },1100);
+    } else { campShowErr(d.error||'Aanmaken mislukt.'); }
+  }catch(e){ campShowErr('Netwerkfout.'); }
   btn.disabled=false; btn.textContent='Campagne aanmaken';
 }
 
