@@ -3532,6 +3532,22 @@ function enforcePracticeAccess(req, res) {
   return false;
 }
 
+// Mag deze gebruiker leads van deze praktijk beheren (bekijken/wijzigen/
+// verwijderen/notities)? Admin = alles, praktijk = eigen code, organisatie =
+// elk van de gekoppelde locatiecodes (organisatie-accounts hebben geen
+// session.practiceCode, maar organisationCodes).
+function mayManagePractice(req, practiceCode) {
+  const role = req.session?.role;
+  if (role === 'admin') return true;
+  if (!practiceCode) return false;
+  if (role === 'practice') return practiceCode === req.session.practiceCode;
+  if (role === 'organisation') {
+    const codes = (req.session.organisationCodes || '').split(',').map(c => c.trim()).filter(Boolean);
+    return codes.includes(practiceCode);
+  }
+  return false;
+}
+
 // ============================================================================
 // AUTH ENDPOINTS
 // ============================================================================
@@ -6082,17 +6098,17 @@ app.patch('/api/leads/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { funnel_stage, status } = req.body;
-    const practiceCode = req.session.practiceCode;
-    const role = req.session.role;
     await withWriteConnection(async (client) => {
-      const q = role === 'admin'
-        ? 'UPDATE public.leads SET funnel_stage=$1, status=$2 WHERE id=$3'
-        : 'UPDATE public.leads SET funnel_stage=$1, status=$2 WHERE id=$3 AND praktijk_code=$4';
-      const params = role === 'admin' ? [funnel_stage, status, id] : [funnel_stage, status, id, practiceCode];
-      await client.query(q, params);
+      const lead = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
+      if (!lead) return;
+      if (!mayManagePractice(req, lead.praktijk_code)) throw Object.assign(new Error('Geen toegang'), { status: 403 });
+      await client.query('UPDATE public.leads SET funnel_stage=$1, status=$2 WHERE id=$3', [funnel_stage, status, id]);
     });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) {
+    if (e.status === 403) return res.status(403).json({ success: false, error: 'Geen toegang' });
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // DELETE /api/leads/:id — verwijder lead vanuit dashboard (incl. bijbehorende
@@ -6100,14 +6116,11 @@ app.patch('/api/leads/:id', requireAuth, async (req, res) => {
 app.delete('/api/leads/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const practiceCode = req.session.practiceCode;
-    const role = req.session.role;
     await withWriteConnection(async (client) => {
       // Eerst controleren of deze gebruiker de lead mag verwijderen.
-      const owns = role === 'admin'
-        ? (await client.query('SELECT 1 FROM public.leads WHERE id=$1', [id])).rowCount
-        : (await client.query('SELECT 1 FROM public.leads WHERE id=$1 AND praktijk_code=$2', [id, practiceCode])).rowCount;
-      if (!owns) return;
+      const lead = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
+      if (!lead) return;
+      if (!mayManagePractice(req, lead.praktijk_code)) throw Object.assign(new Error('Geen toegang'), { status: 403 });
       // Kinderen opruimen (best-effort; tabel kan ontbreken vóór migratie).
       await client.query('DELETE FROM belpogingen WHERE lead_id=$1', [id]).catch(() => {});
       await client.query('DELETE FROM lead_events WHERE lead_id=$1', [id]).catch(() => {});
@@ -6115,7 +6128,10 @@ app.delete('/api/leads/:id', requireAuth, async (req, res) => {
       await client.query('DELETE FROM public.leads WHERE id=$1', [id]);
     });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) {
+    if (e.status === 403) return res.status(403).json({ success: false, error: 'Geen toegang' });
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // GET /api/leads/overzicht — volledig leadoverzicht voor het leadscherm (tabbladen)
@@ -6226,13 +6242,9 @@ app.get('/api/leads/nieuw-count', requireAuth, async (req, res) => {
 app.get('/api/leads/:id/notities', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const practice = enforcePracticeAccess(req, res);
-    if (practice === false) return;
     const notes = await withReadConnection(async (client) => {
-      const scoped = practice ? ' AND praktijk_code=$2' : '';
-      const params = practice ? [id, practice] : [id];
-      const owns = (await client.query(`SELECT 1 FROM public.leads WHERE id=$1${scoped}`, params)).rowCount;
-      if (!owns) return null;
+      const lead = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
+      if (!lead || !mayManagePractice(req, lead.praktijk_code)) return null;
       try {
         return (await client.query(
           `SELECT id, auteur, tekst, aangemaakt_op FROM public.lead_notes WHERE lead_id=$1 ORDER BY aangemaakt_op DESC`,
@@ -6257,14 +6269,21 @@ app.post('/api/leads/:id/notities', requireAuth, async (req, res) => {
     const tekst = ((req.body && req.body.tekst) || '').toString().trim();
     if (!tekst) return res.status(400).json({ success: false, error: 'Lege notitie' });
     if (tekst.length > 4000) return res.status(400).json({ success: false, error: 'Notitie te lang' });
-    const practice = enforcePracticeAccess(req, res);
-    if (practice === false) return;
     const auteur = req.session.email || 'Onbekend';
     const note = await withWriteConnection(async (client) => {
-      const scoped = practice ? ' AND praktijk_code=$2' : '';
-      const params = practice ? [id, practice] : [id];
-      const leadRow = (await client.query(`SELECT praktijk_code FROM public.leads WHERE id=$1${scoped}`, params)).rows[0];
-      if (!leadRow) return null;
+      const leadRow = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
+      if (!leadRow || !mayManagePractice(req, leadRow.praktijk_code)) return null;
+      // Tabel desnoods hier aanmaken zodat notities altijd werken (geen handmatige
+      // migratie nodig). Mislukt dit door rechten, dan vangt de 503 hieronder het op.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.lead_notes (
+          id BIGSERIAL PRIMARY KEY,
+          lead_id BIGINT NOT NULL,
+          praktijk_code TEXT NOT NULL,
+          auteur TEXT,
+          tekst TEXT NOT NULL,
+          aangemaakt_op TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`).catch(() => {});
       return (await client.query(
         `INSERT INTO public.lead_notes (lead_id, praktijk_code, auteur, tekst)
          VALUES ($1,$2,$3,$4) RETURNING id, auteur, tekst, aangemaakt_op`,
@@ -6286,13 +6305,11 @@ app.post('/api/leads/:id/notities', requireAuth, async (req, res) => {
 app.post('/api/leads/:id/gezien', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const practice = enforcePracticeAccess(req, res);
-    if (practice === false) return;
     await withWriteConnection(async (client) => {
-      const scoped = practice ? ' AND praktijk_code=$2' : '';
-      const params = practice ? [id, practice] : [id];
+      const lead = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
+      if (!lead || !mayManagePractice(req, lead.praktijk_code)) return;
       try {
-        await client.query(`UPDATE public.leads SET gezien_op = COALESCE(gezien_op, NOW()) WHERE id=$1${scoped}`, params);
+        await client.query(`UPDATE public.leads SET gezien_op = COALESCE(gezien_op, NOW()) WHERE id=$1`, [id]);
       } catch (e) {
         if (!(/gezien_op/i.test(e.message) && /(column|does not exist)/i.test(e.message))) throw e;
       }
