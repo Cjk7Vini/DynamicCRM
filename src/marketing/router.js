@@ -1236,6 +1236,19 @@ async function graphGet(pathAndId, params) {
 
 // Publiceert naar Meta. Gebruikt door de handmatige knop en de planner.
 // Gooit een fout met een leesbare melding als er iets misgaat.
+// Vertaalt ruwe Meta-fouten naar een duidelijke, bruikbare melding. Vooral
+// code 10 (ontbrekende permissie) laten we uitleggen wat er moet gebeuren.
+function friendlyPublishError(msg, channel) {
+  const m = String(msg || '');
+  if (/\(#?10\)|code\s*10|does not have permission|permission for this action/i.test(m)) {
+    if (channel === 'instagram') {
+      return 'Instagram weigert het publiceren (rechtenfout, code 10). Het access token mist de permissie instagram_content_publish. Genereer het token opnieuw met die permissie erbij en sla het weer op bij de koppeling. Voor echte klantaccounts is daarnaast Meta App Review nodig.';
+    }
+    return 'Meta weigert het publiceren (rechtenfout, code 10). Het access token mist de benodigde permissie. Genereer het token opnieuw met de juiste rechten en sla het weer op bij de koppeling.';
+  }
+  return m;
+}
+
 async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption) {
   const cap = (caption != null) ? String(caption) : '';
   if (channel === 'instagram') {
@@ -1313,7 +1326,10 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
       } catch (_) { /* niet blokkerend */ }
     }
     res.json({ success: true, result });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) {
+    const ch = (req.body && req.body.channel === 'facebook') ? 'facebook' : 'instagram';
+    res.status(400).json({ error: friendlyPublishError(e.message, ch) });
+  }
 });
 
 // =======================================================================
@@ -2092,6 +2108,29 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
         out.topPosts = posts.slice(0, 5);
       } catch (e) { out.errors.topPosts = e.message; }
+
+      // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
+      // instagram_manage_insights. Elke metric apart en volledig afgeschermd:
+      // mislukt er een, dan slaan we alleen die over (rapport blijft heel).
+      out.insights = {};
+      const oneMetric = async (key, params) => {
+        try {
+          const r = await graphGet(`${creds.igUserId}/insights`, { ...params, access_token: token });
+          const row = (r.data && r.data[0]) || null;
+          if (!row) return;
+          if (row.total_value && row.total_value.value != null) {
+            out.insights[key] = Number(row.total_value.value);
+          } else if (Array.isArray(row.values) && row.values.length) {
+            out.insights[key] = row.values.reduce((s, v) => s + (Number(v.value) || 0), 0);
+          }
+        } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
+      };
+      await oneMetric('reach', { metric: 'reach', period: 'days_28' });
+      await oneMetric('views', { metric: 'views', period: 'day', metric_type: 'total_value' });
+      await oneMetric('profile_views', { metric: 'profile_views', period: 'day', metric_type: 'total_value' });
+      await oneMetric('accounts_engaged', { metric: 'accounts_engaged', period: 'day', metric_type: 'total_value' });
+      await oneMetric('total_interactions', { metric: 'total_interactions', period: 'day', metric_type: 'total_value' });
+      if (!Object.keys(out.insights).length) out.insights = null;
     } else {
       out.errors.account = 'Geen Instagram user ID ingesteld';
     }
@@ -2261,8 +2300,9 @@ async function runScheduler() {
           `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
         ));
       } catch (e) {
+        const ch = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
         await withWriteConnection(async (c) => c.query(
-          `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [String(e.message).slice(0, 500), post.id]
+          `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [friendlyPublishError(e.message, ch).slice(0, 500), post.id]
         ));
       }
     }

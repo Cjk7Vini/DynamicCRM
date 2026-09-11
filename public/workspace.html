@@ -422,7 +422,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <p style="margin:0 0 6px;font-size:14px;font-weight:600">Daarna: de ID's ophalen</p>
             <ul style="margin:0 0 10px;padding-left:18px;font-size:14px;line-height:1.7">
               <li>Open de <strong>Graph API Explorer</strong>, kies je app en <strong>User Token</strong>.</li>
-              <li>Zet de permissies aan: <strong>pages_show_list, instagram_basic, pages_read_engagement, business_management</strong>, en klik <strong>Generate Access Token</strong> (inloggen en goedkeuren).</li>
+              <li>Zet de permissies aan en klik <strong>Generate Access Token</strong> (inloggen en goedkeuren):
+                <ul style="margin:4px 0 0;padding-left:16px">
+                  <li><strong>pages_show_list, pages_read_engagement, business_management</strong> - pagina's en business vinden.</li>
+                  <li><strong>instagram_basic</strong> - het Instagram-account en de ID's.</li>
+                  <li><strong>instagram_manage_insights</strong> - statistieken (weergaven, bereik, interacties, profielbezoeken).</li>
+                  <li><strong>instagram_content_publish</strong> - automatisch posten naar Instagram.</li>
+                  <li><strong>ads_management, ads_read</strong> - advertenties maken en cijfers lezen.</li>
+                </ul>
+              </li>
               <li>Voer dit in en klik Submit:</li>
             </ul>
             <div style="font-family:monospace;font-size:13px;background:var(--surface-2,rgba(120,120,140,.1));border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 10px;overflow-x:auto">me/accounts?fields=name,id,instagram_business_account{id,username}</div>
@@ -1398,6 +1406,19 @@ async function loadMetaInsights(){
       html+='<div class="stats">'+tile('Volgers',d.account.followers!=null?d.account.followers:'-',true)+tile('Berichten',d.account.media!=null?d.account.media:'-')+(d.account.username?('<div class="stat"><div class="k">Account</div><div class="v" style="font-size:15px;line-height:1.3;word-break:break-all">@'+esc(d.account.username)+'</div></div>'):'')+'</div>';
     } else {
       html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
+    }
+    // Accountstatistieken (insights, laatste 28 dagen)
+    if(d.insights){
+      var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
+      var icells=[];
+      if(d.insights.views!=null)icells.push(tile('Weergaven',iv(d.insights.views),true));
+      if(d.insights.reach!=null)icells.push(tile('Bereik',iv(d.insights.reach)));
+      if(d.insights.total_interactions!=null)icells.push(tile('Interacties',iv(d.insights.total_interactions)));
+      if(d.insights.accounts_engaged!=null)icells.push(tile('Betrokken accounts',iv(d.insights.accounts_engaged)));
+      if(d.insights.profile_views!=null)icells.push(tile('Profielbezoeken',iv(d.insights.profile_views)));
+      if(icells.length)html+='<div class="section-h" style="margin-top:16px"><h4>Statistieken (laatste 28 dagen)</h4></div><div class="stats">'+icells.join('')+'</div>';
+    } else if(d.account){
+      html+='<div class="card" style="margin-top:12px;color:var(--muted);font-size:13px">Voor weergaven, bereik en interacties is de permissie <strong>instagram_manage_insights</strong> nodig. Voeg die toe aan het token en sla het opnieuw op bij de koppeling.</div>';
     }
     // Top posts
     if(d.topPosts&&d.topPosts.length){
