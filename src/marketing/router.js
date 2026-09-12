@@ -2093,11 +2093,12 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       // --- Recente posts (top op likes) ---
       try {
         const m = await graphGet(`${creds.igUserId}/media`, {
-          fields: 'caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
-          limit: '12', access_token: token,
+          fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
+          limit: '25', access_token: token,
         });
         const posts = (m.data || []).map((p) => ({
-          caption: (p.caption || '').slice(0, 120),
+          id: p.id,
+          caption: (p.caption || '').slice(0, 140),
           media_type: p.media_type,
           timestamp: p.timestamp,
           permalink: p.permalink,
@@ -2106,7 +2107,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           thumb: p.thumbnail_url || p.media_url || null,
         }));
         posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
-        out.topPosts = posts.slice(0, 5);
+        out.topPosts = posts.slice(0, 9);
       } catch (e) { out.errors.topPosts = e.message; }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
@@ -2183,6 +2184,40 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     }
 
     res.json({ success: true, ...out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Detailstatistieken van één Instagram-post (op aanvraag, als je een post opent).
+// Vereist instagram_manage_insights; ontbreekt die, dan geven we permissionMissing
+// terug en toont de app alleen likes/reacties.
+router.get('/api/mkt/clients/:clientId/media/:mediaId/insights', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    if (!creds.token) return res.status(400).json({ error: 'Geen Meta-koppeling' });
+    const mediaId = String(req.params.mediaId || '').replace(/[^0-9_]/g, '');
+    if (!mediaId) return res.status(400).json({ error: 'Ongeldige media-id' });
+
+    const stats = {};
+    let permissionMissing = false;
+    const oneMetric = async (key, metric) => {
+      try {
+        const r = await graphGet(`${mediaId}/insights`, { metric, access_token: creds.token });
+        const row = (r.data && r.data[0]) || null;
+        if (!row) return;
+        if (row.total_value && row.total_value.value != null) stats[key] = Number(row.total_value.value);
+        else if (Array.isArray(row.values) && row.values.length) stats[key] = Number(row.values[0].value);
+      } catch (e) { if (/permission|#?10\b/i.test(String(e.message))) permissionMissing = true; }
+    };
+    await oneMetric('reach', 'reach');
+    await oneMetric('views', 'views');
+    await oneMetric('total_interactions', 'total_interactions');
+    await oneMetric('saved', 'saved');
+    await oneMetric('shares', 'shares');
+    res.json({ success: true, stats, permissionMissing });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

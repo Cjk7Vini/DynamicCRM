@@ -647,6 +647,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   <div class="viewer-box" id="viewerBox"></div>
 </div>
 
+<!-- MODAL: post-details (Instagram) -->
+<div class="modal-ov" id="postDetailModal" onclick="if(event.target===this)closePostDetail()">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h3 style="margin:0">Post-details</h3>
+      <button class="btn btn-ghost" onclick="closePostDetail()" style="padding:4px 10px;font-size:12px">Sluiten</button>
+    </div>
+    <div id="postDetailBody" style="margin-top:12px"></div>
+  </div>
+</div>
+
 <!-- MODAL: campagnes koppelen aan klant -->
 <div class="modal-ov" id="campLinkModal">
   <div class="modal">
@@ -1389,6 +1400,38 @@ async function loadReport(){
     loadMetaInsights();
   }catch(e){body.innerHTML='';showMsg('reportMsg',false,'Netwerkfout.');}
 }
+var _METAPOSTS=[];
+function closePostDetail(){document.getElementById('postDetailModal').classList.remove('open');}
+async function openPostDetail(id){
+  var p=_METAPOSTS.find(function(x){return String(x.id)===String(id);}); if(!p)return;
+  var box=document.getElementById('postDetailBody');
+  document.getElementById('postDetailModal').classList.add('open');
+  function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
+  var head='';
+  if(p.thumb)head+='<img src="'+esc(p.thumb)+'" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-bottom:12px">';
+  head+='<div style="font-size:14px;line-height:1.5;margin-bottom:6px">'+esc(p.caption||'(geen tekst)')+'</div>';
+  head+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+esc(p.media_type||'')+(p.timestamp?(' · '+esc(fmtWhen(p.timestamp))):'')+(p.permalink?(' · <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2)">bekijk op Instagram</a>'):'')+'</div>';
+  box.innerHTML=head+'<div class="stats">'+tile('Likes',p.likes,true)+tile('Reacties',p.comments)+'</div><div id="postDetailStats" style="margin-top:12px;color:var(--muted);font-size:13px">Cijfers laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/media/'+encodeURIComponent(id)+'/insights',{credentials:'include'});
+    var d=await r.json();
+    var sd=document.getElementById('postDetailStats'); if(!sd)return;
+    var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
+    if(r.ok&&d.success&&d.stats&&Object.keys(d.stats).length){
+      var s=d.stats,cells=[];
+      if(s.views!=null)cells.push(tile('Weergaven',iv(s.views),true));
+      if(s.reach!=null)cells.push(tile('Bereik',iv(s.reach)));
+      if(s.total_interactions!=null)cells.push(tile('Interacties',iv(s.total_interactions)));
+      if(s.saved!=null)cells.push(tile('Opgeslagen',iv(s.saved)));
+      if(s.shares!=null)cells.push(tile('Gedeeld',iv(s.shares)));
+      sd.outerHTML=cells.length?('<div style="margin-top:12px"><div class="stats">'+cells.join('')+'</div></div>'):'<div style="margin-top:12px;color:var(--muted);font-size:13px">Geen extra cijfers beschikbaar.</div>';
+    } else if(r.ok&&d.permissionMissing){
+      sd.innerHTML='Voor bereik, weergaven, opgeslagen en gedeeld is de permissie <strong>instagram_manage_insights</strong> nodig.';
+    } else {
+      sd.textContent='Geen extra cijfers beschikbaar voor deze post.';
+    }
+  }catch(e){var sd2=document.getElementById('postDetailStats');if(sd2)sd2.textContent='Kon cijfers niet laden.';}
+}
 async function loadMetaInsights(){
   var box=document.getElementById('metaReport'); if(!box)return;
   function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
@@ -1422,14 +1465,14 @@ async function loadMetaInsights(){
     }
     // Top posts
     if(d.topPosts&&d.topPosts.length){
-      html+='<div class="section-h" style="margin-top:16px"><h4>Best presterende posts</h4></div><div class="post-list">';
+      _METAPOSTS=d.topPosts;
+      html+='<div class="section-h" style="margin-top:16px"><h4>Posts</h4><span style="font-size:12px;color:var(--muted)">Klik een post voor de details</span></div><div class="post-list">';
       html+=d.topPosts.map(function(p){
         var t=p.thumb?('<img class="post-thumb" src="'+esc(p.thumb)+'" alt="">'):'';
         var when=p.timestamp?('<span class="when">'+esc(fmtWhen(p.timestamp))+'</span>'):'';
-        var link=p.permalink?(' · <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2)">bekijk</a>'):'';
-        return '<div class="post-row">'+t+'<div class="post-main"><h5>'+esc(p.caption||'(geen tekst)')+'</h5>'+
+        return '<div class="post-row" style="cursor:pointer" onclick="openPostDetail(\''+esc(p.id)+'\')">'+t+'<div class="post-main"><h5>'+esc(p.caption||'(geen tekst)')+'</h5>'+
           '<div class="post-meta"><span class="chan">'+esc(p.likes)+' likes</span><span class="chan">'+esc(p.comments)+' reacties</span>'+when+'</div>'+
-          '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+esc(p.media_type||'')+link+'</div></div></div>';
+          '<div style="font-size:12px;color:var(--accent-2);margin-top:4px">'+esc(p.media_type||'')+' · details bekijken</div></div></div>';
       }).join('')+'</div>';
     }
     // Ads
