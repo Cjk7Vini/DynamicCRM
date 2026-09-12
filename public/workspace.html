@@ -1442,40 +1442,56 @@ async function loadMetaInsights(){
       box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Nog geen Meta-koppeling ingesteld. Vul in de Koppelingen-tab het access token en Instagram user ID in om cijfers te zien.</div>';
       return;
     }
+    var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
     var html='';
-    // Account
-    html+='<div class="section-h"><h4>Meta (Instagram)</h4></div>';
+    // Kop
+    html+='<div class="section-h"><h4>Instagram</h4><span style="font-size:12px;color:var(--muted)">laatste 28 dagen</span></div>';
+    // Hero: account + volgers
     if(d.account){
-      html+='<div class="stats">'+tile('Volgers',d.account.followers!=null?d.account.followers:'-',true)+tile('Berichten',d.account.media!=null?d.account.media:'-')+(d.account.username?('<div class="stat"><div class="k">Account</div><div class="v" style="font-size:15px;line-height:1.3;word-break:break-all">@'+esc(d.account.username)+'</div></div>'):'')+'</div>';
+      html+='<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">'+
+        '<div><div style="font-size:13px;color:var(--muted);word-break:break-all">'+(d.account.username?('@'+esc(d.account.username)):'Instagram')+'</div>'+
+        '<div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:2px">'+iv(d.account.followers)+'</div>'+
+        '<div style="font-size:12px;color:var(--muted)">volgers</div></div>'+
+        '<div style="text-align:right"><div style="font-size:22px;font-weight:700">'+iv(d.account.media)+'</div><div style="font-size:12px;color:var(--muted)">berichten</div></div>'+
+      '</div>';
     } else {
       html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
     }
-    // Accountstatistieken (insights, laatste 28 dagen)
+    // KPI-rij (insights, laatste 28 dagen)
     if(d.insights){
-      var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
       var icells=[];
       if(d.insights.views!=null)icells.push(tile('Weergaven',iv(d.insights.views),true));
       if(d.insights.reach!=null)icells.push(tile('Bereik',iv(d.insights.reach)));
       if(d.insights.total_interactions!=null)icells.push(tile('Interacties',iv(d.insights.total_interactions)));
-      if(d.insights.accounts_engaged!=null)icells.push(tile('Betrokken accounts',iv(d.insights.accounts_engaged)));
+      if(d.insights.accounts_engaged!=null)icells.push(tile('Betrokken',iv(d.insights.accounts_engaged)));
       if(d.insights.profile_views!=null)icells.push(tile('Profielbezoeken',iv(d.insights.profile_views)));
-      if(icells.length)html+='<div class="section-h" style="margin-top:16px"><h4>Statistieken (laatste 28 dagen)</h4></div><div class="stats">'+icells.join('')+'</div>';
+      if(icells.length)html+='<div class="stats" style="margin-bottom:6px">'+icells.join('')+'</div>';
     } else if(d.account){
-      html+='<div class="card" style="margin-top:12px;color:var(--muted);font-size:13px">Voor weergaven, bereik en interacties is de permissie <strong>instagram_manage_insights</strong> nodig. Voeg die toe aan het token en sla het opnieuw op bij de koppeling.</div>';
+      html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.</div>';
     }
-    // Top posts
-    if(d.topPosts&&d.topPosts.length){
-      _METAPOSTS=d.topPosts;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Posts</h4><span style="font-size:12px;color:var(--muted)">Klik een post voor de details</span></div><div class="post-list">';
-      html+=d.topPosts.map(function(p){
-        var t=p.thumb?('<img class="post-thumb" src="'+esc(p.thumb)+'" alt="">'):'';
-        var when=p.timestamp?('<span class="when">'+esc(fmtWhen(p.timestamp))+'</span>'):'';
-        return '<div class="post-row" style="cursor:pointer" onclick="openPostDetail(\''+esc(p.id)+'\')">'+t+'<div class="post-main"><h5>'+esc(p.caption||'(geen tekst)')+'</h5>'+
-          '<div class="post-meta"><span class="chan">'+esc(p.likes)+' likes</span><span class="chan">'+esc(p.comments)+' reacties</span>'+when+'</div>'+
-          '<div style="font-size:12px;color:var(--accent-2);margin-top:4px">'+esc(p.media_type||'')+' · details bekijken</div></div></div>';
+    // Verdeling per contenttype
+    if(d.contentTypes&&d.contentTypes.length){
+      var TL={IMAGE:'Berichten',CAROUSEL_ALBUM:'Carrousels',VIDEO:'Video',REELS:'Reels',ONBEKEND:'Overig'};
+      var maxc=Math.max.apply(null,d.contentTypes.map(function(c){return c.count;}))||1;
+      html+='<div class="section-h" style="margin-top:16px"><h4>Verdeling per contenttype</h4></div><div class="card">';
+      html+=d.contentTypes.map(function(c){
+        var w=Math.round((c.count/maxc)*100);
+        return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(TL[c.type]||c.type)+'</span><span style="color:var(--muted)">'+c.count+' posts · '+iv(c.interactions)+' interacties</span></div>'+
+          '<div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';
       }).join('')+'</div>';
     }
-    // Ads
+    // Posts (grid met thumbnails, klikbaar)
+    if(d.topPosts&&d.topPosts.length){
+      _METAPOSTS=d.topPosts;
+      html+='<div class="section-h" style="margin-top:16px"><h4>Posts</h4><span style="font-size:12px;color:var(--muted)">Klik een post voor de details</span></div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">';
+      html+=d.topPosts.map(function(p){
+        var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
+        return '<div onclick="openPostDetail(\''+esc(p.id)+'\')" style="cursor:pointer;border:1px solid var(--line);border-radius:12px;overflow:hidden">'+img+
+          '<div style="padding:8px 10px"><div style="font-size:11px;color:var(--muted)">'+esc(p.media_type||'')+'</div><div style="font-size:13px;font-weight:600;margin-top:2px">'+esc(p.likes)+' likes · '+esc(p.comments)+' reacties</div></div></div>';
+      }).join('')+'</div>';
+    }
+    // Advertenties
     if(d.ads&&!d.ads.empty){
       var num=function(v){return v!=null?v:'-';};
       html+='<div class="section-h" style="margin-top:18px"><h4>Advertenties (laatste 30 dagen)</h4></div>';

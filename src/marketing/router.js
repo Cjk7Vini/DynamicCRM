@@ -2108,6 +2108,15 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         }));
         posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
         out.topPosts = posts.slice(0, 9);
+        // Verdeling per contenttype (aantal + interacties), uit alle opgehaalde posts.
+        const byType = {};
+        for (const p of posts) {
+          const t = p.media_type || 'ONBEKEND';
+          if (!byType[t]) byType[t] = { type: t, count: 0, interactions: 0 };
+          byType[t].count += 1;
+          byType[t].interactions += (p.likes || 0) + (p.comments || 0);
+        }
+        out.contentTypes = Object.values(byType).sort((a, b) => b.count - a.count);
       } catch (e) { out.errors.topPosts = e.message; }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
