@@ -4,20 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plan je gratis kennismaking - Serac Fitness</title>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poller+One&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --ink: #111111;
-            --accent: #111111;
-            --background: #f4f4f5;
-            --text-dark: #1c1c1e;
-            --line: #e2e2e5;
+            --ink: #0E1A24;
+            --accent: #1DB954;
+            --accent-dark: #17a648;
+            --background: #F4F1EA;
+            --stone: #E8E4DC;
+            --text-dark: #0E1A24;
+            --line: #E8E4DC;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, "Segoe UI", sans-serif;
+            font-family: 'Manrope', -apple-system, "Segoe UI", sans-serif;
             background: var(--background);
             color: var(--text-dark);
             line-height: 1.6;
@@ -38,7 +40,8 @@
             margin-bottom: 26px;
         }
         .logo .wordmark {
-            font-family: 'Archivo Black', 'Inter', sans-serif;
+            font-family: 'Manrope', sans-serif;
+            font-weight: 800;
             font-size: 46px;
             letter-spacing: .06em;
             color: var(--ink);
@@ -56,9 +59,10 @@
 
         h1 {
             color: var(--ink);
-            font-family: 'Archivo Black', 'Inter', sans-serif;
-            font-size: 27px;
-            line-height: 1.15;
+            font-family: 'Poller One', Georgia, serif;
+            font-weight: 400;
+            font-size: 30px;
+            line-height: 1.12;
             margin-bottom: 12px;
             text-align: center;
             text-wrap: balance;
@@ -90,7 +94,7 @@
             flex-shrink: 0;
             width: 20px; height: 20px;
             border-radius: 50%;
-            background: var(--ink);
+            background: var(--accent);
             color: #fff;
             display: flex; align-items: center; justify-content: center;
             font-size: 12px; font-weight: 700;
@@ -113,7 +117,7 @@
             border: 1.5px solid var(--line);
             border-radius: 9px;
             font-size: 14px;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Manrope', sans-serif;
             transition: border-color .2s;
             background: #fff;
             color: var(--text-dark);
@@ -121,7 +125,16 @@
 
         input:focus, select:focus, textarea:focus {
             outline: none;
-            border-color: var(--ink);
+            border-color: var(--accent);
+        }
+        .eyebrow {
+            text-align: center;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: .22em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
         }
 
         .submit-btn {
@@ -133,12 +146,12 @@
             border-radius: 10px;
             font-size: 16px;
             font-weight: 700;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Manrope', sans-serif;
             cursor: pointer;
             transition: all .2s;
             letter-spacing: .01em;
         }
-        .submit-btn:hover { transform: translateY(-1px); background: #000; }
+        .submit-btn:hover { transform: translateY(-1px); background: var(--accent-dark); }
         .submit-btn:disabled { background: #bbb; cursor: not-allowed; transform: none; }
 
         .error-message { color: #d32f2f; font-size: 12px; margin-top: 5px; display: none; }
@@ -164,10 +177,11 @@
     <div class="container">
         <div class="logo">
             <div class="wordmark">SERAC</div>
-            <div class="tag">Fitness</div>
+            <div class="tag">Sportschool De Lier</div>
         </div>
 
-        <h1>Plan jouw gratis kennismaking bij Serac Fitness</h1>
+        <div class="eyebrow">Sporten zonder gedoe</div>
+        <h1>Plan jouw gratis kennismaking bij Serac</h1>
         <p class="subtitle">Vul het formulier in, dan nemen we binnen 1 werkdag contact met je op om je kennismaking in te plannen.</p>
 
         <div class="benefits">
