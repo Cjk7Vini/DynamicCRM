@@ -6164,6 +6164,27 @@ app.delete('/api/leads/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Welke optionele lead-kolommen/tabel bestaan al? Zo blijft o.a. het
+// notitie-aantal correct, ook als gezien_op of appointment_type nog ontbreken
+// (dan telt de oude alles-of-niets-terugval de notities ten onrechte op 0).
+let _leadSchemaCache = null;
+async function leadSchemaFlags(client) {
+  if (_leadSchemaCache) return _leadSchemaCache;
+  const flags = { gezien: false, apptType: false, notes: false };
+  try {
+    const r = await client.query(`
+      SELECT
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leads' AND column_name='gezien_op') AS gezien,
+        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leads' AND column_name='appointment_type') AS appt,
+        EXISTS(SELECT 1 FROM information_schema.tables  WHERE table_schema='public' AND table_name='lead_notes') AS notes`);
+    const row = r.rows[0] || {};
+    flags.gezien = !!row.gezien; flags.apptType = !!row.appt; flags.notes = !!row.notes;
+  } catch (_) { return flags; }
+  // Alleen cachen als alles bestaat; anders opnieuw proberen (migratie kan later draaien).
+  if (flags.gezien && flags.apptType && flags.notes) _leadSchemaCache = flags;
+  return flags;
+}
+
 // GET /api/leads/overzicht — volledig leadoverzicht voor het leadscherm (tabbladen)
 app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
   try {
@@ -6172,6 +6193,7 @@ app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
     const q = (req.query.q || '').toString().trim().slice(0, 100);
 
     const rows = await withReadConnection(async (client) => {
+      const flags = await leadSchemaFlags(client);
       const bucketExpr = `
         CASE
           WHEN l.funnel_stage = 'won' THEN 'lid'
@@ -6182,52 +6204,40 @@ app.get('/api/leads/overzicht', requireAuth, async (req, res) => {
           ELSE 'nieuw'
         END`;
 
-      // full=true gebruikt de nieuwe kolommen/tabel; bij ontbreken (vóór migratie)
-      // valt de query terug op veilige defaults zodat het scherm nooit omvalt.
-      const build = (full) => {
-        const apptType = full
-          ? `COALESCE(NULLIF(l.appointment_type,''), ${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`
-          : `COALESCE(${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`;
-        const gezien = full ? `l.gezien_op` : `NULL::timestamptz`;
-        const notes = full ? `(SELECT COUNT(*) FROM public.lead_notes n WHERE n.lead_id = l.id)::int` : `0`;
-        let sql = `
-          SELECT l.id, l.praktijk_code, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
-                 l.aangemaakt_op, l.appointment_date, l.appointment_time, l.appointment_datetime,
-                 COALESCE(l.appointment_datetime,
-                   CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
-                     THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
-                     WHEN l.appointment_date IS NOT NULL
-                     THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
-                     ELSE NULL END) AS appt_dt,
-                 l.funnel_stage, l.status,
-                 ${apptType} AS appointment_type,
-                 ${gezien} AS gezien_op,
-                 (SELECT COUNT(*) FROM belpogingen bp WHERE bp.lead_id = l.id)::int AS aantal_pogingen,
-                 ${notes} AS aantal_notities,
-                 ${bucketExpr} AS bucket
-          FROM public.leads l
-          WHERE 1=1`;
-        const params = [];
-        if (practice) { params.push(practice); sql += ` AND l.praktijk_code = $${params.length}`; }
-        if (q) {
-          params.push('%' + q + '%');
-          const p = '$' + params.length;
-          sql += ` AND (l.volledige_naam ILIKE ${p} OR l.emailadres ILIKE ${p} OR l.telefoon ILIKE ${p})`;
-        }
-        sql += ` ORDER BY l.aangemaakt_op DESC LIMIT 1000`;
-        return { sql, params };
-      };
+      // Elk optioneel onderdeel apart: een ontbrekende kolom mag nooit een ander
+      // veld (zoals het notitie-aantal) op 0 zetten.
+      const apptType = flags.apptType
+        ? `COALESCE(NULLIF(l.appointment_type,''), ${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`
+        : `COALESCE(${APPT_TYPE_FROM_EVENTS}, 'vitaliteitscheck')`;
+      const gezien = flags.gezien ? `l.gezien_op` : `NULL::timestamptz`;
+      const notes = flags.notes ? `(SELECT COUNT(*) FROM public.lead_notes n WHERE n.lead_id = l.id)::int` : `0`;
 
-      try {
-        const { sql, params } = build(true);
-        return (await client.query(sql, params)).rows;
-      } catch (e) {
-        if (/(appointment_type|gezien_op|lead_notes)/i.test(e.message) && /(column|relation|does not exist)/i.test(e.message)) {
-          const { sql, params } = build(false);
-          return (await client.query(sql, params)).rows;
-        }
-        throw e;
+      let sql = `
+        SELECT l.id, l.praktijk_code, l.volledige_naam, l.emailadres, l.telefoon, l.bron, l.behandelaar,
+               l.aangemaakt_op, l.appointment_date, l.appointment_time, l.appointment_datetime,
+               COALESCE(l.appointment_datetime,
+                 CASE WHEN l.appointment_date IS NOT NULL AND l.appointment_time IS NOT NULL
+                   THEN timezone('Europe/Amsterdam', (l.appointment_date::date + l.appointment_time::time)::timestamp)
+                   WHEN l.appointment_date IS NOT NULL
+                   THEN timezone('Europe/Amsterdam', (l.appointment_date::date + '09:00'::time)::timestamp)
+                   ELSE NULL END) AS appt_dt,
+               l.funnel_stage, l.status,
+               ${apptType} AS appointment_type,
+               ${gezien} AS gezien_op,
+               (SELECT COUNT(*) FROM belpogingen bp WHERE bp.lead_id = l.id)::int AS aantal_pogingen,
+               ${notes} AS aantal_notities,
+               ${bucketExpr} AS bucket
+        FROM public.leads l
+        WHERE 1=1`;
+      const params = [];
+      if (practice) { params.push(practice); sql += ` AND l.praktijk_code = $${params.length}`; }
+      if (q) {
+        params.push('%' + q + '%');
+        const p = '$' + params.length;
+        sql += ` AND (l.volledige_naam ILIKE ${p} OR l.emailadres ILIKE ${p} OR l.telefoon ILIKE ${p})`;
       }
+      sql += ` ORDER BY l.aangemaakt_op DESC LIMIT 1000`;
+      return (await client.query(sql, params)).rows;
     });
 
     const leads = rows.map(r => ({ ...r, appointment_datetime: r.appt_dt || r.appointment_datetime }));
