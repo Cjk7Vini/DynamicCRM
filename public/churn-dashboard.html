@@ -4028,6 +4028,16 @@
                 <div id="lpApptMsg" style="display:none;font-size:12px;margin-bottom:8px;"></div>
                 <button onclick="leadPlanAppointment('${l.id}')" style="width:100%;padding:9px 14px;border:1px solid #1a9985;background:#1a9985;color:#fff;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:16px;">Afspraak inplannen</button>
 
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Bel-opvolging</div>
+                <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">Start een belpoging voor deze lead. Hij verschijnt dan ook onder Belpogingen, zodat een collega het kan overnemen.</div>
+                <textarea id="lpBpNote" rows="2" placeholder="Notitie (bijv. niet opgenomen, belt terug na 14:00)" style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;margin-bottom:8px;"></textarea>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="date" id="lpBpDate" title="Volgende belpoging (optioneel)" style="flex:1;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+                    <input type="time" id="lpBpTime" style="padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+                </div>
+                <div id="lpBpMsg" style="display:none;font-size:12px;margin-bottom:8px;"></div>
+                <button onclick="leadStartBelpoging('${l.id}')" style="width:100%;padding:9px 14px;border:1px solid #172554;background:#172554;color:#fff;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:16px;">Bel-afspraak starten</button>
+
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin:6px 0 10px;">Notities</div>
                 <div id="lpNotes">${notesHtml}</div>
 
@@ -4116,6 +4126,31 @@
                 if (typeof refreshLeadsBadge === 'function') refreshLeadsBadge();
             } catch (e) {
                 show('Kon afspraak niet inplannen: ' + e.message, '#b91c1c');
+            }
+        }
+
+        // Bel-afspraak starten vanuit het leadprofiel: maakt een eerste belpoging aan,
+        // zodat een lead die nooit via de reminder-mail binnenkwam alsnog opvolgbaar is
+        // onder Belpogingen (met notitie + optioneel een volgende beldatum).
+        async function leadStartBelpoging(id) {
+            const notitie = (document.getElementById('lpBpNote')?.value || '').trim();
+            const datum = document.getElementById('lpBpDate')?.value;
+            const tijd = document.getElementById('lpBpTime')?.value;
+            const volgende = datum ? new Date(datum + 'T' + (tijd || '09:00')).toISOString() : null;
+            const msg = document.getElementById('lpBpMsg');
+            const show = (t, c) => { if (msg) { msg.style.display = 'block'; msg.style.color = c; msg.textContent = t; } };
+            try {
+                const r = await fetch('/api/belpoging', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                    body: JSON.stringify({ lead_id: id, uitkomst: 'geen_gehoor', notitie: notitie || null, volgende_belpoging: volgende })
+                });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.error || 'Fout');
+                show('Bel-afspraak gestart. De lead staat nu ook onder Belpogingen.', '#16a34a');
+                await loadLeadsOverzicht();
+                if (typeof refreshLeadsBadge === 'function') refreshLeadsBadge();
+            } catch (e) {
+                show('Kon bel-afspraak niet starten: ' + e.message, '#b91c1c');
             }
         }
 
@@ -6295,10 +6330,17 @@
             const pogingen = b.pogingen || [];
             const fmtDt = (dt) => dt ? new Date(dt).toLocaleDateString('nl-NL', {day:'numeric',month:'long',year:'numeric'}) + ' om ' + new Date(dt).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) : '-';
 
+            const uitkomstLabel = (u) => u === 'geen_gehoor' ? 'Geen gehoor' : u === 'ingesproken' ? 'Ingesproken' : u === 'verkeerd_moment' ? 'Verkeerd moment' : (u || '-');
             const pogingHistory = pogingen.map(p => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9f9fb;border-radius:6px;margin-bottom:6px;font-size:13px;">
-                    <span>Poging ${p.poging_nummer} - ${p.uitkomst === 'geen_gehoor' ? 'Geen gehoor' : p.uitkomst === 'ingesproken' ? 'Ingesproken' : 'Verkeerd moment'}</span>
-                    <span style="color:#9090a8;font-size:12px;">${fmtDt(p.aangemaakt_op)}${p.volgende_belpoging ? ' &rarr; volgende: ' + fmtDt(p.volgende_belpoging) : ''}</span>
+                <div style="padding:8px 10px;background:#f9f9fb;border-radius:6px;margin-bottom:6px;font-size:13px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <span>Poging ${p.poging_nummer} - ${uitkomstLabel(p.uitkomst)}</span>
+                        <span style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                            <span style="color:#9090a8;font-size:12px;">${fmtDt(p.aangemaakt_op)}${p.volgende_belpoging ? ' &rarr; volgende: ' + fmtDt(p.volgende_belpoging) : ''}</span>
+                            <button onclick="bpVerwijderPoging('${p.id}','${b.id}')" title="Verwijderen" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;">&#x2715;</button>
+                        </span>
+                    </div>
+                    ${p.notitie ? `<div style="margin-top:6px;color:#374151;white-space:pre-wrap;">${escHtml(p.notitie)}</div>` : ''}
                 </div>`).join('');
 
             const modalHtml = `
@@ -6321,7 +6363,7 @@
                 </select>
                 <hr style="border:none;border-top:1px solid #f0f0f2;margin:12px 0;">
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Notitie</div>
-                <textarea id="bpNotitie" rows="2" placeholder="Bijv. belt terug na 14:00..." style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;resize:none;margin-bottom:14px;box-sizing:border-box;">${b.notitie || ''}</textarea>
+                <textarea id="bpNotitie" rows="2" placeholder="Bijv. belt terug na 14:00..." style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;resize:none;margin-bottom:14px;box-sizing:border-box;"></textarea>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Volgende belpoging inplannen</div>
                 <div style="display:flex;gap:8px;margin-bottom:16px;">
                     <input type="date" id="bpDatum" style="flex:1;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;">
@@ -6388,6 +6430,19 @@
                 if (d.success) { sluitBpModal(); loadBelpogingen(); }
                 else alert('Fout bij opslaan: ' + d.error);
             } catch(e) { alert('Fout: ' + e.message); }
+        }
+
+        // Eén poging/notitie verwijderen, daarna de modal verversen.
+        async function bpVerwijderPoging(pogingId, leadId) {
+            if (!confirm('Deze poging en notitie verwijderen?')) return;
+            try {
+                const r = await fetch('/api/belpoging/poging/' + encodeURIComponent(pogingId), { method: 'DELETE', credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok || !d.success) throw new Error(d.error || 'Fout');
+                await loadBelpogingen();
+                const still = _bpData.find(x => String(x.id) === String(leadId));
+                if (still) openBpModal(leadId); else sluitBpModal();
+            } catch(e) { alert('Verwijderen mislukt: ' + e.message); }
         }
 
         // Lead telefonisch bereikt: plan direct een afspraak vanuit de belpoging-modal.

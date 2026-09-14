@@ -1288,6 +1288,24 @@ app.post('/api/tickets', requireAuth, async (req, res) => {
     const tekst = String(bericht).trim();
     const onderwerp = tekst.slice(0, 80);
 
+    // Spam-rem: identieke melding binnen 10 minuten weigeren, en een simpele
+    // snelheidslimiet per melder (max 10 tickets per uur).
+    if (!isAdmin && melderEmail) {
+      const guard = await withReadConnection(async (client) => {
+        const dup = (await client.query(
+          `SELECT id FROM tickets WHERE melder_email=$1 AND onderwerp=$2 AND type=$3 AND bijgewerkt_op > NOW() - INTERVAL '10 minutes' LIMIT 1`,
+          [melderEmail, onderwerp, type]
+        )).rows[0];
+        const cnt = (await client.query(
+          `SELECT COUNT(*)::int AS c FROM tickets WHERE melder_email=$1 AND bijgewerkt_op > NOW() - INTERVAL '1 hour'`,
+          [melderEmail]
+        )).rows[0].c;
+        return { dup, cnt };
+      });
+      if (guard.dup) return res.status(429).json({ error: 'Je hebt net een identieke melding aangemaakt. Bekijk je bestaande tickets.' });
+      if (guard.cnt >= 10) return res.status(429).json({ error: 'Te veel meldingen in korte tijd. Probeer het later opnieuw.' });
+    }
+
     const ticket = await withWriteConnection(async (client) => {
       const info = praktijkCode
         ? (await client.query('SELECT naam, email_to FROM praktijken WHERE code = $1', [praktijkCode])).rows[0] || {}
@@ -3546,6 +3564,18 @@ function mayManagePractice(req, practiceCode) {
     return codes.includes(practiceCode);
   }
   return false;
+}
+
+// De praktijkcodes die deze gebruiker mag zien in lijsten. null = alles (admin).
+// Praktijk = eigen code; organisatie = ALLE gekoppelde locaties (niet enkel de eerste).
+function allowedPracticeCodes(req) {
+  const role = req.session?.role;
+  if (role === 'admin') return null;
+  if (role === 'practice') return req.session.practiceCode ? [req.session.practiceCode] : [];
+  if (role === 'organisation') {
+    return (req.session.organisationCodes || '').split(',').map((c) => c.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 // ============================================================================
@@ -6386,12 +6416,16 @@ app.get('/api/belpoging-registreer', async (req, res) => {
 // GET /api/belpogingen — lijst voor dashboard
 app.get('/api/belpogingen', requireAuth, async (req, res) => {
   try {
-    const practiceCode = req.query.practice || req.session.practiceCode;
-    const role = req.session.role;
-
-    // Niet-admins zonder praktijkcode krijgen lege lijst
-    if (role !== 'admin' && !practiceCode) {
-      return res.json({ success: true, belpogingen: [] });
+    const requested = req.query.practice ? String(req.query.practice) : null;
+    const allowed = allowedPracticeCodes(req); // null = admin (alles)
+    // Filter: één gevraagde locatie (mits toegestaan) of ALLE toegestane locaties
+    // (organisatie-accounts zien zo al hun locaties, niet enkel de eerste).
+    let filterCodes = null;
+    if (allowed === null) {
+      filterCodes = requested ? [requested] : null;
+    } else {
+      if (!allowed.length) return res.json({ success: true, belpogingen: [] });
+      filterCodes = (requested && allowed.includes(requested)) ? [requested] : allowed;
     }
 
     const rows = await withReadConnection(async (client) => {
@@ -6402,7 +6436,7 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
           COUNT(b.id) as aantal_pogingen,
           MAX(b.aangemaakt_op) as laatste_poging,
           MAX(b.volgende_belpoging) as volgende_belpoging,
-          MAX(b.notitie) as notitie,
+          (ARRAY_AGG(b.notitie ORDER BY b.aangemaakt_op DESC) FILTER (WHERE b.notitie IS NOT NULL))[1] as notitie,
           json_agg(json_build_object(
             'id', b.id,
             'poging_nummer', b.poging_nummer,
@@ -6410,19 +6444,16 @@ app.get('/api/belpogingen', requireAuth, async (req, res) => {
             'notitie', b.notitie,
             'aangemaakt_op', b.aangemaakt_op,
             'volgende_belpoging', b.volgende_belpoging
-          ) ORDER BY b.poging_nummer) as pogingen
+          ) ORDER BY b.poging_nummer DESC) as pogingen
         FROM belpogingen b
         JOIN public.leads l ON l.id = b.lead_id
         WHERE l.funnel_stage NOT IN ('won', 'lost')
           AND l.appointment_date IS NULL`;
 
       const params = [];
-      if (role !== 'admin') {
-        params.push(practiceCode);
-        q += ` AND l.praktijk_code = $${params.length}`;
-      } else if (req.query.practice) {
-        params.push(req.query.practice);
-        q += ` AND l.praktijk_code = $${params.length}`;
+      if (filterCodes) {
+        params.push(filterCodes);
+        q += ` AND l.praktijk_code = ANY($${params.length})`;
       }
 
       q += ` GROUP BY l.id, l.volledige_naam, l.telefoon, l.emailadres, l.funnel_stage, l.praktijk_code
@@ -6443,6 +6474,13 @@ app.post('/api/belpoging', requireAuth, async (req, res) => {
   try {
     const { lead_id, uitkomst, notitie, volgende_belpoging } = req.body;
     if (!lead_id) return res.status(400).json({ error: 'lead_id ontbreekt' });
+
+    // Alleen leads van een praktijk die deze gebruiker mag beheren.
+    const lead = await withReadConnection(async (client) => (await client.query(
+      'SELECT praktijk_code FROM public.leads WHERE id=$1', [lead_id]
+    )).rows[0]);
+    if (!lead) return res.status(404).json({ error: 'Lead niet gevonden' });
+    if (!mayManagePractice(req, lead.praktijk_code)) return res.status(403).json({ error: 'Geen toegang' });
 
     const existing = await withReadConnection(async (client) => {
       return (await client.query('SELECT COUNT(*) as cnt FROM belpogingen WHERE lead_id=$1', [lead_id])).rows[0];
@@ -6474,6 +6512,12 @@ app.patch('/api/belpoging/:leadId', requireAuth, async (req, res) => {
     const { leadId } = req.params;
     const { volgende_belpoging, notitie } = req.body;
 
+    const lead = await withReadConnection(async (client) => (await client.query(
+      'SELECT praktijk_code FROM public.leads WHERE id=$1', [leadId]
+    )).rows[0]);
+    if (!lead) return res.status(404).json({ success: false, error: 'Lead niet gevonden' });
+    if (!mayManagePractice(req, lead.praktijk_code)) return res.status(403).json({ success: false, error: 'Geen toegang' });
+
     await withWriteConnection(async (client) => {
       await client.query(
         `UPDATE belpogingen SET volgende_belpoging=$1, notitie=$2, reminder_verstuurd=FALSE
@@ -6485,6 +6529,25 @@ app.patch('/api/belpoging/:leadId', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     console.error('Belpoging patch error:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// DELETE /api/belpoging/poging/:pogingId - verwijder een losse belpoging (met notitie).
+// Zo kan een collega een foutieve poging/notitie weghalen. Praktijk-check verplicht.
+app.delete('/api/belpoging/poging/:pogingId', requireAuth, async (req, res) => {
+  try {
+    const { pogingId } = req.params;
+    await withWriteConnection(async (client) => {
+      const row = (await client.query('SELECT praktijk_code FROM belpogingen WHERE id=$1', [pogingId])).rows[0];
+      if (!row) return;
+      if (!mayManagePractice(req, row.praktijk_code)) throw Object.assign(new Error('Geen toegang'), { status: 403 });
+      await client.query('DELETE FROM belpogingen WHERE id=$1', [pogingId]);
+    });
+    res.json({ success: true });
+  } catch (e) {
+    if (e.status === 403) return res.status(403).json({ success: false, error: 'Geen toegang' });
+    console.error('Belpoging delete error:', e);
     res.status(500).json({ success: false, error: e.message });
   }
 });
