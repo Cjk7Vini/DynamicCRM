@@ -17,10 +17,10 @@ BEGIN
     FROM pg_constraint c
     WHERE c.conrelid = 'marketing.accounts'::regclass
       AND c.contype = 'u'
-      AND (SELECT array_agg(a.attname ORDER BY a.attname)
+      AND (SELECT array_agg(a.attname::text ORDER BY a.attname)
              FROM unnest(c.conkey) k
              JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k
-          ) = ARRAY['email']
+          ) = ARRAY['email']::text[]
   LOOP
     EXECUTE format('ALTER TABLE marketing.accounts DROP CONSTRAINT %I', r.conname);
   END LOOP;
@@ -32,10 +32,10 @@ BEGIN
     WHERE i.indrelid = 'marketing.accounts'::regclass
       AND i.indisunique
       AND NOT i.indisprimary
-      AND (SELECT array_agg(a.attname ORDER BY a.attname)
+      AND (SELECT array_agg(a.attname::text ORDER BY a.attname)
              FROM unnest(i.indkey) k
              JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k
-          ) = ARRAY['email']
+          ) = ARRAY['email']::text[]
       AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid)
   LOOP
     EXECUTE format('DROP INDEX %s', r.idxname);
