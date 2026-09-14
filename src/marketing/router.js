@@ -1132,6 +1132,31 @@ router.delete('/api/mkt/clients/:clientId/integrations', requireMkt, async (req,
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Wis alleen de koppeling van één platform (Meta/Google/TikTok) voor een klant.
+// De kolomnamen komen uit een vaste whitelist; het platform wordt gevalideerd.
+router.post('/api/mkt/clients/:clientId/integrations/clear-platform', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager kan koppelingen wijzigen' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const platform = String((req.body && req.body.platform) || '').toLowerCase();
+    const COLS = {
+      meta: ['meta_page_id', 'meta_ig_user_id', 'meta_pixel_id', 'meta_ad_account_id', 'meta_app_id', 'meta_access_token', 'meta_app_secret'],
+      google: ['google_ads_customer_id', 'google_ads_developer_token', 'ga4_measurement_id'],
+      tiktok: ['tiktok_pixel_id', 'tiktok_access_token'],
+    };
+    const cols = COLS[platform];
+    if (!cols) return res.status(400).json({ error: 'Onbekend platform' });
+    const sets = cols.map((c) => `${c}=NULL`).join(', ');
+    await withWriteConnection(async (c) => c.query(
+      `UPDATE marketing.client_integrations SET ${sets}, updated_at=now() WHERE client_id=$1 AND workspace_id=$2`,
+      [okClient, wsId]
+    ));
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // =======================================================================
 // STAP 16 - WORKSPACE-KOPPELING (gedeelde Meta-basis voor alle klanten)
 // De eigenaar vult token + App ID/Secret + Ad Account eenmalig in op

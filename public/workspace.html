@@ -559,45 +559,80 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div id="dIntegrations" style="display:none">
           <div id="intMsg" class="inline-msg"></div>
           <div class="card" style="max-width:640px">
-            <p style="color:var(--muted);font-size:13px;margin-bottom:6px">Voer hier de koppelingen van deze klant in. Zodra de platform-goedkeuringen (Meta/Google) rond zijn, publiceert de workspace hiermee rechtstreeks. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:6px">Voer de koppelingen per platform in. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
             <div id="intEncWarn" style="display:none;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border:1px solid rgba(245,158,11,.28);padding:9px 12px;border-radius:9px;margin-bottom:14px"></div>
 
-            <div class="nav-label" style="padding-left:0">Meta (Facebook / Instagram)</div>
-            <div class="row2">
-              <div class="field"><label>Facebook Page ID</label><input id="int_meta_page_id"></div>
-              <div class="field"><label>Instagram user ID</label><input id="int_meta_ig_user_id"></div>
-            </div>
-            <div class="row2">
-              <div class="field"><label>Meta Pixel ID</label><input id="int_meta_pixel_id"></div>
-              <div class="field"><label>Ad Account ID</label><input id="int_meta_ad_account_id" placeholder="act_1234567890"></div>
-            </div>
-            <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
-            <div class="row2">
-              <div class="field"><label>Meta App ID</label><input id="int_meta_app_id" placeholder="Voor het verlengen van het token"></div>
-              <div class="field"><label>Meta App Secret</label><input id="int_meta_app_secret" type="password"></div>
-            </div>
-            <div style="margin:-2px 0 4px"><button class="btn btn-ghost" onclick="extendMetaToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button>
-              <span id="extendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
-
-            <div class="nav-label" style="padding-left:0;margin-top:10px">Google</div>
-            <div class="row2">
-              <div class="field"><label>Google Ads customer ID</label><input id="int_google_ads_customer_id"></div>
-              <div class="field"><label>Google Ads developer token</label><input id="int_google_ads_developer_token" type="password"></div>
-            </div>
-            <div class="field"><label>GA4 measurement ID</label><input id="int_ga4_measurement_id" placeholder="G-XXXXXXX"></div>
-
-            <div class="nav-label" style="padding-left:0;margin-top:10px">TikTok</div>
-            <div class="row2">
-              <div class="field"><label>TikTok Pixel ID</label><input id="int_tiktok_pixel_id"></div>
-              <div class="field"><label>TikTok access token</label><input id="int_tiktok_access_token" type="password"></div>
+            <div id="intTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+              <button type="button" id="intTab_meta" class="btn btn-ghost active" onclick="intTab('meta')" style="padding:7px 12px;font-size:13px">Meta</button>
+              <button type="button" id="intTab_google" class="btn btn-ghost" onclick="intTab('google')" style="padding:7px 12px;font-size:13px">Google</button>
+              <button type="button" id="intTab_tiktok" class="btn btn-ghost" onclick="intTab('tiktok')" style="padding:7px 12px;font-size:13px">TikTok</button>
+              <button type="button" id="intTab_linkedin" class="btn btn-ghost" onclick="intTab('linkedin')" style="padding:7px 12px;font-size:13px">LinkedIn</button>
             </div>
 
-            <div class="field"><label>Notities</label><textarea id="int_notes" rows="2" placeholder="Extra info over de koppelingen"></textarea></div>
+            <div class="int-panel" id="intPanel_meta">
+              <div id="stat_meta" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
+              <div class="row2">
+                <div class="field"><label>Facebook Page ID</label><input id="int_meta_page_id"></div>
+                <div class="field"><label>Instagram user ID</label><input id="int_meta_ig_user_id"></div>
+              </div>
+              <div class="row2">
+                <div class="field"><label>Meta Pixel ID</label><input id="int_meta_pixel_id"></div>
+                <div class="field"><label>Ad Account ID</label><input id="int_meta_ad_account_id" placeholder="act_1234567890"></div>
+              </div>
+              <div class="field"><label>Meta access token</label><input id="int_meta_access_token" type="password" placeholder=""></div>
+              <div class="row2">
+                <div class="field"><label>Meta App ID</label><input id="int_meta_app_id" placeholder="Voor het verlengen van het token"></div>
+                <div class="field"><label>Meta App Secret</label><input id="int_meta_app_secret" type="password"></div>
+              </div>
+              <div style="margin:-2px 0 8px"><button class="btn btn-ghost" onclick="extendMetaToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button>
+                <span id="extendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-ghost" onclick="testPlatform('meta',this)">Test verbinding</button>
+                <button class="btn btn-ghost" style="color:#dc2626" onclick="clearPlatform('meta',this)">Meta wissen</button>
+              </div>
+            </div>
+
+            <div class="int-panel" id="intPanel_google" style="display:none">
+              <div id="stat_google" style="font-size:12.5px;color:var(--muted);margin-bottom:10px"></div>
+              <div class="row2">
+                <div class="field"><label>Google Ads customer ID</label><input id="int_google_ads_customer_id"></div>
+                <div class="field"><label>Google Ads developer token</label><input id="int_google_ads_developer_token" type="password"></div>
+              </div>
+              <div class="field"><label>GA4 measurement ID</label><input id="int_ga4_measurement_id" placeholder="G-XXXXXXX"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+                <button class="btn btn-ghost" onclick="testPlatform('google',this)">Test</button>
+                <button class="btn btn-ghost" style="color:#dc2626" onclick="clearPlatform('google',this)">Google wissen</button>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:6px">Google-publiceren/statistieken worden binnenkort live; de gegevens worden nu alvast bewaard.</div>
+            </div>
+
+            <div class="int-panel" id="intPanel_tiktok" style="display:none">
+              <div id="stat_tiktok" style="font-size:12.5px;color:var(--muted);margin-bottom:10px"></div>
+              <div class="row2">
+                <div class="field"><label>TikTok Pixel ID</label><input id="int_tiktok_pixel_id"></div>
+                <div class="field"><label>TikTok access token</label><input id="int_tiktok_access_token" type="password"></div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+                <button class="btn btn-ghost" onclick="testPlatform('tiktok',this)">Test</button>
+                <button class="btn btn-ghost" style="color:#dc2626" onclick="clearPlatform('tiktok',this)">TikTok wissen</button>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:6px">TikTok-publiceren/statistieken worden binnenkort live; de gegevens worden nu alvast bewaard.</div>
+            </div>
+
+            <div class="int-panel" id="intPanel_linkedin" style="display:none">
+              <div style="font-size:13px;margin-bottom:8px"><strong>LinkedIn-bedrijfspagina koppelen</strong></div>
+              <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Organisch posten en statistieken van een LinkedIn-bedrijfspagina kan via de LinkedIn Community Management API, maar vereist eerst goedkeuring door LinkedIn:</div>
+              <ul style="margin:0 0 10px;padding-left:18px;font-size:13px;line-height:1.7">
+                <li><strong>Posten</strong>: product "Community Management / Share on LinkedIn" + scope <span style="font-family:monospace">w_organization_social</span>.</li>
+                <li><strong>Statistieken</strong> (impressies, klikken, reacties): scope <span style="font-family:monospace">r_organization_social</span> via het Marketing Developer Platform (goedkeuring 2 tot 8 weken).</li>
+                <li>Nodig: de <strong>LinkedIn Organization ID</strong> (URN) van de bedrijfspagina.</li>
+              </ul>
+              <div style="font-size:12.5px;color:var(--warn)">Status: in aanvraag, nog niet live. Zodra LinkedIn goedkeurt zetten we de velden en het posten hier aan.</div>
+            </div>
+
+            <div class="field" style="margin-top:14px"><label>Notities</label><textarea id="int_notes" rows="2" placeholder="Extra info over de koppelingen"></textarea></div>
             <div class="actions-split">
               <span style="font-size:12px;color:var(--muted);align-self:center">Laat een token leeg om het ongewijzigd te laten.</span>
-              <span id="intStatus" style="font-size:12.5px;align-self:center;color:var(--muted)"></span>
-              <button class="btn btn-ghost" id="intTestBtn" onclick="testClientIntegration(this)">Test verbinding</button>
-              <button class="btn btn-ghost" id="intClearBtn" style="color:#dc2626" onclick="clearClientIntegration(this)">Koppeling wissen</button>
               <button class="btn btn-primary" id="intSaveBtn" onclick="saveIntegrations()">Koppelingen opslaan</button>
             </div>
           </div>
@@ -1574,6 +1609,51 @@ async function extendMetaToken(){
     else {el.style.color='var(--err)';el.textContent=d.error||'Verlengen mislukt.';}
   }catch(e){el.style.color='var(--err)';el.textContent='Netwerkfout.';}
 }
+var _INTG=null;
+function intSet(f){ var s=_INTG&&_INTG[f]; return !!(s&&s.set); }
+function renderIntPlatformStatus(){
+  var m=document.getElementById('stat_meta');
+  if(m){ var on=intSet('meta_page_id')||intSet('meta_ad_account_id')||intSet('meta_access_token'); m.style.color=on?'#16a34a':'var(--muted)'; m.textContent=on?'Ingesteld - klik Test verbinding voor een live-check':'Nog niet ingesteld'; }
+  var g=document.getElementById('stat_google');
+  if(g){ var on2=intSet('google_ads_customer_id')||intSet('ga4_measurement_id')||intSet('google_ads_developer_token'); g.style.color=on2?'#16a34a':'var(--muted)'; g.textContent=on2?'Ingesteld':'Nog niet ingesteld'; }
+  var t=document.getElementById('stat_tiktok');
+  if(t){ var on3=intSet('tiktok_pixel_id')||intSet('tiktok_access_token'); t.style.color=on3?'#16a34a':'var(--muted)'; t.textContent=on3?'Ingesteld':'Nog niet ingesteld'; }
+}
+function intTab(p){
+  ['meta','google','tiktok','linkedin'].forEach(function(x){
+    var panel=document.getElementById('intPanel_'+x); if(panel)panel.style.display=(x===p)?'':'none';
+    var tabb=document.getElementById('intTab_'+x); if(tabb)tabb.classList.toggle('active',x===p);
+  });
+}
+async function testPlatform(p, btn){
+  if(!CURRENT_CLIENT)return;
+  var el=document.getElementById('stat_'+p);
+  if(p!=='meta'){
+    if(el){ var has=(p==='google')?(intSet('google_ads_customer_id')||intSet('ga4_measurement_id')||intSet('google_ads_developer_token')):(intSet('tiktok_pixel_id')||intSet('tiktok_access_token')); el.style.color='var(--muted)'; el.textContent=has?'Gegevens ingesteld. Live testen kan zodra dit platform live is.':'Nog niet ingesteld.'; }
+    return;
+  }
+  if(el){el.style.color='var(--muted)';el.textContent='Testen...';}
+  if(btn)btn.disabled=true;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-status',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ if(el){el.style.color='#dc2626';el.textContent=(d&&d.error)||'Fout';} }
+    else if(typeof renderKoppStatus==='function') renderKoppStatus(el,d);
+  }catch(e){ if(el){el.style.color='#dc2626';el.textContent='Netwerkfout';} }
+  finally{ if(btn)btn.disabled=false; }
+}
+async function clearPlatform(p, btn){
+  if(!CURRENT_CLIENT)return;
+  var labels={meta:'Meta',google:'Google',tiktok:'TikTok'};
+  if(!confirm('De '+(labels[p]||p)+'-koppeling van deze klant wissen?'))return;
+  if(btn)btn.disabled=true; hideMsg('intMsg');
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations/clear-platform',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({platform:p})});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('intMsg',true,(labels[p]||p)+'-koppeling gewist.');loadIntegrations();}
+    else{showMsg('intMsg',false,(d&&d.error)||'Wissen mislukt.');}
+  }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
+  if(btn)btn.disabled=false;
+}
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
   try{
@@ -1583,6 +1663,7 @@ async function loadIntegrations(){
     INT_PLAIN.forEach(function(f){var el=document.getElementById('int_'+f);if(el)el.value=g[f]||'';});
     // ID's en tokens worden gemaskeerd getoond (leeg veld + hint). Overschrijf om te wijzigen.
     INT_MASKED.concat(INT_SECRET).forEach(function(f){var el=document.getElementById('int_'+f);if(el){var s=g[f]||{};el.value='';el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';}});
+    _INTG=g; renderIntPlatformStatus();
     var warn=document.getElementById('intEncWarn');
     if(!g.encrypted){warn.style.display='block';warn.textContent='Let op: er is nog geen MKT_SECRET_KEY ingesteld in Render, dus tokens worden nu onversleuteld opgeslagen. Stel die sleutel in voor versleuteling.';}
     else {warn.style.display='none';}
