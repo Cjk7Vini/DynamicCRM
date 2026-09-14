@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan je gratis kennismaking - Serac Fitness</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #111111;
+            --accent: #111111;
+            --background: #f4f4f5;
+            --text-dark: #1c1c1e;
+            --line: #e2e2e5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, "Segoe UI", sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 14px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 26px;
+        }
+        .logo .wordmark {
+            font-family: 'Archivo Black', 'Inter', sans-serif;
+            font-size: 46px;
+            letter-spacing: .06em;
+            color: var(--ink);
+            line-height: 1;
+            text-transform: uppercase;
+        }
+        .logo .tag {
+            font-size: 12px;
+            letter-spacing: .42em;
+            color: #8a8a90;
+            text-transform: uppercase;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        h1 {
+            color: var(--ink);
+            font-family: 'Archivo Black', 'Inter', sans-serif;
+            font-size: 27px;
+            line-height: 1.15;
+            margin-bottom: 12px;
+            text-align: center;
+            text-wrap: balance;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #5f5f66;
+            margin-bottom: 26px;
+            font-size: 14.5px;
+        }
+
+        .benefits {
+            background: #fafafa;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+        .benefit-item + .benefit-item { margin-top: 12px; }
+        .benefit-item .check {
+            flex-shrink: 0;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: var(--ink);
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+            margin-top: 1px;
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--ink);
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 13px;
+            border: 1.5px solid var(--line);
+            border-radius: 9px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: border-color .2s;
+            background: #fff;
+            color: var(--text-dark);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--ink);
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--accent);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all .2s;
+            letter-spacing: .01em;
+        }
+        .submit-btn:hover { transform: translateY(-1px); background: #000; }
+        .submit-btn:disabled { background: #bbb; cursor: not-allowed; transform: none; }
+
+        .error-message { color: #d32f2f; font-size: 12px; margin-top: 5px; display: none; }
+        .required { color: var(--ink); }
+        .security-note { text-align: center; color: #9a9aa0; font-size: 12px; margin-top: 14px; }
+
+        @media (max-width: 768px) {
+            .container { padding: 30px 20px; }
+            h1 { font-size: 23px; }
+            .logo .wordmark { font-size: 40px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <div class="wordmark">SERAC</div>
+            <div class="tag">Fitness</div>
+        </div>
+
+        <h1>Plan jouw gratis kennismaking bij Serac Fitness</h1>
+        <p class="subtitle">Vul het formulier in, dan nemen we binnen 1 werkdag contact met je op om je kennismaking in te plannen.</p>
+
+        <div class="benefits">
+            <div class="benefit-item"><span class="check">&#10003;</span><span>Gratis en vrijblijvende kennismaking en rondleiding</span></div>
+            <div class="benefit-item"><span class="check">&#10003;</span><span>Persoonlijk advies over jouw doelen en training</span></div>
+            <div class="benefit-item"><span class="check">&#10003;</span><span>Ontdek welk lidmaatschap het beste bij jou past</span></div>
+        </div>
+
+        <form id="appointmentForm" action="/leads" method="POST">
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="9D4BEF">
+
+            <div class="form-group">
+                <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+                <span class="error-message" id="error-volledige_naam">Vul je volledige naam in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="emailadres">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
+                <span class="error-message" id="error-emailadres">Vul een geldig e-mailadres in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+                <span class="error-message" id="error-telefoon">Vul je telefoonnummer in</span>
+            </div>
+
+            <div class="form-group">
+                <label for="doel">Wat is je voornaamste doel?</label>
+                <input type="text" id="doel" name="doel" placeholder="Bijv. afvallen, sterker worden, fitter worden">
+            </div>
+
+            <div class="form-group">
+                <label for="bron">Hoe heb je ons gevonden?</label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:flex-start;gap:10px;font-weight:normal;cursor:pointer;">
+                    <input type="checkbox" id="toestemming" name="toestemming" value="true" required style="width:auto;margin-top:3px;flex-shrink:0;">
+                    <span>Ik ga akkoord met de privacyverklaring en geef toestemming om contact met mij op te nemen voor meer informatie.</span>
+                </label>
+            </div>
+
+            <button type="submit" class="submit-btn">Plan mijn gratis kennismaking</button>
+            <p class="security-note">Je gegevens worden veilig verwerkt en nooit gedeeld met derden</p>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = this.querySelector('.submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Bezig met versturen...';
+
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            // eventId voor de fetch genereren zodat de server het ontvangt voor CAPI deduplicatie
+            const eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            data.meta_event_id = eventId;
+            data.event_source_url = window.location.href;
+
+            try {
+                const response = await fetch('/leads', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const resData = await response.json().catch(() => ({}));
+                    const submitToken = resData.submit_token || '';
+                    const leadId = resData.lead?.id || '';
+                    window.location.href = 'thankyou.html?s=9D4BEF&eid=' + encodeURIComponent(eventId) + '&st=' + encodeURIComponent(submitToken) + '&lid=' + encodeURIComponent(leadId);
+                } else {
+                    alert('Er ging iets mis. Probeer het opnieuw.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Plan mijn gratis kennismaking';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Er ging iets mis. Probeer het opnieuw.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Plan mijn gratis kennismaking';
+            }
+        });
+
+        // Client-side validatie
+        document.querySelectorAll('input[required], select[required]').forEach(field => {
+            field.addEventListener('blur', function() {
+                const errorMsg = document.getElementById('error-' + this.id);
+                if (!this.value.trim()) {
+                    this.style.borderColor = '#d32f2f';
+                    if (errorMsg) errorMsg.style.display = 'block';
+                } else {
+                    this.style.borderColor = 'var(--line)';
+                    if (errorMsg) errorMsg.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
