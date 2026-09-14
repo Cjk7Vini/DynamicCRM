@@ -2288,19 +2288,46 @@ router.post('/api/mkt/clients/:clientId/login', requireMkt, async (req, res) => 
     const { email, password, full_name } = req.body || {};
     const em = String(email || '').toLowerCase().trim();
     if (!em || !em.includes('@')) return res.status(400).json({ error: 'Geldig e-mailadres verplicht' });
-    if (!password || password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
+
+    // Bestaat dit e-mailadres al ergens?
+    const existing = await withReadConnection(async (c) => (await c.query(
+      'SELECT workspace_id, password_hash, full_name FROM marketing.accounts WHERE email=$1', [em]
+    )).rows);
+    if (existing.some((a) => String(a.workspace_id) === String(wsId))) {
+      return res.status(409).json({ error: 'Er bestaat al een account met dit e-mailadres in deze workspace' });
     }
-    const dup = await withReadConnection(async (c) => (await c.query('SELECT 1 FROM marketing.accounts WHERE email=$1', [em])).rows[0]);
-    if (dup) return res.status(409).json({ error: 'Er bestaat al een account met dit e-mailadres' });
-    const hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role, client_id, active)
-       VALUES ($1,$2,$3,$4,'client',$5,true)
-       RETURNING id, email, full_name, role`,
-      [wsId, em, hash, (full_name && String(full_name).trim()) || null, okClient]
-    )).rows[0]);
-    res.json({ success: true, account: row });
+
+    let hash; let fname;
+    if (existing.length) {
+      // Bestaat al in een andere workspace: dezelfde login hergebruiken (gedeeld
+      // wachtwoord). Er wordt dan geen nieuw wachtwoord gevraagd/gebruikt.
+      hash = existing[0].password_hash;
+      fname = (full_name && String(full_name).trim()) || existing[0].full_name || null;
+    } else {
+      // Nieuw e-mailadres: wachtwoord verplicht.
+      if (!password || password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+        return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
+      }
+      hash = await bcrypt.hash(password, SALT_ROUNDS);
+      fname = (full_name && String(full_name).trim()) || null;
+    }
+
+    let row;
+    try {
+      row = await withWriteConnection(async (c) => (await c.query(
+        `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role, client_id, active)
+         VALUES ($1,$2,$3,$4,'client',$5,true)
+         RETURNING id, email, full_name, role`,
+        [wsId, em, hash, fname, okClient]
+      )).rows[0]);
+    } catch (e) {
+      // Bestaat de globale unieke e-mail-index nog (migratie 005 niet gedraaid)?
+      if (/duplicate key|unique/i.test(String(e.message))) {
+        return res.status(409).json({ error: 'Dit e-mailadres bestaat al in een andere workspace. Voer eerst migratie 005 uit om dezelfde login in meerdere workspaces toe te staan.' });
+      }
+      throw e;
+    }
+    res.json({ success: true, account: row, sharedLogin: existing.length > 0 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

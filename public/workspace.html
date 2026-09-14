@@ -512,7 +512,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div id="clientLoginMsg" class="inline-msg"></div>
             <div class="row2">
               <div class="field"><label>E-mail van de klant</label><input id="clEmail" type="email" placeholder="klant@bedrijf.nl"></div>
-              <div class="field"><label>Wachtwoord</label><input id="clPass" type="text" placeholder="Min. 8 tekens, hoofdletter + cijfer"></div>
+              <div class="field"><label>Wachtwoord</label><input id="clPass" type="text" placeholder="Min. 8 tekens, hoofdletter + cijfer (leeg laten als de klant al elders een login heeft)"></div>
             </div>
             <div style="text-align:right"><button class="btn btn-ghost" onclick="createClientLogin()">Klant-login aanmaken</button></div>
           </div>
@@ -2284,9 +2284,10 @@ async function createClientLogin(){
   var email=document.getElementById('clEmail').value.trim();
   var pass=document.getElementById('clPass').value;
   if(!email||!email.includes('@')){showMsg('clientLoginMsg',false,'Vul een geldig e-mailadres in.');return;}
-  if(pass.length<8){showMsg('clientLoginMsg',false,'Wachtwoord minstens 8 tekens, met hoofdletter en cijfer.');return;}
+  // Wachtwoord is optioneel: leeg laten hergebruikt een bestaande login in een andere workspace.
+  if(pass && pass.length<8){showMsg('clientLoginMsg',false,'Wachtwoord minstens 8 tekens, met hoofdletter en cijfer.');return;}
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:pass})});
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:pass||undefined})});
     var d=await r.json();
     if(r.ok&&d.success){showMsg('clientLoginMsg',true,'Klant-login aangemaakt voor '+email+'. Deel de inloglink /workspace.html met de klant.');document.getElementById('clPass').value='';}
     else {showMsg('clientLoginMsg',false,d.error||'Aanmaken mislukt.');}
