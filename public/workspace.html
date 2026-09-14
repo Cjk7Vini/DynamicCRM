@@ -321,24 +321,48 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <section class="view" id="viewWsSettings">
         <div id="wsiMsg" class="inline-msg"></div>
         <div class="card" style="max-width:640px">
-          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta-koppeling van de werkplek</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Vul hier je gedeelde Meta-gegevens één keer in. Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account of eigen pagina, dan vul je dat bij die klant in (dat wint dan). Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Werkplek-koppeling</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">De gedeelde accounts van de werkplek, per platform. Klanten vallen hierop terug als ze zelf geen koppeling hebben. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
           <div id="wsiEncWarn" style="display:none;font-size:12.5px;color:var(--warn);background:var(--warn-soft);border:1px solid rgba(245,158,11,.28);padding:9px 12px;border-radius:9px;margin-bottom:14px"></div>
-          <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
-          <div class="row2">
-            <div class="field"><label>Ad Account ID</label><input id="wsi_meta_ad_account_id" placeholder="act_1234567890"></div>
-            <div class="field"><label>Meta App ID</label><input id="wsi_meta_app_id"></div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+            <button type="button" id="wsiTab_meta" class="btn btn-ghost active" onclick="wsiTab('meta')" style="padding:7px 12px;font-size:13px">Meta</button>
+            <button type="button" id="wsiTab_google" class="btn btn-ghost" onclick="wsiTab('google')" style="padding:7px 12px;font-size:13px">Google</button>
+            <button type="button" id="wsiTab_tiktok" class="btn btn-ghost" onclick="wsiTab('tiktok')" style="padding:7px 12px;font-size:13px">TikTok</button>
+            <button type="button" id="wsiTab_linkedin" class="btn btn-ghost" onclick="wsiTab('linkedin')" style="padding:7px 12px;font-size:13px">LinkedIn</button>
           </div>
-          <div class="row2">
-            <div class="field"><label>Facebook Page ID</label><input id="wsi_meta_page_id" placeholder="Pagina waarmee je adverteert"></div>
-            <div class="field"><label>Instagram user ID (optioneel)</label><input id="wsi_meta_ig_user_id"></div>
+
+          <div class="wsi-panel" id="wsiPanel_meta">
+            <div id="wsiMetaStatus" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
+            <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account/pagina, dan vul je dat bij die klant in (dat wint).</p>
+            <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
+            <div class="row2">
+              <div class="field"><label>Ad Account ID</label><input id="wsi_meta_ad_account_id" placeholder="act_1234567890"></div>
+              <div class="field"><label>Meta App ID</label><input id="wsi_meta_app_id"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>Facebook Page ID</label><input id="wsi_meta_page_id" placeholder="Pagina waarmee je adverteert"></div>
+              <div class="field"><label>Instagram user ID (optioneel)</label><input id="wsi_meta_ig_user_id"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>Meta Pixel ID (optioneel)</label><input id="wsi_meta_pixel_id"></div>
+              <div class="field"><label>Meta App Secret</label><input id="wsi_meta_app_secret" type="password"></div>
+            </div>
+            <div style="margin:-2px 0 8px"><button class="btn btn-ghost" onclick="extendWsToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button><span id="wsiExtendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="testWsMeta(this)">Test verbinding</button></div>
           </div>
-          <div class="row2">
-            <div class="field"><label>Meta Pixel ID (optioneel)</label><input id="wsi_meta_pixel_id"></div>
-            <div class="field"><label>Meta App Secret</label><input id="wsi_meta_app_secret" type="password"></div>
+
+          <div class="wsi-panel" id="wsiPanel_google" style="display:none">
+            <div style="font-size:13px;color:var(--muted)">Op werkplekniveau gebruiken we nu Meta als gedeeld account. Google-koppelingen stel je per klant in (tabblad Koppelingen bij een klant). Werkplek-breed Google volgt zodra Google-publiceren live is.</div>
           </div>
-          <div style="margin:-2px 0 10px"><button class="btn btn-ghost" onclick="extendWsToken()" style="padding:8px 12px;font-size:12.5px">Token verlengen naar ~60 dagen</button><span id="wsiExtendMsg" style="font-size:12.5px;margin-left:10px"></span></div>
-          <div style="text-align:right"><button class="btn btn-primary" onclick="saveWsIntegrations()">Werkplek-koppeling opslaan</button></div>
+          <div class="wsi-panel" id="wsiPanel_tiktok" style="display:none">
+            <div style="font-size:13px;color:var(--muted)">TikTok stel je per klant in (tabblad Koppelingen bij een klant). Werkplek-breed TikTok volgt zodra TikTok live is.</div>
+          </div>
+          <div class="wsi-panel" id="wsiPanel_linkedin" style="display:none">
+            <div style="font-size:13px;color:var(--muted)">LinkedIn is in aanvraag bij LinkedIn (scopes w_organization_social en r_organization_social). Zodra dat is goedgekeurd verschijnen hier de velden.</div>
+          </div>
+
+          <div style="text-align:right;margin-top:8px"><button class="btn btn-primary" onclick="saveWsIntegrations()">Werkplek-koppeling opslaan</button></div>
         </div>
       </section>
 
@@ -1143,6 +1167,23 @@ function navTo(view){
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
   else {document.getElementById('viewOverzicht').classList.add('active');}
+}
+function wsiTab(p){
+  ['meta','google','tiktok','linkedin'].forEach(function(x){
+    var panel=document.getElementById('wsiPanel_'+x); if(panel)panel.style.display=(x===p)?'':'none';
+    var tabb=document.getElementById('wsiTab_'+x); if(tabb)tabb.classList.toggle('active',x===p);
+  });
+}
+async function testWsMeta(btn){
+  var el=document.getElementById('wsiMetaStatus');
+  if(el){el.style.color='var(--muted)';el.textContent='Testen...';}
+  if(btn)btn.disabled=true;
+  try{
+    var r=await fetch('/api/mkt/workspace/meta-status',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ if(el){el.style.color='#dc2626';el.textContent=(d&&d.error)||'Fout';} }
+    else if(typeof renderKoppStatus==='function') renderKoppStatus(el,d);
+  }catch(e){ if(el){el.style.color='#dc2626';el.textContent='Netwerkfout';} }
+  finally{ if(btn)btn.disabled=false; }
 }
 async function loadWsIntegrations(){
   hideMsg('wsiMsg');
