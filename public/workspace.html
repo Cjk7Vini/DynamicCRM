@@ -964,9 +964,31 @@ async function doLogin(){
   try{
     var r=await fetch('/api/mkt/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:email,password:password})});
     var d=await r.json();
-    if(r.ok&&d.success){await bootstrap();} else {msg.className='msg err';msg.textContent=d.error||'Inloggen mislukt.';}
+    if(r.ok&&d.success){
+      if(d.needsWorkspace){ showClientPicker(d.choices, email); }
+      else { await bootstrap(); }
+    } else {msg.className='msg err';msg.textContent=d.error||'Inloggen mislukt.';}
   }catch(e){msg.className='msg err';msg.textContent='Geen verbinding. Probeer opnieuw.';}
   btn.disabled=false; btn.textContent='Inloggen';
+}
+// Kiezer als één login toegang heeft tot meerdere workspaces.
+function showClientPicker(choices, email){
+  loginView.classList.add('hidden'); appView.classList.add('hidden');
+  document.getElementById('pickerView').classList.remove('hidden');
+  document.getElementById('pkEmail').textContent=email||'';
+  var el=document.getElementById('pkList');
+  el.innerHTML=(choices||[]).map(function(c){
+    return '<div class="cl-card" style="cursor:pointer;padding:16px" onclick="chooseWorkspace('+c.accountId+')"><div class="cl-top">'+
+      '<div class="cl-ava" style="width:40px;height:40px;font-size:15px;background:linear-gradient(135deg,var(--accent),var(--accent-2))">'+esc(initials(c.name))+'</div></div>'+
+      '<h4 style="margin:12px 0 3px">'+esc(c.name)+'</h4><div class="mut">'+esc(c.role||'')+'</div></div>';
+  }).join('');
+}
+async function chooseWorkspace(accountId){
+  try{
+    var r=await fetch('/api/mkt/auth/choose-workspace',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({accountId:accountId})});
+    var d=await r.json();
+    if(r.ok&&d.success){ await bootstrap(); } else alert(d.error||'Kon workspace niet openen.');
+  }catch(e){ alert('Netwerkfout.'); }
 }
 async function doLogout(){
   try{await fetch('/api/mkt/auth/logout',{method:'POST',credentials:'include'});}catch(e){}

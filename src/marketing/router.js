@@ -450,15 +450,29 @@ router.post('/api/mkt/auth/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord verplicht' });
     const em = String(email).toLowerCase().trim();
 
-    // 1) Marketing-account
-    const acc = await withReadConnection(async (c) => (await c.query(
+    // 1) Marketing-account(s). Eén e-mailadres kan (na de multi-workspace-migratie)
+    // in meerdere workspaces bestaan met hetzelfde wachtwoord. Vandaag is er precies
+    // één rij per e-mail, dus dit gedraagt zich identiek aan voorheen.
+    const accs = await withReadConnection(async (c) => (await c.query(
       `SELECT a.*, w.name AS workspace_name, w.slug AS workspace_slug, w.active AS ws_active,
               w.license_type, w.license_end, w.modules
          FROM marketing.accounts a
          JOIN marketing.workspaces w ON w.id = a.workspace_id
-        WHERE a.email=$1 AND a.active=true AND (a.banned IS NULL OR a.banned=false)`, [em]
-    )).rows[0]);
-    if (acc && await bcrypt.compare(password, acc.password_hash)) {
+        WHERE a.email=$1 AND a.active=true AND (a.banned IS NULL OR a.banned=false)
+        ORDER BY w.name ASC`, [em]
+    )).rows);
+    if (accs.length && await bcrypt.compare(password, accs[0].password_hash)) {
+      // Toegankelijke workspaces = rijen met dezelfde credential (gedeeld wachtwoord).
+      const accessible = accs.filter((a) => a.password_hash === accs[0].password_hash);
+      if (accessible.length > 1) {
+        // Meerdere workspaces onder één login: laat de gebruiker kiezen.
+        req.session.mkt = { pending: true, email: em, allowed: accessible.map((a) => a.id) };
+        return req.session.save(() => res.json({
+          success: true, needsWorkspace: true,
+          choices: accessible.map((a) => ({ accountId: a.id, workspaceId: a.workspace_id, name: a.workspace_name, role: a.role }))
+        }));
+      }
+      const acc = accessible[0];
       if (!acc.ws_active) return res.status(403).json({ error: 'Deze workspace is niet actief' });
       if (acc.license_end && new Date(acc.license_end) < new Date())
         return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
@@ -482,6 +496,36 @@ router.post('/api/mkt/auth/login', async (req, res) => {
     }
 
     return res.status(401).json({ error: 'Onjuiste inloggegevens' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Kies een workspace na inloggen, als hetzelfde e-mailadres in meerdere
+// workspaces bestaat. Alleen mogelijk vanuit de 'pending'-staat die de login
+// zet, en alleen voor de accounts die daar zijn geautoriseerd.
+router.post('/api/mkt/auth/choose-workspace', async (req, res) => {
+  try {
+    const m = req.session && req.session.mkt;
+    if (!m || !m.pending || !Array.isArray(m.allowed)) return res.status(401).json({ error: 'Geen workspace-keuze in behandeling' });
+    const chosen = (req.body && req.body.accountId);
+    if (!m.allowed.map(String).includes(String(chosen))) return res.status(403).json({ error: 'Niet toegestaan' });
+    const acc = await withReadConnection(async (c) => (await c.query(
+      `SELECT a.*, w.name AS workspace_name, w.slug AS workspace_slug, w.active AS ws_active,
+              w.license_type, w.license_end, w.modules
+         FROM marketing.accounts a
+         JOIN marketing.workspaces w ON w.id = a.workspace_id
+        WHERE a.id=$1 AND a.active=true AND (a.banned IS NULL OR a.banned=false)`, [chosen]
+    )).rows[0]);
+    if (!acc) return res.status(404).json({ error: 'Account niet gevonden' });
+    if (!acc.ws_active) return res.status(403).json({ error: 'Deze workspace is niet actief' });
+    if (acc.license_end && new Date(acc.license_end) < new Date())
+      return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
+    req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email, clientId: acc.client_id || null };
+    await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
+    return req.session.save(() => res.json({
+      success: true, platformAdmin: false,
+      account: { id: acc.id, email: acc.email, role: acc.role, name: acc.full_name },
+      workspace: { id: acc.workspace_id, name: acc.workspace_name, slug: acc.workspace_slug, modules: acc.modules }
+    }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
