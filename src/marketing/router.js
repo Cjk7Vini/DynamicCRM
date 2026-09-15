@@ -1288,6 +1288,13 @@ function metaErrorMessage(j) {
   if (codes.length) msg += ' (' + codes.join(', ') + ')';
   return msg;
 }
+// Meta legt op sommige (nieuwe) ad accounts een strenge limiet op: 1 verzoek
+// per 30 seconden (code 613, subcode 4841018). Deze helper herkent die fout.
+function isRateLimit613(j) {
+  const e = j && j.error;
+  return !!e && (Number(e.code) === 613 || Number(e.error_subcode) === 4841018);
+}
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
 async function graphPost(pathAndId, params) {
   const body = new URLSearchParams(params);
   const r = await fetch(`${GRAPH}/${pathAndId}`, { method: 'POST', body });
@@ -2739,10 +2746,18 @@ router.delete('/api/mkt/clients/:clientId/meta-campaigns/:campaignId', requireMk
     const token = await metaTokenForClient(wsId, okClient);
     if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
     const cid = req.params.campaignId;
-    const body = new URLSearchParams({ access_token: token });
-    const r = await fetch(`${GRAPH}/${cid}`, { method: 'DELETE', body });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+    // Bij de #613-limiet (1 verzoek per 30 sec op sommige ad accounts) wacht de
+    // actie zelf even en probeert opnieuw, zodat verwijderen in een klik lukt.
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetch(`${GRAPH}/${cid}`, { method: 'DELETE', body: new URLSearchParams({ access_token: token }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && !j.error) { lastErr = null; break; }
+      lastErr = metaErrorMessage(j);
+      if (isRateLimit613(j) && attempt < 2) { await sleepMs(31000); continue; }
+      break;
+    }
+    if (lastErr) throw new Error(lastErr);
     // Ook onze eigen sporen opruimen (campagne-rij en eventuele koppeling).
     try {
       await withWriteConnection(async (c) => {
