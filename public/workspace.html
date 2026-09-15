@@ -1579,7 +1579,7 @@ async function loadMetaInsights(){
       if(d.insights.profile_views!=null)icells.push(tile('Profielbezoeken',iv(d.insights.profile_views)));
       if(icells.length)html+='<div class="stats" style="margin-bottom:6px">'+icells.join('')+'</div>';
     } else if(d.account){
-      html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.</div>';
+      html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
     }
     // Verdeling per contenttype
     if(d.contentTypes&&d.contentTypes.length){
