@@ -54,6 +54,8 @@ function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':St
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
 function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function num(v){return v!=null?v:'-';}
+function fmtn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
+var TYPE_LABELS={IMAGE:'Berichten',CAROUSEL_ALBUM:'Carrousels',VIDEO:'Video',REELS:'Reels',ONBEKEND:'Overig'};
 function param(k){var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):'';}
 var CID=param('client');
 
@@ -91,7 +93,26 @@ async function build(){
   // Meta account + top posts
   if(meta&&meta.success&&meta.configured){
     if(meta.account){
-      html+='<h2>Instagram</h2><div class="grid g3">'+kpi('Volgers',num(meta.account.followers))+kpi('Berichten',num(meta.account.media))+kpi('Account',meta.account.username?('@'+meta.account.username):'-')+'</div>';
+      html+='<h2>Instagram</h2><div class="grid g3">'+kpi('Volgers',fmtn(meta.account.followers))+kpi('Berichten',fmtn(meta.account.media))+kpi('Account',meta.account.username?('@'+meta.account.username):'-')+'</div>';
+    }
+    if(meta.insights){
+      var ik=[];
+      if(meta.insights.views!=null)ik.push(kpi('Weergaven',fmtn(meta.insights.views)));
+      if(meta.insights.reach!=null)ik.push(kpi('Bereik',fmtn(meta.insights.reach)));
+      if(meta.insights.total_interactions!=null)ik.push(kpi('Interacties',fmtn(meta.insights.total_interactions)));
+      if(meta.insights.accounts_engaged!=null)ik.push(kpi('Betrokken accounts',fmtn(meta.insights.accounts_engaged)));
+      if(meta.insights.profile_views!=null)ik.push(kpi('Profielbezoeken',fmtn(meta.insights.profile_views)));
+      if(meta.insights.follower_delta!=null)ik.push(kpi('Volgersgroei',(meta.insights.follower_delta>0?'+':'')+fmtn(meta.insights.follower_delta)));
+      if(ik.length)html+='<h2>Instagram statistieken (laatste 28 dagen)</h2><div class="grid">'+ik.join('')+'</div>';
+    }
+    if(meta.contentTypes&&meta.contentTypes.length){
+      var mx=Math.max.apply(null,meta.contentTypes.map(function(x){return x.count;}))||1;
+      html+='<h2>Verdeling per contenttype</h2>';
+      html+=meta.contentTypes.map(function(x){
+        var w=Math.round((x.count/mx)*100);
+        return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>'+esc(TYPE_LABELS[x.type]||x.type)+'</span><span style="color:var(--muted)">'+x.count+' posts · '+fmtn(x.interactions)+' interacties</span></div>'+
+          '<div style="height:8px;background:var(--soft);border:1px solid var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--brand)"></div></div></div>';
+      }).join('');
     }
     if(meta.topPosts&&meta.topPosts.length){
       html+='<h2>Best presterende posts</h2>';
