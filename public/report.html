@@ -98,6 +98,9 @@ async function build(){
 
   var meta=await jget('/api/mkt/clients/'+CID+'/meta-insights');
   var camps=await jget('/api/mkt/clients/'+CID+'/meta-campaigns');
+  // Alleen de campagnes die aan DEZE klant zijn gekoppeld (geen datalek).
+  var links=await jget('/api/mkt/clients/'+CID+'/campaign-links');
+  var linkedIds=(links&&links.success&&links.links)?links.links.map(String):[];
 
   var html='';
   html+='<div class="head"><div style="display:flex;gap:16px;align-items:center">'+
@@ -168,22 +171,30 @@ async function build(){
       html+='</table></div>';
     }
 
-    // Advertenties
-    if(meta.ads&&!meta.ads.empty){
-      html+='<h2>Advertenties</h2><div class="sect1">laatste 30 dagen</div><div class="grid g3">'+kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',fmtn(meta.ads.impressions))+kpi('Bereik',fmtn(meta.ads.reach))+kpi('Klikken',fmtn(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc))+'</div>';
-    }
-  } else {
-    html+='<h2>Instagram</h2><div class="note">Nog geen Meta-koppeling ingesteld voor deze klant, of de cijfers konden niet worden geladen. Vul in de Koppelingen het access token en Instagram user ID in.</div>';
   }
 
-  // Campagnes op Meta
-  if(camps&&camps.success&&camps.configured&&camps.campaigns&&camps.campaigns.length){
-    html+='<h2>Campagnes op Meta</h2>';
-    html+=camps.campaigns.map(function(c2){
+  // Advertenties (samenvatting voor DEZE klant, ook zonder Instagram-koppeling)
+  if(meta&&meta.ads&&!meta.ads.empty){
+    html+='<h2>Advertenties</h2><div class="sect1">laatste 30 dagen, alleen campagnes van deze klant</div><div class="grid g3">'+kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',fmtn(meta.ads.impressions))+kpi('Bereik',fmtn(meta.ads.reach))+kpi('Klikken',fmtn(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc))+'</div>';
+  }
+
+  // Campagnes op Meta (alleen gekoppeld aan deze klant)
+  var shownCamps=(camps&&camps.success&&camps.configured&&camps.campaigns)?camps.campaigns.filter(function(x){return linkedIds.indexOf(String(x.id))>=0;}):[];
+  if(shownCamps.length){
+    html+='<h2>Campagnes op Meta</h2><div class="sect1">laatste 30 dagen</div>';
+    html+=shownCamps.map(function(c2){
       var b=c2.budget!=null?(' · € '+c2.budget.toFixed(2)+'/'+(c2.budget_type||'')):'';
-      var st=(c2.spend!=null)?('<span class="chip">€ '+num(c2.spend)+' · '+fmtn(c2.clicks)+' klikken</span>'):'';
-      return '<div class="row"><div class="m"><h4>'+esc(c2.name)+'</h4><div class="s">'+esc(c2.objective||'')+' · '+esc(c2.status||'')+b+'</div></div>'+st+'</div>';
+      var stats='';
+      if(c2.spend!=null||c2.impressions!=null){
+        stats='<div class="s" style="margin-top:6px">€ '+num(c2.spend)+' uitgegeven · '+fmtn(c2.impressions)+' impressies · '+fmtn(c2.reach)+' bereik · '+fmtn(c2.clicks)+' klikken · CTR '+num(c2.ctr)+'%</div>';
+      }
+      return '<div class="row"><div class="m"><h4>'+esc(c2.name)+'</h4><div class="s">'+esc(c2.objective||'')+' · '+esc(c2.status||'')+b+'</div>'+stats+'</div></div>';
     }).join('');
+  }
+
+  // Als er voor deze klant helemaal niets is
+  if(!(hasMeta&&meta.account)&&!(meta&&meta.ads&&!meta.ads.empty)&&!shownCamps.length){
+    html+='<h2>Nog geen data</h2><div class="note">Voor deze klant is nog geen Instagram-koppeling of gekoppelde advertentiecampagne ingesteld. Koppel in de Koppelingen een Instagram-account, of koppel via "Campagnes koppelen" de campagnes die bij deze klant horen.</div>';
   }
 
   html+='<div class="foot">Marketing Studio · Powered by Dynamic Health Consultancy</div>';
