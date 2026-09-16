@@ -2216,6 +2216,11 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       await oneMetric('profile_views', { metric: 'profile_views', period: 'day', metric_type: 'total_value' });
       await oneMetric('accounts_engaged', { metric: 'accounts_engaged', period: 'day', metric_type: 'total_value' });
       await oneMetric('total_interactions', { metric: 'total_interactions', period: 'day', metric_type: 'total_value' });
+      // Volgersgroei: som van de dagelijkse netto nieuwe volgers over 28 dagen.
+      // Alleen beschikbaar voor accounts met 100+ volgers; mislukt hij, dan
+      // slaan we hem net als de andere metrics gewoon over.
+      const _now = Math.floor(Date.now() / 1000);
+      await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
       if (!Object.keys(out.insights).length) out.insights = null;
     } else {
       out.errors.account = 'Geen Instagram user ID ingesteld';
