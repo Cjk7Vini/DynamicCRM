@@ -2161,9 +2161,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     if (creds.igUserId) {
       try {
         const a = await graphGet(`${creds.igUserId}`, {
-          fields: 'username,followers_count,media_count', access_token: token,
+          fields: 'username,followers_count,follows_count,media_count', access_token: token,
         });
-        out.account = { username: a.username || null, followers: a.followers_count ?? null, media: a.media_count ?? null };
+        out.account = { username: a.username || null, followers: a.followers_count ?? null, following: a.follows_count ?? null, media: a.media_count ?? null };
       } catch (e) { out.errors.account = e.message; }
 
       // --- Recente posts (top op likes) ---
@@ -2194,6 +2194,29 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         }
         out.contentTypes = Object.values(byType).sort((a, b) => b.count - a.count);
       } catch (e) { out.errors.topPosts = e.message; }
+
+      // --- Per-post cijfers voor de ranglijst (bereik, weergaven, opgeslagen,
+      // gedeeld, interacties + berekende engagement). Instagram-insights vallen
+      // niet onder de strenge advertentielimiet, dus dit mag parallel. Mislukt
+      // een post, dan houden we gewoon de basiscijfers (likes/reacties).
+      if (out.topPosts && out.topPosts.length) {
+        const enrichPost = async (p) => {
+          const trySet = async (metric) => {
+            const pin = await graphGet(`${p.id}/insights`, { metric, access_token: token });
+            (pin.data || []).forEach((row) => {
+              const val = (row.total_value && row.total_value.value != null) ? Number(row.total_value.value)
+                : (Array.isArray(row.values) && row.values.length ? Number(row.values[0].value) : null);
+              if (val != null) p[row.name] = val;
+            });
+          };
+          try { await trySet('reach,views,saved,shares,total_interactions'); }
+          catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
+          if (p.reach != null && p.total_interactions != null && p.reach > 0) {
+            p.engagement = Math.round((p.total_interactions / p.reach) * 10000) / 100;
+          }
+        };
+        try { await Promise.all(out.topPosts.map(enrichPost)); } catch (_) { /* rapport blijft heel */ }
+      }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
       // instagram_manage_insights. Elke metric apart en volledig afgeschermd:
