@@ -47,6 +47,12 @@
             max-width: 190px;
             height: auto;
         }
+        .emblem {
+            width: 130px;
+            height: auto;
+            display: block;
+            margin: 0 auto 8px;
+        }
         /* Tekst-wordmark als het logobestand nog niet aanwezig is */
         .wordmark { display: inline-block; text-align: center; }
         .wordmark .wm-top {
@@ -320,11 +326,27 @@
 
     <div class="logo">
         <img id="brandLogo" src="/images/leefstijlcentrum-haarlemmermeer.png" alt="Leefstijlcentrum Haarlemmermeer"
-             onerror="this.style.display='none';var w=document.getElementById('wordmark');if(w)w.style.display='inline-block';">
-        <div id="wordmark" class="wordmark" style="display:none">
-            <div class="wm-top">Leefstijlcentrum</div>
-            <div class="wm-line"></div>
-            <div class="wm-bot">Haarlemmermeer</div>
+             onerror="this.style.display='none';var w=document.getElementById('logoFallback');if(w)w.style.display='inline-block';">
+        <div id="logoFallback" style="display:none">
+            <svg class="emblem" viewBox="0 0 120 118" role="img" aria-label="Leefstijlcentrum Haarlemmermeer">
+                <g fill="#9b9d00">
+                    <!-- open ring -->
+                    <path d="M103.2 42.3 A46 46 0 1 0 103.2 73.7" fill="none" stroke="#9b9d00" stroke-width="12"/>
+                    <!-- tick bovenaan -->
+                    <rect x="57" y="7" width="6" height="20" rx="2"/>
+                    <!-- figuur: hoofd, armbalken, romp, voet -->
+                    <circle cx="60" cy="43" r="6.5"/>
+                    <rect x="40" y="53" width="40" height="6.5" rx="3.2"/>
+                    <rect x="46" y="64" width="28" height="4.5" rx="2.2"/>
+                    <rect x="56.5" y="57" width="7" height="32" rx="2.5"/>
+                    <rect x="48" y="83" width="24" height="5.5" rx="2.5"/>
+                </g>
+            </svg>
+            <div class="wordmark">
+                <div class="wm-top">Leefstijlcentrum</div>
+                <div class="wm-line"></div>
+                <div class="wm-bot">Haarlemmermeer</div>
+            </div>
         </div>
     </div>
 
