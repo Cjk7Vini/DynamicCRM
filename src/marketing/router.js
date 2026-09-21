@@ -2093,7 +2093,8 @@ router.post('/api/mkt/portal/:token/decision', async (req, res) => {
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, res) => {
   try {
-    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    // Klant-account mag de eigen campagnes alleen-lezen inzien; andere klanten geblokkeerd.
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -2144,7 +2145,8 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, res) => {
   try {
-    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    // Klant-account mag de eigen rapportage alleen-lezen inzien; andere klanten geblokkeerd.
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -2305,7 +2307,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 // terug en toont de app alleen likes/reacties.
 router.get('/api/mkt/clients/:clientId/media/:mediaId/insights', requireMkt, async (req, res) => {
   try {
-    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    // Klant-account mag de eigen post-cijfers alleen-lezen inzien; andere klanten geblokkeerd.
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -2838,7 +2841,8 @@ router.post('/api/mkt/clients/:clientId/meta/extend-token', requireMkt, async (r
 // Welke campagne-ID's zijn aan deze klant gekoppeld.
 router.get('/api/mkt/clients/:clientId/campaign-links', requireMkt, async (req, res) => {
   try {
-    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    // Klant-account mag de eigen campagne-koppelingen alleen-lezen inzien; andere klanten geblokkeerd.
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
