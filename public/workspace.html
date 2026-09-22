@@ -877,6 +877,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
       </select>
     </div>
+    <div class="field"><label>Startdatum en tijd (optioneel)</label>
+      <input id="cpStartTime" type="datetime-local">
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Leeg = meteen (of zodra je hem live zet). Vul een toekomstige datum in om de campagne te plannen; hij verschijnt dan onder "Geplande campagnes". Zet je hem op "direct live" met een datum, dan start Meta hem vanzelf op dat moment.</div>
+    </div>
 
     <!-- Standaardinstellingen + schakelaar om af te wijken -->
     <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:6px 0 8px">
@@ -1530,10 +1534,9 @@ async function loadCampReview(){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('campReviewBody');
   var isClient=(ME&&ME.role==='client');
-  box.innerHTML=(isClient?'<div id="clientMetaIdsWrap"></div>':'')+'<div id="draftsWrap"></div><div id="liveWrap" style="margin-top:6px"><div class="empty">Laden...</div></div>';
+  box.innerHTML=(isClient?'<div id="clientMetaIdsWrap"></div>':'')+'<div id="campSections"><div class="empty">Laden...</div></div>';
   if(isClient)loadClientMetaIds();
-  loadDrafts();
-  loadLiveCampaigns();
+  loadCampSections();
 }
 function cmiVal(id){var e=document.getElementById(id);return e?e.value.trim():'';}
 async function loadClientMetaIds(){
@@ -1554,18 +1557,23 @@ async function saveClientMetaIds(){
   try{var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ids',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});var d=await r.json();
     if(r.ok&&d.success){showMsg('cmiMsg',true,'Opgeslagen.');}else{showMsg('cmiMsg',false,d.error||'Opslaan mislukt.');}}catch(e){showMsg('cmiMsg',false,'Netwerkfout.');}
 }
-async function loadLiveCampaigns(){
-  var box=document.getElementById('liveWrap'); if(!box)return;
+async function loadCampSections(){
+  var box=document.getElementById('campSections'); if(!box)return;
   try{
     var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
     var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
     var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var cd=await cr.json();
-    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Er is nog geen advertentiekoppeling ingesteld voor deze klant.</div>';return;}
+    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Er is nog geen advertentiekoppeling ingesteld voor deze klant.</div>';return;}
     var mr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var md=await mr.json();
     var tree=(md&&md.success&&md.adTree)?md.adTree:[]; var treeById={}; tree.forEach(function(t){treeById[String(t.id)]=t;});
     var camps=(cd&&cd.success&&cd.campaigns)?cd.campaigns.filter(function(x){return linked.indexOf(String(x.id))>=0;}):[];
-    if(!camps.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen live campagnes aan deze klant gekoppeld.</div>';return;}
-    box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div>'+camps.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');
+    if(!camps.length){box.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen campagnes aan deze klant gekoppeld.</div>';return;}
+    var scheduled=camps.filter(function(c){var t=treeById[String(c.id)];return t&&t.scheduled;});
+    var liveOnes=camps.filter(function(c){var t=treeById[String(c.id)];return !(t&&t.scheduled);});
+    var html='';
+    if(scheduled.length){html+='<div class="section-h"><h4>Geplande campagnes</h4><span style="font-size:12px;color:var(--muted)">starten op een toekomstige datum</span></div>'+scheduled.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');}
+    html+='<div class="section-h" style="margin-top:'+(scheduled.length?'18px':'0')+'"><h4>Live op Meta</h4></div>'+(liveOnes.length?liveOnes.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen live of actieve campagnes.</div>');
+    box.innerHTML=html;
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
 }
@@ -1649,7 +1657,8 @@ function campReviewCard(c,t){
         return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px"><strong>'+esc(s.name||'Ad set')+'</strong>'+cbadge(s.live,s.status)+'</td><td style="text-align:right;padding:6px">&euro; '+crn(s.spend)+'</td><td style="text-align:right;padding:6px">'+crn(s.impressions)+'</td><td style="text-align:right;padding:6px">'+crn(s.clicks)+'</td><td style="text-align:right;padding:6px">'+(s.ctr!=null?s.ctr:'-')+'%</td><td style="text-align:right;padding:6px">'+(s.results!=null?crn(s.results):'-')+'</td></tr>'+adr;
       }).join('')+'</table></div>';
   } else { sets='<div style="font-size:13px;color:var(--muted);margin-top:6px">Nog geen ad sets met data in deze periode.</div>'; }
-  return '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start"><div><h4 style="margin:0;font-size:16px">'+esc(c.name||'Campagne')+'</h4><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+esc(c.objective||'')+' &middot; '+esc(c.status||'')+' &middot; '+nsets+' ad sets, '+live+' live</div></div></div>'+
+  var schedTxt=(t&&t.scheduled&&t.scheduled_start)?('<div style="font-size:12.5px;color:#1e40af;font-weight:600;margin-top:2px">Gepland: start '+esc(fmtWhen(t.scheduled_start))+'</div>'):'';
+  return '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start"><div><h4 style="margin:0;font-size:16px">'+esc(c.name||'Campagne')+'</h4><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+esc(c.objective||'')+' &middot; '+esc(c.status||'')+' &middot; '+nsets+' ad sets, '+live+' live</div>'+schedTxt+'</div></div>'+
     '<div style="font-size:13px;color:var(--muted);margin-top:6px">'+tot+'</div>'+sets+
     '<div id="fb_'+esc(String(c.id))+'" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div style="font-size:13px;color:var(--muted)">Opmerkingen laden...</div></div></div>';
 }
@@ -2295,6 +2304,7 @@ async function openCampaign(){
   var cpo=document.getElementById('cpObjective'); if(cpo)cpo.value='OUTCOME_LEADS';
   var cpt=document.getElementById('cpAdvToggle'); if(cpt)cpt.checked=false; toggleCampAdvanced(false);
   CP_GEO=null; var gs=document.getElementById('cpGeoSearch'); if(gs)gs.value=''; var gr=document.getElementById('cpGeoResults'); if(gr)gr.style.display='none'; var grad=document.getElementById('cpGeoRadius'); if(grad)grad.value='25'; renderGeoChosen();
+  var cst=document.getElementById('cpStartTime'); if(cst)cst.value='';
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
   var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
@@ -2433,6 +2443,7 @@ async function createCampaign2(){
   }
   payload.geoKey = CP_GEO ? CP_GEO.key : '';
   payload.geoRadius = document.getElementById('cpGeoRadius') ? document.getElementById('cpGeoRadius').value : '25';
+  payload.startTime = document.getElementById('cpStartTime') ? document.getElementById('cpStartTime').value : '';
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
   function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
   if(!payload.name){campShowErr('Campagnenaam is verplicht.');return;}
