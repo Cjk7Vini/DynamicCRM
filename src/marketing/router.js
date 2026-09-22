@@ -1340,6 +1340,20 @@ function isRateLimit613(j) {
   return !!e && (Number(e.code) === 613 || Number(e.error_subcode) === 4841018);
 }
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+// Telt leads uit een Meta actions-array zonder dubbel te tellen: Meta rapporteert
+// een lead vaak onder meerdere action_types tegelijk. We nemen daarom EEN canoniek
+// type met prioriteit, niet de som van alles met 'lead' erin.
+function pickLeadCount(actions) {
+  if (!Array.isArray(actions)) return null;
+  const byType = {}; let any = false;
+  for (const a of actions) {
+    if (a && typeof a.action_type === 'string' && /lead/i.test(a.action_type)) { byType[a.action_type] = Number(a.value) || 0; any = true; }
+  }
+  if (!any) return null;
+  const pri = ['offsite_conversion.fb_pixel_lead', 'lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.lead', 'leadgen.other'];
+  for (const t of pri) { if (byType[t] != null) return byType[t]; }
+  return Math.max.apply(null, Object.values(byType));
+}
 async function graphPost(pathAndId, params) {
   const body = new URLSearchParams(params);
   const r = await fetch(`${GRAPH}/${pathAndId}`, { method: 'POST', body });
@@ -2377,7 +2391,6 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           if (rows.length) {
             let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
             let linkClicks = 0; let uLinkClicks = 0; let landingViews = 0; let leads = 0;
-            const leadRe = /lead/i;
             for (const r of rows) {
               spend += parseFloat(r.spend || 0) || 0;
               impressions += parseInt(r.impressions || 0, 10) || 0;
@@ -2387,11 +2400,10 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
               uLinkClicks += parseInt(r.unique_inline_link_clicks || 0, 10) || 0;
               if (Array.isArray(r.actions)) {
                 for (const a of r.actions) {
-                  const t = a && a.action_type; if (!t) continue;
-                  if (t === 'landing_page_view') landingViews += Number(a.value) || 0;
-                  else if (leadRe.test(t)) leads += Number(a.value) || 0;
+                  if (a && a.action_type === 'landing_page_view') landingViews += Number(a.value) || 0;
                 }
               }
+              leads += pickLeadCount(r.actions) || 0;
             }
             out.ads = {
               spend: spend.toFixed(2), impressions, reach, clicks,
@@ -2414,14 +2426,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         // en kosten per lead. Insights-reads vallen niet onder de strenge
         // advertentielimiet; per niveau afgeschermd zodat een fout het rapport heel laat.
         try {
-          const leadFromActions = (actions) => {
-            if (!Array.isArray(actions)) return null;
-            let n = 0; let found = false;
-            for (const a of actions) {
-              if (a && typeof a.action_type === 'string' && /lead/i.test(a.action_type)) { n += Number(a.value) || 0; found = true; }
-            }
-            return found ? n : null;
-          };
+          const leadFromActions = pickLeadCount;
           const metricsOf = (r) => {
             const spend = parseFloat(r.spend || 0) || 0;
             const impressions = parseInt(r.impressions || 0, 10) || 0;
