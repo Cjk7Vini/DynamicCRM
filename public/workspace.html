@@ -856,6 +856,20 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     </div>
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
 
+    <!-- Targeting en status: per campagne verschillend, dus altijd zichtbaar -->
+    <div class="field"><label>Interesses (targeting)</label>
+      <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
+      <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Leeg laten = breed richten (Advantage+, aanbevolen door Meta). Voeg interesses toe als je gerichter wilt targeten.</div>
+    </div>
+    <div class="field"><label>Status na aanmaken</label>
+      <select id="cpLaunch">
+        <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
+        <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
+      </select>
+    </div>
+
     <!-- Standaardinstellingen + schakelaar om af te wijken -->
     <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:6px 0 8px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -865,7 +879,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </label>
       </div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.7">
-        Doel: <strong>Leads</strong> &middot; Land: <strong>NL</strong> &middot; Leeftijd: <strong>18-65</strong> &middot; Geslacht: <strong>iedereen</strong> &middot; Plaatsingen: <strong>automatisch (Advantage+)</strong> &middot; Biedstrategie: <strong>laagste kosten</strong> &middot; Doelgroep: <strong>breed, geen interesses (Advantage+)</strong> &middot; Call-to-action: <strong>Meer informatie</strong> &middot; Status: <strong>gepauzeerd</strong>
+        Doel: <strong>Leads</strong> &middot; Land: <strong>NL</strong> &middot; Leeftijd: <strong>18-65</strong> &middot; Geslacht: <strong>iedereen</strong> &middot; Plaatsingen: <strong>automatisch (Advantage+)</strong> &middot; Biedstrategie: <strong>laagste kosten</strong> &middot; Call-to-action: <strong>Meer informatie</strong>
       </div>
     </div>
 
@@ -914,17 +928,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
       </div>
       <div class="field" id="cpBidCapWrap" style="display:none"><label>Biedlimiet (euro)</label><input id="cpBidCap" type="number" min="0.5" step="0.5" value="2"></div>
-      <div class="field"><label>Interesses (targeting)</label>
-        <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
-        <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
-        <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
-      </div>
-      <div class="field"><label>Status na aanmaken</label>
-        <select id="cpLaunch">
-          <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
-          <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
-        </select>
-      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCampaign()">Annuleren</button>
@@ -2371,8 +2374,8 @@ async function createCampaign2(){
       placement:'automatic',
       bidStrategy:'LOWEST_COST_WITHOUT_CAP',
       bidCap:'',
-      interests:[],
-      launch:'paused'
+      interests:CP_INTERESTS,
+      launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
     };
   }
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
