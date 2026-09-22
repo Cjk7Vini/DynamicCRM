@@ -2368,7 +2368,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         try {
           const ins = await graphGet(`${creds.adAccount}/insights`, {
             level: 'campaign',
-            fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
+            fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_clicks,unique_inline_link_clicks,actions',
             date_preset: 'last_30d',
             filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]),
             access_token: token,
@@ -2376,17 +2376,34 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           const rows = ins.data || [];
           if (rows.length) {
             let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
+            let linkClicks = 0; let uLinkClicks = 0; let landingViews = 0; let leads = 0;
+            const leadRe = /lead/i;
             for (const r of rows) {
               spend += parseFloat(r.spend || 0) || 0;
               impressions += parseInt(r.impressions || 0, 10) || 0;
               reach += parseInt(r.reach || 0, 10) || 0;
               clicks += parseInt(r.clicks || 0, 10) || 0;
+              linkClicks += parseInt(r.inline_link_clicks || 0, 10) || 0;
+              uLinkClicks += parseInt(r.unique_inline_link_clicks || 0, 10) || 0;
+              if (Array.isArray(r.actions)) {
+                for (const a of r.actions) {
+                  const t = a && a.action_type; if (!t) continue;
+                  if (t === 'landing_page_view') landingViews += Number(a.value) || 0;
+                  else if (leadRe.test(t)) leads += Number(a.value) || 0;
+                }
+              }
             }
             out.ads = {
               spend: spend.toFixed(2), impressions, reach, clicks,
+              link_clicks: linkClicks, landing_page_views: landingViews, leads,
               ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
-              cpc: clicks ? (spend / clicks).toFixed(2) : '0.00',
+              unique_ctr: (reach && uLinkClicks) ? (uLinkClicks / reach * 100).toFixed(2) : null,
+              cpc: linkClicks ? (spend / linkClicks).toFixed(2) : (clicks ? (spend / clicks).toFixed(2) : null),
               cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
+              frequency: reach ? (impressions / reach).toFixed(2) : null,
+              click_to_lp: linkClicks ? (landingViews / linkClicks * 100).toFixed(0) : null,
+              lp_to_lead: landingViews ? (leads / landingViews * 100).toFixed(2) : null,
+              cost_per_lead: leads > 0 ? (spend / leads).toFixed(2) : null,
             };
           } else {
             out.ads = { empty: true };
