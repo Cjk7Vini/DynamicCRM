@@ -1434,7 +1434,7 @@ function dTabShow(which){
   if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
-  if(which==='assets'){document.getElementById('uploadBtn').style.display=(ME&&ME.role!=='client')?'':'none';loadAssets();}
+  if(which==='assets'){var ub=document.getElementById('uploadBtn');if(ub)ub.style.display='';loadAssets();}
 }
 
 // ---- Assets ----
@@ -1529,9 +1529,30 @@ function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:
 async function loadCampReview(){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('campReviewBody');
-  box.innerHTML='<div id="draftsWrap"></div><div id="liveWrap" style="margin-top:6px"><div class="empty">Laden...</div></div>';
+  var isClient=(ME&&ME.role==='client');
+  box.innerHTML=(isClient?'<div id="clientMetaIdsWrap"></div>':'')+'<div id="draftsWrap"></div><div id="liveWrap" style="margin-top:6px"><div class="empty">Laden...</div></div>';
+  if(isClient)loadClientMetaIds();
   loadDrafts();
   loadLiveCampaigns();
+}
+function cmiVal(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+async function loadClientMetaIds(){
+  var wrap=document.getElementById('clientMetaIdsWrap'); if(!wrap)return;
+  var ids={};
+  try{var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ids',{credentials:'include'});var d=await r.json();if(d&&d.success)ids=d.ids||{};}catch(e){}
+  wrap.innerHTML='<div class="section-h"><h4>Mijn Meta-koppeling</h4></div><div class="card" style="margin-bottom:14px">'+
+    '<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Vul hier je eigen Meta-ID\'s in. Je hoeft geen wachtwoord of token in te vullen; het team maakt de veilige koppeling.</div>'+
+    '<div id="cmiMsg" class="inline-msg"></div>'+
+    '<div class="field"><label>Ad Account ID</label><input id="cmi_ad" placeholder="act_..." value="'+esc(ids.meta_ad_account_id||'')+'"></div>'+
+    '<div class="field"><label>Facebook Page ID</label><input id="cmi_page" value="'+esc(ids.meta_page_id||'')+'"></div>'+
+    '<div class="field"><label>Instagram ID</label><input id="cmi_ig" value="'+esc(ids.meta_ig_user_id||'')+'"></div>'+
+    '<div class="field"><label>Pixel ID</label><input id="cmi_pixel" value="'+esc(ids.meta_pixel_id||'')+'"></div>'+
+    '<button class="btn btn-primary" onclick="saveClientMetaIds()">Opslaan</button></div>';
+}
+async function saveClientMetaIds(){
+  var payload={meta_ad_account_id:cmiVal('cmi_ad'),meta_page_id:cmiVal('cmi_page'),meta_ig_user_id:cmiVal('cmi_ig'),meta_pixel_id:cmiVal('cmi_pixel')};
+  try{var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ids',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});var d=await r.json();
+    if(r.ok&&d.success){showMsg('cmiMsg',true,'Opgeslagen.');}else{showMsg('cmiMsg',false,d.error||'Opslaan mislukt.');}}catch(e){showMsg('cmiMsg',false,'Netwerkfout.');}
 }
 async function loadLiveCampaigns(){
   var box=document.getElementById('liveWrap'); if(!box)return;
