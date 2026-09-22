@@ -175,11 +175,29 @@ async function build(){
 
   }
 
-  // Advertenties (samenvatting voor DEZE klant, ook zonder Instagram-koppeling)
+  // Campagne data algemeen: volledig performance-overzicht met normen (30 dagen)
   if(meta&&meta.ads&&!meta.ads.empty){
-    var adTiles=kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',fmtn(meta.ads.impressions))+kpi('Bereik',fmtn(meta.ads.reach))+kpi('Klikken',fmtn(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc));
-    if(meta.ads.results!=null){adTiles+=kpi('Leads',fmtn(meta.ads.results))+kpi('Kosten per lead',meta.ads.cost_per_result!=null?('€ '+num(meta.ads.cost_per_result)):'-');}
-    html+='<h2>Advertenties</h2><div class="sect1">laatste 30 dagen, alleen campagnes van deze klant</div><div class="grid">'+adTiles+'</div>';
+    var a=meta.ads;
+    var badgeH=function(kind){var m={ok:['binnen norm','#166534','#dcfce7'],warn:['aandachtspunt','#92400e','#fef3c7'],edge:['net op de grens','#92400e','#fef9c3']};var x=m[kind];return x?'<span style="font-size:11px;font-weight:700;color:'+x[1]+';background:'+x[2]+';padding:2px 9px;border-radius:20px;white-space:nowrap;margin-left:10px">'+x[0]+'</span>':'';};
+    var pRow=function(label,sub,value,kind){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid var(--line)"><div style="min-width:0"><span style="font-size:14.5px">'+esc(label)+'</span>'+(sub?' <span style="font-size:12px;color:var(--muted)">'+esc(sub)+'</span>':'')+'</div><div style="display:flex;align-items:center;white-space:nowrap"><span style="font-weight:700;font-size:15px">'+value+'</span>'+badgeH(kind)+'</div></div>';};
+    var rows='';
+    rows+=pRow('Budget besteed','','€ '+num(a.spend),null);
+    rows+=pRow('Weergaven / bereik','',fmtn(a.impressions)+' / '+fmtn(a.reach),null);
+    if(a.cpm!=null)rows+=pRow('CPM','(onder €15)','€ '+num(a.cpm),(Number(a.cpm)<15?'ok':'warn'));
+    if(a.frequency!=null)rows+=pRow('Frequentie','(onder 2,5)',num(a.frequency),(Number(a.frequency)<2.5?'ok':'warn'));
+    if(a.unique_ctr!=null)rows+=pRow('Unieke CTR','(minimaal 2-3%)',num(a.unique_ctr)+'%',(Number(a.unique_ctr)>=3?'ok':(Number(a.unique_ctr)>=2?'edge':'warn')));
+    if(a.cpc!=null)rows+=pRow('CPC','(onder €0,50)','€ '+num(a.cpc),(Number(a.cpc)<0.5?'ok':'warn'));
+    if(a.click_to_lp!=null)rows+=pRow('Klik → landingspagina','(minimaal 60%)',num(a.click_to_lp)+'%',(Number(a.click_to_lp)>=60?'ok':'warn'));
+    if(a.lp_to_lead!=null)rows+=pRow('Landingspagina → lead','(minimaal 5%)',num(a.lp_to_lead)+'%',(Number(a.lp_to_lead)>=5?'ok':'warn'));
+    rows+=pRow('Leads','',fmtn(a.leads!=null?a.leads:0),null);
+    if(a.cost_per_lead!=null)rows+=pRow('Cost per lead','(onder €20)','€ '+num(a.cost_per_lead),(Number(a.cost_per_lead)<20?'ok':'warn'));
+    html+='<h2>Campagne data algemeen</h2><div class="sect1">laatste 30 dagen, alleen campagnes van deze klant</div><div>'+rows+'</div>';
+    var allAdsets=[];
+    (meta.adTree||[]).forEach(function(c){(c.adsets||[]).forEach(function(s){allAdsets.push(s);});});
+    if(allAdsets.length){
+      html+='<h2>Resultaten per adset</h2><div class="tbl-wrap"><table class="rank"><tr><th class="l">Doelgroep</th><th>CTR</th><th>Leads</th><th>Kosten per lead</th></tr>'+
+        allAdsets.map(function(s){return '<tr><td class="l">'+esc(s.name||'Ad set')+'</td><td>'+(s.ctr!=null?(s.ctr+'%'):'-')+'</td><td>'+(s.results!=null?fmtn(s.results):'-')+'</td><td>'+(s.cost_per_result!=null?('€ '+num(s.cost_per_result)):'-')+'</td></tr>';}).join('')+'</table></div>';
+    }
   }
 
   // Campagnes op Meta met ad sets en advertenties (alleen gekoppeld aan deze klant)
