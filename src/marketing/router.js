@@ -2858,6 +2858,64 @@ router.delete('/api/mkt/clients/:clientId/meta-campaigns/:campaignId', requireMk
 });
 
 // =======================================================================
+// Opmerkingen/feedback van de klant op een campagne (inzage + reageren).
+// Deploy-veilig: de tabel wordt bij eerste gebruik aangemaakt.
+// =======================================================================
+async function ensureCampaignFeedbackTable(c) {
+  await c.query(`CREATE TABLE IF NOT EXISTS marketing.campaign_feedback (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER NOT NULL,
+    client_id INTEGER NOT NULL,
+    meta_campaign_id TEXT NOT NULL,
+    author_account_id INTEGER,
+    author_role TEXT,
+    author_name TEXT,
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+  )`);
+}
+router.get('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const rows = await withReadConnection(async (c) => {
+      await ensureCampaignFeedbackTable(c);
+      return (await c.query(
+        `SELECT id, author_role, author_name, body, created_at
+           FROM marketing.campaign_feedback
+          WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id=$3
+          ORDER BY created_at ASC`,
+        [wsId, okClient, String(req.params.campaignId)]
+      )).rows;
+    });
+    res.json({ success: true, feedback: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const body = String((req.body && req.body.body) || '').trim();
+    if (!body) return res.status(400).json({ error: 'Bericht is leeg' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Bericht te lang (max 4000 tekens)' });
+    const m = req.session.mkt;
+    const row = await withWriteConnection(async (c) => {
+      await ensureCampaignFeedbackTable(c);
+      return (await c.query(
+        `INSERT INTO marketing.campaign_feedback (workspace_id, client_id, meta_campaign_id, author_account_id, author_role, author_name, body)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_role, author_name, body, created_at`,
+        [wsId, okClient, String(req.params.campaignId), m.accountId || null, m.role || null, m.email || null, body]
+      )).rows[0];
+    });
+    res.json({ success: true, feedback: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 13 - LANGLEVEND META-TOKEN (kort token omruilen naar ~60 dagen)
 // Nodig voor geplande posts: het opgeslagen token moet nog geldig zijn op
 // het moment van publiceren. Vereist Meta App ID + App Secret in Koppelingen.
