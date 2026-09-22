@@ -509,9 +509,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
-        <div id="clientReportBar" style="display:none;margin:4px 0 18px">
-          <button class="btn btn-primary" onclick="openReportPdf()">Bekijk mijn rapportage</button>
+        <div id="clientReportBar" style="display:none;margin:4px 0 14px">
+          <button class="btn btn-primary" onclick="openReportPdf()">Rapportage op volledig scherm</button>
         </div>
+        <iframe id="clientReportEmbed" title="Rapportage" style="display:none;width:100%;border:1px solid var(--line);border-radius:14px;background:#fff;height:1200px;margin-bottom:18px"></iframe>
         <div id="dInfo">
           <div id="dEditMsg" class="inline-msg"></div>
           <div class="card" style="max-width:580px">
@@ -1110,6 +1111,8 @@ async function enterClientMode(){
 function applyClientMode(){
   ['tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   var rb=document.getElementById('clientReportBar'); if(rb)rb.style.display='block';
+  var emb=document.getElementById('clientReportEmbed');
+  if(emb&&CURRENT_CLIENT){ emb.src='/report.html?client='+CURRENT_CLIENT.id; emb.style.display='block'; }
   var back=document.querySelector('#viewClientDetail .back'); if(back)back.style.display='none';
   var login=document.getElementById('clientLoginCard'); if(login)login.style.display='none';
 }
