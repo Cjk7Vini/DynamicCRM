@@ -1553,7 +1553,14 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     }
     const placement = (b.placement === 'manual') ? 'manual' : 'automatic';
 
-    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    // Locatie: straal rondom een gekozen plaats, of anders het hele land.
+    const geoKey = String(b.geoKey || '').trim();
+    let geoRadius = parseInt(b.geoRadius, 10);
+    if (!Number.isFinite(geoRadius) || geoRadius < 1) geoRadius = 25;
+    if (geoRadius > 80) geoRadius = 80;
+    const targetingObj = { age_min: ageMin, age_max: ageMax };
+    if (geoKey) targetingObj.geo_locations = { cities: [{ key: geoKey, radius: geoRadius, distance_unit: 'kilometer' }] };
+    else targetingObj.geo_locations = { countries: [country] };
     if (genders === 'men') targetingObj.genders = [1];
     else if (genders === 'women') targetingObj.genders = [2];
     if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
@@ -1766,6 +1773,23 @@ router.get('/api/mkt/clients/:clientId/meta/interests', requireMkt, async (req, 
     const r = await graphGet('search', { type: 'adinterest', q, limit: '20', access_token: creds.token });
     const interests = (r.data || []).map((i) => ({ id: i.id, name: i.name, audience_size: i.audience_size_lower_bound || i.audience_size || null }));
     res.json({ success: true, interests });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Locatie zoeken (steden) voor targeting met een straal.
+router.get('/api/mkt/clients/:clientId/meta/geo', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.json({ success: true, locations: [] });
+    const creds = await resolveClientMeta(wsId, okClient);
+    if (!creds.token) return res.json({ success: true, locations: [], configured: false });
+    const r = await graphGet('search', { type: 'adgeolocation', location_types: JSON.stringify(['city']), q, limit: '10', access_token: creds.token });
+    const locations = (r.data || []).map((l) => ({ key: l.key, name: l.name, region: l.region || null, country: l.country_name || l.country_code || null }));
+    res.json({ success: true, locations });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 

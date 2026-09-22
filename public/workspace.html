@@ -857,6 +857,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
 
     <!-- Targeting en status: per campagne verschillend, dus altijd zichtbaar -->
+    <div class="field"><label>Locatie</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="cpGeoSearch" placeholder="Heel Nederland (typ een plaats voor een straal)" oninput="searchGeo()" style="flex:1;min-width:220px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input id="cpGeoRadius" type="number" min="1" max="80" value="25" oninput="renderGeoChosen()" style="width:70px"> km straal</div>
+      </div>
+      <div id="cpGeoResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="cpGeoChosen" style="margin-top:6px;font-size:12.5px;color:var(--muted)">Geen plaats gekozen: hele land (NL).</div>
+    </div>
     <div class="field"><label>Interesses (targeting)</label>
       <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
       <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
@@ -2265,6 +2273,7 @@ async function openCampaign(){
   var cpl=document.getElementById('cpLaunch'); if(cpl)cpl.value='paused';
   var cpo=document.getElementById('cpObjective'); if(cpo)cpo.value='OUTCOME_LEADS';
   var cpt=document.getElementById('cpAdvToggle'); if(cpt)cpt.checked=false; toggleCampAdvanced(false);
+  CP_GEO=null; var gs=document.getElementById('cpGeoSearch'); if(gs)gs.value=''; var gr=document.getElementById('cpGeoResults'); if(gr)gr.style.display='none'; var grad=document.getElementById('cpGeoRadius'); if(grad)grad.value='25'; renderGeoChosen();
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
   var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
@@ -2303,6 +2312,29 @@ function renderInterestChips(){
   document.getElementById('cpInterestChips').innerHTML=CP_INTERESTS.map(function(i){
     return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="removeInterest(\''+esc(i.id)+'\')">×</span></span>';
   }).join('');
+}
+var CP_GEO=null, CP_GEO_TIMER=null;
+function searchGeo(){
+  clearTimeout(CP_GEO_TIMER);
+  var q=document.getElementById('cpGeoSearch').value.trim();
+  var box=document.getElementById('cpGeoResults');
+  if(q.length<2){box.style.display='none';return;}
+  CP_GEO_TIMER=setTimeout(async function(){
+    try{
+      var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/geo?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
+      if(!r.ok||d.error){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">'+esc(d.error||('Fout '+r.status))+'</div>';box.style.display='block';return;}
+      if(!d.locations||!d.locations.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen plaats gevonden.</div>';box.style.display='block';return;}
+      box.innerHTML=d.locations.map(function(l){var lbl=esc(l.name)+(l.region?(', '+esc(l.region)):'')+(l.country?(' ('+esc(l.country)+')'):'');return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'chooseGeo("'+esc(l.key)+'","'+esc(String(l.name).replace(/"/g,""))+'")\'>'+lbl+'</div>';}).join('');
+      box.style.display='block';
+    }catch(e){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">Netwerkfout bij zoeken.</div>';box.style.display='block';}
+  },350);
+}
+function chooseGeo(key,name){CP_GEO={key:key,name:name};document.getElementById('cpGeoResults').style.display='none';document.getElementById('cpGeoSearch').value='';renderGeoChosen();}
+function clearGeo(){CP_GEO=null;renderGeoChosen();}
+function renderGeoChosen(){
+  var el=document.getElementById('cpGeoChosen'); if(!el)return;
+  if(CP_GEO){var km=document.getElementById('cpGeoRadius');var r=km?km.value:'25';el.innerHTML='Straal rondom <strong>'+esc(CP_GEO.name)+'</strong> ('+esc(r)+' km) <span style="cursor:pointer;color:#dc2626;font-weight:700" onclick="clearGeo()">wissen</span>';}
+  else{el.textContent='Geen plaats gekozen: hele land (NL).';}
 }
 function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
 function toggleCampAdvanced(on){var a=document.getElementById('cpAdvanced');if(a)a.style.display=on?'':'none';}
@@ -2378,6 +2410,8 @@ async function createCampaign2(){
       launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
     };
   }
+  payload.geoKey = CP_GEO ? CP_GEO.key : '';
+  payload.geoRadius = document.getElementById('cpGeoRadius') ? document.getElementById('cpGeoRadius').value : '25';
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
   function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
   if(!payload.name){campShowErr('Campagnenaam is verplicht.');return;}
