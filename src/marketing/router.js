@@ -2861,6 +2861,8 @@ router.delete('/api/mkt/clients/:clientId/meta-campaigns/:campaignId', requireMk
 // Opmerkingen/feedback van de klant op een campagne (inzage + reageren).
 // Deploy-veilig: de tabel wordt bij eerste gebruik aangemaakt.
 // =======================================================================
+// Tabel bij eerste gebruik aanmaken. ALLEEN via de schrijf-verbinding aanroepen
+// (DDL kan niet op een alleen-lezen verbinding).
 async function ensureCampaignFeedbackTable(c) {
   await c.query(`CREATE TABLE IF NOT EXISTS marketing.campaign_feedback (
     id SERIAL PRIMARY KEY,
@@ -2871,8 +2873,15 @@ async function ensureCampaignFeedbackTable(c) {
     author_role TEXT,
     author_name TEXT,
     body TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ
   )`);
+}
+// Mag deze gebruiker deze opmerking bewerken/verwijderen? Eigen bericht, of team.
+function mktMayEditFeedback(m, row) {
+  if (!m || !row) return false;
+  if (m.platformAdmin || m.role === 'owner' || m.role === 'manager') return true;
+  return row.author_account_id != null && String(row.author_account_id) === String(m.accountId);
 }
 router.get('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', requireMkt, async (req, res) => {
   try {
@@ -2880,17 +2889,17 @@ router.get('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', requireM
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
-    const rows = await withReadConnection(async (c) => {
+    const rows = await withWriteConnection(async (c) => {
       await ensureCampaignFeedbackTable(c);
       return (await c.query(
-        `SELECT id, author_role, author_name, body, created_at
+        `SELECT id, author_account_id, author_role, author_name, body, created_at, updated_at
            FROM marketing.campaign_feedback
           WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id=$3
           ORDER BY created_at ASC`,
         [wsId, okClient, String(req.params.campaignId)]
       )).rows;
     });
-    res.json({ success: true, feedback: rows });
+    res.json({ success: true, feedback: rows, me: req.session.mkt.accountId || null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 router.post('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', requireMkt, async (req, res) => {
@@ -2907,11 +2916,54 @@ router.post('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback', require
       await ensureCampaignFeedbackTable(c);
       return (await c.query(
         `INSERT INTO marketing.campaign_feedback (workspace_id, client_id, meta_campaign_id, author_account_id, author_role, author_name, body)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_role, author_name, body, created_at`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_account_id, author_role, author_name, body, created_at, updated_at`,
         [wsId, okClient, String(req.params.campaignId), m.accountId || null, m.role || null, m.email || null, body]
       )).rows[0];
     });
     res.json({ success: true, feedback: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Opmerking bewerken (eigen bericht, of team).
+router.patch('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback/:feedbackId', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const body = String((req.body && req.body.body) || '').trim();
+    if (!body) return res.status(400).json({ error: 'Bericht is leeg' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Bericht te lang (max 4000 tekens)' });
+    const m = req.session.mkt;
+    const out = await withWriteConnection(async (c) => {
+      await ensureCampaignFeedbackTable(c);
+      const row = (await c.query('SELECT id, author_account_id FROM marketing.campaign_feedback WHERE id=$1 AND workspace_id=$2 AND client_id=$3', [req.params.feedbackId, wsId, okClient])).rows[0];
+      if (!row) return { code: 404, error: 'Opmerking niet gevonden' };
+      if (!mktMayEditFeedback(m, row)) return { code: 403, error: 'Geen rechten om deze opmerking te bewerken' };
+      const upd = (await c.query('UPDATE marketing.campaign_feedback SET body=$1, updated_at=now() WHERE id=$2 RETURNING id, author_account_id, author_role, author_name, body, created_at, updated_at', [body, req.params.feedbackId])).rows[0];
+      return { feedback: upd };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true, feedback: out.feedback });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Opmerking verwijderen (eigen bericht, of team).
+router.delete('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback/:feedbackId', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const m = req.session.mkt;
+    const out = await withWriteConnection(async (c) => {
+      await ensureCampaignFeedbackTable(c);
+      const row = (await c.query('SELECT id, author_account_id FROM marketing.campaign_feedback WHERE id=$1 AND workspace_id=$2 AND client_id=$3', [req.params.feedbackId, wsId, okClient])).rows[0];
+      if (!row) return { code: 404, error: 'Opmerking niet gevonden' };
+      if (!mktMayEditFeedback(m, row)) return { code: 403, error: 'Geen rechten om deze opmerking te verwijderen' };
+      await c.query('DELETE FROM marketing.campaign_feedback WHERE id=$1', [req.params.feedbackId]);
+      return { ok: true };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
