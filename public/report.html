@@ -67,7 +67,12 @@ table.rank td.l{text-align:left}
 <body>
 <div class="bar">
   <div class="t">Rapportage</div>
-  <button class="btn btn-print" onclick="window.print()">Download als PDF</button>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <label style="font-size:12px;color:var(--mid)">Van <input id="dtSince" type="date" style="font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></label>
+    <label style="font-size:12px;color:var(--mid)">Tot <input id="dtUntil" type="date" style="font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></label>
+    <button class="btn" style="background:var(--soft);color:var(--ink)" onclick="applyDates()">Toepassen</button>
+    <button class="btn btn-print" onclick="window.print()">Download als PDF</button>
+  </div>
 </div>
 <div class="page" id="page"><div class="empty" style="padding:40px">Rapport laden...</div></div>
 <script>
@@ -81,6 +86,10 @@ function statusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE'
 function statusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':statusLabel(st))+'</span>';}
 function param(k){var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):'';}
 var CID=param('client');
+var SINCE=param('since'), UNTIL=param('until');
+(function(){var t=new Date();var u=t.toISOString().slice(0,10);var s=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(SINCE))SINCE=s;if(!/^\d{4}-\d{2}-\d{2}$/.test(UNTIL))UNTIL=u;})();
+function dateQS(){return '?since='+encodeURIComponent(SINCE)+'&until='+encodeURIComponent(UNTIL);}
+function applyDates(){var s=document.getElementById('dtSince').value,u=document.getElementById('dtUntil').value;if(!s||!u)return;location.href='report.html?client='+encodeURIComponent(CID)+'&since='+encodeURIComponent(s)+'&until='+encodeURIComponent(u);}
 var TYPE_LABELS={IMAGE:'Bericht',CAROUSEL_ALBUM:'Carrousel',VIDEO:'Video',REELS:'Reel',ONBEKEND:'Overig'};
 
 function kpi(k,v){return '<div class="kpi"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>';}
@@ -98,8 +107,9 @@ async function build(){
   var c=cd.client, col=c.brand_color||'#6366f1';
   document.documentElement.style.setProperty('--brand',col);
 
-  var meta=await jget('/api/mkt/clients/'+CID+'/meta-insights');
-  var camps=await jget('/api/mkt/clients/'+CID+'/meta-campaigns');
+  var ds=document.getElementById('dtSince'); if(ds)ds.value=SINCE; var du=document.getElementById('dtUntil'); if(du)du.value=UNTIL;
+  var meta=await jget('/api/mkt/clients/'+CID+'/meta-insights'+dateQS());
+  var camps=await jget('/api/mkt/clients/'+CID+'/meta-campaigns'+dateQS());
   // Alleen de campagnes die aan DEZE klant zijn gekoppeld (geen datalek).
   var links=await jget('/api/mkt/clients/'+CID+'/campaign-links');
   var linkedIds=(links&&links.success&&links.links)?links.links.map(String):[];
@@ -107,7 +117,7 @@ async function build(){
   var html='';
   html+='<div class="head"><div style="display:flex;gap:16px;align-items:center">'+
     '<div class="badge" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
-    '<div><h1>'+esc(c.name)+'</h1><div class="sub">Marketingrapportage · laatste 28 dagen</div></div></div>'+
+    '<div><h1>'+esc(c.name)+'</h1><div class="sub">Marketingrapportage · advertenties '+esc(fmtDay(SINCE))+' t/m '+esc(fmtDay(UNTIL))+'</div></div></div>'+
     '<div class="right">Gegenereerd op<br>'+esc(new Date().toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}))+'</div></div>';
 
   var hasMeta=meta&&meta.success&&meta.configured;
@@ -146,6 +156,34 @@ async function build(){
         return '<div class="ctbar"><div class="lab"><span>'+esc(TYPE_LABELS[x.type]||x.type)+'</span><span style="color:var(--muted)">'+x.count+' posts · '+fmtn(x.interactions)+' interacties</span></div>'+
           '<div class="track"><div class="fill" style="width:'+w+'%"></div></div></div>';
       }).join('');
+    }
+
+    // Demografie van de volgers (land, stad, leeftijd/gender)
+    if(meta.demographics){
+      var dm=meta.demographics;
+      var listBlock=function(title,arr){
+        if(!arr||!arr.length)return '';
+        var tot=arr.reduce(function(s,x){return s+(x.value||0);},0)||1;
+        return '<div><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+esc(title)+'</div>'+arr.slice(0,8).map(function(x){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+(x.value/tot*100).toFixed(1)+'%</span></div>';}).join('')+'</div>';
+      };
+      var cols='';
+      if(dm.country)cols+=listBlock('Landen',dm.country);
+      if(dm.city)cols+=listBlock('Steden',dm.city);
+      var gaHtml='';
+      if(dm.gender_age&&dm.gender_age.length){
+        var genders={}, ages={};
+        dm.gender_age.forEach(function(x){var parts=String(x.label).split('.');var g=parts[0],a=parts[1]||'?';genders[g]=(genders[g]||0)+(x.value||0);ages[a]=(ages[a]||0)+(x.value||0);});
+        var gTot=Object.keys(genders).reduce(function(s,k){return s+genders[k];},0)||1;
+        var gLabel={F:'Vrouw',M:'Man',U:'Onbekend'};
+        var gRows=Object.keys(genders).map(function(k){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(gLabel[k]||k)+'</span><span style="color:var(--muted)">'+(genders[k]/gTot*100).toFixed(1)+'%</span></div>';}).join('');
+        var aRows=Object.keys(ages).sort().map(function(k){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(k)+'</span><span style="color:var(--muted)">'+(ages[k]/gTot*100).toFixed(1)+'%</span></div>';}).join('');
+        gaHtml='<div><div style="font-weight:700;font-size:13px;margin-bottom:6px">Geslacht</div>'+gRows+'</div><div><div style="font-weight:700;font-size:13px;margin-bottom:6px">Leeftijd</div>'+aRows+'</div>';
+      }
+      if(cols||gaHtml){
+        html+='<h2>Demografie van je volgers</h2>';
+        if(cols)html+='<div class="grid g2">'+cols+'</div>';
+        if(gaHtml)html+='<div class="grid g2" style="margin-top:12px">'+gaHtml+'</div>';
+      }
     }
 
     // Ranking of posts (met per-post cijfers)
