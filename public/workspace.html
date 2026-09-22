@@ -1528,6 +1528,11 @@ async function delAsset(id){
 function openReportPdf(){ if(CURRENT_CLIENT) window.open('/report.html?client='+CURRENT_CLIENT.id,'_blank'); }
 
 // ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
+var WS_SINCE=null, WS_UNTIL=null;
+(function(){var t=new Date();WS_UNTIL=t.toISOString().slice(0,10);WS_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
+function wsDateQS(){return '?since='+encodeURIComponent(WS_SINCE)+'&until='+encodeURIComponent(WS_UNTIL);}
+function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
+function wsDateBar(){return '<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:13px;color:var(--muted)">Periode (advertenties):</span><label style="font-size:12px">Van <input id="wsDtSince" type="date" value="'+esc(WS_SINCE)+'" style="width:auto"></label><label style="font-size:12px">Tot <input id="wsDtUntil" type="date" value="'+esc(WS_UNTIL)+'" style="width:auto"></label><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="wsApplyDates()">Toepassen</button></div>';}
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
 function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';var lab=live?'LIVE':(st&&/PAUSED/.test(String(st))?'Gepauzeerd':(st||'?'));return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(lab)+'</span>';}
 function campPerfBlock(a){
@@ -1578,15 +1583,15 @@ async function loadCampSections(){
   try{
     var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
     var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
-    var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var cd=await cr.json();
-    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Er is nog geen advertentiekoppeling ingesteld voor deze klant.</div>';return;}
-    var mr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var md=await mr.json();
+    var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns'+wsDateQS(),{credentials:'include'}); var cd=await cr.json();
+    if(cd&&cd.success&&!cd.configured){box.innerHTML=wsDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Er is nog geen advertentiekoppeling ingesteld voor deze klant.</div>';return;}
+    var mr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights'+wsDateQS(),{credentials:'include'}); var md=await mr.json();
     var tree=(md&&md.success&&md.adTree)?md.adTree:[]; var treeById={}; tree.forEach(function(t){treeById[String(t.id)]=t;});
     var camps=(cd&&cd.success&&cd.campaigns)?cd.campaigns.filter(function(x){return linked.indexOf(String(x.id))>=0;}):[];
-    if(!camps.length){box.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen campagnes aan deze klant gekoppeld.</div>';return;}
+    if(!camps.length){box.innerHTML=wsDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen campagnes aan deze klant gekoppeld.</div>';return;}
     var scheduled=camps.filter(function(c){var t=treeById[String(c.id)];return t&&t.scheduled;});
     var liveOnes=camps.filter(function(c){var t=treeById[String(c.id)];return !(t&&t.scheduled);});
-    var html=campPerfBlock((md&&md.success&&md.ads&&!md.ads.empty)?md.ads:null);
+    var html=wsDateBar()+campPerfBlock((md&&md.success&&md.ads&&!md.ads.empty)?md.ads:null);
     if(scheduled.length){html+='<div class="section-h"><h4>Geplande campagnes</h4><span style="font-size:12px;color:var(--muted)">starten op een toekomstige datum</span></div>'+scheduled.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');}
     html+='<div class="section-h" style="margin-top:'+(scheduled.length?'18px':'0')+'"><h4>Live op Meta</h4></div>'+(liveOnes.length?liveOnes.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen live of actieve campagnes.</div>');
     box.innerHTML=html;
@@ -1828,6 +1833,21 @@ async function loadMetaInsights(){
         return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(TL[c.type]||c.type)+'</span><span style="color:var(--muted)">'+c.count+' posts · '+iv(c.interactions)+' interacties</span></div>'+
           '<div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';
       }).join('')+'</div>';
+    }
+    // Demografie van de volgers
+    if(d.demographics){
+      var dm=d.demographics;
+      var lb=function(title,arr){if(!arr||!arr.length)return '';var tot=arr.reduce(function(s,x){return s+(x.value||0);},0)||1;return '<div style="flex:1;min-width:180px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+esc(title)+'</div>'+arr.slice(0,8).map(function(x){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+(x.value/tot*100).toFixed(1)+'%</span></div>';}).join('')+'</div>';};
+      var blocks='';
+      if(dm.country)blocks+=lb('Landen',dm.country);
+      if(dm.city)blocks+=lb('Steden',dm.city);
+      if(dm.gender_age&&dm.gender_age.length){
+        var gg={},aa={};dm.gender_age.forEach(function(x){var p=String(x.label).split('.');gg[p[0]]=(gg[p[0]]||0)+(x.value||0);aa[p[1]||'?']=(aa[p[1]||'?']||0)+(x.value||0);});
+        var gt=Object.keys(gg).reduce(function(s,k){return s+gg[k];},0)||1;var gl={F:'Vrouw',M:'Man',U:'Onbekend'};
+        blocks+='<div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Geslacht</div>'+Object.keys(gg).map(function(k){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(gl[k]||k)+'</span><span style="color:var(--muted)">'+(gg[k]/gt*100).toFixed(1)+'%</span></div>';}).join('')+'</div>';
+        blocks+='<div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Leeftijd</div>'+Object.keys(aa).sort().map(function(k){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)"><span>'+esc(k)+'</span><span style="color:var(--muted)">'+(aa[k]/gt*100).toFixed(1)+'%</span></div>';}).join('')+'</div>';
+      }
+      if(blocks)html+='<div class="section-h" style="margin-top:16px"><h4>Demografie van je volgers</h4></div><div class="card" style="display:flex;gap:24px;flex-wrap:wrap">'+blocks+'</div>';
     }
     // Posts (grid met thumbnails, klikbaar)
     if(d.topPosts&&d.topPosts.length){

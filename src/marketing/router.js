@@ -1354,6 +1354,14 @@ function pickLeadCount(actions) {
   for (const t of pri) { if (byType[t] != null) return byType[t]; }
   return Math.max.apply(null, Object.values(byType));
 }
+// Datumperiode uit de query (since/until als YYYY-MM-DD). Zonder geldige periode:
+// de laatste 30 dagen. Geeft een object dat in Meta ads-insights past.
+function adsDateSel(req) {
+  const s = String((req && req.query && req.query.since) || '').trim();
+  const u = String((req && req.query && req.query.until) || '').trim();
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(s) && /^\d{4}-\d{2}-\d{2}$/.test(u) && s <= u;
+  return ok ? { time_range: JSON.stringify({ since: s, until: u }) } : { date_preset: 'last_30d' };
+}
 async function graphPost(pathAndId, params) {
   const body = new URLSearchParams(params);
   const r = await fetch(`${GRAPH}/${pathAndId}`, { method: 'POST', body });
@@ -2217,7 +2225,7 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
       try {
         const ins = await graphGet(`${adAccount}/insights`, {
           level: 'campaign', fields: 'campaign_id,spend,impressions,reach,clicks,ctr',
-          date_preset: 'last_30d', limit: '200', access_token: token,
+          ...adsDateSel(req), limit: '200', access_token: token,
         });
         (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
       } catch (_) { /* cijfers optioneel */ }
@@ -2360,6 +2368,28 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const _now = Math.floor(Date.now() / 1000);
       await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
       if (!Object.keys(out.insights).length) out.insights = null;
+
+      // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
+      // vereist instagram_manage_insights en 100+ volgers. Elk stuk afgeschermd.
+      out.demographics = null;
+      try {
+        const dg = {};
+        const parseTop = async (metric, key, topN) => {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'lifetime', access_token: token });
+            const row = (r.data && r.data[0]) || null;
+            const val = row && row.values && row.values[0] && row.values[0].value;
+            if (val && typeof val === 'object') {
+              const arr = Object.keys(val).map((k) => ({ label: k, value: Number(val[k]) || 0 })).sort((a, b) => b.value - a.value);
+              dg[key] = topN ? arr.slice(0, topN) : arr;
+            }
+          } catch (e) { /* deze breakdown overslaan */ }
+        };
+        await parseTop('audience_gender_age', 'gender_age', 0);
+        await parseTop('audience_country', 'country', 10);
+        await parseTop('audience_city', 'city', 10);
+        if (Object.keys(dg).length) out.demographics = dg;
+      } catch (_) { /* geen demografie beschikbaar */ }
     } else {
       out.errors.account = 'Geen Instagram user ID ingesteld';
     }
@@ -2383,7 +2413,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           const ins = await graphGet(`${creds.adAccount}/insights`, {
             level: 'campaign',
             fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_clicks,unique_inline_link_clicks,actions',
-            date_preset: 'last_30d',
+            ...adsDateSel(req),
             filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]),
             access_token: token,
           });
@@ -2440,7 +2470,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
               cost_per_result: (results && results > 0) ? (spend / results).toFixed(2) : null,
             };
           };
-          const common = { date_preset: 'last_30d', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token };
+          const common = { ...adsDateSel(req), filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token };
           // Prestaties per niveau (alleen entiteiten met data in de periode).
           const adsetR = await graphGet(`${creds.adAccount}/insights`, { level: 'adset', fields: 'campaign_id,adset_id,spend,impressions,reach,clicks,ctr,cpc,actions', ...common });
           const adR = await graphGet(`${creds.adAccount}/insights`, { level: 'ad', fields: 'adset_id,ad_id,spend,impressions,reach,clicks,ctr,actions', ...common });
