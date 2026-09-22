@@ -505,14 +505,18 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'assets')">Assets</button>
           <button onclick="dTab(this,'content')">Content</button>
-          <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnes</button>
+          <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
+          <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnebeheer</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
         <div id="clientReportBar" style="display:none;margin:4px 0 14px">
-          <button class="btn btn-primary" onclick="openReportPdf()">Rapportage op volledig scherm</button>
+          <button class="btn btn-ghost" onclick="openReportPdf()">Volledige rapportage op scherm</button>
         </div>
-        <iframe id="clientReportEmbed" title="Rapportage" style="display:none;width:100%;border:1px solid var(--line);border-radius:14px;background:#fff;height:1200px;margin-bottom:18px"></iframe>
+        <div id="dCampReview" style="display:none">
+          <div id="campReviewMsg" class="inline-msg"></div>
+          <div id="campReviewBody"><div class="empty">Laden...</div></div>
+        </div>
         <div id="dInfo">
           <div id="dEditMsg" class="inline-msg"></div>
           <div class="card" style="max-width:580px">
@@ -1111,8 +1115,6 @@ async function enterClientMode(){
 function applyClientMode(){
   ['tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   var rb=document.getElementById('clientReportBar'); if(rb)rb.style.display='block';
-  var emb=document.getElementById('clientReportEmbed');
-  if(emb&&CURRENT_CLIENT){ emb.src='/report.html?client='+CURRENT_CLIENT.id; emb.style.display='block'; }
   var back=document.querySelector('#viewClientDetail .back'); if(back)back.style.display='none';
   var login=document.getElementById('clientLoginCard'); if(login)login.style.display='none';
 }
@@ -1372,8 +1374,8 @@ async function openClient(id){
     if(CLIENT_MODE){
       applyClientMode();
       document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});
-      var ct=document.querySelector('#dTabs button[onclick*="content"]'); if(ct)ct.classList.add('active');
-      dTabShow('content');
+      var ct=document.querySelector('#dTabs button[onclick*="campreview"]'); if(ct)ct.classList.add('active');
+      dTabShow('campreview');
     } else {
       document.querySelectorAll('#dTabs button').forEach(function(b,i){b.classList.toggle('active',i===0);});
       dTabShow('info');
@@ -1402,9 +1404,11 @@ function dTabShow(which){
   document.getElementById('dContent').style.display=which==='content'?'':'none';
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
   document.getElementById('dCampaigns').style.display=which==='campaigns'?'':'none';
+  var dcr=document.getElementById('dCampReview'); if(dcr)dcr.style.display=which==='campreview'?'':'none';
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   if(which==='integrations'){loadIntegrations();}
+  if(which==='campreview'){loadCampReview();}
   if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
@@ -1496,6 +1500,65 @@ async function delAsset(id){
 
 // ---- Rapportage ----
 function openReportPdf(){ if(CURRENT_CLIENT) window.open('/report.html?client='+CURRENT_CLIENT.id,'_blank'); }
+
+// ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
+function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
+function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';var lab=live?'LIVE':(st&&/PAUSED/.test(String(st))?'Gepauzeerd':(st||'?'));return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(lab)+'</span>';}
+async function loadCampReview(){
+  if(!CURRENT_CLIENT)return;
+  var box=document.getElementById('campReviewBody'); box.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
+    var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
+    var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var cd=await cr.json();
+    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="empty"><h4>Geen Meta-koppeling</h4><p>Er is nog geen advertentiekoppeling ingesteld voor deze klant.</p></div>';return;}
+    var mr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var md=await mr.json();
+    var tree=(md&&md.success&&md.adTree)?md.adTree:[]; var treeById={}; tree.forEach(function(t){treeById[String(t.id)]=t;});
+    var camps=(cd&&cd.success&&cd.campaigns)?cd.campaigns.filter(function(x){return linked.indexOf(String(x.id))>=0;}):[];
+    if(!camps.length){box.innerHTML='<div class="empty"><h4>Geen campagnes</h4><p>Er zijn nog geen campagnes aan deze klant gekoppeld.</p></div>';return;}
+    box.innerHTML=camps.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');
+    camps.forEach(function(c){loadCampFeedback(c.id);});
+  }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
+}
+function campReviewCard(c,t){
+  var live=t?(t.live_adsets||0):0, nsets=t?((t.adsets||[]).length):0;
+  var tot=t?('&euro; '+crn(t.spend)+' &middot; '+crn(t.impressions)+' impressies &middot; '+crn(t.reach)+' bereik &middot; '+crn(t.clicks)+' klikken &middot; CTR '+(t.ctr!=null?t.ctr:'-')+'%'+(t.results!=null?(' &middot; '+crn(t.results)+' leads'+(t.cost_per_result!=null?(' (&euro; '+t.cost_per_result+'/lead)'):'')):'')):'Nog geen cijfers in deze periode';
+  var sets='';
+  if(t&&t.adsets&&t.adsets.length){
+    sets='<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:left"><th style="padding:6px">Ad set / advertentie</th><th style="text-align:right;padding:6px">Uitgaven</th><th style="text-align:right;padding:6px">Impressies</th><th style="text-align:right;padding:6px">Klikken</th><th style="text-align:right;padding:6px">CTR</th><th style="text-align:right;padding:6px">Leads</th></tr>'+
+      t.adsets.map(function(s){
+        var adr=(s.ads||[]).map(function(a){return '<tr><td style="padding:6px 6px 6px 20px;color:var(--muted)">&#8627; '+esc(a.name||'Advertentie')+cbadge(a.live,a.status)+'</td><td style="text-align:right;padding:6px">&euro; '+crn(a.spend)+'</td><td style="text-align:right;padding:6px">'+crn(a.impressions)+'</td><td style="text-align:right;padding:6px">'+crn(a.clicks)+'</td><td style="text-align:right;padding:6px">'+(a.ctr!=null?a.ctr:'-')+'%</td><td style="text-align:right;padding:6px">'+(a.results!=null?crn(a.results):'-')+'</td></tr>';}).join('');
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px"><strong>'+esc(s.name||'Ad set')+'</strong>'+cbadge(s.live,s.status)+'</td><td style="text-align:right;padding:6px">&euro; '+crn(s.spend)+'</td><td style="text-align:right;padding:6px">'+crn(s.impressions)+'</td><td style="text-align:right;padding:6px">'+crn(s.clicks)+'</td><td style="text-align:right;padding:6px">'+(s.ctr!=null?s.ctr:'-')+'%</td><td style="text-align:right;padding:6px">'+(s.results!=null?crn(s.results):'-')+'</td></tr>'+adr;
+      }).join('')+'</table></div>';
+  } else { sets='<div style="font-size:13px;color:var(--muted);margin-top:6px">Nog geen ad sets met data in deze periode.</div>'; }
+  return '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start"><div><h4 style="margin:0;font-size:16px">'+esc(c.name||'Campagne')+'</h4><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+esc(c.objective||'')+' &middot; '+esc(c.status||'')+' &middot; '+nsets+' ad sets, '+live+' live</div></div></div>'+
+    '<div style="font-size:13px;color:var(--muted);margin-top:6px">'+tot+'</div>'+sets+
+    '<div id="fb_'+esc(String(c.id))+'" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div style="font-size:13px;color:var(--muted)">Opmerkingen laden...</div></div></div>';
+}
+async function loadCampFeedback(campId){
+  var el=document.getElementById('fb_'+campId); if(!el)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback',{credentials:'include'});
+    var d=await r.json(); var list=(d&&d.success&&d.feedback)?d.feedback:[];
+    el.innerHTML=renderFeedback(campId,list);
+  }catch(e){el.innerHTML='';}
+}
+function renderFeedback(campId,list){
+  var items=(list||[]).map(function(f){
+    var who=(f.author_role==='client')?'Klant':'Team';
+    return '<div style="border-top:1px solid var(--line);padding:8px 0"><div style="font-size:12px;color:var(--muted)">'+esc(who)+(f.author_name?(' &middot; '+esc(f.author_name)):'')+' &middot; '+esc(fmtWhen(f.created_at))+'</div><div style="font-size:14px;white-space:pre-wrap;margin-top:2px">'+esc(f.body)+'</div></div>';
+  }).join('')||'<div style="font-size:13px;color:var(--muted)">Nog geen opmerkingen. Plaats hieronder je feedback of tekstsuggestie.</div>';
+  return '<div style="font-weight:700;font-size:13px;margin-bottom:4px">Opmerkingen</div>'+items+
+    '<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start"><textarea id="fbtext_'+esc(String(campId))+'" rows="2" placeholder="Plaats een opmerking of tekstsuggestie..." style="flex:1;min-height:44px"></textarea><button class="btn btn-primary" onclick="postCampFeedback(\''+esc(String(campId))+'\')">Plaats</button></div>';
+}
+async function postCampFeedback(campId){
+  var ta=document.getElementById('fbtext_'+campId); if(!ta)return; var body=ta.value.trim(); if(!body)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({body:body})});
+    var d=await r.json();
+    if(r.ok&&d.success){ta.value='';loadCampFeedback(campId);} else {alert(d.error||'Kon opmerking niet plaatsen.');}
+  }catch(e){alert('Netwerkfout.');}
+}
 async function loadReport(){
   if(!CURRENT_CLIENT)return; var body=document.getElementById('reportBody'); hideMsg('reportMsg');
   body.innerHTML='<div class="empty">Laden...</div>';
