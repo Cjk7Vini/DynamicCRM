@@ -885,7 +885,7 @@ router.get('/api/mkt/clients/:clientId/assets', requireMkt, async (req, res) => 
 // Vraag een upload-handtekening voor Cloudinary (browser uploadt rechtstreeks).
 router.post('/api/mkt/clients/:clientId/assets/sign', requireMkt, async (req, res) => {
   try {
-    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const cfg = cloudinaryConfig();
     if (!cfg) return res.status(500).json({ error: 'Cloudinary is niet geconfigureerd op de server' });
     const wsId = req.session.mkt.workspaceId;
@@ -933,7 +933,7 @@ router.get('/api/mkt/workspace/storage', requireMkt, async (req, res) => {
 // Body: { public_id, url, resource_type, format, bytes, filename, mime }.
 router.post('/api/mkt/clients/:clientId/assets/register', requireMkt, async (req, res) => {
   try {
-    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -960,7 +960,7 @@ router.post('/api/mkt/clients/:clientId/assets/register', requireMkt, async (req
 // Upload een asset (base64). Body: { filename, mime, data_base64 }.
 router.post('/api/mkt/clients/:clientId/assets', assetUploadParser, requireMkt, async (req, res) => {
   try {
-    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -1127,6 +1127,51 @@ router.delete('/api/mkt/clients/:clientId/integrations', requireMkt, async (req,
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     await withWriteConnection(async (c) => c.query(
       'DELETE FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    ));
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Client-veilige Meta-ID's (GEEN token/secret): de klant mag zelf zijn eigen
+// ad account, Facebook Page, Instagram en pixel invullen. Alleen deze vier.
+const CLIENT_META_ID_FIELDS = ['meta_ad_account_id', 'meta_page_id', 'meta_ig_user_id', 'meta_pixel_id'];
+router.get('/api/mkt/clients/:clientId/meta-ids', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_ad_account_id, meta_page_id, meta_ig_user_id, meta_pixel_id FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+    res.json({ success: true, ids: {
+      meta_ad_account_id: row.meta_ad_account_id || '', meta_page_id: row.meta_page_id || '',
+      meta_ig_user_id: row.meta_ig_user_id || '', meta_pixel_id: row.meta_pixel_id || '',
+    } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.put('/api/mkt/clients/:clientId/meta-ids', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+    const clean = (v) => (v === undefined) ? undefined : (String(v == null ? '' : v).trim() || null);
+    const existing = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+    const cols = CLIENT_META_ID_FIELDS;
+    const vals = {};
+    for (const f of cols) { const cv = clean(b[f]); vals[f] = (cv !== undefined) ? cv : (existing[f] || null); }
+    const insertCols = ['client_id', 'workspace_id', ...cols, 'updated_at'];
+    const params = [okClient, wsId, ...cols.map((f) => vals[f])];
+    const placeholders = params.map((_, i) => `$${i + 1}`).join(',') + ',now()';
+    const updates = cols.map((f) => `${f}=EXCLUDED.${f}`).join(', ') + ', updated_at=now()';
+    await withWriteConnection(async (c) => c.query(
+      `INSERT INTO marketing.client_integrations (${insertCols.join(',')})
+       VALUES (${placeholders})
+       ON CONFLICT (client_id) DO UPDATE SET ${updates}`, params
     ));
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2166,6 +2211,17 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
         };
       });
     } catch (e) { out.error = e.message; }
+
+    // Klant-account ziet alleen de aan de eigen klant gekoppelde campagnes,
+    // nooit de hele ad-account (team houdt de volledige lijst om te koppelen).
+    if (mktClientLocked(req)) {
+      try {
+        const linked = new Set((await withReadConnection(async (c) => (await c.query(
+          'SELECT meta_campaign_id FROM marketing.campaign_links WHERE workspace_id=$1 AND client_id=$2 AND meta_campaign_id IS NOT NULL', [wsId, okClient]
+        )).rows)).map((r) => String(r.meta_campaign_id)));
+        out.campaigns = (out.campaigns || []).filter((c) => linked.has(String(c.id)));
+      } catch (_) { out.campaigns = []; }
+    }
 
     res.json({ success: true, ...out });
   } catch (e) { res.status(500).json({ error: e.message }); }
