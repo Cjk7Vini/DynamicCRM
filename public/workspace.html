@@ -1535,18 +1535,23 @@ function campReviewCard(c,t){
     '<div style="font-size:13px;color:var(--muted);margin-top:6px">'+tot+'</div>'+sets+
     '<div id="fb_'+esc(String(c.id))+'" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div style="font-size:13px;color:var(--muted)">Opmerkingen laden...</div></div></div>';
 }
+var FB_ME=null;
 async function loadCampFeedback(campId){
   var el=document.getElementById('fb_'+campId); if(!el)return;
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback',{credentials:'include'});
     var d=await r.json(); var list=(d&&d.success&&d.feedback)?d.feedback:[];
-    el.innerHTML=renderFeedback(campId,list);
+    if(d&&d.me!=null)FB_ME=d.me;
+    el.innerHTML=renderFeedback(campId,list,FB_ME);
   }catch(e){el.innerHTML='';}
 }
-function renderFeedback(campId,list){
+function renderFeedback(campId,list,me){
   var items=(list||[]).map(function(f){
     var who=(f.author_role==='client')?'Klant':'Team';
-    return '<div style="border-top:1px solid var(--line);padding:8px 0"><div style="font-size:12px;color:var(--muted)">'+esc(who)+(f.author_name?(' &middot; '+esc(f.author_name)):'')+' &middot; '+esc(fmtWhen(f.created_at))+'</div><div style="font-size:14px;white-space:pre-wrap;margin-top:2px">'+esc(f.body)+'</div></div>';
+    var mine=(me!=null&&String(f.author_account_id)===String(me));
+    var edited=f.updated_at?' (bewerkt)':'';
+    var acts=mine?('<div style="margin-top:4px"><a href="#" onclick="editCampFeedback(\''+esc(String(campId))+'\','+f.id+',this);return false;" style="font-size:12px;color:var(--accent-2,#6366f1);margin-right:12px">Bewerken</a><a href="#" onclick="deleteCampFeedback(\''+esc(String(campId))+'\','+f.id+');return false;" style="font-size:12px;color:#dc2626">Verwijderen</a></div>'):'';
+    return '<div data-fb="'+f.id+'" style="border-top:1px solid var(--line);padding:8px 0"><div style="font-size:12px;color:var(--muted)">'+esc(who)+(f.author_name?(' &middot; '+esc(f.author_name)):'')+' &middot; '+esc(fmtWhen(f.created_at))+edited+'</div><div class="fb-body" style="font-size:14px;white-space:pre-wrap;margin-top:2px">'+esc(f.body)+'</div>'+acts+'</div>';
   }).join('')||'<div style="font-size:13px;color:var(--muted)">Nog geen opmerkingen. Plaats hieronder je feedback of tekstsuggestie.</div>';
   return '<div style="font-weight:700;font-size:13px;margin-bottom:4px">Opmerkingen</div>'+items+
     '<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start"><textarea id="fbtext_'+esc(String(campId))+'" rows="2" placeholder="Plaats een opmerking of tekstsuggestie..." style="flex:1;min-height:44px"></textarea><button class="btn btn-primary" onclick="postCampFeedback(\''+esc(String(campId))+'\')">Plaats</button></div>';
@@ -1557,6 +1562,24 @@ async function postCampFeedback(campId){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({body:body})});
     var d=await r.json();
     if(r.ok&&d.success){ta.value='';loadCampFeedback(campId);} else {alert(d.error||'Kon opmerking niet plaatsen.');}
+  }catch(e){alert('Netwerkfout.');}
+}
+async function editCampFeedback(campId,id,link){
+  var wrap=link&&link.closest?link.closest('[data-fb]'):null;
+  var cur=wrap?(wrap.querySelector('.fb-body').textContent||''):'';
+  var v=prompt('Opmerking bewerken:',cur); if(v==null)return; v=v.trim(); if(!v)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({body:v})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadCampFeedback(campId);} else {alert(d.error||'Kon opmerking niet bewerken.');}
+  }catch(e){alert('Netwerkfout.');}
+}
+async function deleteCampFeedback(campId,id){
+  if(!confirm('Deze opmerking verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns/'+encodeURIComponent(campId)+'/feedback/'+id,{method:'DELETE',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){loadCampFeedback(campId);} else {alert(d.error||'Kon opmerking niet verwijderen.');}
   }catch(e){alert('Netwerkfout.');}
 }
 async function loadReport(){
