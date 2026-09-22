@@ -2968,6 +2968,121 @@ router.delete('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback/:feedba
 });
 
 // =======================================================================
+// Geplande (concept) Meta-campagnes: het team zet toekomstige campagnes klaar,
+// de klant ziet ze in een overzicht en kan goedkeuren/wijzigingen vragen.
+// Puur een plan in onze database; er gebeurt niets automatisch bij Meta.
+// =======================================================================
+const DRAFT_STATUS = ['concept', 'ter_goedkeuring', 'goedgekeurd', 'wijzigingen', 'live'];
+async function ensureCampaignDraftTable(c) {
+  await c.query(`CREATE TABLE IF NOT EXISTS marketing.campaign_drafts (
+    id SERIAL PRIMARY KEY,
+    workspace_id INTEGER NOT NULL,
+    client_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    objective TEXT,
+    daily_budget_cents INTEGER,
+    audience TEXT,
+    ad_text TEXT,
+    planned_start DATE,
+    notes TEXT,
+    status TEXT DEFAULT 'concept',
+    created_by INTEGER,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ
+  )`);
+}
+router.get('/api/mkt/clients/:clientId/campaign-drafts', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const clientOnly = mktClientLocked(req);
+    const rows = await withWriteConnection(async (c) => {
+      await ensureCampaignDraftTable(c);
+      return (await c.query(
+        `SELECT id, name, objective, daily_budget_cents, audience, ad_text, planned_start, notes, status, created_at, updated_at
+           FROM marketing.campaign_drafts
+          WHERE workspace_id=$1 AND client_id=$2 ${clientOnly ? "AND status <> 'concept'" : ''}
+          ORDER BY (status='live') ASC, planned_start ASC NULLS LAST, created_at DESC`,
+        [wsId, okClient]
+      )).rows;
+    });
+    res.json({ success: true, drafts: rows, canManage: mktCanManage(req) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/clients/:clientId/campaign-drafts', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om campagnes klaar te zetten' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Naam is verplicht' });
+    const budgetCents = (b.daily_budget != null && b.daily_budget !== '') ? Math.round(Number(b.daily_budget) * 100) : null;
+    const st = DRAFT_STATUS.includes(b.status) ? b.status : 'concept';
+    const row = await withWriteConnection(async (c) => {
+      await ensureCampaignDraftTable(c);
+      return (await c.query(
+        `INSERT INTO marketing.campaign_drafts (workspace_id, client_id, name, objective, daily_budget_cents, audience, ad_text, planned_start, notes, status, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING id, name, objective, daily_budget_cents, audience, ad_text, planned_start, notes, status, created_at, updated_at`,
+        [wsId, okClient, name, b.objective || null, budgetCents, b.audience || null, b.ad_text || null, b.planned_start || null, b.notes || null, st, req.session.mkt.accountId || null]
+      )).rows[0];
+    });
+    res.json({ success: true, draft: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/api/mkt/clients/:clientId/campaign-drafts/:draftId', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+    const isClient = mktClientLocked(req);
+    const out = await withWriteConnection(async (c) => {
+      await ensureCampaignDraftTable(c);
+      const cur = (await c.query('SELECT id FROM marketing.campaign_drafts WHERE id=$1 AND workspace_id=$2 AND client_id=$3', [req.params.draftId, wsId, okClient])).rows[0];
+      if (!cur) return { code: 404, error: 'Geplande campagne niet gevonden' };
+      const sets = []; const vals = []; let i = 1;
+      if (isClient) {
+        // Een klant mag alleen goedkeuren of wijzigingen vragen.
+        if (!['goedgekeurd', 'wijzigingen'].includes(b.status)) return { code: 403, error: 'Een klant kan alleen goedkeuren of wijzigingen vragen' };
+        sets.push(`status=$${i++}`); vals.push(b.status);
+      } else {
+        if (!mktCanManage(req)) return { code: 403, error: 'Geen rechten' };
+        const map = { name: 'name', objective: 'objective', audience: 'audience', ad_text: 'ad_text', planned_start: 'planned_start', notes: 'notes' };
+        for (const k of Object.keys(map)) { if (b[k] !== undefined) { sets.push(`${map[k]}=$${i++}`); vals.push(b[k] === '' ? null : b[k]); } }
+        if (b.daily_budget !== undefined) { sets.push(`daily_budget_cents=$${i++}`); vals.push((b.daily_budget != null && b.daily_budget !== '') ? Math.round(Number(b.daily_budget) * 100) : null); }
+        if (b.status !== undefined && DRAFT_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+      }
+      if (!sets.length) return { code: 400, error: 'Niets om bij te werken' };
+      sets.push('updated_at=now()');
+      vals.push(req.params.draftId);
+      const row = (await c.query(`UPDATE marketing.campaign_drafts SET ${sets.join(', ')} WHERE id=$${i} RETURNING id, name, objective, daily_budget_cents, audience, ad_text, planned_start, notes, status, created_at, updated_at`, vals)).rows[0];
+      return { draft: row };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true, draft: out.draft });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/clients/:clientId/campaign-drafts/:draftId', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    await withWriteConnection(async (c) => {
+      await ensureCampaignDraftTable(c);
+      await c.query('DELETE FROM marketing.campaign_drafts WHERE id=$1 AND workspace_id=$2 AND client_id=$3', [req.params.draftId, wsId, okClient]);
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 13 - LANGLEVEND META-TOKEN (kort token omruilen naar ~60 dagen)
 // Nodig voor geplande posts: het opgeslagen token moet nog geldig zijn op
 // het moment van publiceren. Vereist Meta App ID + App Secret in Koppelingen.
