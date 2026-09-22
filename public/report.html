@@ -12,7 +12,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvet
 .bar .t{font-size:14px;color:var(--mid)}
 .btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:650;cursor:pointer;font-family:inherit}
 .btn-print{background:var(--brand);color:#fff}
-.page{max-width:900px;margin:24px auto;background:#fff;padding:44px 48px;box-shadow:0 6px 30px rgba(0,0,0,.10);border-radius:6px}
+.page{max-width:1100px;margin:24px auto;background:#fff;padding:44px 48px;box-shadow:0 6px 30px rgba(0,0,0,.10);border-radius:6px}
 .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--brand);padding-bottom:20px;margin-bottom:26px}
 .head .badge{width:54px;height:54px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px}
 .head h1{font-size:26px;letter-spacing:-.02em}
@@ -77,6 +77,8 @@ function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()
 function fmtDay(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'});}
 function num(v){return v!=null?v:'-';}
 function fmtn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
+function statusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
+function statusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':statusLabel(st))+'</span>';}
 function param(k){var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):'';}
 var CID=param('client');
 var TYPE_LABELS={IMAGE:'Bericht',CAROUSEL_ALBUM:'Carrousel',VIDEO:'Video',REELS:'Reel',ONBEKEND:'Overig'};
@@ -175,12 +177,32 @@ async function build(){
 
   // Advertenties (samenvatting voor DEZE klant, ook zonder Instagram-koppeling)
   if(meta&&meta.ads&&!meta.ads.empty){
-    html+='<h2>Advertenties</h2><div class="sect1">laatste 30 dagen, alleen campagnes van deze klant</div><div class="grid g3">'+kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',fmtn(meta.ads.impressions))+kpi('Bereik',fmtn(meta.ads.reach))+kpi('Klikken',fmtn(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc))+'</div>';
+    var adTiles=kpi('Uitgaven','€ '+num(meta.ads.spend))+kpi('Impressies',fmtn(meta.ads.impressions))+kpi('Bereik',fmtn(meta.ads.reach))+kpi('Klikken',fmtn(meta.ads.clicks))+kpi('CTR',num(meta.ads.ctr)+'%')+kpi('CPC','€ '+num(meta.ads.cpc));
+    if(meta.ads.results!=null){adTiles+=kpi('Leads',fmtn(meta.ads.results))+kpi('Kosten per lead',meta.ads.cost_per_result!=null?('€ '+num(meta.ads.cost_per_result)):'-');}
+    html+='<h2>Advertenties</h2><div class="sect1">laatste 30 dagen, alleen campagnes van deze klant</div><div class="grid">'+adTiles+'</div>';
   }
 
-  // Campagnes op Meta (alleen gekoppeld aan deze klant)
+  // Campagnes op Meta met ad sets en advertenties (alleen gekoppeld aan deze klant)
   var shownCamps=(camps&&camps.success&&camps.configured&&camps.campaigns)?camps.campaigns.filter(function(x){return linkedIds.indexOf(String(x.id))>=0;}):[];
-  if(shownCamps.length){
+  var campMeta={}; shownCamps.forEach(function(c2){campMeta[String(c2.id)]={name:c2.name,objective:c2.objective,status:c2.status,budget:c2.budget,budget_type:c2.budget_type};});
+  var tree=(meta&&meta.adTree)?meta.adTree:[];
+  if(tree.length){
+    html+='<h2>Campagnes op Meta</h2><div class="sect1">laatste 30 dagen, per campagne, ad set en advertentie</div>';
+    html+=tree.map(function(c){
+      var cm=campMeta[String(c.id)]||{};
+      var nSets=(c.adsets||[]).length, nLive=c.live_adsets||0;
+      var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div><h4 style="font-size:15px">'+esc(cm.name||'Campagne')+'</h4><div class="s">'+esc(cm.objective||'')+(cm.status?(' · '+esc(cm.status)):'')+(cm.budget!=null?(' · € '+Number(cm.budget).toFixed(2)+'/'+esc(cm.budget_type||'')):'')+'</div><div class="s" style="margin-top:3px;font-weight:600">'+nSets+' ad sets · '+nLive+' live</div></div>'+
+        '<div class="s" style="text-align:right">€ '+num(c.spend)+' · '+fmtn(c.impressions)+' impr · '+fmtn(c.clicks)+' klikken · CTR '+num(c.ctr)+'%'+(c.results!=null?(' · '+fmtn(c.results)+' leads'+(c.cost_per_result!=null?(' (€ '+num(c.cost_per_result)+'/lead)'):'')):'')+'</div></div>';
+      var setRows=(c.adsets||[]).map(function(s){
+        var adLines=(s.ads||[]).map(function(a){
+          return '<tr><td class="l" style="padding-left:18px;color:var(--muted)">&#8627; '+esc(a.name||'Advertentie')+statusBadge(a.live,a.status)+'</td><td>&euro; '+num(a.spend)+'</td><td>'+fmtn(a.impressions)+'</td><td>'+fmtn(a.reach)+'</td><td>'+fmtn(a.clicks)+'</td><td>'+num(a.ctr)+'%</td><td>'+(a.results!=null?fmtn(a.results):'-')+'</td><td>'+(a.cost_per_result!=null?('&euro; '+num(a.cost_per_result)):'-')+'</td></tr>';
+        }).join('');
+        return '<tr><td class="l"><strong>'+esc(s.name||'Ad set')+'</strong>'+statusBadge(s.live,s.status)+'</td><td>&euro; '+num(s.spend)+'</td><td>'+fmtn(s.impressions)+'</td><td>'+fmtn(s.reach)+'</td><td>'+fmtn(s.clicks)+'</td><td>'+num(s.ctr)+'%</td><td>'+(s.results!=null?fmtn(s.results):'-')+'</td><td>'+(s.cost_per_result!=null?('&euro; '+num(s.cost_per_result)):'-')+'</td></tr>'+adLines;
+      }).join('');
+      var table=setRows?('<div class="tbl-wrap"><table class="rank"><tr><th class="l">Ad set / advertentie</th><th>Uitgaven</th><th>Impressies</th><th>Bereik</th><th>Klikken</th><th>CTR</th><th>Leads</th><th>Kosten/lead</th></tr>'+setRows+'</table></div>'):'<div class="s" style="color:var(--muted)">Nog geen ad sets met data in deze periode.</div>';
+      return '<div class="row" style="display:block">'+head+table+'</div>';
+    }).join('');
+  } else if(shownCamps.length){
     html+='<h2>Campagnes op Meta</h2><div class="sect1">laatste 30 dagen</div>';
     html+=shownCamps.map(function(c2){
       var b=c2.budget!=null?(' · € '+c2.budget.toFixed(2)+'/'+(c2.budget_type||'')):'';

@@ -2293,6 +2293,63 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
             out.ads = { empty: true };
           }
         } catch (e) { out.errors.ads = e.message; }
+
+        // Verdieping: campagnes -> ad sets -> advertenties, met resultaten (leads)
+        // en kosten per lead. Insights-reads vallen niet onder de strenge
+        // advertentielimiet; per niveau afgeschermd zodat een fout het rapport heel laat.
+        try {
+          const leadFromActions = (actions) => {
+            if (!Array.isArray(actions)) return null;
+            let n = 0; let found = false;
+            for (const a of actions) {
+              if (a && typeof a.action_type === 'string' && /lead/i.test(a.action_type)) { n += Number(a.value) || 0; found = true; }
+            }
+            return found ? n : null;
+          };
+          const metricsOf = (r) => {
+            const spend = parseFloat(r.spend || 0) || 0;
+            const impressions = parseInt(r.impressions || 0, 10) || 0;
+            const clicks = parseInt(r.clicks || 0, 10) || 0;
+            const results = leadFromActions(r.actions);
+            return {
+              spend: spend.toFixed(2), impressions, reach: parseInt(r.reach || 0, 10) || 0, clicks,
+              ctr: r.ctr != null ? Number(r.ctr).toFixed(2) : (impressions ? (clicks / impressions * 100).toFixed(2) : '0.00'),
+              cpc: r.cpc != null ? Number(r.cpc).toFixed(2) : (clicks ? (spend / clicks).toFixed(2) : '0.00'),
+              results,
+              cost_per_result: (results && results > 0) ? (spend / results).toFixed(2) : null,
+            };
+          };
+          const common = { date_preset: 'last_30d', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token };
+          // Prestaties per niveau (alleen entiteiten met data in de periode).
+          const adsetR = await graphGet(`${creds.adAccount}/insights`, { level: 'adset', fields: 'campaign_id,adset_id,spend,impressions,reach,clicks,ctr,cpc,actions', ...common });
+          const adR = await graphGet(`${creds.adAccount}/insights`, { level: 'ad', fields: 'adset_id,ad_id,spend,impressions,reach,clicks,ctr,actions', ...common });
+          // Entiteiten met live-status (ook zonder uitgaven), zodat zichtbaar is wat live staat.
+          const adsetsList = await graphGet(`${creds.adAccount}/adsets`, { fields: 'id,name,effective_status,campaign_id', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
+          const adsList = await graphGet(`${creds.adAccount}/ads`, { fields: 'id,name,effective_status,adset_id', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
+          const adsetMx = {}; (adsetR.data || []).forEach((r) => { adsetMx[r.adset_id] = metricsOf(r); });
+          const adMx = {}; (adR.data || []).forEach((r) => { adMx[r.ad_id] = metricsOf(r); });
+          const camps = {};
+          campIds.forEach((id) => { camps[id] = { id, adsets: {} }; });
+          (adsetsList.data || []).forEach((s) => { const c = camps[s.campaign_id]; if (!c) return; c.adsets[s.id] = { id: s.id, name: s.name, status: s.effective_status || null, live: s.effective_status === 'ACTIVE', ...(adsetMx[s.id] || {}), ads: [] }; });
+          (adsList.data || []).forEach((a) => { for (const cid in camps) { const s = camps[cid].adsets[a.adset_id]; if (s) { s.ads.push({ id: a.id, name: a.name, status: a.effective_status || null, live: a.effective_status === 'ACTIVE', ...(adMx[a.id] || {}) }); break; } } });
+          // Campagne-totalen: som van de ad sets.
+          const sumUp = (list) => {
+            let spend = 0; let impressions = 0; let reach = 0; let clicks = 0; let results = 0; let anyRes = false;
+            list.forEach((x) => { spend += parseFloat(x.spend || 0) || 0; impressions += x.impressions || 0; reach += x.reach || 0; clicks += x.clicks || 0; if (x.results != null) { results += x.results; anyRes = true; } });
+            return { spend: spend.toFixed(2), impressions, reach, clicks, ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00', results: anyRes ? results : null, cost_per_result: (anyRes && results > 0) ? (spend / results).toFixed(2) : null };
+          };
+          const tree = Object.values(camps).map((c) => { const adsets = Object.values(c.adsets); return { id: c.id, ...sumUp(adsets), live_adsets: adsets.filter((s) => s.live).length, adsets }; });
+          if (tree.length) {
+            out.adTree = tree;
+            // Totaal aantal leads over alle campagnes, voor de samenvatting.
+            let totRes = 0; let anyRes = false;
+            tree.forEach((c) => { if (c.results != null) { totRes += c.results; anyRes = true; } });
+            if (anyRes && out.ads && !out.ads.empty) {
+              out.ads.results = totRes;
+              out.ads.cost_per_result = totRes > 0 ? (parseFloat(out.ads.spend) / totRes).toFixed(2) : null;
+            }
+          }
+        } catch (e) { out.errors.adtree = e.message; }
       } else {
         out.ads = { empty: true };
       }
