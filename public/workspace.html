@@ -900,10 +900,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
       <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
     </div>
-    <div class="field"><label>Custom audiences (optioneel)</label>
-      <select id="cpAudiences" multiple size="3" style="height:auto"></select>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">Houd Ctrl/Cmd ingedrukt om meerdere te kiezen.</div>
-    </div>
     <div class="field"><label>Bestemmings-URL *</label><input id="cpLink" placeholder="https://..."></div>
     <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
       <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
@@ -2258,13 +2254,6 @@ async function openCampaign(){
     (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
     sel.innerHTML=opts;
   }catch(e){}
-  // audiences laden
-  var aud=document.getElementById('cpAudiences'); aud.innerHTML='';
-  try{
-    var au=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/audiences',{credentials:'include'}); var aud2=await au.json();
-    if(aud2.success&&aud2.audiences&&aud2.audiences.length){ aud.innerHTML=aud2.audiences.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>';}).join(''); }
-    else { aud.innerHTML='<option disabled>Geen custom audiences gevonden</option>'; }
-  }catch(e){ aud.innerHTML='<option disabled>Kon audiences niet laden</option>'; }
   document.getElementById('campModal').classList.add('open');document.getElementById('cpName').focus();
 }
 var CP_INT_TIMER=null;
@@ -2341,7 +2330,6 @@ async function createCampaign2(){
     bidStrategy:document.getElementById('cpBidStrategy').value,
     bidCap:document.getElementById('cpBidCap').value,
     interests:CP_INTERESTS,
-    audiences:Array.prototype.slice.call(document.getElementById('cpAudiences').selectedOptions||[]).map(function(o){return o.value;}).filter(function(v){return v;}),
     launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
   };
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
