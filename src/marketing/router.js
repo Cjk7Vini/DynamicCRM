@@ -1621,6 +1621,16 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     // krijgt alles meteen op ACTIVE. launch is strikt begrensd tot deze twee waarden.
     const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
 
+    // Startdatum: leeg = over een uur; anders de gekozen (toekomstige) datum, dit
+    // is hoe Meta plant (ad set start_time). Minstens 5 minuten in de toekomst.
+    let startIso = new Date(Date.now() + 3600 * 1000).toISOString();
+    if (b.startTime) {
+      const t = new Date(b.startTime);
+      if (isNaN(t.getTime())) return res.status(400).json({ error: 'Ongeldige startdatum' });
+      if (t.getTime() < Date.now() + 5 * 60 * 1000) return res.status(400).json({ error: 'Kies een startdatum en tijd minstens 5 minuten in de toekomst' });
+      startIso = t.toISOString();
+    }
+
     // 1) Campagne. Meta vereist expliciet is_adset_budget_sharing_enabled;
     // false = elke advertentieset houdt zijn eigen budget (past bij onze opzet).
     const campaign = await graphPost(`${adAccount}/campaigns`, {
@@ -1646,7 +1656,7 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
       bid_strategy: bidStrategy, targeting, status: launchStatus,
       dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
-      start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
+      start_time: startIso, access_token: token,
     };
     if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
@@ -2413,13 +2423,13 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           const adsetR = await graphGet(`${creds.adAccount}/insights`, { level: 'adset', fields: 'campaign_id,adset_id,spend,impressions,reach,clicks,ctr,cpc,actions', ...common });
           const adR = await graphGet(`${creds.adAccount}/insights`, { level: 'ad', fields: 'adset_id,ad_id,spend,impressions,reach,clicks,ctr,actions', ...common });
           // Entiteiten met live-status (ook zonder uitgaven), zodat zichtbaar is wat live staat.
-          const adsetsList = await graphGet(`${creds.adAccount}/adsets`, { fields: 'id,name,effective_status,campaign_id', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
+          const adsetsList = await graphGet(`${creds.adAccount}/adsets`, { fields: 'id,name,effective_status,campaign_id,start_time', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
           const adsList = await graphGet(`${creds.adAccount}/ads`, { fields: 'id,name,effective_status,adset_id', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
           const adsetMx = {}; (adsetR.data || []).forEach((r) => { adsetMx[r.adset_id] = metricsOf(r); });
           const adMx = {}; (adR.data || []).forEach((r) => { adMx[r.ad_id] = metricsOf(r); });
           const camps = {};
           campIds.forEach((id) => { camps[id] = { id, adsets: {} }; });
-          (adsetsList.data || []).forEach((s) => { const c = camps[s.campaign_id]; if (!c) return; c.adsets[s.id] = { id: s.id, name: s.name, status: s.effective_status || null, live: s.effective_status === 'ACTIVE', ...(adsetMx[s.id] || {}), ads: [] }; });
+          (adsetsList.data || []).forEach((s) => { const c = camps[s.campaign_id]; if (!c) return; c.adsets[s.id] = { id: s.id, name: s.name, status: s.effective_status || null, live: s.effective_status === 'ACTIVE', start_time: s.start_time || null, ...(adsetMx[s.id] || {}), ads: [] }; });
           (adsList.data || []).forEach((a) => { for (const cid in camps) { const s = camps[cid].adsets[a.adset_id]; if (s) { s.ads.push({ id: a.id, name: a.name, status: a.effective_status || null, live: a.effective_status === 'ACTIVE', ...(adMx[a.id] || {}) }); break; } } });
           // Campagne-totalen: som van de ad sets.
           const sumUp = (list) => {
@@ -2427,7 +2437,15 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
             list.forEach((x) => { spend += parseFloat(x.spend || 0) || 0; impressions += x.impressions || 0; reach += x.reach || 0; clicks += x.clicks || 0; if (x.results != null) { results += x.results; anyRes = true; } });
             return { spend: spend.toFixed(2), impressions, reach, clicks, ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00', results: anyRes ? results : null, cost_per_result: (anyRes && results > 0) ? (spend / results).toFixed(2) : null };
           };
-          const tree = Object.values(camps).map((c) => { const adsets = Object.values(c.adsets); return { id: c.id, ...sumUp(adsets), live_adsets: adsets.filter((s) => s.live).length, adsets }; });
+          const nowMs = Date.now();
+          const tree = Object.values(camps).map((c) => {
+            const adsets = Object.values(c.adsets);
+            // Gepland = alle ad sets hebben een starttijd in de toekomst (nog niet begonnen).
+            const futureStarts = adsets.map((s) => (s.start_time ? new Date(s.start_time).getTime() : null)).filter((t) => t != null);
+            const scheduled = adsets.length > 0 && futureStarts.length === adsets.length && futureStarts.every((t) => t > nowMs);
+            const scheduledStart = scheduled && futureStarts.length ? new Date(Math.min.apply(null, futureStarts)).toISOString() : null;
+            return { id: c.id, ...sumUp(adsets), live_adsets: adsets.filter((s) => s.live).length, scheduled, scheduled_start: scheduledStart, adsets };
+          });
           if (tree.length) {
             out.adTree = tree;
             // Totaal aantal leads over alle campagnes, voor de samenvatting.
