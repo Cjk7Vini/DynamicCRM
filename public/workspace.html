@@ -1506,19 +1506,94 @@ function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
 function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';var lab=live?'LIVE':(st&&/PAUSED/.test(String(st))?'Gepauzeerd':(st||'?'));return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(lab)+'</span>';}
 async function loadCampReview(){
   if(!CURRENT_CLIENT)return;
-  var box=document.getElementById('campReviewBody'); box.innerHTML='<div class="empty">Laden...</div>';
+  var box=document.getElementById('campReviewBody');
+  box.innerHTML='<div id="draftsWrap"></div><div id="liveWrap" style="margin-top:6px"><div class="empty">Laden...</div></div>';
+  loadDrafts();
+  loadLiveCampaigns();
+}
+async function loadLiveCampaigns(){
+  var box=document.getElementById('liveWrap'); if(!box)return;
   try{
     var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
     var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
     var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns',{credentials:'include'}); var cd=await cr.json();
-    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="empty"><h4>Geen Meta-koppeling</h4><p>Er is nog geen advertentiekoppeling ingesteld voor deze klant.</p></div>';return;}
+    if(cd&&cd.success&&!cd.configured){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Er is nog geen advertentiekoppeling ingesteld voor deze klant.</div>';return;}
     var mr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var md=await mr.json();
     var tree=(md&&md.success&&md.adTree)?md.adTree:[]; var treeById={}; tree.forEach(function(t){treeById[String(t.id)]=t;});
     var camps=(cd&&cd.success&&cd.campaigns)?cd.campaigns.filter(function(x){return linked.indexOf(String(x.id))>=0;}):[];
-    if(!camps.length){box.innerHTML='<div class="empty"><h4>Geen campagnes</h4><p>Er zijn nog geen campagnes aan deze klant gekoppeld.</p></div>';return;}
-    box.innerHTML=camps.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');
+    if(!camps.length){box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen live campagnes aan deze klant gekoppeld.</div>';return;}
+    box.innerHTML='<div class="section-h"><h4>Live op Meta</h4></div>'+camps.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
+}
+// ---- Geplande (concept) campagnes: klaarzetten + goedkeuren ----
+var DRAFTS_CACHE={}, DRAFTS_CANMANAGE=false, EDIT_DRAFT_ID=null;
+function fmtDayShort(d){try{var x=new Date(d);if(isNaN(x.getTime()))return String(d);return x.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'});}catch(e){return String(d);}}
+function draftStatus(s){var m={concept:['Concept','#374151','#f3f4f6'],ter_goedkeuring:['Ter goedkeuring','#92400e','#fef3c7'],goedgekeurd:['Goedgekeurd','#166534','#dcfce7'],wijzigingen:['Wijzigingen gevraagd','#9a3412','#ffedd5'],live:['Live gezet','#1e40af','#dbeafe']};var x=m[s]||[s,'#374151','#f3f4f6'];return '<span style="font-size:10px;font-weight:700;color:'+x[1]+';background:'+x[2]+';padding:2px 8px;border-radius:20px;white-space:nowrap">'+esc(x[0])+'</span>';}
+async function loadDrafts(){
+  var wrap=document.getElementById('draftsWrap'); if(!wrap)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-drafts',{credentials:'include'}); var d=await r.json();
+    var drafts=(d&&d.success&&d.drafts)?d.drafts:[]; DRAFTS_CANMANAGE=!!(d&&d.canManage);
+    DRAFTS_CACHE={}; drafts.forEach(function(x){DRAFTS_CACHE[x.id]=x;});
+    var head='<div class="section-h" style="display:flex;justify-content:space-between;align-items:center"><h4>Geplande campagnes</h4>'+(DRAFTS_CANMANAGE?'<button class="btn btn-primary" style="padding:6px 12px;font-size:13px" onclick="openDraftForm()">+ Campagne klaarzetten</button>':'')+'</div>';
+    var list=drafts.length?drafts.map(renderDraftCard).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen geplande campagnes.</div>';
+    wrap.innerHTML=head+'<div id="draftFormWrap" style="display:none"></div>'+list;
+    drafts.forEach(function(dr){loadCampFeedback('draft_'+dr.id);});
+  }catch(e){wrap.innerHTML='<div class="section-h"><h4>Geplande campagnes</h4></div><div class="card" style="color:var(--muted)">Kon geplande campagnes niet laden.</div>';}
+}
+function renderDraftCard(dr){
+  var budget=(dr.daily_budget_cents!=null)?('&euro; '+(dr.daily_budget_cents/100).toFixed(2)+'/dag'):'';
+  var start=dr.planned_start?('Start '+esc(fmtDayShort(dr.planned_start))):'';
+  var meta=[esc(dr.objective||''),budget,start].filter(Boolean).join(' &middot; ');
+  var body='';
+  if(dr.audience)body+='<div style="margin-top:6px;font-size:13px"><strong>Doelgroep:</strong> '+esc(dr.audience)+'</div>';
+  if(dr.ad_text)body+='<div style="margin-top:4px;font-size:13px;white-space:pre-wrap"><strong>Advertentietekst:</strong> '+esc(dr.ad_text)+'</div>';
+  if(dr.notes&&DRAFTS_CANMANAGE)body+='<div style="margin-top:4px;font-size:12.5px;color:var(--muted);white-space:pre-wrap"><strong>Notitie (intern):</strong> '+esc(dr.notes)+'</div>';
+  var teamActs=DRAFTS_CANMANAGE?('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+    '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="editDraft('+dr.id+')">Bewerken</button>'+
+    (dr.status==='concept'?'<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setDraftStatus('+dr.id+',\'ter_goedkeuring\')">Naar klant ter goedkeuring</button>':'')+
+    '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setDraftStatus('+dr.id+',\'live\')">Markeer als live</button>'+
+    '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;color:#dc2626" onclick="deleteDraft('+dr.id+')">Verwijderen</button></div>'):'';
+  var clientActs=(!DRAFTS_CANMANAGE&&(dr.status==='ter_goedkeuring'||dr.status==='wijzigingen'))?('<div style="display:flex;gap:8px;margin-top:10px">'+
+    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="setDraftStatus('+dr.id+',\'goedgekeurd\')">Goedkeuren</button>'+
+    '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="setDraftStatus('+dr.id+',\'wijzigingen\')">Wijzigingen vragen</button></div>'):'';
+  return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start"><div><h4 style="margin:0;font-size:15px">'+esc(dr.name)+'</h4><div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+meta+'</div></div>'+draftStatus(dr.status)+'</div>'+body+teamActs+clientActs+
+    '<div id="fb_draft_'+dr.id+'" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"></div></div>';
+}
+function draftFieldVal(id){var e=document.getElementById(id);return e?e.value:'';}
+function openDraftForm(dr){
+  EDIT_DRAFT_ID=(dr&&dr.id)?dr.id:null; var v=dr||{};
+  var w=document.getElementById('draftFormWrap'); if(!w)return;
+  w.innerHTML='<div class="card" style="margin-bottom:12px"><div style="font-weight:700;margin-bottom:8px">'+(EDIT_DRAFT_ID?'Campagne bewerken':'Nieuwe geplande campagne')+'</div>'+
+    '<div class="field"><label>Naam</label><input id="df_name" value="'+esc(v.name||'')+'"></div>'+
+    '<div class="row2"><div class="field"><label>Doelstelling</label><input id="df_obj" placeholder="bijv. Leads" value="'+esc(v.objective||'')+'"></div>'+
+    '<div class="field"><label>Dagbudget (&euro;)</label><input id="df_budget" type="number" step="0.01" value="'+(v.daily_budget_cents!=null?(v.daily_budget_cents/100):'')+'"></div></div>'+
+    '<div class="field"><label>Startdatum</label><input id="df_start" type="date" value="'+esc(String(v.planned_start||'').slice(0,10))+'"></div>'+
+    '<div class="field"><label>Doelgroep</label><textarea id="df_aud" rows="2">'+esc(v.audience||'')+'</textarea></div>'+
+    '<div class="field"><label>Advertentietekst</label><textarea id="df_text" rows="3">'+esc(v.ad_text||'')+'</textarea></div>'+
+    '<div class="field"><label>Interne notitie</label><textarea id="df_notes" rows="2">'+esc(v.notes||'')+'</textarea></div>'+
+    '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" onclick="saveDraft()">Opslaan</button><button class="btn btn-ghost" onclick="closeDraftForm()">Annuleren</button></div></div>';
+  w.style.display='block';
+}
+function closeDraftForm(){var w=document.getElementById('draftFormWrap');if(w){w.style.display='none';w.innerHTML='';}EDIT_DRAFT_ID=null;}
+function editDraft(id){openDraftForm(DRAFTS_CACHE[id]||{id:id});}
+async function saveDraft(){
+  var name=draftFieldVal('df_name').trim(); if(!name){alert('Naam is verplicht');return;}
+  var payload={name:name,objective:draftFieldVal('df_obj'),daily_budget:draftFieldVal('df_budget'),planned_start:draftFieldVal('df_start'),audience:draftFieldVal('df_aud'),ad_text:draftFieldVal('df_text'),notes:draftFieldVal('df_notes')};
+  var url='/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-drafts'+(EDIT_DRAFT_ID?('/'+EDIT_DRAFT_ID):'');
+  try{var r=await fetch(url,{method:EDIT_DRAFT_ID?'PATCH':'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});var d=await r.json();
+    if(r.ok&&d.success){closeDraftForm();loadDrafts();} else alert(d.error||'Kon niet opslaan.');}catch(e){alert('Netwerkfout.');}
+}
+async function setDraftStatus(id,status){
+  if(status==='live'&&!confirm('Deze campagne als live markeren?'))return;
+  try{var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-drafts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})});var d=await r.json();
+    if(r.ok&&d.success){loadDrafts();} else alert(d.error||'Kon status niet wijzigen.');}catch(e){alert('Netwerkfout.');}
+}
+async function deleteDraft(id){
+  if(!confirm('Deze geplande campagne verwijderen?'))return;
+  try{var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-drafts/'+id,{method:'DELETE',credentials:'include'});var d=await r.json();
+    if(r.ok&&d.success){loadDrafts();} else alert(d.error||'Kon niet verwijderen.');}catch(e){alert('Netwerkfout.');}
 }
 function campReviewCard(c,t){
   var live=t?(t.live_adsets||0):0, nsets=t?((t.adsets||[]).length):0;
