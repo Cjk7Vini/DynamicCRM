@@ -1581,13 +1581,22 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
     )).rows[0]);
     const beneficiary = String((beneficiaryRow && beneficiaryRow.name) || name).slice(0, 100);
+    // Voor Leads/Verkoop optimaliseren we op echte conversies via de pixel
+    // (LEAD-event) zodra er een pixel is; anders veilig terugvallen op linkklikken.
+    let optimizationGoal = CAMPAIGN_OBJECTIVES[objective];
+    let promotedObject = null;
+    if ((objective === 'OUTCOME_LEADS' || objective === 'OUTCOME_SALES') && creds.pixelId) {
+      optimizationGoal = 'OFFSITE_CONVERSIONS';
+      promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
+    }
     const adsetParams = {
       name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
-      billing_event: 'IMPRESSIONS', optimization_goal: CAMPAIGN_OBJECTIVES[objective],
+      billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
       bid_strategy: bidStrategy, targeting, status: launchStatus,
       dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
+    if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
     // 3) Creatief (afbeelding-link-advertentie)

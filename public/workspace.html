@@ -840,8 +840,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="sub">Wordt gepauzeerd aangemaakt bij Meta. Er wordt niets uitgegeven tot jij hem in Meta activeert.</div>
     <div id="campModalMsg" class="inline-msg"></div>
     <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-      <label style="display:flex;align-items:center;gap:6px">AI-assistent <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></label>
-      <div style="font-size:12.5px;color:var(--muted);margin:2px 0 8px">Beschrijf kort wat je wilt adverteren. De AI vult tekst, doel en targeting alvast in. Het beeld kies je zelf.</div>
+      <label>AI-assistent</label>
+      <div style="font-size:12.5px;color:var(--muted);margin:2px 0 8px">Beschrijf kort wat je wilt adverteren. De AI vult de advertentietekst alvast in. Het beeld kies je zelf.</div>
       <textarea id="cpAiPrompt" rows="2" placeholder="Bijv. Gratis intake voor fysiotherapie in Goes, gericht op mensen met rugklachten van 30 tot 55 jaar"></textarea>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
         <button type="button" class="btn btn-primary" id="cpAiBtn" onclick="aiSuggestCampaign()" style="padding:8px 14px;font-size:13px">Genereer voorstel</button>
@@ -849,67 +849,82 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="field"><label>Campagnenaam *</label><input id="cpName" placeholder="Bijv. Zomeractie juli"></div>
-    <div class="row2">
-      <div class="field"><label>Doel</label>
-        <select id="cpObjective">
-          <option value="OUTCOME_AWARENESS">Bekendheid (bereik)</option>
-          <option value="OUTCOME_TRAFFIC">Verkeer (klikken naar site)</option>
-          <option value="OUTCOME_ENGAGEMENT">Betrokkenheid</option>
-          <option value="OUTCOME_LEADS">Leads</option>
-          <option value="OUTCOME_SALES">Verkoop</option>
-        </select>
-      </div>
-      <div class="field"><label>Dagbudget (euro) *</label><input id="cpBudget" type="number" min="1" step="1" value="10"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Land</label><input id="cpCountry" value="NL" maxlength="2" style="text-transform:uppercase"></div>
-      <div class="field"><label>Call-to-action</label>
-        <select id="cpCta">
-          <option value="LEARN_MORE">Meer informatie</option>
-          <option value="SHOP_NOW">Nu shoppen</option>
-          <option value="SIGN_UP">Aanmelden</option>
-          <option value="CONTACT_US">Neem contact op</option>
-          <option value="GET_OFFER">Bekijk aanbod</option>
-          <option value="SUBSCRIBE">Abonneren</option>
-        </select>
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Leeftijd van</label><input id="cpAgeMin" type="number" min="13" max="65" value="18"></div>
-      <div class="field"><label>Leeftijd tot</label><input id="cpAgeMax" type="number" min="13" max="65" value="65"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Geslacht</label>
-        <select id="cpGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
-      </div>
-      <div class="field"><label>Plaatsingen</label>
-        <select id="cpPlacement"><option value="automatic">Automatisch (aanrader)</option><option value="manual">Alleen Facebook + Instagram feed</option></select>
-      </div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Biedstrategie</label>
-        <select id="cpBidStrategy" onchange="document.getElementById('cpBidCapWrap').style.display=this.value==='LOWEST_COST_WITH_BID_CAP'?'':'none'">
-          <option value="LOWEST_COST_WITHOUT_CAP">Laagste kosten (automatisch)</option>
-          <option value="LOWEST_COST_WITH_BID_CAP">Met biedlimiet</option>
-        </select>
-      </div>
-      <div class="field" id="cpBidCapWrap" style="display:none"><label>Biedlimiet (euro)</label><input id="cpBidCap" type="number" min="0.5" step="0.5" value="2"></div>
-    </div>
-    <div class="field"><label>Interesses (targeting)</label>
-      <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
-      <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
-      <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
-    </div>
+    <div class="field"><label>Dagbudget (euro) *</label><input id="cpBudget" type="number" min="1" step="1" value="10"></div>
     <div class="field"><label>Bestemmings-URL *</label><input id="cpLink" placeholder="https://..."></div>
     <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
       <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
     </div>
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
-    <div class="field"><label>Status na aanmaken</label>
-      <select id="cpLaunch">
-        <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
-        <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
-      </select>
+
+    <!-- Standaardinstellingen + schakelaar om af te wijken -->
+    <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:6px 0 8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <label style="margin:0">Standaardinstellingen</label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin:0">
+          <input type="checkbox" id="cpAdvToggle" onchange="toggleCampAdvanced(this.checked)" style="width:auto"> Afwijken
+        </label>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.7">
+        Doel: <strong>Leads</strong> &middot; Land: <strong>NL</strong> &middot; Leeftijd: <strong>18-65</strong> &middot; Geslacht: <strong>iedereen</strong> &middot; Plaatsingen: <strong>automatisch (Advantage+)</strong> &middot; Biedstrategie: <strong>laagste kosten</strong> &middot; Doelgroep: <strong>breed, geen interesses (Advantage+)</strong> &middot; Call-to-action: <strong>Meer informatie</strong> &middot; Status: <strong>gepauzeerd</strong>
+      </div>
+    </div>
+
+    <!-- Geavanceerde instellingen (alleen als je afwijkt) -->
+    <div id="cpAdvanced" style="display:none">
+      <div class="row2">
+        <div class="field"><label>Doel</label>
+          <select id="cpObjective">
+            <option value="OUTCOME_LEADS" selected>Leads</option>
+            <option value="OUTCOME_TRAFFIC">Verkeer (klikken naar site)</option>
+            <option value="OUTCOME_ENGAGEMENT">Betrokkenheid</option>
+            <option value="OUTCOME_AWARENESS">Bekendheid (bereik)</option>
+            <option value="OUTCOME_SALES">Verkoop</option>
+          </select>
+        </div>
+        <div class="field"><label>Call-to-action</label>
+          <select id="cpCta">
+            <option value="LEARN_MORE">Meer informatie</option>
+            <option value="SHOP_NOW">Nu shoppen</option>
+            <option value="SIGN_UP">Aanmelden</option>
+            <option value="CONTACT_US">Neem contact op</option>
+            <option value="GET_OFFER">Bekijk aanbod</option>
+            <option value="SUBSCRIBE">Abonneren</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Land</label><input id="cpCountry" value="NL" maxlength="2" style="text-transform:uppercase"></div>
+        <div class="field"><label>Geslacht</label>
+          <select id="cpGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Leeftijd van</label><input id="cpAgeMin" type="number" min="13" max="65" value="18"></div>
+        <div class="field"><label>Leeftijd tot</label><input id="cpAgeMax" type="number" min="13" max="65" value="65"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Plaatsingen</label>
+          <select id="cpPlacement"><option value="automatic">Automatisch (aanrader)</option><option value="manual">Alleen Facebook + Instagram feed</option></select>
+        </div>
+        <div class="field"><label>Biedstrategie</label>
+          <select id="cpBidStrategy" onchange="document.getElementById('cpBidCapWrap').style.display=this.value==='LOWEST_COST_WITH_BID_CAP'?'':'none'">
+            <option value="LOWEST_COST_WITHOUT_CAP">Laagste kosten (automatisch)</option>
+            <option value="LOWEST_COST_WITH_BID_CAP">Met biedlimiet</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="cpBidCapWrap" style="display:none"><label>Biedlimiet (euro)</label><input id="cpBidCap" type="number" min="0.5" step="0.5" value="2"></div>
+      <div class="field"><label>Interesses (targeting)</label>
+        <input id="cpInterestSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="searchInterests()">
+        <div id="cpInterestResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+        <div id="cpInterestChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+      </div>
+      <div class="field"><label>Status na aanmaken</label>
+        <select id="cpLaunch">
+          <option value="paused">Gepauzeerd aanmaken (aanrader, jij zet hem daarna live)</option>
+          <option value="active">Direct live zetten (gaat meteen geld uitgeven)</option>
+        </select>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCampaign()">Annuleren</button>
@@ -2245,6 +2260,8 @@ async function openCampaign(){
   document.getElementById('cpGenders').value='all';document.getElementById('cpPlacement').value='automatic';
   document.getElementById('cpBidStrategy').value='LOWEST_COST_WITHOUT_CAP';document.getElementById('cpBidCapWrap').style.display='none';
   var cpl=document.getElementById('cpLaunch'); if(cpl)cpl.value='paused';
+  var cpo=document.getElementById('cpObjective'); if(cpo)cpo.value='OUTCOME_LEADS';
+  var cpt=document.getElementById('cpAdvToggle'); if(cpt)cpt.checked=false; toggleCampAdvanced(false);
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
   var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
@@ -2285,6 +2302,7 @@ function renderInterestChips(){
   }).join('');
 }
 function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
+function toggleCampAdvanced(on){var a=document.getElementById('cpAdvanced');if(a)a.style.display=on?'':'none';}
 async function aiSuggestCampaign(){
   var brief=document.getElementById('cpAiPrompt').value.trim();
   var hint=document.getElementById('cpAiHint');
@@ -2314,24 +2332,49 @@ async function aiSuggestCampaign(){
 }
 async function createCampaign2(){
   var btn=document.getElementById('cpBtn'); hideMsg('campModalMsg');
-  var payload={
-    name:document.getElementById('cpName').value.trim(),
-    objective:document.getElementById('cpObjective').value,
-    dailyBudget:document.getElementById('cpBudget').value,
-    country:document.getElementById('cpCountry').value.trim(),
-    cta:document.getElementById('cpCta').value,
-    ageMin:document.getElementById('cpAgeMin').value,
-    ageMax:document.getElementById('cpAgeMax').value,
-    link:document.getElementById('cpLink').value.trim(),
-    assetId:document.getElementById('cpAsset').value||null,
-    caption:document.getElementById('cpCaption').value,
-    genders:document.getElementById('cpGenders').value,
-    placement:document.getElementById('cpPlacement').value,
-    bidStrategy:document.getElementById('cpBidStrategy').value,
-    bidCap:document.getElementById('cpBidCap').value,
-    interests:CP_INTERESTS,
-    launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
-  };
+  var adv=!!(document.getElementById('cpAdvToggle')&&document.getElementById('cpAdvToggle').checked);
+  var payload;
+  if(adv){
+    // Afwijken: gebruik de ingevulde geavanceerde velden.
+    payload={
+      name:document.getElementById('cpName').value.trim(),
+      objective:document.getElementById('cpObjective').value,
+      dailyBudget:document.getElementById('cpBudget').value,
+      country:document.getElementById('cpCountry').value.trim(),
+      cta:document.getElementById('cpCta').value,
+      ageMin:document.getElementById('cpAgeMin').value,
+      ageMax:document.getElementById('cpAgeMax').value,
+      link:document.getElementById('cpLink').value.trim(),
+      assetId:document.getElementById('cpAsset').value||null,
+      caption:document.getElementById('cpCaption').value,
+      genders:document.getElementById('cpGenders').value,
+      placement:document.getElementById('cpPlacement').value,
+      bidStrategy:document.getElementById('cpBidStrategy').value,
+      bidCap:document.getElementById('cpBidCap').value,
+      interests:CP_INTERESTS,
+      launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
+    };
+  } else {
+    // Standaardinstellingen (Meta best practice): Leads, NL, 18-65, iedereen,
+    // automatische plaatsingen, laagste kosten, breed (geen interesses), gepauzeerd.
+    payload={
+      name:document.getElementById('cpName').value.trim(),
+      objective:'OUTCOME_LEADS',
+      dailyBudget:document.getElementById('cpBudget').value,
+      country:'NL',
+      cta:'LEARN_MORE',
+      ageMin:18, ageMax:65,
+      link:document.getElementById('cpLink').value.trim(),
+      assetId:document.getElementById('cpAsset').value||null,
+      caption:document.getElementById('cpCaption').value,
+      genders:'all',
+      placement:'automatic',
+      bidStrategy:'LOWEST_COST_WITHOUT_CAP',
+      bidCap:'',
+      interests:[],
+      launch:'paused'
+    };
+  }
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
   function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
   if(!payload.name){campShowErr('Campagnenaam is verplicht.');return;}
