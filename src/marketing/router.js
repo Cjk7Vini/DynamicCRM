@@ -2870,22 +2870,10 @@ router.delete('/api/mkt/clients/:clientId/meta-campaigns/:campaignId', requireMk
 // Opmerkingen/feedback van de klant op een campagne (inzage + reageren).
 // Deploy-veilig: de tabel wordt bij eerste gebruik aangemaakt.
 // =======================================================================
-// Tabel bij eerste gebruik aanmaken. ALLEEN via de schrijf-verbinding aanroepen
-// (DDL kan niet op een alleen-lezen verbinding).
-async function ensureCampaignFeedbackTable(c) {
-  await c.query(`CREATE TABLE IF NOT EXISTS marketing.campaign_feedback (
-    id SERIAL PRIMARY KEY,
-    workspace_id INTEGER NOT NULL,
-    client_id INTEGER NOT NULL,
-    meta_campaign_id TEXT NOT NULL,
-    author_account_id INTEGER,
-    author_role TEXT,
-    author_name TEXT,
-    body TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ
-  )`);
-}
+// De app-gebruiker mag geen tabellen aanmaken in schema marketing; de tabel
+// wordt via migratie 006 in Neon aangemaakt. Deze helper doet daarom niets meer
+// (blijft bestaan zodat de aanroepen ongewijzigd blijven).
+async function ensureCampaignFeedbackTable(_c) { /* tabel komt uit migratie 006 */ }
 // Mag deze gebruiker deze opmerking bewerken/verwijderen? Eigen bericht, of team.
 function mktMayEditFeedback(m, row) {
   if (!m || !row) return false;
@@ -2982,24 +2970,8 @@ router.delete('/api/mkt/clients/:clientId/campaigns/:campaignId/feedback/:feedba
 // Puur een plan in onze database; er gebeurt niets automatisch bij Meta.
 // =======================================================================
 const DRAFT_STATUS = ['concept', 'ter_goedkeuring', 'goedgekeurd', 'wijzigingen', 'live'];
-async function ensureCampaignDraftTable(c) {
-  await c.query(`CREATE TABLE IF NOT EXISTS marketing.campaign_drafts (
-    id SERIAL PRIMARY KEY,
-    workspace_id INTEGER NOT NULL,
-    client_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    objective TEXT,
-    daily_budget_cents INTEGER,
-    audience TEXT,
-    ad_text TEXT,
-    planned_start DATE,
-    notes TEXT,
-    status TEXT DEFAULT 'concept',
-    created_by INTEGER,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ
-  )`);
-}
+// Tabel komt uit migratie 006 (app-gebruiker mag geen DDL in schema marketing).
+async function ensureCampaignDraftTable(_c) { /* tabel komt uit migratie 006 */ }
 router.get('/api/mkt/clients/:clientId/campaign-drafts', requireMkt, async (req, res) => {
   try {
     if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
