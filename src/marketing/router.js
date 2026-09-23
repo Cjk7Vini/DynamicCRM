@@ -2406,6 +2406,28 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       await igPrev('website_clicks', 'website_clicks');
       await igPrev('follower_delta', 'follower_count', true);
 
+      // Weergaven-splitsingen (best-effort; breakdown-parameters kunnen per
+      // Meta-versie verschillen, daarom volledig afgeschermd).
+      out.views_split = null;    // volgers vs niet-volgers
+      out.views_by_type = null;  // per contenttype (incl. verhalen)
+      try {
+        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', ...igWin, access_token: token });
+        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+        if (bd && Array.isArray(bd.results)) {
+          let f = 0; let n = 0;
+          bd.results.forEach((x) => { const dv = (x.dimension_values || [])[0]; const v = Number(x.value) || 0; if (dv === 'FOLLOWER') f += v; else if (dv === 'NON_FOLLOWER') n += v; });
+          if (f + n > 0) out.views_split = { follower: f, non_follower: n };
+        }
+      } catch (e) { /* breakdown niet beschikbaar */ }
+      try {
+        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', ...igWin, access_token: token });
+        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+        if (bd && Array.isArray(bd.results)) {
+          const arr = bd.results.map((x) => ({ type: (x.dimension_values || [])[0] || '?', value: Number(x.value) || 0 })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+          if (arr.length) out.views_by_type = arr;
+        }
+      } catch (e) { /* breakdown niet beschikbaar */ }
+
       if (!Object.keys(out.insights).length) out.insights = null;
 
       // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,

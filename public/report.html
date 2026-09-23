@@ -151,7 +151,25 @@ async function build(){
     if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
     else html+='<div class="note">Statistieken (bereik, weergaven, interacties) zijn nog niet beschikbaar.'+((meta.errors&&meta.errors.insights)?(' Meta-melding: '+esc(meta.errors.insights)):'')+'</div>';
 
-    // Verdeling per contenttype
+    // Weergaven: volgers vs niet-volgers (indien beschikbaar)
+    if(meta.views_split){
+      var vf=meta.views_split.follower||0, vn=meta.views_split.non_follower||0, vt=vf+vn;
+      if(vt>0){
+        html+='<h2>Weergaven: volgers vs niet-volgers</h2>';
+        html+='<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin-bottom:6px"><div style="width:'+(vf/vt*100).toFixed(1)+'%;background:var(--brand)"></div><div style="width:'+(vn/vt*100).toFixed(1)+'%;background:#c7cbe0"></div></div>';
+        html+='<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted)"><span>Volgers '+(vf/vt*100).toFixed(1)+'% ('+fmtn(vf)+')</span><span>Niet-volgers '+(vn/vt*100).toFixed(1)+'% ('+fmtn(vn)+')</span></div>';
+      }
+    }
+
+    // Weergaven per contenttype (incl. verhalen), indien beschikbaar via de API
+    if(meta.views_by_type&&meta.views_by_type.length){
+      var MPT={REELS:'Reels',VIDEO:'Video',CAROUSEL_CONTAINER:'Carrousels',CAROUSEL_ALBUM:'Carrousels',POST:'Berichten',IMAGE:'Berichten',FEED:'Berichten',STORY:'Verhalen',IGTV:'Video',AD:'Advertenties'};
+      var mvt=Math.max.apply(null,meta.views_by_type.map(function(x){return x.value;}))||1;
+      html+='<h2>Weergaven per contenttype</h2>';
+      html+=meta.views_by_type.map(function(x){var w=Math.round((x.value/mvt)*100);return '<div class="ctbar"><div class="lab"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+fmtn(x.value)+' weergaven</span></div><div class="track"><div class="fill" style="width:'+w+'%"></div></div></div>';}).join('');
+    }
+
+    // Verdeling per contenttype (op basis van geplaatste posts + interacties)
     if(meta.contentTypes&&meta.contentTypes.length){
       var mx=Math.max.apply(null,meta.contentTypes.map(function(x){return x.count;}))||1;
       html+='<h2>Verdeling per contenttype</h2>';
