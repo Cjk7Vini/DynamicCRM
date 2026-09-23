@@ -123,30 +123,32 @@ async function build(){
   var hasMeta=meta&&meta.success&&meta.configured;
 
   if(hasMeta&&meta.account){
-    var acc=meta.account, ins=meta.insights||{};
-    // Community growth (gekleurde tegels)
+    var acc=meta.account, ins=meta.insights||{}, pmeta=meta.insights_prev||{};
     var followers=acc.followers, delta=ins.follower_delta;
     var growthPct=null;
     if(delta!=null&&followers!=null&&(followers-delta)>0){growthPct=Math.round((delta/(followers-delta))*10000)/100;}
-    html+='<h2>Community growth</h2>';
+    var pctChange=function(cur,prev){if(cur==null||prev==null||Number(prev)===0)return null;return Math.round(((Number(cur)-Number(prev))/Number(prev))*1000)/10;};
+    var deltaTxt=function(p){if(p==null)return '';return (p>=0?'↑ +':'↓ ')+Math.abs(p)+'%';};
+    var deltaSpan=function(cur,prev){var p=pctChange(cur,prev);if(p==null)return '';return '<span style="font-size:12px;font-weight:700;color:'+(p>=0?'#16a34a':'#dc2626')+';margin-left:6px">'+deltaTxt(p)+'</span>';};
+    var kpiD=function(label,val,cur,prev){return '<div class="kpi"><div class="k">'+esc(label)+'</div><div class="v">'+val+deltaSpan(cur,prev)+'</div></div>';};
+    // 1. Accountoverzicht
+    html+='<h2>Accountoverzicht</h2>';
     if(acc.username)html+='<div class="sect1">@'+esc(acc.username)+'</div>';
+    var vP=pctChange(ins.views,pmeta.views);
     html+='<div class="grid g3">'+
-      bigtile('c-purple','Volgers',fmtn(followers),growthPct!=null?((growthPct>=0?'+':'')+growthPct+'%'):'',growthPct==null||growthPct>=0)+
-      bigtile('c-green','Volgersbalans (28d)',(delta!=null?((delta>=0?'+':'')+fmtn(delta)):'-'),'',delta==null||delta>=0)+
-      bigtile('c-amber','Berichten totaal',fmtn(acc.media),'',true)+
+      bigtile('c-purple','Weergaven',fmtn(ins.views),(vP!=null?deltaTxt(vP):''),(vP==null||vP>=0))+
+      bigtile('c-green','Totaal volgers',fmtn(followers),(growthPct!=null?deltaTxt(growthPct):''),(growthPct==null||growthPct>=0))+
+      bigtile('c-amber','Gepubliceerde content',fmtn(acc.media),'',true)+
       '</div>';
-
-    // Instagram statistieken
-    var ik=[];
-    if(ins.reach!=null)ik.push(kpi('Bereik',fmtn(ins.reach)));
-    if(ins.views!=null)ik.push(kpi('Weergaven',fmtn(ins.views)));
-    if(ins.total_interactions!=null)ik.push(kpi('Interacties',fmtn(ins.total_interactions)));
-    if(ins.accounts_engaged!=null)ik.push(kpi('Betrokken accounts',fmtn(ins.accounts_engaged)));
-    if(ins.profile_views!=null)ik.push(kpi('Profielbezoeken',fmtn(ins.profile_views)));
-    if(ins.website_clicks!=null)ik.push(kpi('Klikken in bio',fmtn(ins.website_clicks)));
-    if(ins.follower_delta!=null)ik.push(kpi('Netto nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta)));
-    if(acc.following!=null)ik.push(kpi('Volgend',fmtn(acc.following)));
-    if(ik.length)html+='<h2>Instagram statistieken</h2><div class="sect1">gekozen periode</div><div class="grid">'+ik.join('')+'</div>';
+    // 2. Prestaties (vergeleken met de vorige, even lange periode)
+    var pr=[];
+    if(ins.reach!=null)pr.push(kpiD('Bereik',fmtn(ins.reach),null,null));
+    if(ins.views!=null)pr.push(kpiD('Weergaven',fmtn(ins.views),ins.views,pmeta.views));
+    if(ins.total_interactions!=null)pr.push(kpiD('Interacties',fmtn(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
+    if(ins.follower_delta!=null)pr.push(kpiD('Netto nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
+    if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',fmtn(ins.profile_views),ins.profile_views,pmeta.profile_views));
+    if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
+    if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
     else html+='<div class="note">Statistieken (bereik, weergaven, interacties) zijn nog niet beschikbaar.'+((meta.errors&&meta.errors.insights)?(' Meta-melding: '+esc(meta.errors.insights)):'')+'</div>';
 
     // Verdeling per contenttype
