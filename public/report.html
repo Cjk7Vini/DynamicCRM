@@ -143,8 +143,10 @@ async function build(){
     if(ins.total_interactions!=null)ik.push(kpi('Interacties',fmtn(ins.total_interactions)));
     if(ins.accounts_engaged!=null)ik.push(kpi('Betrokken accounts',fmtn(ins.accounts_engaged)));
     if(ins.profile_views!=null)ik.push(kpi('Profielbezoeken',fmtn(ins.profile_views)));
+    if(ins.website_clicks!=null)ik.push(kpi('Klikken in bio',fmtn(ins.website_clicks)));
+    if(ins.follower_delta!=null)ik.push(kpi('Netto nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta)));
     if(acc.following!=null)ik.push(kpi('Volgend',fmtn(acc.following)));
-    if(ik.length)html+='<h2>Instagram statistieken</h2><div class="sect1">laatste 28 dagen</div><div class="grid">'+ik.join('')+'</div>';
+    if(ik.length)html+='<h2>Instagram statistieken</h2><div class="sect1">gekozen periode</div><div class="grid">'+ik.join('')+'</div>';
     else html+='<div class="note">Statistieken (bereik, weergaven, interacties) zijn nog niet beschikbaar.'+((meta.errors&&meta.errors.insights)?(' Meta-melding: '+esc(meta.errors.insights)):'')+'</div>';
 
     // Verdeling per contenttype
