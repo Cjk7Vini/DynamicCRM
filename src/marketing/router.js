@@ -2357,16 +2357,21 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           }
         } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
       };
-      await oneMetric('reach', { metric: 'reach', period: 'days_28' });
-      await oneMetric('views', { metric: 'views', period: 'day', metric_type: 'total_value' });
-      await oneMetric('profile_views', { metric: 'profile_views', period: 'day', metric_type: 'total_value' });
-      await oneMetric('accounts_engaged', { metric: 'accounts_engaged', period: 'day', metric_type: 'total_value' });
-      await oneMetric('total_interactions', { metric: 'total_interactions', period: 'day', metric_type: 'total_value' });
-      // Volgersgroei: som van de dagelijkse netto nieuwe volgers over 28 dagen.
-      // Alleen beschikbaar voor accounts met 100+ volgers; mislukt hij, dan
-      // slaan we hem net als de andere metrics gewoon over.
-      const _now = Math.floor(Date.now() / 1000);
-      await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
+      // Instagram-venster: gekozen periode of de laatste 30 dagen. De total_value
+      // metrics MOETEN een venster (since/until) meekrijgen, anders geeft Meta maar
+      // 1 dag terug (dat was de bug: 750 i.p.v. ~10.471 weergaven).
+      const igU = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.until || '')) ? Math.floor(new Date(req.query.until + 'T23:59:59Z').getTime() / 1000) : Math.floor(Date.now() / 1000);
+      const igS = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.since || '')) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (igU - 30 * 24 * 3600);
+      const igWin = { since: String(igS), until: String(igU) };
+      out.insights_period = { since: igS, until: igU };
+      await oneMetric('reach', { metric: 'reach', metric_type: 'total_value', ...igWin });
+      await oneMetric('views', { metric: 'views', metric_type: 'total_value', ...igWin });
+      await oneMetric('profile_views', { metric: 'profile_views', metric_type: 'total_value', ...igWin });
+      await oneMetric('accounts_engaged', { metric: 'accounts_engaged', metric_type: 'total_value', ...igWin });
+      await oneMetric('total_interactions', { metric: 'total_interactions', metric_type: 'total_value', ...igWin });
+      await oneMetric('website_clicks', { metric: 'website_clicks', metric_type: 'total_value', ...igWin });
+      // Volgersgroei (netto nieuwe volgers) over het venster; time_series-metric.
+      await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
       if (!Object.keys(out.insights).length) out.insights = null;
 
       // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
