@@ -2364,14 +2364,22 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const igS = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.since || '')) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (igU - 30 * 24 * 3600);
       const igWin = { since: String(igS), until: String(igU) };
       out.insights_period = { since: igS, until: igU };
-      await oneMetric('reach', { metric: 'reach', metric_type: 'total_value', ...igWin });
-      await oneMetric('views', { metric: 'views', metric_type: 'total_value', ...igWin });
-      await oneMetric('profile_views', { metric: 'profile_views', metric_type: 'total_value', ...igWin });
-      await oneMetric('accounts_engaged', { metric: 'accounts_engaged', metric_type: 'total_value', ...igWin });
-      await oneMetric('total_interactions', { metric: 'total_interactions', metric_type: 'total_value', ...igWin });
-      await oneMetric('website_clicks', { metric: 'website_clicks', metric_type: 'total_value', ...igWin });
-      // Volgersgroei (netto nieuwe volgers) over het venster; time_series-metric.
+      // Robuust: probeer eerst met tijdvenster (30 dagen / gekozen periode); geeft
+      // Meta daar niets op terug, dan vallen we terug op de aanroep zonder venster,
+      // zodat de cijfers NOOIT wegvallen. period:'day' moet altijd meegestuurd worden.
+      const igMetric = async (key, metric) => {
+        await oneMetric(key, { metric, period: 'day', metric_type: 'total_value', ...igWin });
+        if (out.insights[key] == null) await oneMetric(key, { metric, period: 'day', metric_type: 'total_value' });
+      };
+      await oneMetric('reach', { metric: 'reach', period: 'days_28' });
+      await igMetric('views', 'views');
+      await igMetric('profile_views', 'profile_views');
+      await igMetric('accounts_engaged', 'accounts_engaged');
+      await igMetric('total_interactions', 'total_interactions');
+      await igMetric('website_clicks', 'website_clicks');
+      const _now = Math.floor(Date.now() / 1000);
       await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
+      if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
       if (!Object.keys(out.insights).length) out.insights = null;
 
       // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
