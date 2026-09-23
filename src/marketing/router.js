@@ -2384,6 +2384,28 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const _now = Math.floor(Date.now() / 1000);
       await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
       if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
+
+      // Vorige, even lange periode voor de procentuele verandering (best-effort).
+      // Alleen voor de venster-metrics, zodat de vergelijking eerlijk is.
+      out.insights_prev = {};
+      const prevLen = igU - igS;
+      const prevWin = { since: String(igS - prevLen), until: String(igS) };
+      const igPrev = async (key, metric, isDelta) => {
+        try {
+          const params = isDelta ? { metric, period: 'day', ...prevWin, access_token: token } : { metric, period: 'day', metric_type: 'total_value', ...prevWin, access_token: token };
+          const r = await graphGet(`${creds.igUserId}/insights`, params);
+          const row = (r.data && r.data[0]) || null; if (!row) return;
+          if (row.total_value && row.total_value.value != null) out.insights_prev[key] = Number(row.total_value.value);
+          else if (Array.isArray(row.values) && row.values.length) out.insights_prev[key] = row.values.reduce((s, v) => s + (Number(v.value) || 0), 0);
+        } catch (e) { /* vorige periode overslaan */ }
+      };
+      await igPrev('views', 'views');
+      await igPrev('profile_views', 'profile_views');
+      await igPrev('accounts_engaged', 'accounts_engaged');
+      await igPrev('total_interactions', 'total_interactions');
+      await igPrev('website_clicks', 'website_clicks');
+      await igPrev('follower_delta', 'follower_count', true);
+
       if (!Object.keys(out.insights).length) out.insights = null;
 
       // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
