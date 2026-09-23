@@ -137,7 +137,7 @@ async function build(){
     var vP=pctChange(ins.views,pmeta.views);
     html+='<div class="grid g3">'+
       bigtile('c-purple','Weergaven',fmtn(ins.views),(vP!=null?deltaTxt(vP):''),(vP==null||vP>=0))+
-      bigtile('c-green','Totaal volgers',fmtn(followers),(growthPct!=null?deltaTxt(growthPct):''),(growthPct==null||growthPct>=0))+
+      bigtile('c-green','Totaal volgers',fmtn(followers),'',true)+
       bigtile('c-amber','Gepubliceerde content',fmtn(acc.media),'',true)+
       '</div>';
     // 2. Prestaties (vergeleken met de vorige, even lange periode)
@@ -145,7 +145,7 @@ async function build(){
     if(ins.reach!=null)pr.push(kpiD('Bereik',fmtn(ins.reach),null,null));
     if(ins.views!=null)pr.push(kpiD('Weergaven',fmtn(ins.views),ins.views,pmeta.views));
     if(ins.total_interactions!=null)pr.push(kpiD('Interacties',fmtn(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
-    if(ins.follower_delta!=null)pr.push(kpiD('Netto nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
+    if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
     if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',fmtn(ins.profile_views),ins.profile_views,pmeta.profile_views));
     if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
     if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
