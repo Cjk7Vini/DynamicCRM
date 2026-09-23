@@ -193,7 +193,7 @@ async function build(){
       html+='<h2>Ranking of posts</h2><div class="sect1">'+meta.topPosts.length+' best presterende posts</div>';
       html+='<div class="tbl-wrap"><table class="rank"><tr>'+
         '<th class="l">Datum</th><th class="l">Type</th><th class="l">Tekst</th>'+
-        '<th>Weergaven</th><th>Kijkers</th><th>Likes</th><th>Reacties</th><th>Opgeslagen</th><th>Gedeeld</th><th>Engagement</th></tr>';
+        '<th>Weergaven</th><th>Kijkers</th><th>Nieuwe volgers</th><th>Likes</th><th>Reacties</th><th>Opgeslagen</th><th>Gedeeld</th><th>Engagement</th></tr>';
       html+=meta.topPosts.map(function(p){
         var img=p.thumb?('<img class="pthumb" src="'+esc(p.thumb)+'" alt="">'):'<div class="pthumb"></div>';
         var link=p.permalink?('<a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--brand);font-size:11px">bekijk</a>'):'';
@@ -203,6 +203,7 @@ async function build(){
           '<td class="l"><div class="ptxt">'+esc((p.caption||'(geen tekst)'))+'</div></td>'+
           '<td>'+fmtn(p.views)+'</td>'+
           '<td>'+fmtn(p.reach)+'</td>'+
+          '<td>'+(p.follows!=null?fmtn(p.follows):'-')+'</td>'+
           '<td>'+fmtn(p.likes)+'</td>'+
           '<td>'+fmtn(p.comments)+'</td>'+
           '<td>'+fmtn(p.saved)+'</td>'+

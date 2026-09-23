@@ -2334,6 +2334,10 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           };
           try { await trySet('reach,views,saved,shares,total_interactions'); }
           catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
+          // Nieuwe volgers vanuit deze post ("follows"). Apart en afgeschermd, want
+          // deze metric is niet voor elke post/accounttype beschikbaar; mislukt hij,
+          // dan blijven de andere cijfers gewoon staan.
+          try { await trySet('follows'); } catch (_) { /* follows niet beschikbaar */ }
           if (p.reach != null && p.total_interactions != null && p.reach > 0) {
             p.engagement = Math.round((p.total_interactions / p.reach) * 10000) / 100;
           }
