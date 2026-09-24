@@ -2380,7 +2380,10 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       await igMetric('profile_views', 'profile_views');
       await igMetric('accounts_engaged', 'accounts_engaged');
       await igMetric('total_interactions', 'total_interactions');
-      await igMetric('website_clicks', 'website_clicks');
+      // website_clicks (klikken op de link in bio) is een DAGELIJKSE metric die je
+      // optelt; niet total_value. Eerst dagelijks over het venster, dan terugval.
+      await oneMetric('website_clicks', { metric: 'website_clicks', period: 'day', ...igWin });
+      if (out.insights.website_clicks == null) await oneMetric('website_clicks', { metric: 'website_clicks', period: 'day', metric_type: 'total_value', ...igWin });
       const _now = Math.floor(Date.now() / 1000);
       await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
       if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
@@ -2403,7 +2406,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       await igPrev('profile_views', 'profile_views');
       await igPrev('accounts_engaged', 'accounts_engaged');
       await igPrev('total_interactions', 'total_interactions');
-      await igPrev('website_clicks', 'website_clicks');
+      await igPrev('website_clicks', 'website_clicks', true);
       await igPrev('follower_delta', 'follower_count', true);
 
       // Weergaven-splitsingen (best-effort; breakdown-parameters kunnen per
