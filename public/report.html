@@ -82,6 +82,25 @@ function fmtWhen(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()
 function fmtDay(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'});}
 function num(v){return v!=null?v:'-';}
 function fmtn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
+function lineChartSVG(data,color){
+  if(!data||data.length<2)return '';
+  var W=600,H=180,pad=26;
+  var vals=data.map(function(d){return d.v;});
+  var max=Math.max.apply(null,vals)||1, min=Math.min.apply(null,vals);
+  var n=data.length, range=(max-min)||1;
+  var x=function(i){return pad+(i/(n-1))*(W-2*pad);};
+  var y=function(v){return H-pad-((v-min)/range)*(H-2*pad);};
+  var pts=data.map(function(d,i){return x(i).toFixed(1)+','+y(d.v).toFixed(1);}).join(' ');
+  function lbl(iso){if(!iso)return '';var dd=new Date(iso);if(isNaN(dd.getTime()))return '';return dd.toLocaleDateString('nl-NL',{day:'numeric',month:'short'});}
+  var first=lbl(data[0].t), mid=lbl(data[Math.floor(n/2)].t), last=lbl(data[n-1].t);
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+
+    '<polyline fill="none" stroke="'+color+'" stroke-width="2.5" points="'+pts+'"/>'+
+    '<text x="'+pad+'" y="14" font-size="11" fill="#8a8f9e">max '+fmtn(max)+'</text>'+
+    '<text x="'+pad+'" y="'+(H-6)+'" font-size="11" fill="#8a8f9e">'+esc(first)+'</text>'+
+    '<text x="'+(W/2)+'" y="'+(H-6)+'" font-size="11" fill="#8a8f9e" text-anchor="middle">'+esc(mid)+'</text>'+
+    '<text x="'+(W-pad)+'" y="'+(H-6)+'" font-size="11" fill="#8a8f9e" text-anchor="end">'+esc(last)+'</text>'+
+  '</svg>';
+}
 function statusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
 function statusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':statusLabel(st))+'</span>';}
 function param(k){var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):'';}
@@ -150,6 +169,14 @@ async function build(){
     if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
     if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
     else html+='<div class="note">Statistieken (bereik, weergaven, interacties) zijn nog niet beschikbaar.'+((meta.errors&&meta.errors.insights)?(' Meta-melding: '+esc(meta.errors.insights)):'')+'</div>';
+
+    // Grafiek: weergaven en nieuwe volgers per dag (over de gekozen periode)
+    if(meta.series&&meta.series.views&&meta.series.views.length>1){
+      html+='<h2>Weergaven per dag</h2><div class="card">'+lineChartSVG(meta.series.views,'#e1306c')+'</div>';
+    }
+    if(meta.series&&meta.series.follower_count&&meta.series.follower_count.length>1){
+      html+='<h2>Nieuwe volgers per dag</h2><div class="card">'+lineChartSVG(meta.series.follower_count,'#16a34a')+'</div>';
+    }
 
     // Weergaven: volgers vs niet-volgers (indien beschikbaar)
     if(meta.views_split){
