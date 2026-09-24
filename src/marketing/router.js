@@ -2431,6 +2431,23 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         }
       } catch (e) { /* breakdown niet beschikbaar */ }
 
+      // Dagelijkse reeks over de periode voor de grafiek (weergaven en nieuwe
+      // volgers per dag). Afgeschermd; ontbreekt hij, dan gewoon geen grafiek.
+      out.series = null;
+      try {
+        const s = {};
+        const daily = async (key, metric) => {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', ...igWin, access_token: token });
+            const row = (r.data && r.data[0]) || null;
+            if (row && Array.isArray(row.values) && row.values.length) s[key] = row.values.map((v) => ({ t: v.end_time || null, v: Number(v.value) || 0 }));
+          } catch (e) { /* deze reeks overslaan */ }
+        };
+        await daily('views', 'views');
+        await daily('follower_count', 'follower_count');
+        if (Object.keys(s).length) out.series = s;
+      } catch (e) { /* geen grafiekdata */ }
+
       if (!Object.keys(out.insights).length) out.insights = null;
 
       // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
