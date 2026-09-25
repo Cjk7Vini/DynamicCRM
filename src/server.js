@@ -3464,16 +3464,44 @@ function requireCron(req, res, next) {
   next();
 }
 
-function requireAuth(req, res, next) {
-  console.log('🔐 Auth check:', {
-    hasSession: !!req.session,
-    userId: req.session?.userId,
-    sessionID: req.sessionID
-  });
-  
+// Bepaalt of het account nog een geldige licentie heeft. Admin altijd; praktijk
+// via public.praktijken (actief + einddatum); organisatie via de user-licentie.
+async function accountLicenseActive(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dateOk = (d) => { if (!d) return true; try { return new Date(d).toISOString().slice(0, 10) >= todayStr; } catch (_) { return true; } };
+  if (user.role === 'organisation') {
+    if (user.org_license_type === 'unlimited') return true;
+    return dateOk(user.org_license_end_date);
+  }
+  const code = user.practice_code;
+  if (!code) return true;
+  const p = await withReadConnection(async (c) => (await c.query('SELECT actief, license_type, license_end_date FROM public.praktijken WHERE code=$1', [code])).rows[0]);
+  if (!p) return false;
+  if (p.actief === false) return false;
+  if (p.license_type === 'unlimited') return true;
+  return dateOk(p.license_end_date);
+}
+
+async function requireAuth(req, res, next) {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ error: 'Niet ingelogd' });
   }
+  // Licentie/actief hooguit eens per 5 minuten per sessie hercontroleren, zodat een
+  // verlopen of ingetrokken licentie ook een bestaande sessie afkapt.
+  try {
+    const now = Date.now();
+    if (!req.session.licCheckedAt || (now - req.session.licCheckedAt) > 5 * 60 * 1000) {
+      const user = await withReadConnection(async (c) => (await c.query(
+        'SELECT id, role, practice_code, org_license_type, org_license_end_date FROM public.users WHERE id=$1 AND active = TRUE AND (banned IS NULL OR banned = FALSE)', [req.session.userId]
+      )).rows[0]);
+      if (!user) { req.session.destroy(() => {}); return res.status(401).json({ error: 'Sessie ongeldig' }); }
+      const ok = await accountLicenseActive(user);
+      if (!ok) { req.session.destroy(() => {}); return res.status(403).json({ error: 'Je licentie is verlopen. Neem contact op met Dynamic Health Consultancy.' }); }
+      req.session.licCheckedAt = now;
+    }
+  } catch (e) { /* bij DB-fout niet iedereen buitensluiten */ }
   next();
 }
 
@@ -3611,9 +3639,17 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Onjuiste inloggegevens' });
     }
 
+    // Licentie-check: geen geldige/actieve licentie -> geen toegang.
+    const licOk = await accountLicenseActive(user);
+    if (!licOk) {
+      console.warn(`[AUTH] Login geweigerd - licentie verlopen/inactief: ${email} IP: ${req.ip}`);
+      return res.status(403).json({ error: 'Je licentie is verlopen of niet meer actief. Neem contact op met Dynamic Health Consultancy.' });
+    }
+
     console.log(`[AUTH] Ingelogd: ${email} rol=${user.role} IP: ${req.ip}`);
-    
+
     req.session.userId = user.id;
+    req.session.licCheckedAt = Date.now();
     req.session.email = user.email;
     req.session.role = user.role;
     req.session.organisationCodes = user.organisation_codes || null;
