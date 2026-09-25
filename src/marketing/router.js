@@ -2520,6 +2520,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
               spend: spend.toFixed(2), impressions, reach, clicks,
               link_clicks: linkClicks, landing_page_views: landingViews, leads,
               ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
+              link_ctr: impressions ? (linkClicks / impressions * 100).toFixed(2) : '0.00',
               unique_ctr: (reach && uLinkClicks) ? (uLinkClicks / reach * 100).toFixed(2) : null,
               cpc: linkClicks ? (spend / linkClicks).toFixed(2) : (clicks ? (spend / clicks).toFixed(2) : null),
               cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
