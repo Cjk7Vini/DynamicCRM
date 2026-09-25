@@ -1592,12 +1592,46 @@ async function loadCampSections(){
     if(!camps.length){box.innerHTML=wsDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Er zijn nog geen campagnes aan deze klant gekoppeld.</div>';return;}
     var scheduled=camps.filter(function(c){var t=treeById[String(c.id)];return t&&t.scheduled;});
     var liveOnes=camps.filter(function(c){var t=treeById[String(c.id)];return !(t&&t.scheduled);});
-    var html=wsDateBar()+campPerfBlock((md&&md.success&&md.ads&&!md.ads.empty)?md.ads:null);
+    var adsData=(md&&md.success&&md.ads&&!md.ads.empty)?md.ads:null;
+    var html=wsDateBar()+campPerfBlock(adsData);
+    html+='<div id="kpiAnalyseBox"></div>';
     if(scheduled.length){html+='<div class="section-h"><h4>Geplande campagnes</h4><span style="font-size:12px;color:var(--muted)">starten op een toekomstige datum</span></div>'+scheduled.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');}
     html+='<div class="section-h" style="margin-top:'+(scheduled.length?'18px':'0')+'"><h4>Live op Meta</h4></div>'+(liveOnes.length?liveOnes.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen live of actieve campagnes.</div>');
     box.innerHTML=html;
+    if(adsData)loadKpiAnalyse(adsData);
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
+}
+// ---- Claude KPI-analyse tussen "Campagne data algemeen" en de campagnes ----
+function kpiStatusStyle(s){var m={sterk:['#166534','#dcfce7'],goed:['#166534','#dcfce7'],aandacht:['#92400e','#fef3c7'],zwak:['#991b1b','#fee2e2']};return m[s]||['#334155','#e2e8f0'];}
+function renderKpiAnalyse(a){
+  var box=document.getElementById('kpiAnalyseBox'); if(!box)return;
+  var st=kpiStatusStyle(a.status);
+  var badge=a.status?'<span style="font-size:11px;font-weight:700;color:'+st[0]+';background:'+st[1]+';padding:3px 10px;border-radius:20px;text-transform:capitalize">'+esc(a.status)+'</span>':'';
+  var bn=a.bottleneck&&a.bottleneck!=='Geen'?'<div style="font-size:13px;margin:6px 0 2px"><span style="color:var(--muted)">Grootste knelpunt:</span> <strong>'+esc(a.bottleneck)+'</strong></div>':'';
+  var lis=function(arr){return (arr&&arr.length)?'<ul style="margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.55">'+arr.map(function(x){return '<li style="margin-bottom:4px">'+esc(x)+'</li>';}).join('')+'</ul>':'';};
+  var body='';
+  if(a.eindoordeel)body+='<div style="font-size:14px;line-height:1.5;margin-bottom:6px">'+esc(a.eindoordeel)+'</div>';
+  body+=bn;
+  if(a.analyse&&a.analyse.length)body+='<div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Analyse</div>'+lis(a.analyse);
+  if(a.acties&&a.acties.length)body+='<div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Wat je kunt doen</div>'+lis(a.acties);
+  box.innerHTML='<div class="card" style="margin-bottom:16px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(99,102,241,.06),transparent)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:9px"><span style="font-size:15px;font-weight:700">Claude analyse</span>'+badge+'</div>'
+    +'<button class="btn btn-ghost" style="padding:5px 11px;font-size:12px" onclick="loadKpiAnalyse(window.__lastAdsData,true)">Ververs</button></div>'
+    +body+'</div>';
+}
+async function loadKpiAnalyse(ads,force){
+  var box=document.getElementById('kpiAnalyseBox'); if(!box||!ads||!CURRENT_CLIENT)return;
+  window.__lastAdsData=ads;
+  box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13.5px">Claude analyseert de cijfers...</div>';
+  var period=(WS_SINCE&&WS_UNTIL)?(WS_SINCE+' t/m '+WS_UNTIL):'laatste 30 dagen';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/kpi-analysis',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({ads:ads,period:period})});
+    var d=await r.json();
+    if(r.status===503){box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13px">Claude-analyse is nog niet geconfigureerd (ANTHROPIC_API_KEY ontbreekt in Render).</div>';return;}
+    if(!r.ok||!d.success||!d.analysis){box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13px">Analyse niet beschikbaar'+(d&&d.error?': '+esc(d.error):'')+'. <a href="#" onclick="loadKpiAnalyse(window.__lastAdsData,true);return false;">Opnieuw proberen</a></div>';return;}
+    renderKpiAnalyse(d.analysis);
+  }catch(e){box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13px">Netwerkfout bij de analyse. <a href="#" onclick="loadKpiAnalyse(window.__lastAdsData,true);return false;">Opnieuw proberen</a></div>';}
 }
 // ---- Geplande (concept) campagnes: klaarzetten + goedkeuren ----
 var DRAFTS_CACHE={}, DRAFTS_CANMANAGE=false, EDIT_DRAFT_ID=null;

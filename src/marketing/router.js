@@ -2089,6 +2089,93 @@ router.post('/api/mkt/clients/:clientId/ai/analysis', requireMkt, async (req, re
 });
 
 // =======================================================================
+// AI-KPI-ANALYSE - toetst de reeds berekende campagnecijfers ("Campagne
+// data algemeen") aan de DHC-normering v2.0 en geeft een kort, concreet
+// advies: eindoordeel, funnel-bottleneck, observaties en verbeteracties.
+// De cijfers komen uit de body (exact wat de workspace toont), er wordt
+// dus geen extra Meta-call gedaan.
+// =======================================================================
+router.post('/api/mkt/clients/:clientId/ai/kpi-analysis', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const ads = (req.body && typeof req.body.ads === 'object' && req.body.ads) ? req.body.ads : null;
+    if (!ads || ads.empty || ads.impressions == null) {
+      return res.status(400).json({ error: 'Geen campagnecijfers om te analyseren' });
+    }
+    const period = String((req.body && req.body.period) || 'laatste 30 dagen').slice(0, 60);
+
+    const client = await withReadConnection(async (c) => (await c.query(
+      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+
+    const system = [
+      'Je bent een ervaren Nederlandse Meta-marketingspecialist bij Dynamic Health Consultancy (DHC).',
+      'Je beoordeelt de cijfers van EEN betaalde Meta-leadcampagne (lokale fysio/leefstijl) volgens de vaste DHC-normering v2.0.',
+      'Schrijf in het Nederlands, kort en concreet. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Baseer je uitsluitend op de aangeleverde cijfers. Verzin nooit getallen.',
+      '',
+      'DHC-normering v2.0 (per KPI):',
+      '- Cost per Lead (CPL): PRIMAIRE resultaat-KPI. Doel < EUR 20. Beoordeel ALTIJD eerst CPL en het aantal leads.',
+      '- Betrouwbaarheid op leadvolume: 0 tot 1 lead = geen harde conclusies (alleen signaleren); 2 = voorzichtig; 3 tot 4 = indicatief; 5 tot 9 = bruikbaar; 10 of meer = sterker onderbouwd.',
+      '- CPM: < EUR 15 is norm, EUR 10 tot 13 is sterk.',
+      '- Frequentie: DIAGNOSTISCH, geen afkeurgrens. < 2,5 normaal; 2,5 tot 3,5 monitoren; 3,5 tot 5 verhoogd (creative fatigue checken); > 5 alleen ingrijpen als CTR daalt en CPC/CPL stijgen. Keur een campagne NOOIT af op frequentie alleen.',
+      '- CTR link: >= 2% is norm, >= 3% is sterk.',
+      '- CPC link: functioneel tot EUR 0,65, streefwaarde < EUR 0,50.',
+      '- Klik naar landingspagina: >= 60% norm, >= 70% goed.',
+      '- Landingspagina naar lead: >= 3% functioneel, >= 5% ambitie.',
+      '',
+      'Beslisregels om de bottleneck te bepalen:',
+      '- CPL < EUR 20: eindresultaat binnen doel, niet onnodig ingrijpen.',
+      '- CTR < 2%: advertentie/boodschap spreekt onvoldoende aan (creative, hook, propositie, doelgroep, CTA).',
+      '- CTR goed maar CPC > EUR 0,65: verkeer is duur (veiling, doelgroep, plaatsingen, creative).',
+      '- CTR goed + klik naar LP goed + LP naar lead < 3%: verlies zit NA de klik (landingspagina, aanbod, formulier, vertrouwen, CTA).',
+      '- Klik naar LP < 60%: technische overgang (laadsnelheid, mobiel, link, tracking).',
+      '- LP naar lead >= 5% maar CPL hoog: pagina converteert sterk maar verkeer is te duur (CPM, CPC, targeting).',
+      '',
+      'KERNREGEL: beoordeel eerst het commerciele resultaat (CPL en volume), bepaal daarna waar in de funnel winst of verlies ontstaat, en optimaliseer de bottleneck, niet de KPI die toevallig het meest rood kleurt.',
+      '',
+      'Antwoord UITSLUITEND met een geldig JSON-object, zonder tekst eromheen, met exact deze velden:',
+      '{',
+      '  "eindoordeel": "1 korte zin over hoe de campagne er commercieel voor staat (CPL + leadvolume + betrouwbaarheid)",',
+      '  "status": "een van: sterk, goed, aandacht, zwak",',
+      '  "bottleneck": "een van: Bereik, Advertentie, Verkeer, Landingspagina, Leadopvolging, Geen",',
+      '  "analyse": ["2 tot 4 observaties, elk 1 korte zin, per relevante KPI wat opvalt en waarom"],',
+      '  "acties": ["2 tot 4 concrete verbeteracties, meest impactvolle eerst; sla frequentie over tenzij die echt problematisch is"]',
+      '}',
+    ].join('\n');
+
+    const userText = 'Klant: ' + (client.name || 'onbekend') + '\n'
+      + 'Periode: ' + period + '\n'
+      + 'Campagnecijfers (som over de gekoppelde campagnes van deze klant):\n'
+      + JSON.stringify(ads, null, 2);
+
+    const raw = await callClaude(system, userText, 1200);
+    let j;
+    try { j = extractJson(raw); } catch (_) { j = null; }
+    if (!j) return res.json({ success: true, analysis: { eindoordeel: raw.slice(0, 600), status: '', bottleneck: '', analyse: [], acties: [] } });
+
+    const allowStatus = ['sterk', 'goed', 'aandacht', 'zwak'];
+    const allowBottleneck = ['Bereik', 'Advertentie', 'Verkeer', 'Landingspagina', 'Leadopvolging', 'Geen'];
+    const cleanList = (v) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 4) : []);
+    res.json({
+      success: true,
+      analysis: {
+        eindoordeel: String(j.eindoordeel || '').slice(0, 400),
+        status: allowStatus.includes(j.status) ? j.status : '',
+        bottleneck: allowBottleneck.includes(j.bottleneck) ? j.bottleneck : '',
+        analyse: cleanList(j.analyse),
+        acties: cleanList(j.acties),
+      },
+    });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 6 - RAPPORTAGE per klant (cijfers uit eigen data)
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/stats', requireMkt, async (req, res) => {
