@@ -1534,6 +1534,25 @@ function wsDateQS(){return '?since='+encodeURIComponent(WS_SINCE)+'&until='+enco
 function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
 function wsDateBar(){return '<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:13px;color:var(--muted)">Periode (advertenties):</span><label style="font-size:12px">Van <input id="wsDtSince" type="date" value="'+esc(WS_SINCE)+'" style="width:auto"></label><label style="font-size:12px">Tot <input id="wsDtUntil" type="date" value="'+esc(WS_UNTIL)+'" style="width:auto"></label><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="wsApplyDates()">Toepassen</button></div>';}
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
+function wsLineChart(data,color){
+  if(!data||data.length<2)return '';
+  var W=600,H=170,pad=26;
+  var vals=data.map(function(d){return d.v;});
+  var max=Math.max.apply(null,vals)||1, min=Math.min.apply(null,vals);
+  var n=data.length, range=(max-min)||1;
+  var x=function(i){return pad+(i/(n-1))*(W-2*pad);};
+  var y=function(v){return H-pad-((v-min)/range)*(H-2*pad);};
+  var pts=data.map(function(d,i){return x(i).toFixed(1)+','+y(d.v).toFixed(1);}).join(' ');
+  var lbl=function(iso){if(!iso)return '';var dd=new Date(iso);if(isNaN(dd.getTime()))return '';return dd.toLocaleDateString('nl-NL',{day:'numeric',month:'short'});};
+  var first=lbl(data[0].t), mid=lbl(data[Math.floor(n/2)].t), last=lbl(data[n-1].t);
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+
+    '<polyline fill="none" stroke="'+color+'" stroke-width="2.5" points="'+pts+'"/>'+
+    '<text x="'+pad+'" y="14" font-size="11" fill="var(--muted)">max '+crn(max)+'</text>'+
+    '<text x="'+pad+'" y="'+(H-6)+'" font-size="11" fill="var(--muted)">'+esc(first)+'</text>'+
+    '<text x="'+(W/2)+'" y="'+(H-6)+'" font-size="11" fill="var(--muted)" text-anchor="middle">'+esc(mid)+'</text>'+
+    '<text x="'+(W-pad)+'" y="'+(H-6)+'" font-size="11" fill="var(--muted)" text-anchor="end">'+esc(last)+'</text>'+
+  '</svg>';
+}
 function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';var lab=live?'LIVE':(st&&/PAUSED/.test(String(st))?'Gepauzeerd':(st||'?'));return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(lab)+'</span>';}
 function campPerfBlock(a){
   if(!a)return '';
@@ -1858,6 +1877,15 @@ async function loadMetaInsights(){
       if(icells.length)html+='<div class="stats" style="margin-bottom:6px">'+icells.join('')+'</div>';
     } else if(d.account){
       html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
+    }
+    // Grafiek: weergaven en nieuwe volgers per dag
+    if(d.series){
+      if(d.series.views&&d.series.views.length>1){
+        html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+wsLineChart(d.series.views,'#e1306c')+'</div>';
+      }
+      if(d.series.follower_count&&d.series.follower_count.length>1){
+        html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4></div><div class="card">'+wsLineChart(d.series.follower_count,'#16a34a')+'</div>';
+      }
     }
     // Verdeling per contenttype
     if(d.contentTypes&&d.contentTypes.length){
