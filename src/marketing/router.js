@@ -1356,11 +1356,16 @@ function pickLeadCount(actions) {
 }
 // Datumperiode uit de query (since/until als YYYY-MM-DD). Zonder geldige periode:
 // de laatste 30 dagen. Geeft een object dat in Meta ads-insights past.
+// Meta-presets die we toestaan (matchen 1-op-1 met Meta's date_preset in de UI).
+const ADS_DATE_PRESETS = ['last_7d', 'last_14d', 'last_30d', 'this_week_mon_today', 'last_week_mon_sun', 'this_month', 'last_month', 'maximum'];
 function adsDateSel(req) {
   const s = String((req && req.query && req.query.since) || '').trim();
   const u = String((req && req.query && req.query.until) || '').trim();
   const ok = /^\d{4}-\d{2}-\d{2}$/.test(s) && /^\d{4}-\d{2}-\d{2}$/.test(u) && s <= u;
-  return ok ? { time_range: JSON.stringify({ since: s, until: u }) } : { date_preset: 'last_30d' };
+  if (ok) return { time_range: JSON.stringify({ since: s, until: u }) };
+  const preset = String((req && req.query && req.query.preset) || '').trim();
+  if (ADS_DATE_PRESETS.includes(preset)) return { date_preset: preset };
+  return { date_preset: 'last_30d' };
 }
 async function graphPost(pathAndId, params) {
   const body = new URLSearchParams(params);
