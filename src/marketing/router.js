@@ -2124,16 +2124,16 @@ router.post('/api/mkt/clients/:clientId/ai/kpi-analysis', requireMkt, async (req
       '- Betrouwbaarheid op leadvolume: 0 tot 1 lead = geen harde conclusies (alleen signaleren); 2 = voorzichtig; 3 tot 4 = indicatief; 5 tot 9 = bruikbaar; 10 of meer = sterker onderbouwd.',
       '- CPM: < EUR 15 is norm, EUR 10 tot 13 is sterk.',
       '- Frequentie: DIAGNOSTISCH, geen afkeurgrens. < 2,5 normaal; 2,5 tot 3,5 monitoren; 3,5 tot 5 verhoogd (creative fatigue checken); > 5 alleen ingrijpen als CTR daalt en CPC/CPL stijgen. Keur een campagne NOOIT af op frequentie alleen.',
-      '- CTR link: >= 2% is norm, >= 3% is sterk.',
+      '- Unieke CTR: >= 2% is norm, >= 3% is sterk. (CTR alle staat er ook bij als context; beoordeel op unieke CTR.)',
       '- CPC link: functioneel tot EUR 0,65, streefwaarde < EUR 0,50.',
       '- Klik naar landingspagina: >= 60% norm, >= 70% goed.',
       '- Landingspagina naar lead: >= 3% functioneel, >= 5% ambitie.',
       '',
       'Beslisregels om de bottleneck te bepalen:',
       '- CPL < EUR 20: eindresultaat binnen doel, niet onnodig ingrijpen.',
-      '- CTR < 2%: advertentie/boodschap spreekt onvoldoende aan (creative, hook, propositie, doelgroep, CTA).',
-      '- CTR goed maar CPC > EUR 0,65: verkeer is duur (veiling, doelgroep, plaatsingen, creative).',
-      '- CTR goed + klik naar LP goed + LP naar lead < 3%: verlies zit NA de klik (landingspagina, aanbod, formulier, vertrouwen, CTA).',
+      '- Unieke CTR < 2%: advertentie/boodschap spreekt onvoldoende aan (creative, hook, propositie, doelgroep, CTA).',
+      '- Unieke CTR goed maar CPC > EUR 0,65: verkeer is duur (veiling, doelgroep, plaatsingen, creative).',
+      '- Unieke CTR goed + klik naar LP goed + LP naar lead < 3%: verlies zit NA de klik (landingspagina, aanbod, formulier, vertrouwen, CTA).',
       '- Klik naar LP < 60%: technische overgang (laadsnelheid, mobiel, link, tracking).',
       '- LP naar lead >= 5% maar CPL hoog: pagina converteert sterk maar verkeer is te duur (CPM, CPC, targeting).',
       '',
@@ -2580,7 +2580,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         try {
           const ins = await graphGet(`${creds.adAccount}/insights`, {
             level: 'campaign',
-            fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_clicks,unique_inline_link_clicks,actions',
+            fields: 'spend,impressions,reach,clicks,ctr,unique_ctr,cpc,cpm,frequency,inline_link_clicks,unique_inline_link_clicks,actions',
             ...adsDateSel(req),
             filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]),
             access_token: token,
@@ -2589,13 +2589,16 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           if (rows.length) {
             let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
             let linkClicks = 0; let uLinkClicks = 0; let landingViews = 0; let leads = 0;
+            let uCtrWeighted = 0; // Meta's eigen unieke-CTR, gewogen op vertoningen (exact voor 1 campagne).
             for (const r of rows) {
+              const rowImpr = parseInt(r.impressions || 0, 10) || 0;
               spend += parseFloat(r.spend || 0) || 0;
-              impressions += parseInt(r.impressions || 0, 10) || 0;
+              impressions += rowImpr;
               reach += parseInt(r.reach || 0, 10) || 0;
               clicks += parseInt(r.clicks || 0, 10) || 0;
               linkClicks += parseInt(r.inline_link_clicks || 0, 10) || 0;
               uLinkClicks += parseInt(r.unique_inline_link_clicks || 0, 10) || 0;
+              uCtrWeighted += (parseFloat(r.unique_ctr) || 0) * rowImpr;
               if (Array.isArray(r.actions)) {
                 for (const a of r.actions) {
                   if (a && a.action_type === 'landing_page_view') landingViews += Number(a.value) || 0;
@@ -2608,7 +2611,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
               link_clicks: linkClicks, landing_page_views: landingViews, leads,
               ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
               link_ctr: impressions ? (linkClicks / impressions * 100).toFixed(2) : '0.00',
-              unique_ctr: (reach && uLinkClicks) ? (uLinkClicks / reach * 100).toFixed(2) : null,
+              unique_ctr: impressions ? (uCtrWeighted / impressions).toFixed(2) : ((reach && uLinkClicks) ? (uLinkClicks / reach * 100).toFixed(2) : null),
               cpc: linkClicks ? (spend / linkClicks).toFixed(2) : (clicks ? (spend / clicks).toFixed(2) : null),
               cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
               frequency: reach ? (impressions / reach).toFixed(2) : null,
