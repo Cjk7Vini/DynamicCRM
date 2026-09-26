@@ -1558,7 +1558,8 @@ function campPerfBlock(a){
   if(!a)return '';
   var badge=function(kind,txt){var m={ok:['binnen norm','#166534','#dcfce7'],warn:['aandachtspunt','#92400e','#fef3c7'],edge:['net op de grens','#92400e','#fef9c3'],diag:['monitoren','#334155','#e2e8f0']};var x=m[kind];if(!x)return '';var label=txt||x[0];return '<span style="font-size:10px;font-weight:700;color:'+x[1]+';background:'+x[2]+';padding:2px 8px;border-radius:20px;margin-left:8px;white-space:nowrap">'+label+'</span>';};
   var row=function(label,sub,value,kind,txt){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line)"><div><span style="font-size:14px">'+label+'</span>'+(sub?' <span style="font-size:12px;color:var(--muted)">'+sub+'</span>':'')+'</div><div style="display:flex;align-items:center;white-space:nowrap"><strong>'+value+'</strong>'+badge(kind,txt)+'</div></div>';};
-  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">laatste 30 dagen</span></div><div class="card" style="margin-bottom:16px">';
+  var perLbl=(WS_SINCE&&WS_UNTIL)?(WS_SINCE+' t/m '+WS_UNTIL):'laatste 30 dagen';
+  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">'+esc(perLbl)+'</span></div><div class="card" style="margin-bottom:16px">';
   h+=row('Budget besteed','','&euro; '+crn(a.spend),null);
   h+=row('Weergaven / bereik','',crn(a.impressions)+' / '+crn(a.reach),null);
   if(a.cpm!=null)h+=row('CPM','(onder &euro;15)','&euro; '+a.cpm,(Number(a.cpm)<15?'ok':'warn'));
