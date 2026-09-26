@@ -1528,11 +1528,26 @@ async function delAsset(id){
 function openReportPdf(){ if(CURRENT_CLIENT) window.open('/report.html?client='+CURRENT_CLIENT.id,'_blank'); }
 
 // ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
-var WS_SINCE=null, WS_UNTIL=null;
+var WS_MODE='preset', WS_PRESET='last_30d', WS_SINCE=null, WS_UNTIL=null;
 (function(){var t=new Date();WS_UNTIL=t.toISOString().slice(0,10);WS_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
-function wsDateQS(){return '?since='+encodeURIComponent(WS_SINCE)+'&until='+encodeURIComponent(WS_UNTIL);}
-function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
-function wsDateBar(){return '<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:13px;color:var(--muted)">Periode (advertenties):</span><label style="font-size:12px">Van <input id="wsDtSince" type="date" value="'+esc(WS_SINCE)+'" style="width:auto"></label><label style="font-size:12px">Tot <input id="wsDtUntil" type="date" value="'+esc(WS_UNTIL)+'" style="width:auto"></label><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="wsApplyDates()">Toepassen</button></div>';}
+var WS_PRESETS=[{k:'last_7d',l:'Afgelopen 7 dagen'},{k:'last_14d',l:'Afgelopen 14 dagen'},{k:'last_30d',l:'Afgelopen 30 dagen'},{k:'this_week_mon_today',l:'Deze week'},{k:'last_week_mon_sun',l:'Vorige week'},{k:'this_month',l:'Deze maand'},{k:'last_month',l:'Vorige maand'},{k:'maximum',l:'Maximum'}];
+function wsDateQS(){return (WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)?('?since='+encodeURIComponent(WS_SINCE)+'&until='+encodeURIComponent(WS_UNTIL)):('?preset='+encodeURIComponent(WS_PRESET));}
+function wsPeriodLabel(){if(WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)return WS_SINCE+' t/m '+WS_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===WS_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
+function wsSetPreset(k){WS_MODE='preset';WS_PRESET=k;loadCampSections();}
+function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_MODE='custom';WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
+function wsDateBar(){
+  var chips=WS_PRESETS.map(function(p){var on=(WS_MODE==='preset'&&WS_PRESET===p.k);return '<button onclick="wsSetPreset(\''+p.k+'\')" style="padding:5px 11px;font-size:12.5px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+'">'+esc(p.l)+'</button>';}).join('');
+  var custOn=(WS_MODE==='custom');
+  return '<div class="card" style="margin-bottom:14px">'+
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Periode (advertenties)</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+chips+'</div>'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)">'+
+      '<span style="font-size:12px;color:'+(custOn?'var(--accent-2)':'var(--muted)')+';font-weight:'+(custOn?'700':'400')+'">Aangepast:</span>'+
+      '<label style="font-size:12px">Van <input id="wsDtSince" type="date" value="'+esc(WS_SINCE)+'" style="width:auto"></label>'+
+      '<label style="font-size:12px">Tot <input id="wsDtUntil" type="date" value="'+esc(WS_UNTIL)+'" style="width:auto"></label>'+
+      '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="wsApplyDates()">Toepassen</button>'+
+    '</div></div>';
+}
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
 function wsLineChart(data,color){
   if(!data||data.length<2)return '';
@@ -1558,8 +1573,7 @@ function campPerfBlock(a){
   if(!a)return '';
   var badge=function(kind,txt){var m={ok:['binnen norm','#166534','#dcfce7'],warn:['aandachtspunt','#92400e','#fef3c7'],edge:['net op de grens','#92400e','#fef9c3'],diag:['monitoren','#334155','#e2e8f0']};var x=m[kind];if(!x)return '';var label=txt||x[0];return '<span style="font-size:10px;font-weight:700;color:'+x[1]+';background:'+x[2]+';padding:2px 8px;border-radius:20px;margin-left:8px;white-space:nowrap">'+label+'</span>';};
   var row=function(label,sub,value,kind,txt){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line)"><div><span style="font-size:14px">'+label+'</span>'+(sub?' <span style="font-size:12px;color:var(--muted)">'+sub+'</span>':'')+'</div><div style="display:flex;align-items:center;white-space:nowrap"><strong>'+value+'</strong>'+badge(kind,txt)+'</div></div>';};
-  var perLbl=(WS_SINCE&&WS_UNTIL)?(WS_SINCE+' t/m '+WS_UNTIL):'laatste 30 dagen';
-  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">'+esc(perLbl)+'</span></div><div class="card" style="margin-bottom:16px">';
+  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">'+esc(wsPeriodLabel())+'</span></div><div class="card" style="margin-bottom:16px">';
   h+=row('Budget besteed','','&euro; '+crn(a.spend),null);
   h+=row('Weergaven / bereik','',crn(a.impressions)+' / '+crn(a.reach),null);
   if(a.cpm!=null)h+=row('CPM','(onder &euro;15)','&euro; '+a.cpm,(Number(a.cpm)<15?'ok':'warn'));
@@ -1644,7 +1658,7 @@ async function loadKpiAnalyse(ads,force){
   var box=document.getElementById('kpiAnalyseBox'); if(!box||!ads||!CURRENT_CLIENT)return;
   window.__lastAdsData=ads;
   box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13.5px">Claude analyseert de cijfers...</div>';
-  var period=(WS_SINCE&&WS_UNTIL)?(WS_SINCE+' t/m '+WS_UNTIL):'laatste 30 dagen';
+  var period=wsPeriodLabel();
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/kpi-analysis',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({ads:ads,period:period})});
     var d=await r.json();
