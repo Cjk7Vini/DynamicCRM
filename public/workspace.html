@@ -1564,8 +1564,8 @@ function campPerfBlock(a){
   h+=row('Weergaven / bereik','',crn(a.impressions)+' / '+crn(a.reach),null);
   if(a.cpm!=null)h+=row('CPM','(onder &euro;15)','&euro; '+a.cpm,(Number(a.cpm)<15?'ok':'warn'));
   if(a.frequency!=null){var fq=Number(a.frequency);var ft=fq<2.5?'normaal':(fq<3.5?'monitoren':(fq<=5?'verhoogd':'hoge herhaling'));var fk=fq<3.5?'diag':'edge';h+=row('Frequentie','(diagnostisch)',a.frequency,fk,ft);}
-  var ctrv=(a.link_ctr!=null?a.link_ctr:a.unique_ctr);
-  if(ctrv!=null)h+=row('CTR link','(min. 2%; sterk &ge;3%)',ctrv+'%',(Number(ctrv)>=3?'ok':(Number(ctrv)>=2?'edge':'warn')));
+  if(a.ctr!=null)h+=row('CTR (alle)','(alle kliks)',a.ctr+'%',null);
+  if(a.unique_ctr!=null)h+=row('Unieke CTR','(min. 2%; sterk &ge;3%)',a.unique_ctr+'%',(Number(a.unique_ctr)>=3?'ok':(Number(a.unique_ctr)>=2?'edge':'warn')));
   if(a.cpc!=null)h+=row('CPC','(func. &le; &euro;0,65; streef &lt; &euro;0,50)','&euro; '+a.cpc,(Number(a.cpc)<0.5?'ok':(Number(a.cpc)<=0.65?'edge':'warn')));
   if(a.click_to_lp!=null)h+=row('Klik &rarr; landingspagina','(min. 60%)',a.click_to_lp+'%',(Number(a.click_to_lp)>=60?'ok':'warn'));
   if(a.lp_to_lead!=null)h+=row('Landingspagina &rarr; lead','(min. 3%; ambitie &ge;5%)',a.lp_to_lead+'%',(Number(a.lp_to_lead)>=5?'ok':(Number(a.lp_to_lead)>=3?'edge':'warn')));
