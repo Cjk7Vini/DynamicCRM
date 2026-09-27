@@ -2904,11 +2904,26 @@ function renderBoard(posts){
   }).join('')+'</div>';
 }
 // ---- Gepubliceerd (eigen weergave) ----
+var _PUB_MONTH=null; // null = alle maanden, anders Date (eerste van de maand)
+function pubDate(p){var d=p.published_at||p.scheduled_at||p.created_at;return d?new Date(d):null;}
+function pubShift(delta){
+  if(_PUB_MONTH===null){var n=new Date();_PUB_MONTH=new Date(n.getFullYear(),n.getMonth(),1);}
+  _PUB_MONTH=new Date(_PUB_MONTH.getFullYear(),_PUB_MONTH.getMonth()+delta,1);renderContentView();
+}
+function pubAllMonths(){_PUB_MONTH=null;renderContentView();}
 function renderPublished(posts){
   var pub=posts.filter(function(p){return p.status==='published';});
-  if(!pub.length)return '<div class="card" style="color:var(--muted);font-size:14px">Nog geen gepubliceerde content.</div>';
   var canManage=ME.role!=='client';
-  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">'+pub.map(function(p){
+  var bar;
+  if(_PUB_MONTH===null){
+    bar='<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Alle maanden</span><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="pubShift(0)">Filter op maand</button></div>';
+  } else {
+    var mLbl=_PUB_MONTH.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});
+    bar='<div class="card" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-ghost" style="padding:6px 12px" onclick="pubShift(-1)">&larr;</button><strong style="text-transform:capitalize;min-width:120px;text-align:center">'+esc(mLbl)+'</strong><button class="btn btn-ghost" style="padding:6px 12px" onclick="pubShift(1)">&rarr;</button></div><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="pubAllMonths()">Alle maanden</button></div>';
+    pub=pub.filter(function(p){var d=pubDate(p);return d&&d.getFullYear()===_PUB_MONTH.getFullYear()&&d.getMonth()===_PUB_MONTH.getMonth();});
+  }
+  if(!pub.length)return bar+'<div class="card" style="color:var(--muted);font-size:14px">Nog geen gepubliceerde content'+(_PUB_MONTH!==null?' in deze maand':'')+'.</div>';
+  return bar+'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">'+pub.map(function(p){
     var thumb=p.asset_url?('<img src="'+esc(p.asset_type==='video'?videoPoster(p.asset_url):p.asset_url)+'" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
     var when=p.published_at?fmtWhen(p.published_at):(p.scheduled_at?fmtWhen(p.scheduled_at):'');
     var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="event.stopPropagation();delPost('+p.id+')" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5)"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'):'';
