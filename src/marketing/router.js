@@ -741,6 +741,18 @@ async function contentBlocksAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+const POST_TYPES = ['bericht', 'reel', 'story', 'carrousel'];
+let _hasPostType = null;
+async function postTypeAvailable() {
+  if (_hasPostType === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='post_type'"
+    )).rows);
+    if (r.length > 0) _hasPostType = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 let _hasFollowerSnapshots = null;
 async function followerSnapshotsAvailable() {
   if (_hasFollowerSnapshots === true) return true;
@@ -812,12 +824,14 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasLabels = await contentLabelsAvailable();
     const hasComments = await contentCommentsAvailable();
     const hasBlocks = await contentBlocksAvailable();
+    const hasType = await postTypeAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               ${hasLabels ? 'p.labels,' : ''}
               ${hasBlocks ? 'p.content_blocks,' : ''}
+              ${hasType ? 'p.post_type,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -884,6 +898,7 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
       sets.push(`labels=$${i++}`); vals.push(clean);
