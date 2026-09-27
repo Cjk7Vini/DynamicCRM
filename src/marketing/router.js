@@ -730,6 +730,29 @@ async function contentCommentsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+let _hasContentBlocks = null;
+async function contentBlocksAvailable() {
+  if (_hasContentBlocks === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='content_blocks'"
+    )).rows);
+    if (r.length > 0) _hasContentBlocks = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
+function sanitizeBlocks(input) {
+  if (!Array.isArray(input)) return null;
+  const out = [];
+  for (const b of input) {
+    if (!b || typeof b !== 'object') continue;
+    if (b.type === 'media') { out.push({ type: 'media' }); }
+    else if (b.type === 'text') { out.push({ type: 'text', text: String(b.text || '').slice(0, 4000) }); }
+    if (out.length >= 30) break;
+  }
+  return out;
+}
 
 // Controleert dat de klant bestaat EN bij de actieve workspace hoort.
 // Geeft het klant-id terug, of null als het niet mag.
@@ -755,11 +778,13 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const clientOnly = mktClientLocked(req);
     const hasLabels = await contentLabelsAvailable();
     const hasComments = await contentCommentsAvailable();
+    const hasBlocks = await contentBlocksAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               ${hasLabels ? 'p.labels,' : ''}
+              ${hasBlocks ? 'p.content_blocks,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -829,6 +854,17 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x)) : [];
       sets.push(`labels=$${i++}`); vals.push(clean);
+    }
+    if (b.blocks !== undefined && await contentBlocksAvailable()) {
+      const clean = sanitizeBlocks(b.blocks);
+      if (clean) {
+        sets.push(`content_blocks=$${i++}::jsonb`); vals.push(JSON.stringify(clean));
+        // body synchroon houden met de tekstblokken (voor caption/publiceren) als de client geen aparte body meestuurt.
+        if (b.body === undefined) {
+          const joined = clean.filter((x) => x.type === 'text' && x.text).map((x) => x.text).join('\n\n');
+          sets.push(`body=$${i++}`); vals.push(joined || null);
+        }
+      }
     }
     // Marketeer mag alleen 'ter goedkeuring' zetten of intrekken; goedkeuren doet de klant via de portal.
     if (b.approval !== undefined && (b.approval === 'pending' || b.approval === 'none')) {

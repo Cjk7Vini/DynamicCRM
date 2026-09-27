@@ -1007,9 +1007,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3 id="postModalTitle">Nieuwe post</h3>
     <div class="sub">Plan content voor deze klant.</div>
     <div id="postMsg" class="inline-msg"></div>
-    <div id="pfMediaPreview"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
-    <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="5" placeholder="De post-tekst die klaar moet staan..."></textarea></div>
+    <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
+      <div id="pfBlocks"></div>
+      <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
+    </div>
     <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="row2">
       <div class="field"><label>Kanaal</label>
@@ -2987,24 +2989,44 @@ async function fillPostAssetSelect(selectedId){
   }catch(e){}
   updatePfMedia();
 }
-function updatePfMedia(){
-  var box=document.getElementById('pfMediaPreview'); if(!box)return;
-  var sel=document.getElementById('pfAsset'); var id=sel?sel.value:'';
-  var a=PF_ASSETS[String(id)];
-  if(!a){ box.innerHTML=''; box.style.display='none'; return; }
-  box.style.display='block'; box.style.marginBottom='12px';
-  box.innerHTML=(a.type==='video')
-    ? '<video src="'+esc(a.url)+'" controls style="width:100%;max-height:320px;border-radius:12px;background:#000;display:block"></video>'
-    : '<img src="'+esc(a.url)+'" alt="" style="width:100%;max-height:320px;object-fit:contain;border-radius:12px;background:var(--panel);display:block">';
+function updatePfMedia(){ renderPfBlocks(); }
+// ---- Sleepbare inhoudsblokken (beeld + tekstblokken) in de kaart ----
+var PF_BLOCKS=[], _PFB_DRAG=null;
+function pfMediaInner(){
+  var sel=document.getElementById('pfAsset'); var id=sel?sel.value:''; var a=PF_ASSETS[String(id)];
+  var media=a?((a.type==='video')
+      ?'<video src="'+esc(a.url)+'" controls style="width:100%;max-height:300px;border-radius:8px;background:#000;display:block"></video>'
+      :'<img src="'+esc(a.url)+'" alt="" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:var(--panel);display:block">')
+    :'<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:8px">Beeld (kies onderaan bij Beeld)</div>';
+  return '<div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.4px;margin-bottom:4px">BEELD</div>'+media;
 }
+function renderPfBlocks(){
+  var box=document.getElementById('pfBlocks'); if(!box)return;
+  if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];
+  box.innerHTML=PF_BLOCKS.map(function(b,idx){
+    var handle='<span draggable="true" ondragstart="pfbDrag(event,'+idx+')" title="Sleep om te ordenen" style="cursor:grab;color:var(--muted);padding:2px 4px;user-select:none;font-size:16px;line-height:1">&#9776;</span>';
+    var inner,del='';
+    if(b.type==='media'){ inner=pfMediaInner(); }
+    else { inner='<textarea rows="3" oninput="pfTextInput('+idx+',this)" placeholder="Tekst voor de post / notitie..." style="width:100%">'+esc(b.text||'')+'</textarea>';
+      del='<button type="button" class="icon-btn del" title="Blok verwijderen" onclick="pfDelBlock('+idx+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'; }
+    return '<div class="pfblock" ondragover="pfbOver(event)" ondrop="pfbDrop(event,'+idx+')" style="display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--panel-2,rgba(255,255,255,.02))">'+handle+'<div style="flex:1;min-width:0">'+inner+'</div>'+del+'</div>';
+  }).join('');
+}
+function pfAddText(){PF_BLOCKS.push({type:'text',text:''});renderPfBlocks();}
+function pfDelBlock(i){if(PF_BLOCKS[i]&&PF_BLOCKS[i].type==='media')return;PF_BLOCKS.splice(i,1);if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];renderPfBlocks();}
+function pfTextInput(i,el){if(PF_BLOCKS[i])PF_BLOCKS[i].text=el.value;}
+function pfbDrag(e,i){_PFB_DRAG=i;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(i));}catch(_){}}
+function pfbOver(e){e.preventDefault();}
+function pfbDrop(e,i){e.preventDefault();var from=_PFB_DRAG;_PFB_DRAG=null;if(from==null||from===i)return;var item=PF_BLOCKS.splice(from,1)[0];var target=(from<i)?i-1:i;PF_BLOCKS.splice(target,0,item);renderPfBlocks();}
 function openNewPost(){
   EDIT_POST=null; hideMsg('postMsg');
   document.getElementById('postModalTitle').textContent='Nieuwe post';
-  document.getElementById('pfTitle').value='';document.getElementById('pfBody').value='';
+  document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
+  PF_BLOCKS=[{type:'media'},{type:'text',text:''}];
   document.getElementById('pfCommentsWrap').style.display='none';
   fillPostAssetSelect('');
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
@@ -3016,11 +3038,12 @@ function openEditPost(id){
     var p=d.posts.filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
     EDIT_POST=p; hideMsg('postMsg');
     document.getElementById('postModalTitle').textContent='Post bewerken';
-    document.getElementById('pfTitle').value=p.title||'';document.getElementById('pfBody').value=p.body||'';
+    document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
+    PF_BLOCKS=(Array.isArray(p.content_blocks)&&p.content_blocks.length)?p.content_blocks.map(function(b){return b&&b.type==='media'?{type:'media'}:{type:'text',text:(b&&b.text)||''};}):[{type:'media'},{type:'text',text:p.body||''}];
     document.getElementById('pfCommentsWrap').style.display='block';
     loadContentComments(p.id);
     fillPostAssetSelect(p.asset_id||'');
@@ -3034,7 +3057,8 @@ async function savePost(){
   if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
-  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
+  var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
@@ -3042,7 +3066,11 @@ async function savePost(){
     var method=EDIT_POST?'PATCH':'POST';
     var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){closePost();loadPosts();} else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
+    if(r.ok&&d.success){
+      // Nieuwe post: blokken opslaan via een vervolg-PATCH (create bewaart de blokken nog niet).
+      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText})}); }catch(_){} }
+      closePost();loadPosts();
+    } else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Opslaan';
 }
