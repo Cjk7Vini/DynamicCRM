@@ -662,6 +662,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
             <div class="int-panel" id="intPanel_meta">
               <div id="stat_meta" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
+              <div style="background:rgba(99,102,241,.06);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+                <div style="font-weight:700;font-size:14px;margin-bottom:3px">Snel koppelen</div>
+                <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Plak je Meta access token en klik Ophalen. Kies daarna het juiste account; de velden hieronder worden automatisch ingevuld. (De klant verschijnt alleen als je token toegang heeft tot zijn pagina.)</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                  <input id="mqToken" type="password" placeholder="Plak hier je Meta access token" style="flex:1;min-width:220px">
+                  <button class="btn btn-primary" style="padding:8px 14px" onclick="metaDiscover(this)">Accounts ophalen</button>
+                </div>
+                <div id="mqResult" style="margin-top:10px"></div>
+              </div>
               <div class="row2">
                 <div class="field"><label>Facebook Page ID</label><input id="int_meta_page_id"></div>
                 <div class="field"><label>Instagram user ID</label><input id="int_meta_ig_user_id"></div>
@@ -2305,6 +2314,38 @@ async function clearPlatform(p, btn){
     else{showMsg('intMsg',false,(d&&d.error)||'Wissen mislukt.');}
   }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
   if(btn)btn.disabled=false;
+}
+var _MQ_PAGES=[], _MQ_ADS=[];
+async function metaDiscover(btn){
+  var token=(document.getElementById('mqToken').value||'').trim();
+  var box=document.getElementById('mqResult');
+  if(token.length<20){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">Plak eerst een geldig access token.</div>';return;}
+  var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Ophalen...';}
+  box.innerHTML='<div style="font-size:12.5px;color:var(--muted)">Accounts ophalen...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-discover',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({token:token})});
+    var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">'+esc(d.error||'Ophalen mislukt.')+'</div>';return;}
+    _MQ_PAGES=d.pages||[]; _MQ_ADS=d.adaccounts||[];
+    if(!_MQ_PAGES.length){box.innerHTML='<div style="font-size:12.5px;color:#b45309">Geen pagina\'s gevonden voor dit token. Zorg dat je token toegang heeft tot de pagina van de klant (zie handleiding: paginatoegang).</div>';return;}
+    var pageOpts=_MQ_PAGES.map(function(p,i){var lbl=p.name+(p.ig_username?(' (@'+p.ig_username+')'):' (geen Instagram gekoppeld)');return '<option value="'+i+'">'+esc(lbl)+'</option>';}).join('');
+    var adOpts='<option value="">Geen / later</option>'+_MQ_ADS.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name+' - '+a.id)+'</option>';}).join('');
+    box.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<label style="font-size:12.5px;color:var(--muted)">Account (pagina + Instagram)<select id="mqPage" style="margin-top:3px">'+pageOpts+'</select></label>'+
+      '<label style="font-size:12.5px;color:var(--muted)">Advertentieaccount (optioneel)<select id="mqAd" style="margin-top:3px">'+adOpts+'</select></label>'+
+      '<button class="btn btn-primary" style="padding:8px 14px;align-self:flex-start" onclick="metaFillFromDiscover()">Velden invullen</button>'+
+    '</div>';
+  }catch(e){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">Netwerkfout.</div>';}
+  finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
+}
+function metaFillFromDiscover(){
+  var pi=document.getElementById('mqPage').value; var p=_MQ_PAGES[pi]; if(!p)return;
+  document.getElementById('int_meta_page_id').value=p.id||'';
+  document.getElementById('int_meta_ig_user_id').value=p.ig_id||'';
+  document.getElementById('int_meta_access_token').value=(document.getElementById('mqToken').value||'').trim();
+  var ad=document.getElementById('mqAd').value; if(ad)document.getElementById('int_meta_ad_account_id').value=ad;
+  if(!p.ig_id){showMsg('intMsg',false,'Let op: deze pagina heeft geen gekoppeld Instagram-bedrijfsaccount. Koppel Instagram aan de pagina en probeer opnieuw.');}
+  else{showMsg('intMsg',true,'Velden ingevuld voor '+(p.ig_username?('@'+p.ig_username):p.name)+'. Klik op Koppelingen opslaan om te bewaren.');}
 }
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
