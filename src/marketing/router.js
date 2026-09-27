@@ -3942,8 +3942,9 @@ router.get('/api/mkt/koppelingen/overview', requireMkt, async (req, res) => {
       try { creds = await resolveClientMeta(wsId, cl.id); } catch (_) { creds = {}; }
       out.push({
         id: cl.id, name: cl.name, brand_color: cl.brand_color,
-        token: !!creds.token, adAccount: !!creds.adAccount, pageId: !!creds.pageId,
-        igUserId: !!creds.igUserId, pixelId: !!creds.pixelId,
+        token: !!creds.token,
+        adAccount: creds.adAccount || null, pageId: creds.pageId || null,
+        igUserId: creds.igUserId || null, pixelId: creds.pixelId || null,
       });
     }
     res.json({ success: true, clients: out });

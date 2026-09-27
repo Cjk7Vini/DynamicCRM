@@ -1378,6 +1378,7 @@ async function loadKoppelingenOverview(){
   // Groen = ingesteld (er staat iets ingevuld). Of de koppeling ook echt werkt,
   // zie je pas na "Test verbinding" (die pingt Meta live).
   function dot(on){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#16a34a':'var(--line)')+'"></span>'+(on?'ingesteld':'-')+'</span>';}
+  function idval(v){return v?('<span style="font-family:monospace;font-size:12px">'+esc(v)+'</span>'):'<span style="color:var(--muted)">-</span>';}
   try{
     var r=await fetch('/api/mkt/koppelingen/overview',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('koppOverviewMsg',false,d.error||'Kon koppelingen niet laden.');return;}
@@ -1390,10 +1391,10 @@ async function loadKoppelingenOverview(){
       return '<tr style="border-top:1px solid var(--line)">'+
         '<td style="padding:8px 10px;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+esc(c.brand_color||'#6366f1')+';margin-right:8px"></span>'+esc(c.name)+'</td>'+
         '<td style="padding:8px 10px">'+dot(c.token)+'</td>'+
-        '<td style="padding:8px 10px">'+dot(c.adAccount)+'</td>'+
-        '<td style="padding:8px 10px">'+dot(c.pageId)+'</td>'+
-        '<td style="padding:8px 10px">'+dot(c.igUserId)+'</td>'+
-        '<td style="padding:8px 10px">'+dot(c.pixelId)+'</td>'+
+        '<td style="padding:8px 10px">'+idval(c.adAccount)+'</td>'+
+        '<td style="padding:8px 10px">'+idval(c.pageId)+'</td>'+
+        '<td style="padding:8px 10px">'+idval(c.igUserId)+'</td>'+
+        '<td style="padding:8px 10px">'+idval(c.pixelId)+'</td>'+
         '<td style="padding:8px 10px"><span id="kstat-'+c.id+'" style="font-size:12.5px;color:var(--muted)">Niet getest</span></td>'+
         '<td style="padding:8px 10px;text-align:right;white-space:nowrap">'+
           '<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="testKoppeling('+c.id+',this)">Test</button> '+
