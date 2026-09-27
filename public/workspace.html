@@ -395,92 +395,116 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
       <!-- HANDLEIDING -->
       <section class="view" id="viewHandleiding">
-        <div class="section-h"><span class="pill">Handleiding en verbinden</span></div>
-        <div style="max-width:860px">
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <p style="margin:0 0 8px;font-size:14px">Om cijfers en campagnes te laten werken heb je per klant 4 dingen nodig: een <strong>access token</strong>, het <strong>Instagram user ID</strong>, het <strong>Facebook Page ID</strong> en (voor advertenties) het <strong>Ad Account ID</strong>. Hieronder vind je precies waar je klikt om ze te vinden.</p>
-            <p style="margin:0;font-size:13px;color:var(--muted)">Goed nieuws: je hebt <strong>geen bedrijfsportfolio</strong> nodig. Zolang aan de 3 voorwaarden hieronder is voldaan, werkt het.</p>
+        <div class="section-h"><span class="pill">Handleiding: Meta koppelen</span></div>
+        <div style="max-width:820px">
+
+          <div class="card" style="padding:20px 22px;margin-bottom:16px">
+            <h3 style="margin:0 0 6px;font-size:17px">In het kort</h3>
+            <p style="margin:0 0 4px;font-size:14px;line-height:1.6">Per klant heb je 4 gegevens nodig: <strong>access token</strong>, <strong>Instagram user ID</strong>, <strong>Facebook Page ID</strong> en (voor advertenties) <strong>Ad Account ID</strong>. Volg de 5 stappen hieronder om ze op te halen en in te vullen.</p>
+            <p style="margin:8px 0 0;font-size:13px;color:var(--muted)">Je hebt <strong>geen bedrijfsportfolio</strong> nodig. Zolang je met je Facebook-account toegang hebt tot de pagina van de klant, werkt het.</p>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Welke route past bij jou?</h3>
-            <p style="margin:0 0 6px;font-size:14px"><strong>Route A - Bureau koppelt alles (meest gebruikt).</strong> Jij hebt toegang tot de accounts van je klanten via jouw eigen Meta. Jij maakt de token en zoekt de ID's op. De klant hoeft zelf niets te doen.</p>
-            <p style="margin:0;font-size:14px"><strong>Route B - Klant koppelt zelf.</strong> De klant volgt dezelfde stappen op zijn eigen Meta en stuurt jou de token + ID's, die jij invult.</p>
-            <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">De stappen zijn voor beide routes identiek. Bij Route A doe jij ze, bij Route B doet de klant ze.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:4px">Route A - Bureau koppelt alles</div><div style="font-size:13px;color:var(--muted);line-height:1.6">Jij hebt toegang tot de accounts van je klanten. Jij doet de 5 stappen. De klant hoeft niets te doen. (Meest gebruikt.)</div></div>
+            <div class="card" style="padding:16px 18px"><div style="font-weight:700;margin-bottom:4px">Route B - Klant koppelt zelf</div><div style="font-size:13px;color:var(--muted);line-height:1.6">De klant doet dezelfde 5 stappen op zijn eigen Meta en stuurt jou de token + ID's, die jij invult.</div></div>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Voorwaarden vooraf (3 checks)</h3>
-            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
-              <li>Het Instagram-account is een <strong>Bedrijfs- of Creator-account</strong> (niet prive). Instellen kan gratis in de Instagram-app: Instellingen &rarr; Account &rarr; Overschakelen naar professioneel account.</li>
-              <li>Het Instagram-account is <strong>gekoppeld aan een Facebook-pagina</strong>. Zonder deze koppeling geeft de API geen Instagram-ID.</li>
-              <li>Jij (of de klant) hebt <strong>toegang tot die Facebook-pagina</strong> met het Facebook-profiel waarmee je de token maakt.</li>
-            </ul>
-            <p style="margin:10px 0 0;font-size:13px;color:var(--muted)"><strong>Let op (situatie zonder bedrijfsportfolio):</strong> je hoeft de pagina NIET in een Meta Business Portfolio te hebben. Zolang je met je eigen Facebook-account toegang hebt tot de pagina van de klant, verschijnt het Instagram-ID vanzelf in de query verderop.</p>
+          <div class="card" style="padding:20px 22px;margin-bottom:16px">
+            <h3 style="margin:0 0 10px;font-size:16px">Voorwaarden vooraf</h3>
+            <div style="font-size:14px;line-height:1.7">
+              <div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#16a34a;font-weight:800">&#10003;</span><span>Instagram is een <strong>Bedrijfs- of Creator-account</strong> (gratis om te wisselen in de Instagram-app).</span></div>
+              <div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#16a34a;font-weight:800">&#10003;</span><span>Instagram is <strong>gekoppeld aan een Facebook-pagina</strong>.</span></div>
+              <div style="display:flex;gap:10px"><span style="color:#16a34a;font-weight:800">&#10003;</span><span>Je hebt met je Facebook-account <strong>toegang tot die pagina</strong>.</span></div>
+            </div>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Stap 1 - Token maken (Graph API Explorer)</h3>
+          <div class="card" style="padding:20px 22px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700">1</span><h3 style="margin:0;font-size:16px">Token maken</h3></div>
             <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
               <li>Ga naar <strong>developers.facebook.com/tools/explorer</strong> en log in met het Facebook-account dat toegang heeft tot de pagina.</li>
-              <li>Rechtsboven bij <strong>Meta App</strong>: kies een app (of maak er gratis een aan via My Apps &rarr; Create App &rarr; type "Other" / "Business").</li>
-              <li>Bij <strong>User or Page</strong> kies je <strong>User Token</strong>.</li>
-              <li>Klik <strong>Add a Permission</strong> en zet deze aan:
-                <ul style="margin:4px 0 0;padding-left:16px">
-                  <li><strong>pages_show_list</strong>, <strong>pages_read_engagement</strong></li>
-                  <li><strong>instagram_basic</strong>, <strong>instagram_manage_insights</strong></li>
-                  <li><strong>instagram_content_publish</strong> (voor automatisch posten)</li>
-                  <li><strong>ads_management</strong>, <strong>ads_read</strong> (voor advertenties)</li>
-                </ul>
-              </li>
-              <li>Klik <strong>Generate Access Token</strong>, log in en klik alle vinkjes / toegang aan. Kies je de pagina van de klant expliciet.</li>
-              <li>De lange tekst die verschijnt is je <strong>access token</strong>. Kopieer hem.</li>
+              <li>Kies rechtsboven een app (of maak er gratis een via My Apps &rarr; Create App &rarr; type Business).</li>
+              <li>Bij <strong>User or Page</strong>: kies <strong>User Token</strong>.</li>
+              <li>Klik <strong>Add a Permission</strong> en zet de permissies aan (zie het overzicht onderaan).</li>
+              <li>Klik <strong>Generate Access Token</strong>, log in en geef toegang tot de pagina van de klant. De lange tekst is je <strong>access token</strong>.</li>
             </ul>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Stap 2 - Instagram user ID en Facebook Page ID vinden</h3>
-            <p style="margin:0 0 8px;font-size:14px">In de Graph API Explorer (met de token uit stap 1) typ je bovenin dit precies in en klik je op <strong>Submit</strong>:</p>
-            <div style="font-family:monospace;font-size:13px;background:var(--surface-2,rgba(120,120,140,.1));border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 10px;overflow-x:auto">me/accounts?fields=name,id,instagram_business_account{id,username}</div>
-            <p style="margin:0 0 6px;font-size:14px">Je krijgt een lijst met pagina's. Zoek de juiste pagina en lees af:</p>
+          <div class="card" style="padding:20px 22px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700">2</span><h3 style="margin:0;font-size:16px">Instagram user ID + Facebook Page ID vinden</h3></div>
+            <p style="margin:0 0 8px;font-size:14px">Typ in de Graph API Explorer (met je token) dit in en klik <strong>Submit</strong>:</p>
+            <div style="font-family:monospace;font-size:13px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 10px;overflow-x:auto">me/accounts?fields=name,id,instagram_business_account{id,username}</div>
             <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
-              <li><strong>Facebook Page ID</strong> = het veld <strong>id</strong> van die pagina.</li>
-              <li><strong>Instagram user ID</strong> = het veld <strong>instagram_business_account.id</strong> (begint meestal met 1784...).</li>
+              <li><strong>Facebook Page ID</strong> = het veld <strong>id</strong> van de juiste pagina.</li>
+              <li><strong>Instagram user ID</strong> = <strong>instagram_business_account.id</strong> (begint met 1784...).</li>
             </ul>
-            <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Zie je geen instagram_business_account bij de pagina? Dan is de Instagram nog niet gekoppeld aan die pagina, of het is nog een prive-account (zie de 3 checks hierboven).</p>
+            <p style="margin:8px 0 0;font-size:13px;color:var(--muted)">Geen instagram_business_account te zien? Dan is de Instagram nog niet gekoppeld aan die pagina of nog prive (zie voorwaarden).</p>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Stap 3 - Ad Account ID vinden (alleen voor advertenties)</h3>
+          <div class="card" style="padding:20px 22px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700">3</span><h3 style="margin:0;font-size:16px">Ad Account ID vinden (alleen voor advertenties)</h3></div>
             <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
               <li>Ga naar <strong>Meta Advertentiebeheer</strong> (business.facebook.com/adsmanager).</li>
-              <li>Linksboven staat de accountkiezer; onder de accountnaam staat het nummer <strong>act_...</strong></li>
-              <li>Dat hele stuk (inclusief <strong>act_</strong>) is je Ad Account ID.</li>
+              <li>Linksboven bij de accountkiezer staat het nummer <strong>act_...</strong> - dat hele stuk is je Ad Account ID.</li>
+              <li>Geen advertenties? Laat dit leeg; de Instagram-rapportage werkt dan nog steeds.</li>
             </ul>
-            <p style="margin:10px 0 0;font-size:13px;color:var(--muted)">Geen advertenties voor deze klant? Laat het Ad Account ID gewoon leeg; de Instagram-rapportage werkt dan nog steeds.</p>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Stap 4 - Invullen in de app</h3>
-            <p style="margin:0 0 6px;font-size:14px"><strong>Route A (bureau koppelt alles):</strong> open de klant via <strong>Klanten</strong> &rarr; tabblad <strong>Koppelingen</strong>. Vul in: Access token, Instagram user ID, Facebook Page ID, en (optioneel) Ad Account ID. Opslaan.</p>
-            <p style="margin:0 0 6px;font-size:14px">Werk je voor alle klanten met hetzelfde bureau-account? Vul dan token + Ad Account + Page + Instagram eenmalig in bij <strong>Werkplek-koppeling</strong>. Klanten zonder eigen koppeling vallen daar automatisch op terug.</p>
-            <p style="margin:0;font-size:14px"><strong>Route B (klant koppelt zelf):</strong> de klant stuurt jou de 4 gegevens uit stap 1 t/m 3; jij vult ze in bij die klant onder <strong>Koppelingen</strong>.</p>
-          </div>
-
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Stap 5 - Testen en verlengen</h3>
+          <div class="card" style="padding:20px 22px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700">4</span><h3 style="margin:0;font-size:16px">Invullen in de app</h3></div>
             <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
-              <li>Klik in het <strong>Koppelingen</strong>-tabblad op <strong>Test verbinding</strong>. Je ziet <strong>Verbonden</strong> met de accountnaam, of de exacte foutmelding.</li>
-              <li>Een token uit de Explorer verloopt standaard snel. Klik in de app op <strong>Token verlengen</strong> (of gebruik in de Explorer de knop om een token van 60 dagen te maken) zodat de koppeling niet uitvalt.</li>
-              <li>Onder <strong>Koppelingen</strong> in het hoofdmenu zie je per klant of alles live staat.</li>
+              <li>Open de klant via <strong>Klanten</strong> &rarr; tabblad <strong>Koppelingen</strong> en vul de 4 gegevens in. Opslaan.</li>
+              <li>Werk je voor iedereen met hetzelfde bureau-account? Vul dan eenmalig <strong>Werkplek-koppeling</strong> in; klanten zonder eigen koppeling vallen daarop terug.</li>
             </ul>
           </div>
 
-          <div class="card" style="padding:18px 20px;margin-bottom:16px">
-            <h3 style="margin:0 0 8px;font-size:16px">Adverteren namens een klant (optioneel)</h3>
-            <p style="margin:0 0 6px;font-size:14px">Wil je vanuit het ad-account van je bureau adverteren maar met de pagina van de klant? Dan geeft de klant je eenmalig partnertoegang in Meta (Bedrijfsinstellingen &rarr; Gebruikers &rarr; Partners &rarr; Business ID van jouw bureau). Zet daarna bij die klant alleen de <strong>Facebook Page ID</strong> in; token en ad-account gebruik je van je bureau (werkplek-koppeling).</p>
-            <p style="margin:0;font-size:13px;color:var(--muted)">Dit is alleen nodig als je namens de klant wilt adverteren; voor rapportage is het niet vereist.</p>
+          <div class="card" style="padding:20px 22px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700">5</span><h3 style="margin:0;font-size:16px">Testen en verlengen</h3></div>
+            <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8">
+              <li>Klik in <strong>Koppelingen</strong> op <strong>Test verbinding</strong>: je ziet Verbonden met de accountnaam, of de exacte fout.</li>
+              <li>Verleng de token (knop <strong>Token verlengen</strong> in de app, of maak een 60-daagse token in de Explorer) zodat de koppeling niet uitvalt.</li>
+            </ul>
           </div>
+
+          <div class="card" style="padding:20px 22px;margin-bottom:16px">
+            <h3 style="margin:0 0 12px;font-size:16px">Permissies die je aanvinkt</h3>
+            <div style="margin-bottom:12px">
+              <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Organische data (rapportage)</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">instagram_basic</code>
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">instagram_manage_insights</code>
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">pages_show_list</code>
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">pages_read_engagement</code>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Publiceren</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">instagram_content_publish</code>
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">pages_manage_posts</code>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:5px">pages_manage_posts alleen als je ook automatisch naar een Facebook-pagina publiceert.</div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Advertenties</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">ads_read</code>
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">ads_management</code>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Aanrader (assets onder jouw Meta-business)</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <code style="font-size:12.5px;background:rgba(120,120,140,.12);border:1px solid var(--line);border-radius:6px;padding:3px 8px">business_management</code>
+              </div>
+            </div>
+            <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">Voor gebruik op klantaccounts in productie vereist Meta <strong>App Review + geavanceerde toegang</strong> en een <strong>Live</strong> app. Voor testen met je eigen account of accounts met een rol in je app werkt het al in development.</p>
+          </div>
+
+          <div class="card" style="padding:20px 22px">
+            <h3 style="margin:0 0 8px;font-size:16px">Adverteren namens een klant (optioneel)</h3>
+            <p style="margin:0;font-size:14px;line-height:1.6">Wil je met het ad-account van je bureau adverteren maar met de pagina van de klant? De klant geeft je eenmalig partnertoegang in Meta (Bedrijfsinstellingen &rarr; Gebruikers &rarr; Partners &rarr; jouw Business ID). Zet daarna bij die klant alleen de <strong>Facebook Page ID</strong>; token en ad-account gebruik je van je bureau. Voor rapportage is dit niet nodig.</p>
+          </div>
+
         </div>
       </section>
 
