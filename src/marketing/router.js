@@ -703,6 +703,33 @@ router.delete('/api/mkt/clients/:id', requireMkt, async (req, res) => {
 // =======================================================================
 const POST_STATUS = ['idea', 'draft', 'scheduled', 'approved', 'published'];
 const POST_CHANNELS = ['instagram', 'facebook', 'linkedin', 'tiktok', 'youtube', 'blog', 'other'];
+// Vaste labels (gekleurde tags) op contentkaarten; alleen deze sleutels worden opgeslagen.
+const CONTENT_LABEL_KEYS = ['tekst_geschreven', 'beeld_nodig', 'klaar_controle', 'wordt_overlegd', 'klaar_inplannen', 'nog_editen', 'goedgekeurd', 'gepost'];
+
+// Detecteren of migratie 007 al gedraaid is (labels-kolom + opmerkingen-tabel).
+// We cachen het resultaat zodat we niet elke request opnieuw kijken.
+let _hasContentLabels = null;
+let _hasContentComments = null;
+async function contentLabelsAvailable() {
+  if (_hasContentLabels !== null) return _hasContentLabels;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='labels'"
+    )).rows);
+    _hasContentLabels = r.length > 0;
+  } catch (_) { _hasContentLabels = false; }
+  return _hasContentLabels;
+}
+async function contentCommentsAvailable() {
+  if (_hasContentComments !== null) return _hasContentComments;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='content_comments'"
+    )).rows);
+    _hasContentComments = r.length > 0;
+  } catch (_) { _hasContentComments = false; }
+  return _hasContentComments;
+}
 
 // Controleert dat de klant bestaat EN bij de actieve workspace hoort.
 // Geeft het klant-id terug, of null als het niet mag.
@@ -726,10 +753,12 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const filterStatus = POST_STATUS.includes(status) ? status : null;
     // Klant-account ziet alleen wat gedeeld is (ter goedkeuring, goedgekeurd of wijzigingen).
     const clientOnly = mktClientLocked(req);
+    const hasLabels = await contentLabelsAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
+              ${hasLabels ? 'p.labels,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
          LEFT JOIN marketing.assets a ON a.id = p.asset_id
@@ -795,6 +824,10 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    if (b.labels !== undefined && await contentLabelsAvailable()) {
+      const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x)) : [];
+      sets.push(`labels=$${i++}`); vals.push(clean);
+    }
     // Marketeer mag alleen 'ter goedkeuring' zetten of intrekken; goedkeuren doet de klant via de portal.
     if (b.approval !== undefined && (b.approval === 'pending' || b.approval === 'none')) {
       sets.push(`approval=$${i++}`); vals.push(b.approval);
@@ -851,6 +884,90 @@ router.delete('/api/mkt/posts/:id', requireMkt, async (req, res) => {
       [req.params.id, req.session.mkt.workspaceId]
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Post niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- Opmerkingen op een contentkaart (agency <-> klant) ----
+// Controleert dat de post bij deze klant + workspace hoort.
+async function postInClient(postId, clientId, wsId) {
+  return await withReadConnection(async (c) => (await c.query(
+    'SELECT id FROM marketing.content_posts WHERE id=$1 AND client_id=$2 AND workspace_id=$3', [postId, clientId, wsId]
+  )).rows[0]);
+}
+router.get('/api/mkt/clients/:clientId/posts/:postId/comments', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentCommentsAvailable())) return res.json({ success: true, comments: [] });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, author_account_id, author_role, author_name, body, created_at, updated_at
+         FROM marketing.content_comments WHERE workspace_id=$1 AND client_id=$2 AND post_id=$3 ORDER BY created_at ASC`,
+      [wsId, okClient, req.params.postId]
+    )).rows);
+    res.json({ success: true, comments: rows, me: req.session.mkt.accountId || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/clients/:clientId/posts/:postId/comments', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentCommentsAvailable())) return res.status(503).json({ error: 'Opmerkingen zijn nog niet ingeschakeld (migratie 007 nog niet gedraaid).' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    if (!(await postInClient(req.params.postId, okClient, wsId))) return res.status(404).json({ error: 'Post niet gevonden' });
+    const body = String((req.body && req.body.body) || '').trim();
+    if (!body) return res.status(400).json({ error: 'Bericht is leeg' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Bericht te lang (max 4000 tekens)' });
+    const m = req.session.mkt;
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.content_comments (workspace_id, client_id, post_id, author_account_id, author_role, author_name, body)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_account_id, author_role, author_name, body, created_at, updated_at`,
+      [wsId, okClient, req.params.postId, m.accountId || null, m.role || null, m.email || null, body]
+    )).rows[0]);
+    res.json({ success: true, comment: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/api/mkt/clients/:clientId/posts/:postId/comments/:commentId', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentCommentsAvailable())) return res.status(503).json({ error: 'Opmerkingen zijn nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const body = String((req.body && req.body.body) || '').trim();
+    if (!body) return res.status(400).json({ error: 'Bericht is leeg' });
+    if (body.length > 4000) return res.status(400).json({ error: 'Bericht te lang (max 4000 tekens)' });
+    const m = req.session.mkt;
+    const out = await withWriteConnection(async (c) => {
+      const row = (await c.query('SELECT id, author_account_id FROM marketing.content_comments WHERE id=$1 AND workspace_id=$2 AND client_id=$3 AND post_id=$4', [req.params.commentId, wsId, okClient, req.params.postId])).rows[0];
+      if (!row) return { code: 404, error: 'Opmerking niet gevonden' };
+      if (!mktMayEditFeedback(m, row)) return { code: 403, error: 'Geen rechten om deze opmerking te bewerken' };
+      const upd = (await c.query('UPDATE marketing.content_comments SET body=$1, updated_at=now() WHERE id=$2 RETURNING id, author_account_id, author_role, author_name, body, created_at, updated_at', [body, req.params.commentId])).rows[0];
+      return { comment: upd };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true, comment: out.comment });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/clients/:clientId/posts/:postId/comments/:commentId', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentCommentsAvailable())) return res.status(503).json({ error: 'Opmerkingen zijn nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const m = req.session.mkt;
+    const out = await withWriteConnection(async (c) => {
+      const row = (await c.query('SELECT id, author_account_id FROM marketing.content_comments WHERE id=$1 AND workspace_id=$2 AND client_id=$3 AND post_id=$4', [req.params.commentId, wsId, okClient, req.params.postId])).rows[0];
+      if (!row) return { code: 404, error: 'Opmerking niet gevonden' };
+      if (!mktMayEditFeedback(m, row)) return { code: 403, error: 'Geen rechten om deze opmerking te verwijderen' };
+      await c.query('DELETE FROM marketing.content_comments WHERE id=$1', [req.params.commentId]);
+      return { ok: true };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

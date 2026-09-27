@@ -1047,9 +1047,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
     </div>
     <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="4" placeholder="De post-tekst..."></textarea></div>
+    <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePost()">Annuleren</button>
       <button class="btn btn-primary" id="pfSaveBtn" onclick="savePost()">Opslaan</button>
+    </div>
+    <div id="pfCommentsWrap" style="display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Opmerkingen</label>
+      <div id="pfComments" style="max-height:240px;overflow-y:auto;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px"><input id="pfCommentInput" placeholder="Plaats een opmerking of feedback..." style="flex:1"><button class="btn btn-primary" style="padding:8px 14px" onclick="postContentComment()">Plaats</button></div>
     </div>
   </div>
 </div>
@@ -2783,6 +2789,28 @@ function renderContentView(){
 // ---- Bord (kanban) ----
 var _DRAG_POST=null;
 var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'],['approved','Goedgekeurd']];
+// Vaste labels (moeten matchen met CONTENT_LABEL_KEYS in de backend).
+var CONTENT_LABELS=[
+  {k:'tekst_geschreven',l:'Tekst geschreven',c:'#2563eb'},
+  {k:'beeld_nodig',l:'Beeld nodig',c:'#d97706'},
+  {k:'klaar_controle',l:'Klaar voor controle',c:'#dc2626'},
+  {k:'wordt_overlegd',l:'Wordt overlegd',c:'#d97706'},
+  {k:'klaar_inplannen',l:'Klaar om in te plannen',c:'#16a34a'},
+  {k:'nog_editen',l:'Nog editen',c:'#dc2626'},
+  {k:'goedgekeurd',l:'Goedgekeurd',c:'#16a34a'},
+  {k:'gepost',l:'Gepost',c:'#16a34a'}
+];
+function labelDef(k){return CONTENT_LABELS.filter(function(x){return x.k===k;})[0];}
+function labelChips(labels){
+  if(!labels||!labels.length)return '';
+  return '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">'+labels.map(function(k){var d=labelDef(k);if(!d)return '';return '<span style="font-size:10px;font-weight:700;color:#fff;background:'+d.c+';padding:2px 8px;border-radius:20px">'+esc(d.l)+'</span>';}).join('')+'</div>';
+}
+var PF_LABELS=[];
+function renderPfLabels(){
+  var box=document.getElementById('pfLabels'); if(!box)return;
+  box.innerHTML=CONTENT_LABELS.map(function(d){var on=PF_LABELS.indexOf(d.k)>=0;return '<button type="button" onclick="togglePfLabel(\''+d.k+'\')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+d.c+';background:'+(on?d.c:'transparent')+';color:'+(on?'#fff':d.c)+'">'+esc(d.l)+'</button>';}).join('');
+}
+function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);renderPfLabels();}
 function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
 function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
 function kanbanLeave(e){e.currentTarget.style.outline='';}
@@ -2807,6 +2835,7 @@ function boardCard(p,canManage){
   return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')" '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
     thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
+    labelChips(p.labels)+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+'</div>'+when+acts+'</div>';
 }
 function renderBoard(posts){
@@ -2929,6 +2958,8 @@ function openNewPost(){
   document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
+  PF_LABELS=[];renderPfLabels();
+  document.getElementById('pfCommentsWrap').style.display='none';
   fillPostAssetSelect('');
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
 }
@@ -2943,6 +2974,9 @@ function openEditPost(id){
     document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
+    PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
+    document.getElementById('pfCommentsWrap').style.display='block';
+    loadContentComments(p.id);
     fillPostAssetSelect(p.asset_id||'');
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
   });
@@ -2954,7 +2988,7 @@ async function savePost(){
   if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
-  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value};
+  var payload={title:title,body:document.getElementById('pfBody').value.trim(),channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
@@ -2965,6 +2999,49 @@ async function savePost(){
     if(r.ok&&d.success){closePost();loadPosts();} else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Opslaan';
+}
+var _PC_ME=null;
+async function loadContentComments(postId){
+  var box=document.getElementById('pfComments'); if(!box)return;
+  box.innerHTML='<div style="font-size:13px;color:var(--muted)">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+postId+'/comments',{credentials:'include'});
+    var d=await r.json(); if(d&&d.me!=null)_PC_ME=d.me;
+    var list=(d&&d.success&&d.comments)?d.comments:[];
+    box.innerHTML=list.length?list.map(function(f){
+      var who=(f.author_role==='client')?'Klant':'Team';
+      var mine=(_PC_ME!=null&&String(f.author_account_id)===String(_PC_ME));
+      var edited=f.updated_at?' (bewerkt)':'';
+      var acts=mine?('<div style="margin-top:3px"><a href="#" onclick="editContentComment('+postId+','+f.id+',this);return false;" style="font-size:12px;color:var(--accent-2);margin-right:12px">Bewerken</a><a href="#" onclick="deleteContentComment('+postId+','+f.id+');return false;" style="font-size:12px;color:#dc2626">Verwijderen</a></div>'):'';
+      return '<div data-pc="'+f.id+'" style="border-top:1px solid var(--line);padding:8px 0"><div style="font-size:12px;color:var(--muted)">'+esc(who)+(f.author_name?(' &middot; '+esc(f.author_name)):'')+' &middot; '+esc(fmtWhen(f.created_at))+edited+'</div><div class="pc-body" style="font-size:14px;white-space:pre-wrap;margin-top:2px">'+esc(f.body)+'</div>'+acts+'</div>';
+    }).join(''):'<div style="font-size:13px;color:var(--muted)">Nog geen opmerkingen.</div>';
+  }catch(e){box.innerHTML='<div style="font-size:13px;color:var(--muted)">Kon opmerkingen niet laden.</div>';}
+}
+async function postContentComment(){
+  if(!EDIT_POST)return; var inp=document.getElementById('pfCommentInput'); var body=inp.value.trim(); if(!body)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+EDIT_POST.id+'/comments',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({body:body})});
+    var d=await r.json();
+    if(r.ok&&d.success){inp.value='';loadContentComments(EDIT_POST.id);} else {alert(d.error||'Kon opmerking niet plaatsen.');}
+  }catch(e){alert('Netwerkfout.');}
+}
+async function editContentComment(postId,id,link){
+  var wrap=link&&link.closest?link.closest('[data-pc]'):null;
+  var cur=wrap?(wrap.querySelector('.pc-body').textContent||''):'';
+  var v=prompt('Opmerking bewerken:',cur); if(v==null)return; v=v.trim(); if(!v)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+postId+'/comments/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({body:v})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadContentComments(postId);} else {alert(d.error||'Kon opmerking niet bewerken.');}
+  }catch(e){alert('Netwerkfout.');}
+}
+async function deleteContentComment(postId,id){
+  if(!confirm('Deze opmerking verwijderen?'))return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+postId+'/comments/'+id,{method:'DELETE',credentials:'include'});
+    var d=await r.json();
+    if(r.ok&&d.success){loadContentComments(postId);} else {alert(d.error||'Kon opmerking niet verwijderen.');}
+  }catch(e){alert('Netwerkfout.');}
 }
 async function delPost(id){
   if(!confirm('Deze post verwijderen?'))return;
