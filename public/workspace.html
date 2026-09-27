@@ -1004,8 +1004,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <!-- MODAL: post (nieuw + bewerken) -->
 <div class="modal-ov" id="postModal">
   <div class="modal">
-    <h3 id="postModalTitle">Nieuwe post</h3>
-    <div class="sub">Plan content voor deze klant.</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div><h3 id="postModalTitle">Nieuwe post</h3><div class="sub">Plan content voor deze klant.</div></div>
+      <button onclick="closePost()" title="Sluiten" aria-label="Sluiten" style="background:transparent;border:none;color:var(--muted);font-size:26px;line-height:1;cursor:pointer;padding:0 4px">&times;</button>
+    </div>
     <div id="postMsg" class="inline-msg"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
     <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
@@ -2846,7 +2848,7 @@ function renderPfLabels(){
   var box=document.getElementById('pfLabels'); if(!box)return;
   box.innerHTML=CONTENT_LABELS.map(function(d){var on=PF_LABELS.indexOf(d.k)>=0;return '<button type="button" onclick="togglePfLabel(\''+d.k+'\')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+d.c+';background:'+(on?d.c:'transparent')+';color:'+(on?'#fff':d.c)+'">'+esc(d.l)+'</button>';}).join('');
 }
-function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);renderPfLabels();}
+function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);POST_DIRTY=true;renderPfLabels();}
 function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
 function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
 function kanbanLeave(e){e.currentTarget.style.outline='';}
@@ -3012,12 +3014,12 @@ function renderPfBlocks(){
     return '<div class="pfblock" ondragover="pfbOver(event)" ondrop="pfbDrop(event,'+idx+')" style="display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--panel-2,rgba(255,255,255,.02))">'+handle+'<div style="flex:1;min-width:0">'+inner+'</div>'+del+'</div>';
   }).join('');
 }
-function pfAddText(){PF_BLOCKS.push({type:'text',text:''});renderPfBlocks();}
-function pfDelBlock(i){if(PF_BLOCKS[i]&&PF_BLOCKS[i].type==='media')return;PF_BLOCKS.splice(i,1);if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];renderPfBlocks();}
-function pfTextInput(i,el){if(PF_BLOCKS[i])PF_BLOCKS[i].text=el.value;}
+function pfAddText(){PF_BLOCKS.push({type:'text',text:''});POST_DIRTY=true;renderPfBlocks();}
+function pfDelBlock(i){if(PF_BLOCKS[i]&&PF_BLOCKS[i].type==='media')return;PF_BLOCKS.splice(i,1);if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];POST_DIRTY=true;renderPfBlocks();}
+function pfTextInput(i,el){if(PF_BLOCKS[i])PF_BLOCKS[i].text=el.value;POST_DIRTY=true;}
 function pfbDrag(e,i){_PFB_DRAG=i;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(i));}catch(_){}}
 function pfbOver(e){e.preventDefault();}
-function pfbDrop(e,i){e.preventDefault();var from=_PFB_DRAG;_PFB_DRAG=null;if(from==null||from===i)return;var item=PF_BLOCKS.splice(from,1)[0];var target=(from<i)?i-1:i;PF_BLOCKS.splice(target,0,item);renderPfBlocks();}
+function pfbDrop(e,i){e.preventDefault();var from=_PFB_DRAG;_PFB_DRAG=null;if(from==null||from===i)return;var item=PF_BLOCKS.splice(from,1)[0];var target=(from<i)?i-1:i;PF_BLOCKS.splice(target,0,item);POST_DIRTY=true;renderPfBlocks();}
 function openNewPost(){
   EDIT_POST=null; hideMsg('postMsg');
   document.getElementById('postModalTitle').textContent='Nieuwe post';
@@ -3029,7 +3031,9 @@ function openNewPost(){
   PF_BLOCKS=[{type:'media'},{type:'text',text:''}];
   document.getElementById('pfCommentsWrap').style.display='none';
   fillPostAssetSelect('');
+  ensurePostDirty();
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
+  POST_DIRTY=false;
 }
 function openEditPost(id){
   var body=document.getElementById('postsBody');
@@ -3047,10 +3051,24 @@ function openEditPost(id){
     document.getElementById('pfCommentsWrap').style.display='block';
     loadContentComments(p.id);
     fillPostAssetSelect(p.asset_id||'');
+    ensurePostDirty();
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
+    POST_DIRTY=false;
   });
 }
-function closePost(){document.getElementById('postModal').classList.remove('open');}
+var POST_DIRTY=false, _POST_LISTENERS=false;
+function ensurePostDirty(){
+  if(_POST_LISTENERS)return; _POST_LISTENERS=true;
+  var m=document.getElementById('postModal');
+  m.addEventListener('input',function(){POST_DIRTY=true;});
+  m.addEventListener('change',function(){POST_DIRTY=true;});
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&m.classList.contains('open'))closePost(); });
+}
+function closePost(force){
+  if(force!==true&&POST_DIRTY){ if(!confirm('Je hebt mogelijk niet-opgeslagen wijzigingen. Toch sluiten zonder opslaan?'))return; }
+  POST_DIRTY=false;
+  document.getElementById('postModal').classList.remove('open');
+}
 async function savePost(){
   var btn=document.getElementById('pfSaveBtn'); hideMsg('postMsg');
   var title=document.getElementById('pfTitle').value.trim();
@@ -3069,7 +3087,7 @@ async function savePost(){
     if(r.ok&&d.success){
       // Nieuwe post: blokken opslaan via een vervolg-PATCH (create bewaart de blokken nog niet).
       if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText})}); }catch(_){} }
-      closePost();loadPosts();
+      POST_DIRTY=false;closePost(true);loadPosts();
     } else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Opslaan';
