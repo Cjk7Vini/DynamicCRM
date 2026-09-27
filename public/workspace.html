@@ -689,7 +689,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <span class="pill">Rapportage</span>
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost" id="aiAnalyseBtn" onclick="runAiAnalysis()">AI-analyse</button>
-              <button class="btn btn-primary" onclick="window.print()">Download als PDF</button>
             </div>
           </div>
           <div id="reportMsg" class="inline-msg"></div>
@@ -1549,7 +1548,26 @@ async function delAsset(id){
 }
 
 // ---- Rapportage ----
-function openReportPdf(){ window.print(); }
+function presetToRange(preset){
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var iso=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+  var t=new Date(); var today=new Date(t.getFullYear(),t.getMonth(),t.getDate());
+  var since=new Date(today), until=new Date(today);
+  if(preset==='last_7d'){since.setDate(today.getDate()-6);}
+  else if(preset==='last_14d'){since.setDate(today.getDate()-13);}
+  else if(preset==='this_week_mon_today'){var dow=(today.getDay()+6)%7;since.setDate(today.getDate()-dow);}
+  else if(preset==='last_week_mon_sun'){var d2=(today.getDay()+6)%7;until.setDate(today.getDate()-d2-1);since=new Date(until);since.setDate(until.getDate()-6);}
+  else if(preset==='this_month'){since=new Date(today.getFullYear(),today.getMonth(),1);}
+  else if(preset==='last_month'){since=new Date(today.getFullYear(),today.getMonth()-1,1);until=new Date(today.getFullYear(),today.getMonth(),0);}
+  else if(preset==='maximum'){since.setDate(today.getDate()-729);}
+  else {since.setDate(today.getDate()-29);} // last_30d / default
+  return {since:iso(since),until:iso(until)};
+}
+function openReportPdf(){
+  if(!CURRENT_CLIENT)return;
+  var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);
+  window.open('/report.html?client='+encodeURIComponent(CURRENT_CLIENT.id)+'&since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until),'_blank');
+}
 
 // ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
 var WS_MODE='preset', WS_PRESET='last_30d', WS_SINCE=null, WS_UNTIL=null;
@@ -1926,7 +1944,7 @@ function rptDateBar(){
   return '<div class="card no-print" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Periode</span>'+
     '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line)" onclick="rptOpenPicker()">'+dpCalIcon()+'<span>Kalender / Filter</span><span style="color:var(--muted);font-size:11px">&#9662;</span></button></div>'+
-    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="window.print()">Download als PDF</button></div>';
+    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="openReportPdf()">Download rapportage</button></div>';
 }
 function rptStatusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
 function rptStatusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':rptStatusLabel(st))+'</span>';}
