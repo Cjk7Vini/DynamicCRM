@@ -23,6 +23,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvet
 .hidden{display:none!important}
 button{font-family:inherit}
 svg{display:block}
+/* Datumvelden: licht thema zodat de kalender-popup wit en leesbaar is (niet zwart-op-zwart). */
+input[type="date"]{color-scheme:light;background:#fff;color:#111;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 
 /* ---------- BUTTONS ---------- */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:none;border-radius:10px;font-weight:650;font-size:13.5px;cursor:pointer;transition:transform .12s,box-shadow .12s,background .12s;white-space:nowrap}
@@ -263,7 +265,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     </nav>
     <div class="nav-label">Per klant</div>
     <nav class="nav">
-      <a onclick="perKlant('content')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Contentkalender</a>
+      <a onclick="perKlant('content')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Content planning</a>
       <a onclick="perKlant('assets')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Assets</a>
       <a onclick="perKlant('content')"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Goedkeuringen</a>
       <a onclick="perKlant('report')"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Rapportage</a>
@@ -308,8 +310,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="section-h"><h4>Modules</h4></div>
         <div class="grid">
           <div class="mod live" onclick="navTo('clients')"><h5>Klanten</h5><p>Beheer per klant een eigen space.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="perKlant('content')"><h5>Contentkalender</h5><p>Plan en plan posts in, per klant.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="perKlant('assets')"><h5>Assets</h5><p>Foto en video uploaden en organiseren.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="perKlant('content')"><h5>Content planning</h5><p>Posts klaarzetten, plannen en goedkeuren.</p><span class="tag on">Actief</span></div>
+          <div class="mod live" onclick="perKlant('assets')"><h5>Content</h5><p>Foto en video uploaden en organiseren.</p><span class="tag on">Actief</span></div>
           <div class="mod live" onclick="perKlant('content')"><h5>Goedkeuringen</h5><p>Klant bekijkt en keurt content goed.</p><span class="tag on">Actief</span></div>
           <div class="mod live" onclick="navTo('koppelingen')"><h5>Koppelingen</h5><p>API's, pixels en tokens per klant.</p><span class="tag on">Actief</span></div>
           <div class="mod live" onclick="navTo('reporting')"><h5>Rapportage</h5><p>Cijfers per klant uit je workspace.</p><span class="tag on">Actief</span></div>
@@ -503,8 +505,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
         <div class="tabs" id="dTabs">
           <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
-          <button onclick="dTab(this,'assets')">Assets</button>
-          <button onclick="dTab(this,'content')">Content</button>
+          <button onclick="dTab(this,'assets')">Content</button>
+          <button onclick="dTab(this,'content')">Content planning</button>
           <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnebeheer</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
@@ -1936,7 +1938,7 @@ async function loadMetaInsights(){
       html+=d.topPosts.map(function(p){
         var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
         return '<div onclick="openPostDetail(\''+esc(p.id)+'\')" style="cursor:pointer;border:1px solid var(--line);border-radius:12px;overflow:hidden">'+img+
-          '<div style="padding:8px 10px"><div style="font-size:11px;color:var(--muted)">'+esc(p.media_type||'')+'</div><div style="font-size:13px;font-weight:600;margin-top:2px">'+esc(p.likes)+' likes · '+esc(p.comments)+' reacties</div></div></div>';
+          '<div style="padding:8px 10px"><div style="font-size:11px;color:var(--muted)">'+esc(p.media_type||'')+(p.views!=null?(' &middot; '+iv(p.views)+' weergaven'):'')+'</div><div style="font-size:13px;font-weight:600;margin-top:2px">'+esc(p.likes)+' likes &middot; '+esc(p.comments)+' reacties'+(p.engagement!=null?(' &middot; '+p.engagement+'% engagement'):'')+'</div></div></div>';
       }).join('')+'</div>';
     }
     // Advertenties
