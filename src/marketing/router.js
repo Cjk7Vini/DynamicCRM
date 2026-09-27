@@ -763,6 +763,17 @@ async function clientItemsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+let _hasContentLabelDefs = null;
+async function contentLabelDefsAvailable() {
+  if (_hasContentLabelDefs === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='content_labels'"
+    )).rows);
+    if (r.length > 0) _hasContentLabelDefs = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
   if (!Array.isArray(input)) return null;
@@ -874,7 +885,7 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
-      const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x)) : [];
+      const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
       sets.push(`labels=$${i++}`); vals.push(clean);
     }
     if (b.blocks !== undefined && await contentBlocksAvailable()) {
@@ -1099,6 +1110,44 @@ router.delete('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, re
       'DELETE FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND client_id=$3 RETURNING id', [req.params.id, wsId, okClient]
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Item niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- Eigen (custom) labels per werkplek ----
+router.get('/api/mkt/label-defs', requireMkt, async (req, res) => {
+  try {
+    if (!(await contentLabelDefsAvailable())) return res.json({ success: true, labels: [] });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, label, color FROM marketing.content_labels WHERE workspace_id=$1 ORDER BY created_at ASC',
+      [req.session.mkt.workspaceId]
+    )).rows);
+    res.json({ success: true, labels: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/label-defs', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentLabelDefsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld (migratie 011 nog niet gedraaid).' });
+    const label = String((req.body && req.body.label) || '').trim().slice(0, 40);
+    if (!label) return res.status(400).json({ error: 'Labelnaam is verplicht' });
+    let color = String((req.body && req.body.color) || '').trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#6366f1';
+    const row = await withWriteConnection(async (c) => (await c.query(
+      'INSERT INTO marketing.content_labels (workspace_id, label, color) VALUES ($1,$2,$3) RETURNING id, label, color',
+      [req.session.mkt.workspaceId, label, color]
+    )).rows[0]);
+    res.json({ success: true, label: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/label-defs/:id', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentLabelDefsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      'DELETE FROM marketing.content_labels WHERE id=$1 AND workspace_id=$2 RETURNING id', [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Label niet gevonden' });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
