@@ -1606,7 +1606,7 @@ function wsOpenPicker(){openDatePicker({since:WS_SINCE,until:WS_UNTIL,active:(WS
 function wsDateBar(){
   return '<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
     '<div style="font-size:13px;color:var(--muted)">Periode (advertenties)</div>'+
-    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px" onclick="wsOpenPicker()">'+dpCalIcon()+esc(wsPeriodLabel())+'</button></div>';
+    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line)" onclick="wsOpenPicker()">'+dpCalIcon()+'<span>'+esc(wsPeriodLabel())+'</span><span style="color:var(--muted);font-size:11px">&#9662;</span></button></div>';
 }
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
 function wsLineChart(data,color){
@@ -1925,7 +1925,7 @@ function rptOpenPicker(){openDatePicker({since:RPT_SINCE,until:RPT_UNTIL,active:
 function rptDateBar(){
   return '<div class="card no-print" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Periode</span>'+
-    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px" onclick="rptOpenPicker()">'+dpCalIcon()+esc(rptPeriodLabel())+'</button></div>'+
+    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line)" onclick="rptOpenPicker()">'+dpCalIcon()+'<span>'+esc(rptPeriodLabel())+'</span><span style="color:var(--muted);font-size:11px">&#9662;</span></button></div>'+
     '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="window.print()">Download als PDF</button></div>';
 }
 function rptStatusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
