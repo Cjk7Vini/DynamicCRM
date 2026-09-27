@@ -1007,7 +1007,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3 id="postModalTitle">Nieuwe post</h3>
     <div class="sub">Plan content voor deze klant.</div>
     <div id="postMsg" class="inline-msg"></div>
+    <div id="pfMediaPreview"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
+    <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="5" placeholder="De post-tekst die klaar moet staan..."></textarea></div>
+    <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="row2">
       <div class="field"><label>Kanaal</label>
         <select id="pfChannel">
@@ -1031,6 +1034,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
+    <div class="field"><label>Beeld (afbeelding of video)</label>
+      <select id="pfAsset" onchange="updatePfMedia()"><option value="">Geen beeld</option></select>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
+    </div>
     <div class="field" style="background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
       <label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin:0">
         <input type="checkbox" id="pfAuto" style="width:auto" onchange="document.getElementById('pfAutoCh').style.display=this.checked?'block':'none'">
@@ -1042,12 +1049,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div style="font-size:12px;color:var(--muted);margin-top:6px">Vereist een gekoppeld account en een beeld (voor Instagram). Post gaat automatisch de deur uit.</div>
       </div>
     </div>
-    <div class="field"><label>Beeld (afbeelding of video)</label>
-      <select id="pfAsset"><option value="">Geen beeld</option></select>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
-    </div>
-    <div class="field"><label>Tekst / caption</label><textarea id="pfBody" rows="4" placeholder="De post-tekst..."></textarea></div>
-    <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePost()">Annuleren</button>
       <button class="btn btn-primary" id="pfSaveBtn" onclick="savePost()">Opslaan</button>
@@ -2977,12 +2978,24 @@ async function loadPosts(){
     renderContentView();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
+var PF_ASSETS={};
 async function fillPostAssetSelect(selectedId){
-  var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>';
+  var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>'; PF_ASSETS={};
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
-    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var o=document.createElement('option');o.value=a.id;o.textContent=a.filename+' ('+(a.resource_type==='video'?'video':'foto')+')';if(String(a.id)===String(selectedId))o.selected=true;sel.appendChild(o); } });
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ PF_ASSETS[String(a.id)]={url:a.url,type:a.resource_type}; var o=document.createElement('option');o.value=a.id;o.textContent=a.filename+' ('+(a.resource_type==='video'?'video':'foto')+')';if(String(a.id)===String(selectedId))o.selected=true;sel.appendChild(o); } });
   }catch(e){}
+  updatePfMedia();
+}
+function updatePfMedia(){
+  var box=document.getElementById('pfMediaPreview'); if(!box)return;
+  var sel=document.getElementById('pfAsset'); var id=sel?sel.value:'';
+  var a=PF_ASSETS[String(id)];
+  if(!a){ box.innerHTML=''; box.style.display='none'; return; }
+  box.style.display='block'; box.style.marginBottom='12px';
+  box.innerHTML=(a.type==='video')
+    ? '<video src="'+esc(a.url)+'" controls style="width:100%;max-height:320px;border-radius:12px;background:#000;display:block"></video>'
+    : '<img src="'+esc(a.url)+'" alt="" style="width:100%;max-height:320px;object-fit:contain;border-radius:12px;background:var(--panel);display:block">';
 }
 function openNewPost(){
   EDIT_POST=null; hideMsg('postMsg');
