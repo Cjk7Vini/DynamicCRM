@@ -3079,8 +3079,42 @@ async function runScheduler() {
       }
     }
     try { await runAssetRetentionIfDue(); } catch (_) { /* opruimen niet kritisch */ }
+    try { await runFollowerSnapshotsIfDue(); } catch (_) { /* snapshots niet kritisch */ }
   } catch (_) { /* infrafout: volgende minuut opnieuw */ }
   finally { schedulerBusy = false; }
+}
+
+// Slaat hooguit eens per 24 uur het totale volgersaantal op voor elke klant met
+// een Instagram-koppeling. Zo bouwen we automatisch dag-historie op voor NETTO
+// nieuwe volgers, ook als niemand de rapportage opent. Eén lichte API-call per
+// klant per dag (accountcijfers, ruime limiet, geen advertentielimiet).
+async function runFollowerSnapshotsIfDue() {
+  const now = Date.now();
+  if (global.__mktLastFollowerSnap && (now - global.__mktLastFollowerSnap) < 24 * 60 * 60 * 1000) return;
+  if (!(await followerSnapshotsAvailable())) return;
+  global.__mktLastFollowerSnap = now;
+  let clients = [];
+  try {
+    clients = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, workspace_id FROM marketing.clients ORDER BY id'
+    )).rows);
+  } catch (_) { return; }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  for (const cl of clients) {
+    try {
+      const creds = await resolveClientMeta(cl.workspace_id, cl.id);
+      if (!creds.token || !creds.igUserId) continue;
+      const a = await graphGet(`${creds.igUserId}`, { fields: 'followers_count', access_token: creds.token });
+      if (a && a.followers_count != null) {
+        await withWriteConnection(async (c) => c.query(
+          `INSERT INTO marketing.follower_snapshots (workspace_id, client_id, day, followers)
+           VALUES ($1,$2,$3,$4) ON CONFLICT (client_id, day) DO UPDATE SET followers=EXCLUDED.followers`,
+          [cl.workspace_id, cl.id, todayStr, a.followers_count]
+        ));
+      }
+      await sleepMs(300); // rustig aan, ruim binnen de limieten
+    } catch (_) { /* deze klant overslaan */ }
+  }
 }
 
 // Ruimt hooguit eens per 24 uur assets op die ouder zijn dan de bewaartermijn
