@@ -1394,15 +1394,34 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
     if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
     const token = String((req.body && req.body.token) || '').trim();
     if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
-    const out = { pages: [], adaccounts: [] };
-    try {
-      const r = await graphGet('me/accounts', { fields: 'name,id,instagram_business_account{id,username}', limit: '200', access_token: token });
-      out.pages = (r.data || []).map((p) => ({
+    const pageMap = {};
+    const addPage = (p) => {
+      if (!p || !p.id || pageMap[p.id]) return;
+      pageMap[p.id] = {
         id: p.id, name: p.name || '(zonder naam)',
         ig_id: (p.instagram_business_account && p.instagram_business_account.id) || null,
         ig_username: (p.instagram_business_account && p.instagram_business_account.username) || null,
-      }));
+      };
+    };
+    const PF = 'name,id,instagram_business_account{id,username}';
+    // 1. Pagina's met een directe rol.
+    try {
+      const r = await graphGet('me/accounts', { fields: PF, limit: '200', access_token: token });
+      (r.data || []).forEach(addPage);
     } catch (e) { return res.status(400).json({ error: 'Kon accounts niet ophalen: ' + e.message }); }
+    // 2. Pagina's die via haar account/business zijn toegewezen (owned + client pages).
+    try {
+      const b = await graphGet('me/businesses', { fields: 'id,name', limit: '100', access_token: token });
+      for (const biz of (b.data || [])) {
+        for (const edge of ['owned_pages', 'client_pages']) {
+          try {
+            const pr = await graphGet(`${biz.id}/${edge}`, { fields: PF, limit: '200', access_token: token });
+            (pr.data || []).forEach(addPage);
+          } catch (_) { /* deze edge overslaan */ }
+        }
+      }
+    } catch (_) { /* geen business-toegang: alleen directe pagina's */ }
+    const out = { pages: Object.values(pageMap), adaccounts: [] };
     try {
       const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });
       out.adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
