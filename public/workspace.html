@@ -25,6 +25,15 @@ button{font-family:inherit}
 svg{display:block}
 /* Datumvelden: licht thema zodat de kalender-popup wit en leesbaar is (niet zwart-op-zwart). */
 input[type="date"]{color-scheme:light;background:#fff;color:#111;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+/* Print: alleen het rapport, wit en leesbaar (voor Download als PDF). */
+@media print{
+  .side,.topbar,button{display:none!important}
+  .main{margin:0!important}
+  body,.shell,.main,.content{background:#fff!important}
+  #reportBody, #reportBody *{color:#111!important}
+  #reportBody .card{background:#fff!important;border:1px solid #ddd!important;box-shadow:none!important}
+  .card,.stat,table tr{break-inside:avoid}
+}
 
 /* ---------- BUTTONS ---------- */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:none;border-radius:10px;font-weight:650;font-size:13.5px;cursor:pointer;transition:transform .12s,box-shadow .12s,background .12s;white-space:nowrap}
@@ -512,9 +521,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
-        <div id="clientReportBar" style="display:none;margin:4px 0 14px">
-          <button class="btn btn-ghost" onclick="openReportPdf()">Volledige rapportage op scherm</button>
-        </div>
+        <div id="clientReportBar" style="display:none;margin:4px 0 14px"></div>
         <div id="dCampReview" style="display:none">
           <div id="campReviewMsg" class="inline-msg"></div>
           <div id="campReviewBody"><div class="empty">Laden...</div></div>
@@ -676,7 +683,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <span class="pill">Rapportage</span>
             <div style="display:flex;gap:8px">
               <button class="btn btn-ghost" id="aiAnalyseBtn" onclick="runAiAnalysis()">AI-analyse</button>
-              <button class="btn btn-primary" onclick="openReportPdf()">Rapport openen (PDF)</button>
+              <button class="btn btn-primary" onclick="window.print()">Download als PDF</button>
             </div>
           </div>
           <div id="reportMsg" class="inline-msg"></div>
@@ -1527,7 +1534,7 @@ async function delAsset(id){
 }
 
 // ---- Rapportage ----
-function openReportPdf(){ if(CURRENT_CLIENT) window.open('/report.html?client='+CURRENT_CLIENT.id,'_blank'); }
+function openReportPdf(){ window.print(); }
 
 // ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
 var WS_MODE='preset', WS_PRESET='last_30d', WS_SINCE=null, WS_UNTIL=null;
@@ -1571,11 +1578,11 @@ function wsLineChart(data,color){
   '</svg>';
 }
 function cbadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';var lab=live?'LIVE':(st&&/PAUSED/.test(String(st))?'Gepauzeerd':(st||'?'));return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(lab)+'</span>';}
-function campPerfBlock(a){
+function campPerfBlock(a,perLblOverride){
   if(!a)return '';
   var badge=function(kind,txt){var m={ok:['binnen norm','#166534','#dcfce7'],warn:['aandachtspunt','#92400e','#fef3c7'],edge:['net op de grens','#92400e','#fef9c3'],diag:['monitoren','#334155','#e2e8f0']};var x=m[kind];if(!x)return '';var label=txt||x[0];return '<span style="font-size:10px;font-weight:700;color:'+x[1]+';background:'+x[2]+';padding:2px 8px;border-radius:20px;margin-left:8px;white-space:nowrap">'+label+'</span>';};
   var row=function(label,sub,value,kind,txt){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line)"><div><span style="font-size:14px">'+label+'</span>'+(sub?' <span style="font-size:12px;color:var(--muted)">'+sub+'</span>':'')+'</div><div style="display:flex;align-items:center;white-space:nowrap"><strong>'+value+'</strong>'+badge(kind,txt)+'</div></div>';};
-  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">'+esc(wsPeriodLabel())+'</span></div><div class="card" style="margin-bottom:16px">';
+  var h='<div class="section-h"><h4>Campagne data algemeen</h4><span style="font-size:12px;color:var(--muted)">'+esc(perLblOverride||wsPeriodLabel())+'</span></div><div class="card" style="margin-bottom:16px">';
   h+=row('Budget besteed','','&euro; '+crn(a.spend),null);
   h+=row('Weergaven / bereik','',crn(a.impressions)+' / '+crn(a.reach),null);
   if(a.cpm!=null)h+=row('CPM','(onder &euro;15)','&euro; '+a.cpm,(Number(a.cpm)<15?'ok':'warn'));
@@ -1856,20 +1863,73 @@ async function openPostDetail(id){
     }
   }catch(e){var sd2=document.getElementById('postDetailStats');if(sd2)sd2.textContent='Kon cijfers niet laden.';}
 }
+// ---- Rapportage: periode-state (eigen aan de rapportage-tab) ----
+var RPT_MODE='preset', RPT_PRESET='last_30d', RPT_SINCE=null, RPT_UNTIL=null;
+(function(){var t=new Date();RPT_UNTIL=t.toISOString().slice(0,10);RPT_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
+function rptDateQS(){return (RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?('?since='+encodeURIComponent(RPT_SINCE)+'&until='+encodeURIComponent(RPT_UNTIL)):('?preset='+encodeURIComponent(RPT_PRESET));}
+function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)return RPT_SINCE+' t/m '+RPT_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
+function rptSetPreset(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();}
+function rptApplyDates(){var s=document.getElementById('rptDtSince').value,u=document.getElementById('rptDtUntil').value;if(!s||!u)return;RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}
+function rptDateBar(){
+  var chips=WS_PRESETS.map(function(p){var on=(RPT_MODE==='preset'&&RPT_PRESET===p.k);return '<button onclick="rptSetPreset(\''+p.k+'\')" style="padding:5px 11px;font-size:12.5px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+'">'+esc(p.l)+'</button>';}).join('');
+  var custOn=(RPT_MODE==='custom');
+  return '<div class="card no-print" style="margin-bottom:16px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px"><div style="font-size:13px;color:var(--muted)">Periode (Instagram + advertenties)</div>'+
+    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="window.print()">Download als PDF</button></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+chips+'</div>'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)">'+
+      '<span style="font-size:12px;color:'+(custOn?'var(--accent-2)':'var(--muted)')+';font-weight:'+(custOn?'700':'400')+'">Aangepast:</span>'+
+      '<label style="font-size:12px">Van <input id="rptDtSince" type="date" value="'+esc(RPT_SINCE)+'" style="width:auto"></label>'+
+      '<label style="font-size:12px">Tot <input id="rptDtUntil" type="date" value="'+esc(RPT_UNTIL)+'" style="width:auto"></label>'+
+      '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="rptApplyDates()">Toepassen</button>'+
+    '</div></div>';
+}
+function rptStatusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
+function rptStatusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':rptStatusLabel(st))+'</span>';}
+function rptShort(v){v=Number(v)||0;if(Math.abs(v)>=1000)return (v/1000).toFixed(Math.abs(v)>=10000?0:1)+'k';return Math.round(v).toString();}
+// Professionele lijngrafiek: y-as met raster + labels, x-as datums, area-gradient, eindpunt.
+function reportChart(data,color,gid){
+  if(!data||data.length<2)return '<div style="color:var(--muted);font-size:13px;padding:8px 2px">Nog te weinig dagdata voor een grafiek.</div>';
+  var W=720,H=240,padL=46,padR=14,padT=16,padB=30;
+  var vals=data.map(function(d){return Number(d.v)||0;});
+  var max=Math.max.apply(null,vals), min=Math.min.apply(null,vals);
+  if(min>0)min=0; if(max===min)max=min+1;
+  var n=data.length;
+  var X=function(i){return padL+(i/(n-1))*(W-padL-padR);};
+  var Y=function(v){return H-padB-((v-min)/(max-min))*(H-padT-padB);};
+  var lineP=data.map(function(d,i){return (i===0?'M':'L')+X(i).toFixed(1)+' '+Y(d.v).toFixed(1);}).join(' ');
+  var areaP=lineP+' L'+X(n-1).toFixed(1)+' '+(H-padB)+' L'+X(0).toFixed(1)+' '+(H-padB)+' Z';
+  var grid='',steps=4;
+  for(var g=0;g<=steps;g++){var vv=min+(max-min)*(g/steps);var yy=Y(vv);grid+='<line x1="'+padL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+yy.toFixed(1)+'" stroke="var(--line)" stroke-width="1"/><text x="'+(padL-8)+'" y="'+(yy+3).toFixed(1)+'" font-size="10" fill="var(--muted)" text-anchor="end">'+esc(rptShort(vv))+'</text>';}
+  var lbl=function(iso){if(!iso)return '';var dd=new Date(iso);if(isNaN(dd.getTime()))return '';return dd.toLocaleDateString('nl-NL',{day:'numeric',month:'short'});};
+  var xl='',marks=[0,Math.floor((n-1)/2),n-1];
+  marks.forEach(function(i,idx){var anc=idx===0?'start':(idx===2?'end':'middle');xl+='<text x="'+X(i).toFixed(1)+'" y="'+(H-9)+'" font-size="10" fill="var(--muted)" text-anchor="'+anc+'">'+esc(lbl(data[i].t))+'</text>';});
+  var dot='<circle cx="'+X(n-1).toFixed(1)+'" cy="'+Y(data[n-1].v).toFixed(1)+'" r="3.5" fill="'+color+'"/>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block"><defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity="0.28"/><stop offset="100%" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+grid+'<path d="'+areaP+'" fill="url(#'+gid+')"/><path d="'+lineP+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+dot+xl+'</svg>';
+}
 async function loadMetaInsights(){
   var box=document.getElementById('metaReport'); if(!box)return;
   function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
+  var RTL={IMAGE:'Bericht',CAROUSEL_ALBUM:'Carrousel',VIDEO:'Video',REELS:'Reel',ONBEKEND:'Overig'};
+  var MPT={REELS:'Reels',VIDEO:'Video',CAROUSEL_CONTAINER:'Carrousels',CAROUSEL_ALBUM:'Carrousels',POST:'Berichten',IMAGE:'Berichten',FEED:'Berichten',STORY:'Verhalen',IGTV:'Video',AD:'Advertenties'};
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights',{credentials:'include'}); var d=await r.json();
-    if(!r.ok||!d.success){box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Kon Meta-cijfers niet laden.</div>';return;}
-    if(!d.configured){
-      box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Nog geen Meta-koppeling ingesteld. Vul in de Koppelingen-tab het access token en Instagram user ID in om cijfers te zien.</div>';
-      return;
-    }
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights'+rptDateQS(),{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Kon Meta-cijfers niet laden.</div>';return;}
+    if(!d.configured){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Nog geen Meta-koppeling ingesteld. Vul in de Koppelingen-tab het access token en Instagram user ID in om cijfers te zien.</div>';return;}
+    // Campagnes + koppelingen ophalen voor de campagnesecties (alleen deze klant).
+    var camps=null, linkedIds=[];
+    try{ var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns'+rptDateQS(),{credentials:'include'}); camps=await cr.json(); }catch(_){}
+    try{ var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json(); if(ld&&ld.success&&ld.links)linkedIds=ld.links.map(String); }catch(_){}
     var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
-    var html='';
-    // Kop
-    html+='<div class="section-h"><h4>Instagram</h4><span style="font-size:12px;color:var(--muted)">laatste 28 dagen</span></div>';
+    var num=function(v){return v!=null?v:'-';};
+    var ins=d.insights||{}, pmeta=d.insights_prev||{};
+    var pctChange=function(cur,prev){if(cur==null||prev==null||Number(prev)===0)return null;return Math.round(((Number(cur)-Number(prev))/Number(prev))*1000)/10;};
+    var deltaTxt=function(p){if(p==null)return '';return (p>=0?'↑ +':'↓ ')+Math.abs(p)+'%';};
+    var deltaSpan=function(cur,prev){var p=pctChange(cur,prev);if(p==null)return '';return '<span style="font-size:12px;font-weight:700;color:'+(p>=0?'#16a34a':'#dc2626')+';margin-left:6px">'+deltaTxt(p)+'</span>';};
+    var kpiD=function(label,val,cur,prev){return '<div class="stat"><div class="k">'+esc(label)+'</div><div class="v">'+val+deltaSpan(cur,prev)+'</div></div>';};
+    var bigtile=function(label,val,accent){return '<div class="stat"><div class="k">'+esc(label)+'</div><div class="v'+(accent?' accent':'')+'">'+esc(val)+'</div></div>';};
+    var html=rptDateBar();
+    html+='<div class="section-h"><h4>Instagram</h4><span style="font-size:12px;color:var(--muted)">'+esc(rptPeriodLabel())+'</span></div>';
     // Hero: account + volgers
     if(d.account){
       html+='<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">'+
@@ -1881,39 +1941,50 @@ async function loadMetaInsights(){
     } else {
       html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
     }
-    // KPI-rij (insights, laatste 28 dagen)
+    // Accountoverzicht (grote tegels)
+    if(d.account){
+      var vP=pctChange(ins.views,pmeta.views);
+      html+='<div class="section-h"><h4>Accountoverzicht</h4></div>';
+      html+='<div class="stats" style="margin-bottom:6px">'+bigtile('Weergaven',iv(ins.views),true)+bigtile('Totaal volgers',iv(d.account.followers))+bigtile('Gepubliceerde content',iv(d.account.media))+'</div>';
+    }
+    // Prestaties (vergeleken met de vorige, even lange periode)
     if(d.insights){
-      var icells=[];
-      if(d.insights.views!=null)icells.push(tile('Weergaven',iv(d.insights.views),true));
-      if(d.insights.reach!=null)icells.push(tile('Bereik',iv(d.insights.reach)));
-      if(d.insights.total_interactions!=null)icells.push(tile('Interacties',iv(d.insights.total_interactions)));
-      if(d.insights.accounts_engaged!=null)icells.push(tile('Betrokken',iv(d.insights.accounts_engaged)));
-      if(d.insights.profile_views!=null)icells.push(tile('Profielbezoeken',iv(d.insights.profile_views)));
-      if(d.insights.website_clicks!=null)icells.push(tile('Klikken in bio',iv(d.insights.website_clicks)));
-      if(d.insights.follower_delta!=null)icells.push(tile('Nieuwe volgers',(d.insights.follower_delta>0?'+':'')+iv(d.insights.follower_delta),true));
-      if(icells.length)html+='<div class="stats" style="margin-bottom:6px">'+icells.join('')+'</div>';
+      var pr=[];
+      if(ins.reach!=null)pr.push(kpiD('Bereik',iv(ins.reach),null,null));
+      if(ins.views!=null)pr.push(kpiD('Weergaven',iv(ins.views),ins.views,pmeta.views));
+      if(ins.total_interactions!=null)pr.push(kpiD('Interacties',iv(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
+      if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
+      if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',iv(ins.profile_views),ins.profile_views,pmeta.profile_views));
+      if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
+      if(pr.length)html+='<div class="section-h" style="margin-top:16px"><h4>Prestaties</h4><span style="font-size:12px;color:var(--muted)">vergeleken met de vorige periode</span></div><div class="stats" style="margin-bottom:6px">'+pr.join('')+'</div>';
     } else if(d.account){
       html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
     }
-    // Grafiek: weergaven en nieuwe volgers per dag
+    // Professionele grafieken: weergaven en nieuwe volgers per dag
     if(d.series){
-      if(d.series.views&&d.series.views.length>1){
-        html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+wsLineChart(d.series.views,'#e1306c')+'</div>';
-      }
-      if(d.series.follower_count&&d.series.follower_count.length>1){
-        html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4></div><div class="card">'+wsLineChart(d.series.follower_count,'#16a34a')+'</div>';
+      if(d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
+      if(d.series.follower_count&&d.series.follower_count.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4></div><div class="card">'+reportChart(d.series.follower_count,'#16a34a','gFollow')+'</div>';
+    }
+    // Weergaven: volgers vs niet-volgers
+    if(d.views_split){
+      var vf=d.views_split.follower||0, vn=d.views_split.non_follower||0, vt=vf+vn;
+      if(vt>0){
+        html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven: volgers vs niet-volgers</h4></div><div class="card">';
+        html+='<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin-bottom:6px"><div style="width:'+(vf/vt*100).toFixed(1)+'%;background:var(--accent)"></div><div style="width:'+(vn/vt*100).toFixed(1)+'%;background:#c7cbe0"></div></div>';
+        html+='<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted)"><span>Volgers '+(vf/vt*100).toFixed(1)+'% ('+iv(vf)+')</span><span>Niet-volgers '+(vn/vt*100).toFixed(1)+'% ('+iv(vn)+')</span></div></div>';
       }
     }
-    // Verdeling per contenttype
+    // Weergaven per contenttype
+    if(d.views_by_type&&d.views_by_type.length){
+      var mvt=Math.max.apply(null,d.views_by_type.map(function(x){return x.value;}))||1;
+      html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per contenttype</h4></div><div class="card">';
+      html+=d.views_by_type.map(function(x){var w=Math.round((x.value/mvt)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+' weergaven</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
+    }
+    // Verdeling per contenttype (posts + interacties)
     if(d.contentTypes&&d.contentTypes.length){
-      var TL={IMAGE:'Berichten',CAROUSEL_ALBUM:'Carrousels',VIDEO:'Video',REELS:'Reels',ONBEKEND:'Overig'};
       var maxc=Math.max.apply(null,d.contentTypes.map(function(c){return c.count;}))||1;
       html+='<div class="section-h" style="margin-top:16px"><h4>Verdeling per contenttype</h4></div><div class="card">';
-      html+=d.contentTypes.map(function(c){
-        var w=Math.round((c.count/maxc)*100);
-        return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(TL[c.type]||c.type)+'</span><span style="color:var(--muted)">'+c.count+' posts · '+iv(c.interactions)+' interacties</span></div>'+
-          '<div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';
-      }).join('')+'</div>';
+      html+=d.contentTypes.map(function(c){var w=Math.round((c.count/maxc)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(RTL[c.type]||c.type)+'</span><span style="color:var(--muted)">'+c.count+' posts &middot; '+iv(c.interactions)+' interacties</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
     }
     // Demografie van de volgers
     if(d.demographics){
@@ -1930,30 +2001,56 @@ async function loadMetaInsights(){
       }
       if(blocks)html+='<div class="section-h" style="margin-top:16px"><h4>Demografie van je volgers</h4></div><div class="card" style="display:flex;gap:24px;flex-wrap:wrap">'+blocks+'</div>';
     }
-    // Posts (grid met thumbnails, klikbaar)
+    // Ranking of posts (tabel met per-post cijfers)
     if(d.topPosts&&d.topPosts.length){
       _METAPOSTS=d.topPosts;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Posts</h4><span style="font-size:12px;color:var(--muted)">Klik een post voor de details</span></div>';
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">';
+      html+='<div class="section-h" style="margin-top:16px"><h4>Ranking of posts</h4><span style="font-size:12px;color:var(--muted)">'+d.topPosts.length+' best presterende posts (op weergaven)</span></div>';
+      html+='<div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Datum</th><th style="text-align:left;padding:8px 6px">Type</th><th style="text-align:left;padding:8px 6px">Tekst</th><th style="padding:8px 6px">Weergaven</th><th style="padding:8px 6px">Kijkers</th><th style="padding:8px 6px">Nieuwe volgers</th><th style="padding:8px 6px">Likes</th><th style="padding:8px 6px">Reacties</th><th style="padding:8px 6px">Opgeslagen</th><th style="padding:8px 6px">Gedeeld</th><th style="padding:8px 6px">Engagement</th></tr>';
       html+=d.topPosts.map(function(p){
-        var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
-        return '<div onclick="openPostDetail(\''+esc(p.id)+'\')" style="cursor:pointer;border:1px solid var(--line);border-radius:12px;overflow:hidden">'+img+
-          '<div style="padding:8px 10px"><div style="font-size:11px;color:var(--muted)">'+esc(p.media_type||'')+(p.views!=null?(' &middot; '+iv(p.views)+' weergaven'):'')+'</div><div style="font-size:13px;font-weight:600;margin-top:2px">'+esc(p.likes)+' likes &middot; '+esc(p.comments)+' reacties'+(p.engagement!=null?(' &middot; '+p.engagement+'% engagement'):'')+'</div></div></div>';
-      }).join('')+'</div>';
+        var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:cover;display:block">'):'<div style="width:40px;height:40px;border-radius:7px;background:var(--line)"></div>';
+        var link=p.permalink?(' <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2);font-size:11px">bekijk</a>'):'';
+        return '<tr style="text-align:right;border-top:1px solid var(--line);cursor:pointer" onclick="openPostDetail(\''+esc(p.id)+'\')">'+
+          '<td style="text-align:left;padding:8px 6px;white-space:nowrap;color:var(--muted)">'+esc(fmtDayShort(p.timestamp))+link+'</td>'+
+          '<td style="text-align:left;padding:8px 6px">'+img+'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+esc(RTL[p.media_type]||p.media_type||'')+'</div></td>'+
+          '<td style="text-align:left;padding:8px 6px;max-width:220px;font-size:12.5px;line-height:1.4">'+esc(p.caption||'(geen tekst)')+'</td>'+
+          '<td style="padding:8px 6px">'+iv(p.views)+'</td><td style="padding:8px 6px">'+iv(p.reach)+'</td><td style="padding:8px 6px">'+(p.follows!=null?iv(p.follows):'-')+'</td>'+
+          '<td style="padding:8px 6px">'+iv(p.likes)+'</td><td style="padding:8px 6px">'+iv(p.comments)+'</td><td style="padding:8px 6px">'+iv(p.saved)+'</td><td style="padding:8px 6px">'+iv(p.shares)+'</td>'+
+          '<td style="padding:8px 6px;font-weight:700">'+(p.engagement!=null?(p.engagement+'%'):'-')+'</td></tr>';
+      }).join('')+'</table></div>';
     }
-    // Advertenties
+    // Campagne data algemeen (met normen) + per adset + campagnes op Meta
     if(d.ads&&!d.ads.empty){
-      var num=function(v){return v!=null?v:'-';};
-      html+='<div class="section-h" style="margin-top:18px"><h4>Advertenties (laatste 30 dagen)</h4></div>';
-      html+='<div class="stats">'+tile('Uitgaven','€ '+num(d.ads.spend),true)+tile('Impressies',num(d.ads.impressions))+tile('Bereik',num(d.ads.reach))+tile('Klikken',num(d.ads.clicks))+tile('CTR',num(d.ads.ctr)+'%')+tile('CPC','€ '+num(d.ads.cpc))+'</div>';
+      html+='<div style="margin-top:8px">'+campPerfBlock(d.ads,rptPeriodLabel())+'</div>';
+      var allAdsets=[]; (d.adTree||[]).forEach(function(c){(c.adsets||[]).forEach(function(s){allAdsets.push(s);});});
+      if(allAdsets.length){
+        html+='<div class="section-h"><h4>Resultaten per adset</h4></div><div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Doelgroep</th><th style="padding:8px 6px">CTR</th><th style="padding:8px 6px">Leads</th><th style="padding:8px 6px">Kosten per lead</th></tr>'+
+          allAdsets.map(function(s){return '<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:8px 6px">'+esc(s.name||'Ad set')+'</td><td style="padding:8px 6px">'+(s.ctr!=null?(s.ctr+'%'):'-')+'</td><td style="padding:8px 6px">'+(s.results!=null?iv(s.results):'-')+'</td><td style="padding:8px 6px">'+(s.cost_per_result!=null?('€ '+num(s.cost_per_result)):'-')+'</td></tr>';}).join('')+'</table></div>';
+      }
     } else if(d.ads&&d.ads.empty){
-      html+='<div class="section-h" style="margin-top:18px"><h4>Advertenties</h4></div><div class="card" style="color:var(--muted);font-size:13px">Geen advertentiedata in de laatste 30 dagen.</div>';
+      html+='<div class="section-h" style="margin-top:8px"><h4>Advertenties</h4></div><div class="card" style="color:var(--muted);font-size:13px">Geen advertentiedata in deze periode.</div>';
     }
-    if(d.errors&&d.errors.ads){
-      html+='<div style="margin-top:10px;font-size:12px;color:var(--faint)">Advertentiecijfers niet beschikbaar: '+esc(d.errors.ads)+'</div>';
+    if(d.errors&&d.errors.ads)html+='<div style="margin-top:10px;font-size:12px;color:var(--faint)">Advertentiecijfers niet beschikbaar: '+esc(d.errors.ads)+'</div>';
+    // Campagnes op Meta (per campagne, ad set en advertentie) - alleen gekoppeld aan deze klant
+    var shownCamps=(camps&&camps.success&&camps.configured&&camps.campaigns)?camps.campaigns.filter(function(x){return linkedIds.indexOf(String(x.id))>=0;}):[];
+    var campMeta={}; shownCamps.forEach(function(c2){campMeta[String(c2.id)]={name:c2.name,objective:c2.objective,status:c2.status,budget:c2.budget,budget_type:c2.budget_type};});
+    var tree=(d&&d.adTree)?d.adTree:[];
+    if(tree.length){
+      html+='<div class="section-h" style="margin-top:8px"><h4>Campagnes op Meta</h4><span style="font-size:12px;color:var(--muted)">per campagne, ad set en advertentie</span></div>';
+      html+=tree.map(function(c){
+        var cm=campMeta[String(c.id)]||{};
+        var nSets=(c.adsets||[]).length, nLive=c.live_adsets||0;
+        var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div><h4 style="font-size:15px">'+esc(cm.name||'Campagne')+'</h4><div style="font-size:12px;color:var(--muted)">'+esc(cm.objective||'')+(cm.status?(' &middot; '+esc(cm.status)):'')+(cm.budget!=null?(' &middot; € '+Number(cm.budget).toFixed(2)+'/'+esc(cm.budget_type||'')):'')+'</div><div style="font-size:12px;color:var(--muted);margin-top:3px;font-weight:600">'+nSets+' ad sets &middot; '+nLive+' live</div></div>'+
+          '<div style="font-size:12px;color:var(--muted);text-align:right">€ '+num(c.spend)+' &middot; '+iv(c.impressions)+' impr &middot; '+iv(c.clicks)+' klikken &middot; CTR '+num(c.ctr)+'%'+(c.results!=null?(' &middot; '+iv(c.results)+' leads'+(c.cost_per_result!=null?(' (€ '+num(c.cost_per_result)+'/lead)'):'')):'')+'</div></div>';
+        var setRows=(c.adsets||[]).map(function(s){
+          var adLines=(s.ads||[]).map(function(a){return '<tr style="text-align:right"><td style="text-align:left;padding:6px;padding-left:18px;color:var(--muted)">&#8627; '+esc(a.name||'Advertentie')+rptStatusBadge(a.live,a.status)+'</td><td style="padding:6px">€ '+num(a.spend)+'</td><td style="padding:6px">'+iv(a.impressions)+'</td><td style="padding:6px">'+iv(a.reach)+'</td><td style="padding:6px">'+iv(a.clicks)+'</td><td style="padding:6px">'+num(a.ctr)+'%</td><td style="padding:6px">'+(a.results!=null?iv(a.results):'-')+'</td><td style="padding:6px">'+(a.cost_per_result!=null?('€ '+num(a.cost_per_result)):'-')+'</td></tr>';}).join('');
+          return '<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:6px"><strong>'+esc(s.name||'Ad set')+'</strong>'+rptStatusBadge(s.live,s.status)+'</td><td style="padding:6px">€ '+num(s.spend)+'</td><td style="padding:6px">'+iv(s.impressions)+'</td><td style="padding:6px">'+iv(s.reach)+'</td><td style="padding:6px">'+iv(s.clicks)+'</td><td style="padding:6px">'+num(s.ctr)+'%</td><td style="padding:6px">'+(s.results!=null?iv(s.results):'-')+'</td><td style="padding:6px">'+(s.cost_per_result!=null?('€ '+num(s.cost_per_result)):'-')+'</td></tr>'+adLines;
+        }).join('');
+        var table=setRows?('<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:6px">Ad set / advertentie</th><th style="padding:6px">Uitgaven</th><th style="padding:6px">Impressies</th><th style="padding:6px">Bereik</th><th style="padding:6px">Klikken</th><th style="padding:6px">CTR</th><th style="padding:6px">Leads</th><th style="padding:6px">Kosten/lead</th></tr>'+setRows+'</table></div>'):'<div style="font-size:12px;color:var(--muted)">Nog geen ad sets met data in deze periode.</div>';
+        return '<div class="card" style="margin-bottom:10px">'+head+table+'</div>';
+      }).join('');
     }
     box.innerHTML=html;
-  }catch(e){box.innerHTML='<div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
+  }catch(e){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
 }
 
 async function runAiAnalysis(){
