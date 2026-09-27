@@ -1066,7 +1066,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <option value="bericht">Bericht</option>
         <option value="reel">Reel</option>
         <option value="story">Story</option>
-        <option value="carrousel">Carrousel</option>
       </select>
     </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
@@ -3073,7 +3072,7 @@ function renderCalendar(posts){
     var isToday=(iso===todayStr);
     var chips=(byDay[dnum]||[]).map(function(p){
       var col=p.approval==='approved'?'#16a34a':(p.approval==='changes'?'#dc2626':(p.status==='published'?'#6366f1':'var(--accent)'));
-      var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Carrousel'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
+      var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Bericht'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
       var thumb=p.asset_url?('<img src="'+esc(p.asset_type==='video'?videoPoster(p.asset_url):p.asset_url)+'" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:2px solid '+col+'">'):('<div style="width:44px;height:44px;border-radius:6px;background:'+col+';opacity:.4"></div>');
       return '<div onclick="openEditPost('+p.id+')" title="'+esc(p.title)+'" style="display:inline-flex;flex-direction:column;align-items:center;width:46px;margin:4px 4px 0 0;cursor:pointer;vertical-align:top">'+thumb+'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+typ+'</div></div>';
     }).join('');
