@@ -1387,6 +1387,30 @@ router.get('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Snel koppelen: met de meegegeven token de beschikbare pagina's + Instagram-accounts
+// en advertentieaccounts ophalen, zodat de gebruiker het juiste kan kiezen.
+router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const token = String((req.body && req.body.token) || '').trim();
+    if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
+    const out = { pages: [], adaccounts: [] };
+    try {
+      const r = await graphGet('me/accounts', { fields: 'name,id,instagram_business_account{id,username}', limit: '200', access_token: token });
+      out.pages = (r.data || []).map((p) => ({
+        id: p.id, name: p.name || '(zonder naam)',
+        ig_id: (p.instagram_business_account && p.instagram_business_account.id) || null,
+        ig_username: (p.instagram_business_account && p.instagram_business_account.username) || null,
+      }));
+    } catch (e) { return res.status(400).json({ error: 'Kon accounts niet ophalen: ' + e.message }); }
+    try {
+      const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });
+      out.adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
+    } catch (_) { /* ad accounts optioneel */ }
+    res.json({ success: true, pages: out.pages, adaccounts: out.adaccounts });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Koppelingen opslaan. Lege tokenvelden laten het bestaande token ongemoeid.
 router.put('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, res) => {
   try {
