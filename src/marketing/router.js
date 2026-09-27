@@ -711,24 +711,24 @@ const CONTENT_LABEL_KEYS = ['tekst_geschreven', 'beeld_nodig', 'klaar_controle',
 let _hasContentLabels = null;
 let _hasContentComments = null;
 async function contentLabelsAvailable() {
-  if (_hasContentLabels !== null) return _hasContentLabels;
+  if (_hasContentLabels === true) return true; // alleen een 'ja' onthouden
   try {
     const r = await withReadConnection(async (c) => (await c.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='labels'"
     )).rows);
-    _hasContentLabels = r.length > 0;
-  } catch (_) { _hasContentLabels = false; }
-  return _hasContentLabels;
+    if (r.length > 0) _hasContentLabels = true;
+    return r.length > 0;
+  } catch (_) { return false; }
 }
 async function contentCommentsAvailable() {
-  if (_hasContentComments !== null) return _hasContentComments;
+  if (_hasContentComments === true) return true; // alleen een 'ja' onthouden
   try {
     const r = await withReadConnection(async (c) => (await c.query(
       "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='content_comments'"
     )).rows);
-    _hasContentComments = r.length > 0;
-  } catch (_) { _hasContentComments = false; }
-  return _hasContentComments;
+    if (r.length > 0) _hasContentComments = true;
+    return r.length > 0;
+  } catch (_) { return false; }
 }
 
 // Controleert dat de klant bestaat EN bij de actieve workspace hoort.

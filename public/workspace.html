@@ -1556,18 +1556,54 @@ function wsDateQS(){return (WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)?('?since='+e
 function wsPeriodLabel(){if(WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)return WS_SINCE+' t/m '+WS_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===WS_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function wsSetPreset(k){WS_MODE='preset';WS_PRESET=k;loadCampSections();}
 function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_MODE='custom';WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
-function wsDateBar(){
-  var chips=WS_PRESETS.map(function(p){var on=(WS_MODE==='preset'&&WS_PRESET===p.k);return '<button onclick="wsSetPreset(\''+p.k+'\')" style="padding:5px 11px;font-size:12.5px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+'">'+esc(p.l)+'</button>';}).join('');
-  var custOn=(WS_MODE==='custom');
-  return '<div class="card" style="margin-bottom:14px">'+
-    '<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Periode (advertenties)</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+chips+'</div>'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)">'+
-      '<span style="font-size:12px;color:'+(custOn?'var(--accent-2)':'var(--muted)')+';font-weight:'+(custOn?'700':'400')+'">Aangepast:</span>'+
-      '<label style="font-size:12px">Van <input id="wsDtSince" type="date" value="'+esc(WS_SINCE)+'" style="width:auto"></label>'+
-      '<label style="font-size:12px">Tot <input id="wsDtUntil" type="date" value="'+esc(WS_UNTIL)+'" style="width:auto"></label>'+
-      '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="wsApplyDates()">Toepassen</button>'+
+// ---- Herbruikbare datumkiezer-popup (presets + kalender, Meta-stijl) ----
+var _DP={onPreset:null,onRange:null,active:null,since:null,until:null,cursor:null,pick:0};
+function dpCalIcon(){return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-2px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';}
+function openDatePicker(cfg){
+  _DP.onPreset=cfg.onPreset;_DP.onRange=cfg.onRange;_DP.active=cfg.active||null;
+  _DP.since=cfg.since||null;_DP.until=cfg.until||null;_DP.pick=0;
+  var base=cfg.until?new Date(cfg.until):new Date();
+  _DP.cursor=new Date(base.getFullYear(),base.getMonth(),1);
+  var ov=document.getElementById('dpOverlay');
+  if(!ov){ov=document.createElement('div');ov.id='dpOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:400';ov.onclick=function(e){if(e.target===ov)dpClose();};document.body.appendChild(ov);}
+  ov.style.display='flex';renderDatePicker();
+}
+function dpClose(){var ov=document.getElementById('dpOverlay');if(ov)ov.style.display='none';}
+function dpPreset(k){if(_DP.onPreset)_DP.onPreset(k);dpClose();}
+function dpNav(delta){_DP.cursor=new Date(_DP.cursor.getFullYear(),_DP.cursor.getMonth()+delta,1);renderDatePicker();}
+function dpPick(iso){ if(_DP.pick===0){_DP.since=iso;_DP.until=null;_DP.pick=1;} else { if(iso<_DP.since){_DP.until=_DP.since;_DP.since=iso;} else {_DP.until=iso;} _DP.pick=0; } renderDatePicker(); }
+function dpApply(){ if(_DP.since&&_DP.until&&_DP.onRange){_DP.onRange(_DP.since,_DP.until);dpClose();} }
+function renderDatePicker(){
+  var ov=document.getElementById('dpOverlay'); if(!ov)return;
+  var presets=WS_PRESETS.map(function(p){var on=(_DP.active===p.k);return '<button onclick="dpPreset(\''+p.k+'\')" style="display:block;width:100%;text-align:left;padding:8px 12px;font-size:13px;border:none;background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+';cursor:pointer;border-radius:8px;margin-bottom:2px">'+esc(p.l)+'</button>';}).join('');
+  var y=_DP.cursor.getFullYear(),mo=_DP.cursor.getMonth();
+  var monthName=_DP.cursor.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});
+  var startDow=(new Date(y,mo,1).getDay()+6)%7, days=new Date(y,mo+1,0).getDate();
+  var dows=['ma','di','wo','do','vr','za','zo'];
+  var cells=dows.map(function(x){return '<div style="font-size:11px;color:var(--muted);text-align:center;padding:4px 0">'+x+'</div>';}).join('');
+  for(var b=0;b<startDow;b++)cells+='<div></div>';
+  for(var dn=1;dn<=days;dn++){
+    var iso=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');
+    var inRange=(_DP.since&&_DP.until&&iso>=_DP.since&&iso<=_DP.until);
+    var isEnd=(iso===_DP.since||iso===_DP.until);
+    var bg=isEnd?'var(--accent)':(inRange?'rgba(99,102,241,.22)':'transparent');
+    cells+='<button onclick="dpPick(\''+iso+'\')" style="padding:7px 0;font-size:12.5px;border:none;border-radius:8px;cursor:pointer;background:'+bg+';color:'+(isEnd?'#fff':'inherit')+'">'+dn+'</button>';
+  }
+  var range=(_DP.since||'...')+'  t/m  '+(_DP.until||'...');
+  var canApply=_DP.since&&_DP.until;
+  ov.innerHTML='<div style="background:var(--panel,#111827);border:1px solid var(--line);border-radius:16px;padding:16px;width:min(580px,94vw);display:flex;gap:14px;flex-wrap:wrap" onclick="event.stopPropagation()">'+
+    '<div style="min-width:160px;border-right:1px solid var(--line);padding-right:10px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Snel</div>'+presets+'</div>'+
+    '<div style="flex:1;min-width:260px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><button onclick="dpNav(-1)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px">&larr;</button><span style="font-weight:700;text-transform:capitalize">'+esc(monthName)+'</span><button onclick="dpNav(1)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px">&rarr;</button></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">'+cells+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap"><span style="font-size:12.5px;color:var(--muted)">'+esc(range)+'</span><div style="display:flex;gap:8px"><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="dpClose()">Annuleren</button><button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px'+(canApply?'':';opacity:.5;pointer-events:none')+'" onclick="dpApply()">Toepassen</button></div></div>'+
     '</div></div>';
+}
+function wsOpenPicker(){openDatePicker({since:WS_SINCE,until:WS_UNTIL,active:(WS_MODE==='preset'?WS_PRESET:null),onPreset:function(k){WS_MODE='preset';WS_PRESET=k;loadCampSections();},onRange:function(s,u){WS_MODE='custom';WS_SINCE=s;WS_UNTIL=u;loadCampSections();}});}
+function wsDateBar(){
+  return '<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
+    '<div style="font-size:13px;color:var(--muted)">Periode (advertenties)</div>'+
+    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px" onclick="wsOpenPicker()">'+dpCalIcon()+esc(wsPeriodLabel())+'</button></div>';
 }
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
 function wsLineChart(data,color){
@@ -1882,19 +1918,12 @@ function rptDateQS(){return (RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?('?since
 function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)return RPT_SINCE+' t/m '+RPT_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function rptSetPreset(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();}
 function rptApplyDates(){var s=document.getElementById('rptDtSince').value,u=document.getElementById('rptDtUntil').value;if(!s||!u)return;RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}
+function rptOpenPicker(){openDatePicker({since:RPT_SINCE,until:RPT_UNTIL,active:(RPT_MODE==='preset'?RPT_PRESET:null),onPreset:function(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();},onRange:function(s,u){RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}});}
 function rptDateBar(){
-  var chips=WS_PRESETS.map(function(p){var on=(RPT_MODE==='preset'&&RPT_PRESET===p.k);return '<button onclick="rptSetPreset(\''+p.k+'\')" style="padding:5px 11px;font-size:12.5px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+'">'+esc(p.l)+'</button>';}).join('');
-  var custOn=(RPT_MODE==='custom');
-  return '<div class="card no-print" style="margin-bottom:16px">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px"><div style="font-size:13px;color:var(--muted)">Periode (Instagram + advertenties)</div>'+
-    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="window.print()">Download als PDF</button></div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+chips+'</div>'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)">'+
-      '<span style="font-size:12px;color:'+(custOn?'var(--accent-2)':'var(--muted)')+';font-weight:'+(custOn?'700':'400')+'">Aangepast:</span>'+
-      '<label style="font-size:12px">Van <input id="rptDtSince" type="date" value="'+esc(RPT_SINCE)+'" style="width:auto"></label>'+
-      '<label style="font-size:12px">Tot <input id="rptDtUntil" type="date" value="'+esc(RPT_UNTIL)+'" style="width:auto"></label>'+
-      '<button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="rptApplyDates()">Toepassen</button>'+
-    '</div></div>';
+  return '<div class="card no-print" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Periode</span>'+
+    '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px" onclick="rptOpenPicker()">'+dpCalIcon()+esc(rptPeriodLabel())+'</button></div>'+
+    '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="window.print()">Download als PDF</button></div>';
 }
 function rptStatusLabel(st){if(!st)return 'Onbekend';st=String(st);if(st==='ACTIVE')return 'Live';if(/PAUSED/.test(st))return 'Gepauzeerd';if(st==='ARCHIVED')return 'Gearchiveerd';if(st==='DELETED')return 'Verwijderd';return st.charAt(0)+st.slice(1).toLowerCase().replace(/_/g,' ');}
 function rptStatusBadge(live,st){var col=live?'color:#166534;background:#dcfce7':'color:#92400e;background:#fef3c7';return '<span style="font-size:10px;font-weight:700;'+col+';padding:2px 8px;border-radius:20px;margin-left:6px;white-space:nowrap">'+esc(live?'LIVE':rptStatusLabel(st))+'</span>';}
