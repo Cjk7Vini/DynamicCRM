@@ -2529,6 +2529,10 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 
     // --- Instagram account: volgers + aantal media ---
     if (creds.igUserId) {
+      // Meetvenster (Unix) uit de gekozen periode; de frontend stuurt altijd van/tot mee.
+      const _okd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+      const winU = _okd(req.query.until) ? Math.floor(new Date(req.query.until + 'T23:59:59Z').getTime() / 1000) : Math.floor(Date.now() / 1000);
+      const winS = _okd(req.query.since) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (winU - 30 * 24 * 3600);
       try {
         const a = await graphGet(`${creds.igUserId}`, {
           fields: 'username,followers_count,follows_count,media_count', access_token: token,
@@ -2556,6 +2560,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           comments: p.comments_count ?? 0,
           thumb: p.thumbnail_url || p.media_url || null,
         }));
+        // Alleen posts binnen de gekozen periode meenemen (ranking + verdeling per periode).
+        allPosts = allPosts.filter((p) => { if (!p.timestamp) return true; const ts = Math.floor(new Date(p.timestamp).getTime() / 1000); return ts >= winS && ts <= winU; });
         // Verdeling per contenttype (aantal + interacties), uit alle opgehaalde posts.
         const byType = {};
         for (const p of allPosts) {
@@ -2617,8 +2623,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       // Instagram-venster: gekozen periode of de laatste 30 dagen. De total_value
       // metrics MOETEN een venster (since/until) meekrijgen, anders geeft Meta maar
       // 1 dag terug (dat was de bug: 750 i.p.v. ~10.471 weergaven).
-      const igU = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.until || '')) ? Math.floor(new Date(req.query.until + 'T23:59:59Z').getTime() / 1000) : Math.floor(Date.now() / 1000);
-      const igS = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.since || '')) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (igU - 30 * 24 * 3600);
+      const igU = winU;
+      const igS = winS;
       const igWin = { since: String(igS), until: String(igU) };
       out.insights_period = { since: igS, until: igU };
       // Robuust: probeer eerst met tijdvenster (30 dagen / gekozen periode); geeft
