@@ -2015,7 +2015,8 @@ async function loadMetaInsights(){
       if(ins.reach!=null)pr.push(kpiD('Bereik',iv(ins.reach),null,null));
       if(ins.views!=null)pr.push(kpiD('Weergaven',iv(ins.views),ins.views,pmeta.views));
       if(ins.total_interactions!=null)pr.push(kpiD('Interacties',iv(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
-      if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
+      if(ins.follower_net!=null)pr.push(kpiD('Nieuwe volgers (netto)',(ins.follower_net>0?'+':'')+iv(ins.follower_net),null,null));
+      else if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers (bruto)',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
       if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',iv(ins.profile_views),ins.profile_views,pmeta.profile_views));
       if(ins.website_clicks!=null)pr.push(kpiD('Klikken op links in bio',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
       if(pr.length)html+='<div class="section-h" style="margin-top:16px"><h4>Prestaties</h4><span style="font-size:12px;color:var(--muted)">vergeleken met de vorige periode</span></div><div class="stats" style="margin-bottom:6px">'+pr.join('')+'</div>';

@@ -741,6 +741,17 @@ async function contentBlocksAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+let _hasFollowerSnapshots = null;
+async function followerSnapshotsAvailable() {
+  if (_hasFollowerSnapshots === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='follower_snapshots'"
+    )).rows);
+    if (r.length > 0) _hasFollowerSnapshots = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
   if (!Array.isArray(input)) return null;
@@ -2646,6 +2657,29 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const _now = Math.floor(Date.now() / 1000);
       await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
       if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
+
+      // NETTO nieuwe volgers via dagelijkse snapshots (eind - begin van de periode).
+      // Meta geeft geen ontvolgingen/historisch totaal; daarom slaan we het totaal
+      // dagelijks zelf op en berekenen we het netto verschil zodra er historie is.
+      try {
+        if (out.account && out.account.followers != null && await followerSnapshotsAvailable()) {
+          const todayStr = new Date().toISOString().slice(0, 10);
+          await withWriteConnection(async (c) => c.query(
+            `INSERT INTO marketing.follower_snapshots (workspace_id, client_id, day, followers)
+             VALUES ($1,$2,$3,$4) ON CONFLICT (client_id, day) DO UPDATE SET followers=EXCLUDED.followers`,
+            [wsId, okClient, todayStr, out.account.followers]
+          ));
+          const sinceStr = new Date(igS * 1000).toISOString().slice(0, 10);
+          const startRow = await withReadConnection(async (c) => (await c.query(
+            'SELECT followers FROM marketing.follower_snapshots WHERE client_id=$1 AND day <= $2 ORDER BY day DESC LIMIT 1',
+            [okClient, sinceStr]
+          )).rows[0]);
+          if (startRow && startRow.followers != null) {
+            out.insights.follower_net = out.account.followers - startRow.followers;
+            out.insights.follower_net_since = sinceStr;
+          }
+        }
+      } catch (_) { /* geen netto beschikbaar */ }
 
       // Vorige, even lange periode voor de procentuele verandering (best-effort).
       // Alleen voor de venster-metrics, zodat de vergelijking eerlijk is.

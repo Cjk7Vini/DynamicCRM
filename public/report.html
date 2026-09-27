@@ -164,7 +164,8 @@ async function build(){
     if(ins.reach!=null)pr.push(kpiD('Bereik',fmtn(ins.reach),null,null));
     if(ins.views!=null)pr.push(kpiD('Weergaven',fmtn(ins.views),ins.views,pmeta.views));
     if(ins.total_interactions!=null)pr.push(kpiD('Interacties',fmtn(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
-    if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
+    if(ins.follower_net!=null)pr.push(kpiD('Nieuwe volgers (netto)',(ins.follower_net>0?'+':'')+fmtn(ins.follower_net),null,null));
+    else if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers (bruto)',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
     if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',fmtn(ins.profile_views),ins.profile_views,pmeta.profile_views));
     if(ins.website_clicks!=null)pr.push(kpiD('Klikken op links in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
     if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
