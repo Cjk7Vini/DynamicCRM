@@ -516,6 +516,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'assets')">Content</button>
           <button onclick="dTab(this,'content')">Content planning</button>
+          <button id="tabTodo" onclick="dTab(this,'todo')">To do</button>
+          <button id="tabDocs" onclick="dTab(this,'docs')">Documenten</button>
           <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnebeheer</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
@@ -583,6 +585,18 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
           <div id="postsMsg" class="inline-msg"></div>
           <div id="postsBody"><div class="empty">Laden...</div></div>
+        </div>
+        <div id="dTodo" style="display:none">
+          <div class="section-h"><span class="pill">To do</span></div>
+          <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px">Wat de klant of jij nog moet regelen. Voeg eventueel een link toe (bv. naar een vragenlijst).</div>
+          <div id="todoMsg" class="inline-msg"></div>
+          <div id="todoBody"><div class="empty">Laden...</div></div>
+        </div>
+        <div id="dDocs" style="display:none">
+          <div class="section-h"><span class="pill">Documenten</span></div>
+          <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px">Belangrijke links en bestanden (contract, bedrijfsinfo, Google Drive-map).</div>
+          <div id="docsMsg" class="inline-msg"></div>
+          <div id="docsBody"><div class="empty">Laden...</div></div>
         </div>
         <div id="dAssets" style="display:none">
           <div class="section-h">
@@ -1456,14 +1470,51 @@ function dTabShow(which){
   var dcr=document.getElementById('dCampReview'); if(dcr)dcr.style.display=which==='campreview'?'':'none';
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
+  var dtd=document.getElementById('dTodo'); if(dtd)dtd.style.display=which==='todo'?'':'none';
+  var ddc=document.getElementById('dDocs'); if(ddc)ddc.style.display=which==='docs'?'':'none';
   if(which==='integrations'){loadIntegrations();}
   if(which==='campreview'){loadCampReview();}
   if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
+  if(which==='todo'){loadClientItems('todo');}
+  if(which==='docs'){loadClientItems('document');}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
   if(which==='assets'){var ub=document.getElementById('uploadBtn');if(ub)ub.style.display='';loadAssets();}
 }
 
+// ---- Client-items: To do / Documenten ----
+function clientItemsCtx(kind){return kind==='document'?{body:'docsBody',msg:'docsMsg',ph:'Naam (bv. Contract, Bedrijfsinfo)',urlPh:'Link (Google Drive, bestand...)',empty:'Nog geen documenten.'}:{body:'todoBody',msg:'todoMsg',ph:'Wat moet er gebeuren?',urlPh:'Optionele link (bv. vragenlijst)',empty:'Nog geen to do-items.'};}
+async function loadClientItems(kind){
+  if(!CURRENT_CLIENT)return; var c=clientItemsCtx(kind); var body=document.getElementById(c.body); if(!body)return;
+  body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items?kind='+kind,{credentials:'include'}); var d=await r.json();
+    var items=(d&&d.success&&d.items)?d.items:[];
+    var add='<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><input id="ci_title_'+kind+'" placeholder="'+esc(c.ph)+'" style="flex:2;min-width:180px"><input id="ci_url_'+kind+'" placeholder="'+esc(c.urlPh)+'" style="flex:2;min-width:160px"><button class="btn btn-primary" style="padding:8px 14px" onclick="addClientItem(\''+kind+'\')">Toevoegen</button></div>';
+    var list=items.length?items.map(function(it){
+      var check=(kind==='todo')?('<input type="checkbox" '+(it.done?'checked':'')+' onchange="toggleClientItem('+it.id+',\''+kind+'\',this.checked)" style="width:auto;margin-right:10px;flex:none">'):'';
+      var title='<span style="font-size:14px;'+(it.done?'text-decoration:line-through;color:var(--muted)':'')+'">'+esc(it.title)+'</span>';
+      var link=it.url?(' <a href="'+esc(it.url)+'" target="_blank" style="color:var(--accent-2);font-size:12.5px;margin-left:8px">openen</a>'):'';
+      return '<div class="card" style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="flex:1;display:flex;align-items:center">'+check+'<div>'+title+link+'</div></div><button class="icon-btn del" title="Verwijderen" onclick="delClientItem('+it.id+',\''+kind+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button></div>';
+    }).join(''):'<div class="empty">'+esc(c.empty)+'</div>';
+    body.innerHTML=add+list;
+  }catch(e){body.innerHTML='<div class="empty">Kon niet laden.</div>';}
+}
+async function addClientItem(kind){
+  var title=(document.getElementById('ci_title_'+kind).value||'').trim(); if(!title)return;
+  var url=(document.getElementById('ci_url_'+kind).value||'').trim();
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({kind:kind,title:title,url:url})});
+    var d=await r.json(); if(r.ok&&d.success){loadClientItems(kind);}else{showMsg(clientItemsCtx(kind).msg,false,d.error||'Toevoegen mislukt.');}
+  }catch(e){showMsg(clientItemsCtx(kind).msg,false,'Netwerkfout.');}
+}
+async function toggleClientItem(id,kind,done){
+  try{ await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({done:done})}); loadClientItems(kind); }catch(e){}
+}
+async function delClientItem(id,kind){
+  if(!confirm('Dit item verwijderen?'))return;
+  try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json(); if(r.ok&&d.success){loadClientItems(kind);}else{showMsg(clientItemsCtx(kind).msg,false,d.error||'Verwijderen mislukt.');} }catch(e){showMsg(clientItemsCtx(kind).msg,false,'Netwerkfout.');}
+}
 // ---- Assets ----
 function fmtSize(b){b=Number(b)||0;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
 // Cloudinary genereert een poster (eerste frame) door /upload/ -> /upload/so_0/ en extensie .jpg.
