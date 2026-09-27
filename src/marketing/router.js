@@ -754,11 +754,13 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     // Klant-account ziet alleen wat gedeeld is (ter goedkeuring, goedgekeurd of wijzigingen).
     const clientOnly = mktClientLocked(req);
     const hasLabels = await contentLabelsAvailable();
+    const hasComments = await contentCommentsAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               ${hasLabels ? 'p.labels,' : ''}
+              ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
          LEFT JOIN marketing.assets a ON a.id = p.asset_id

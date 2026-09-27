@@ -2834,6 +2834,10 @@ function labelChips(labels){
   if(!labels||!labels.length)return '';
   return '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">'+labels.map(function(k){var d=labelDef(k);if(!d)return '';return '<span style="font-size:10px;font-weight:700;color:#fff;background:'+d.c+';padding:2px 8px;border-radius:20px">'+esc(d.l)+'</span>';}).join('')+'</div>';
 }
+function commentChip(p){
+  var n=Number(p&&p.comment_count)||0; if(!n)return '';
+  return '<span title="'+n+' opmerking(en)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent-2);border:1px solid var(--accent-2);padding:2px 7px;border-radius:20px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:block"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>'+n+'</span>';
+}
 var PF_LABELS=[];
 function renderPfLabels(){
   var box=document.getElementById('pfLabels'); if(!box)return;
@@ -2865,7 +2869,7 @@ function boardCard(p,canManage){
     thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+'</div>'+when+acts+'</div>';
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+commentChip(p)+'</div>'+when+acts+'</div>';
 }
 function renderBoard(posts){
   var canManage=ME.role!=='client';
@@ -2958,7 +2962,7 @@ function renderList(posts){
       return '<div class="post-row">'+thumb+'<div class="post-main"><h5>'+esc(p.title)+'</h5>'+
         (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
         '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
-        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+autoBadge+when+'</div>'+note+'</div>'+acts+'</div>';
+        '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+autoBadge+commentChip(p)+when+'</div>'+note+'</div>'+acts+'</div>';
     }).join('')+'</div>';
 }
 async function loadPosts(){
