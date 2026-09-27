@@ -1061,6 +1061,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </select>
       </div>
     </div>
+    <div class="field"><label>Type post</label>
+      <select id="pfType">
+        <option value="bericht">Bericht</option>
+        <option value="reel">Reel</option>
+        <option value="story">Story</option>
+        <option value="carrousel">Carrousel</option>
+      </select>
+    </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
     <div class="field"><label>Beeld (afbeelding of video)</label>
       <select id="pfAsset" onchange="updatePfMedia()"><option value="">Geen beeld</option></select>
@@ -3065,7 +3073,7 @@ function renderCalendar(posts){
     var isToday=(iso===todayStr);
     var chips=(byDay[dnum]||[]).map(function(p){
       var col=p.approval==='approved'?'#16a34a':(p.approval==='changes'?'#dc2626':(p.status==='published'?'#6366f1':'var(--accent)'));
-      var typ=(p.asset_type==='video')?'Reel':'Bericht';
+      var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Carrousel'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
       var thumb=p.asset_url?('<img src="'+esc(p.asset_type==='video'?videoPoster(p.asset_url):p.asset_url)+'" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:2px solid '+col+'">'):('<div style="width:44px;height:44px;border-radius:6px;background:'+col+';opacity:.4"></div>');
       return '<div onclick="openEditPost('+p.id+')" title="'+esc(p.title)+'" style="display:inline-flex;flex-direction:column;align-items:center;width:46px;margin:4px 4px 0 0;cursor:pointer;vertical-align:top">'+thumb+'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+typ+'</div></div>';
     }).join('');
@@ -3173,6 +3181,7 @@ function openNewPost(){
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
+  document.getElementById('pfType').value='bericht';
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
@@ -3190,6 +3199,7 @@ function openEditPost(id){
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
+    document.getElementById('pfType').value=p.post_type||'bericht';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
@@ -3208,7 +3218,7 @@ async function savePost(){
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
-  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
@@ -3218,7 +3228,7 @@ async function savePost(){
     var d=await r.json();
     if(r.ok&&d.success){
       // Nieuwe post: blokken opslaan via een vervolg-PATCH (create bewaart de blokken nog niet).
-      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText})}); }catch(_){} }
+      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText,post_type:document.getElementById('pfType').value})}); }catch(_){} }
       closePost();loadPosts();
     } else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
