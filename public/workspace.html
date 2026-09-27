@@ -561,7 +561,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div id="dContent" style="display:none">
           <div class="section-h">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <select id="postFilter" onchange="loadPosts()" style="width:auto;padding:8px 12px">
+              <div id="contentViewSwitch" style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+                <button id="cvBoard" class="cvbtn" onclick="setContentView('board')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:var(--accent);color:#fff">Bord</button>
+                <button id="cvCal" class="cvbtn" onclick="setContentView('calendar')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Kalender</button>
+                <button id="cvList" class="cvbtn" onclick="setContentView('list')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Lijst</button>
+              </div>
+              <select id="postFilter" onchange="loadPosts()" style="width:auto;padding:8px 12px;display:none">
                 <option value="">Alle statussen</option>
                 <option value="idea">Idee</option>
                 <option value="draft">Concept</option>
@@ -2755,20 +2760,92 @@ async function publishNow(){
   }catch(e){showMsg('publishMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Nu publiceren';
 }
-async function loadPosts(){
-  if(!CURRENT_CLIENT)return;
-  var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
-  var st=document.getElementById('postFilter').value;
-  try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts'+(st?('?status='+st):''),{credentials:'include'});
-    var d=await r.json();
-    if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
-    if(!d.posts.length){
-      body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Nog geen content</h4><p>Plan je eerste post voor deze klant.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewPost()">+ Nieuwe post</button>':'')+'</div>';
-      return;
-    }
-    var canManage=ME.role!=='client';
-    body.innerHTML='<div class="post-list">'+d.posts.map(function(p){
+var CONTENT_VIEW='board', _CONTENT_POSTS=[];
+function setContentView(v){
+  CONTENT_VIEW=v;
+  var map={board:'cvBoard',calendar:'cvCal',list:'cvList'};
+  ['cvBoard','cvCal','cvList'].forEach(function(id){var b=document.getElementById(id);if(!b)return;var on=(map[v]===id);b.style.background=on?'var(--accent)':'transparent';b.style.color=on?'#fff':'var(--muted)';});
+  var pf=document.getElementById('postFilter'); if(pf)pf.style.display=(v==='list')?'':'none';
+  if(v==='list'){loadPosts();} else {renderContentView();}
+}
+function renderContentView(){
+  var body=document.getElementById('postsBody'); if(!body)return;
+  if(!_CONTENT_POSTS.length){
+    body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Nog geen content</h4><p>Plan je eerste post voor deze klant.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewPost()">+ Nieuwe post</button>':'')+'</div>';
+    return;
+  }
+  if(CONTENT_VIEW==='board')body.innerHTML=renderBoard(_CONTENT_POSTS);
+  else if(CONTENT_VIEW==='calendar')body.innerHTML=renderCalendar(_CONTENT_POSTS);
+  else body.innerHTML=renderList(_CONTENT_POSTS);
+}
+// ---- Bord (kanban) ----
+var _DRAG_POST=null;
+var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'],['approved','Goedgekeurd'],['published','Gepubliceerd']];
+function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
+function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
+function kanbanLeave(e){e.currentTarget.style.outline='';}
+async function kanbanDrop(e,status){e.preventDefault();e.currentTarget.style.outline='';var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await setPostStatus(id,status);}
+async function setPostStatus(id,status){
+  try{var r=await fetch('/api/mkt/posts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})});var d=await r.json();
+    if(r.ok&&d.success){var p=_CONTENT_POSTS.filter(function(x){return String(x.id)===String(id);})[0];if(p)p.status=status;renderContentView();}
+    else{showMsg('postsMsg',false,d.error||'Kon status niet wijzigen.');}
+  }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
+}
+function boardCard(p,canManage){
+  var thumb=p.asset_url?('<img src="'+esc(p.asset_type==='video'?videoPoster(p.asset_url):p.asset_url)+'" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px">'):'';
+  var badge=approvalBadge(p.approval);
+  var when=p.scheduled_at?('<div style="font-size:11px;color:var(--muted);margin-top:5px">'+esc(fmtWhen(p.scheduled_at))+'</div>'):'';
+  var acts=canManage?('<div class="post-acts" style="margin-top:8px;display:flex;gap:4px" onclick="event.stopPropagation()">'+
+      '<button class="icon-btn" title="Bewerken" onclick=\'openEditPost('+p.id+')\'><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></button>'+
+      ((p.approval==='none')?('<button class="icon-btn" title="Ter goedkeuring sturen" onclick="setApproval('+p.id+',\'pending\')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>'):'')+
+      '<button class="icon-btn" title="Publiceren" onclick="openPublish('+p.id+')"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>'+
+      '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
+    '</div>'):'';
+  var chan='<span class="status '+esc(p.status)+'" style="font-size:10px">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>';
+  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')" '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
+    thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
+    (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+'</div>'+when+acts+'</div>';
+}
+function renderBoard(posts){
+  var canManage=ME.role!=='client';
+  return '<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+CONTENT_COLS.map(function(c){
+    var key=c[0],label=c[1];
+    var items=posts.filter(function(p){return p.status===key;});
+    var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
+    return '<div class="kcol" data-status="'+key+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+key+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span>'+esc(label)+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+'</div>';
+  }).join('')+'</div>';
+}
+// ---- Kalender ----
+var _CAL_MONTH=null;
+function calShift(delta){ if(!_CAL_MONTH){var n=new Date();_CAL_MONTH=new Date(n.getFullYear(),n.getMonth(),1);} _CAL_MONTH=new Date(_CAL_MONTH.getFullYear(),_CAL_MONTH.getMonth()+delta,1); renderContentView(); }
+function renderCalendar(posts){
+  if(!_CAL_MONTH){var n=new Date();_CAL_MONTH=new Date(n.getFullYear(),n.getMonth(),1);}
+  var y=_CAL_MONTH.getFullYear(), mo=_CAL_MONTH.getMonth();
+  var monthName=_CAL_MONTH.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});
+  var first=new Date(y,mo,1); var startDow=(first.getDay()+6)%7; // maandag=0
+  var days=new Date(y,mo+1,0).getDate();
+  var byDay={};
+  posts.forEach(function(p){ if(!p.scheduled_at)return; var d=new Date(p.scheduled_at); if(isNaN(d.getTime()))return; if(d.getFullYear()===y&&d.getMonth()===mo){var k=d.getDate();(byDay[k]=byDay[k]||[]).push(p);} });
+  var head='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><button class="btn btn-ghost" style="padding:6px 12px" onclick="calShift(-1)">&larr;</button><div style="font-weight:700;font-size:15px;text-transform:capitalize">'+esc(monthName)+'</div><button class="btn btn-ghost" style="padding:6px 12px" onclick="calShift(1)">&rarr;</button></div>';
+  var dows=['ma','di','wo','do','vr','za','zo'];
+  var grid='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">';
+  grid+=dows.map(function(x){return '<div style="font-size:11px;color:var(--muted);font-weight:600;text-align:center;padding-bottom:2px">'+x+'</div>';}).join('');
+  for(var b=0;b<startDow;b++){grid+='<div></div>';}
+  var todayStr=new Date().toISOString().slice(0,10);
+  for(var dnum=1;dnum<=days;dnum++){
+    var iso=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(dnum).padStart(2,'0');
+    var isToday=(iso===todayStr);
+    var chips=(byDay[dnum]||[]).map(function(p){var col=p.approval==='approved'?'#16a34a':(p.approval==='changes'?'#dc2626':(p.status==='published'?'#6366f1':'var(--accent)'));return '<div onclick="openEditPost('+p.id+')" title="'+esc(p.title)+'" style="font-size:10.5px;padding:2px 5px;border-radius:5px;background:'+col+';color:#fff;margin-top:3px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.title)+'</div>';}).join('');
+    grid+='<div style="min-height:78px;border:1px solid var(--line);border-radius:8px;padding:5px;'+(isToday?'outline:2px solid var(--accent);outline-offset:-2px':'')+'"><div style="font-size:11px;color:var(--muted);font-weight:600">'+dnum+'</div>'+chips+'</div>';
+  }
+  grid+='</div>';
+  return '<div class="card">'+head+grid+'<div style="font-size:12px;color:var(--muted);margin-top:10px">Alleen posts met een ingeplande datum staan in de kalender. Sleep in het Bord een post naar "Ingepland" en zet een datum via Bewerken.</div></div>';
+}
+function renderList(posts){
+  var canManage=ME.role!=='client';
+  return '<div class="post-list">'+posts.map(function(p){
       var when=p.scheduled_at?('<span class="when">'+esc(fmtWhen(p.scheduled_at))+'</span>'):'';
       var appBadge=approvalBadge(p.approval);
       var autoBadge='';
@@ -2808,6 +2885,17 @@ async function loadPosts(){
         '<div class="post-meta"><span class="chan">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>'+
         '<span class="status '+esc(p.status)+'">'+esc(POST_STATUS_LABEL[p.status]||p.status)+'</span>'+appBadge+autoBadge+when+'</div>'+note+'</div>'+acts+'</div>';
     }).join('')+'</div>';
+}
+async function loadPosts(){
+  if(!CURRENT_CLIENT)return;
+  var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  var st=(CONTENT_VIEW==='list')?document.getElementById('postFilter').value:'';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts'+(st?('?status='+st):''),{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
+    _CONTENT_POSTS=d.posts||[];
+    renderContentView();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
 async function fillPostAssetSelect(selectedId){
