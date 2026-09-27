@@ -166,7 +166,7 @@ async function build(){
     if(ins.total_interactions!=null)pr.push(kpiD('Interacties',fmtn(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
     if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+fmtn(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
     if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',fmtn(ins.profile_views),ins.profile_views,pmeta.profile_views));
-    if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
+    if(ins.website_clicks!=null)pr.push(kpiD('Klikken op links in bio',fmtn(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
     if(pr.length)html+='<h2>Prestaties</h2><div class="sect1">gekozen periode, vergeleken met de vorige periode</div><div class="grid">'+pr.join('')+'</div>';
     else html+='<div class="note">Statistieken (bereik, weergaven, interacties) zijn nog niet beschikbaar.'+((meta.errors&&meta.errors.insights)?(' Meta-melding: '+esc(meta.errors.insights)):'')+'</div>';
 
@@ -175,7 +175,8 @@ async function build(){
       html+='<h2>Weergaven per dag</h2><div class="card">'+lineChartSVG(meta.series.views,'#e1306c')+'</div>';
     }
     if(meta.series&&meta.series.follower_count&&meta.series.follower_count.length>1){
-      html+='<h2>Nieuwe volgers per dag</h2><div class="card">'+lineChartSVG(meta.series.follower_count,'#16a34a')+'</div>';
+      var fc=meta.series.follower_count;var tot=fc.reduce(function(s,x){return s+(Number(x.v)||0);},0);var avg=(tot/fc.length);
+      html+='<h2>Nieuwe volgers per dag</h2><div class="sect1">gemiddeld '+avg.toFixed(1)+' per dag, '+fmtn(tot)+' totaal</div><div class="card">'+lineChartSVG(meta.series.follower_count,'#16a34a')+'</div>';
     }
 
     // Weergaven: volgers vs niet-volgers (indien beschikbaar)

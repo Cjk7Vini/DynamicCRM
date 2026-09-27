@@ -1573,7 +1573,7 @@ function openReportPdf(){
 var WS_MODE='preset', WS_PRESET='last_30d', WS_SINCE=null, WS_UNTIL=null;
 (function(){var t=new Date();WS_UNTIL=t.toISOString().slice(0,10);WS_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
 var WS_PRESETS=[{k:'last_7d',l:'Afgelopen 7 dagen'},{k:'last_14d',l:'Afgelopen 14 dagen'},{k:'last_30d',l:'Afgelopen 30 dagen'},{k:'this_week_mon_today',l:'Deze week'},{k:'last_week_mon_sun',l:'Vorige week'},{k:'this_month',l:'Deze maand'},{k:'last_month',l:'Vorige maand'},{k:'maximum',l:'Maximum'}];
-function wsDateQS(){return (WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)?('?since='+encodeURIComponent(WS_SINCE)+'&until='+encodeURIComponent(WS_UNTIL)):('?preset='+encodeURIComponent(WS_PRESET));}
+function wsDateQS(){var r=(WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)?{since:WS_SINCE,until:WS_UNTIL}:presetToRange(WS_PRESET);return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
 function wsPeriodLabel(){if(WS_MODE==='custom'&&WS_SINCE&&WS_UNTIL)return WS_SINCE+' t/m '+WS_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===WS_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function wsSetPreset(k){WS_MODE='preset';WS_PRESET=k;loadCampSections();}
 function wsApplyDates(){var s=document.getElementById('wsDtSince').value,u=document.getElementById('wsDtUntil').value;if(!s||!u)return;WS_MODE='custom';WS_SINCE=s;WS_UNTIL=u;loadCampSections();}
@@ -1623,7 +1623,7 @@ function renderDatePicker(){
 function wsOpenPicker(){openDatePicker({since:WS_SINCE,until:WS_UNTIL,active:(WS_MODE==='preset'?WS_PRESET:null),onPreset:function(k){WS_MODE='preset';WS_PRESET=k;loadCampSections();},onRange:function(s,u){WS_MODE='custom';WS_SINCE=s;WS_UNTIL=u;loadCampSections();}});}
 function wsDateBar(){
   return '<div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
-    '<div style="font-size:13px;color:var(--muted)">Periode (advertenties)</div>'+
+    '<div style="font-size:13px;color:var(--muted)">Periode (advertenties): <strong style="color:var(--text,inherit)">'+esc(wsPeriodLabel())+'</strong></div>'+
     '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line)" onclick="wsOpenPicker()">'+dpCalIcon()+'<span>Kalender / Filter</span><span style="color:var(--muted);font-size:11px">&#9662;</span></button></div>';
 }
 function crn(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';}
@@ -1935,14 +1935,14 @@ async function openPostDetail(id){
 // ---- Rapportage: periode-state (eigen aan de rapportage-tab) ----
 var RPT_MODE='preset', RPT_PRESET='last_30d', RPT_SINCE=null, RPT_UNTIL=null;
 (function(){var t=new Date();RPT_UNTIL=t.toISOString().slice(0,10);RPT_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
-function rptDateQS(){return (RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?('?since='+encodeURIComponent(RPT_SINCE)+'&until='+encodeURIComponent(RPT_UNTIL)):('?preset='+encodeURIComponent(RPT_PRESET));}
+function rptDateQS(){var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
 function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)return RPT_SINCE+' t/m '+RPT_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function rptSetPreset(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();}
 function rptApplyDates(){var s=document.getElementById('rptDtSince').value,u=document.getElementById('rptDtUntil').value;if(!s||!u)return;RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}
 function rptOpenPicker(){openDatePicker({since:RPT_SINCE,until:RPT_UNTIL,active:(RPT_MODE==='preset'?RPT_PRESET:null),onPreset:function(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();},onRange:function(s,u){RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}});}
 function rptDateBar(){
   return '<div class="card no-print" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Periode</span>'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Periode: <strong style="color:var(--text,inherit)">'+esc(rptPeriodLabel())+'</strong></span>'+
     '<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line)" onclick="rptOpenPicker()">'+dpCalIcon()+'<span>Kalender / Filter</span><span style="color:var(--muted);font-size:11px">&#9662;</span></button></div>'+
     '<button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="openReportPdf()">Download rapportage</button></div>';
 }
@@ -2017,7 +2017,7 @@ async function loadMetaInsights(){
       if(ins.total_interactions!=null)pr.push(kpiD('Interacties',iv(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
       if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
       if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',iv(ins.profile_views),ins.profile_views,pmeta.profile_views));
-      if(ins.website_clicks!=null)pr.push(kpiD('Klikken in bio',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
+      if(ins.website_clicks!=null)pr.push(kpiD('Klikken op links in bio',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
       if(pr.length)html+='<div class="section-h" style="margin-top:16px"><h4>Prestaties</h4><span style="font-size:12px;color:var(--muted)">vergeleken met de vorige periode</span></div><div class="stats" style="margin-bottom:6px">'+pr.join('')+'</div>';
     } else if(d.account){
       html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
@@ -2025,7 +2025,7 @@ async function loadMetaInsights(){
     // Professionele grafieken: weergaven en nieuwe volgers per dag
     if(d.series){
       if(d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
-      if(d.series.follower_count&&d.series.follower_count.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4></div><div class="card">'+reportChart(d.series.follower_count,'#16a34a','gFollow')+'</div>';
+      if(d.series.follower_count&&d.series.follower_count.length>1){var fc=d.series.follower_count;var tot=fc.reduce(function(s,x){return s+(Number(x.v)||0);},0);var avg=(tot/fc.length);html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4><span style="font-size:12px;color:var(--muted)">gemiddeld '+avg.toFixed(1)+' per dag &middot; '+iv(tot)+' totaal</span></div><div class="card">'+reportChart(fc,'#16a34a','gFollow')+'</div>';}
     }
     // Weergaven: volgers vs niet-volgers
     if(d.views_split){
