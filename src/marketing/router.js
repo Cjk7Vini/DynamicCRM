@@ -752,6 +752,17 @@ async function followerSnapshotsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+let _hasClientItems = null;
+async function clientItemsAvailable() {
+  if (_hasClientItems === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='client_items'"
+    )).rows);
+    if (r.length > 0) _hasClientItems = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
   if (!Array.isArray(input)) return null;
@@ -1021,9 +1032,76 @@ router.delete('/api/mkt/clients/:clientId/posts/:postId/comments/:commentId', re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// =======================================================================
-// STAP 3 - ASSETS (beeldmateriaal per klant, opgeslagen als bytea in Neon)
-// Upload via base64-JSON met een ruimere body-limiet, alleen op deze route.
+// ---- Client-items: To do en Documenten per klant ----
+router.get('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await clientItemsAvailable())) return res.json({ success: true, items: [] });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const kind = (req.query.kind === 'document') ? 'document' : 'todo';
+    const rows = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, kind, title, url, done, created_at FROM marketing.client_items WHERE workspace_id=$1 AND client_id=$2 AND kind=$3 ORDER BY done ASC, created_at DESC',
+      [wsId, okClient, kind]
+    )).rows);
+    res.json({ success: true, items: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await clientItemsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld (migratie 010 nog niet gedraaid).' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const kind = (req.body && req.body.kind === 'document') ? 'document' : 'todo';
+    const title = String((req.body && req.body.title) || '').trim();
+    if (!title) return res.status(400).json({ error: 'Titel is verplicht' });
+    let url = String((req.body && req.body.url) || '').trim().slice(0, 2000) || null;
+    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.client_items (workspace_id, client_id, kind, title, url, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, kind, title, url, done, created_at`,
+      [wsId, okClient, kind, title.slice(0, 500), url, req.session.mkt.accountId || null]
+    )).rows[0]);
+    res.json({ success: true, item: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await clientItemsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {}; const sets = []; const vals = []; let i = 1;
+    if (b.title !== undefined) { if (!String(b.title).trim()) return res.status(400).json({ error: 'Titel mag niet leeg zijn' }); sets.push(`title=$${i++}`); vals.push(String(b.title).trim().slice(0, 500)); }
+    if (b.url !== undefined) { let u = String(b.url || '').trim().slice(0, 2000); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; sets.push(`url=$${i++}`); vals.push(u || null); }
+    if (b.done !== undefined) { sets.push(`done=$${i++}`); vals.push(b.done === true); }
+    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    vals.push(req.params.id, wsId, okClient);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.client_items SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i++} AND client_id=$${i} RETURNING id, kind, title, url, done, created_at`, vals
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Item niet gevonden' });
+    res.json({ success: true, item: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await clientItemsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      'DELETE FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND client_id=$3 RETURNING id', [req.params.id, wsId, okClient]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Item niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 // =======================================================================
 const ASSET_MAX_BYTES = 8 * 1024 * 1024; // 8 MB per bestand
 const ASSET_MIME_OK = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
