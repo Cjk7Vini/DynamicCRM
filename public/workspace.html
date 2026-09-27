@@ -2927,7 +2927,12 @@ var CONTENT_LABELS=[
   {k:'goedgekeurd',l:'Goedgekeurd',c:'#16a34a'},
   {k:'gepost',l:'Gepost',c:'#16a34a'}
 ];
-function labelDef(k){return CONTENT_LABELS.filter(function(x){return x.k===k;})[0];}
+var CUSTOM_LABELS=[];
+async function loadCustomLabels(){
+  try{var r=await fetch('/api/mkt/label-defs',{credentials:'include'});var d=await r.json();CUSTOM_LABELS=(d&&d.success&&d.labels)?d.labels:[];}catch(e){CUSTOM_LABELS=[];}
+}
+function allLabelDefs(){return CONTENT_LABELS.concat(CUSTOM_LABELS.map(function(x){return {k:'c'+x.id,l:x.label,c:x.color||'#6366f1',custom:true,id:x.id};}));}
+function labelDef(k){return allLabelDefs().filter(function(x){return x.k===k;})[0];}
 function labelChips(labels){
   if(!labels||!labels.length)return '';
   return '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">'+labels.map(function(k){var d=labelDef(k);if(!d)return '';return '<span style="font-size:10px;font-weight:700;color:#fff;background:'+d.c+';padding:2px 8px;border-radius:20px">'+esc(d.l)+'</span>';}).join('')+'</div>';
@@ -2939,9 +2944,25 @@ function commentChip(p){
 var PF_LABELS=[];
 function renderPfLabels(){
   var box=document.getElementById('pfLabels'); if(!box)return;
-  box.innerHTML=CONTENT_LABELS.map(function(d){var on=PF_LABELS.indexOf(d.k)>=0;return '<button type="button" onclick="togglePfLabel(\''+d.k+'\')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+d.c+';background:'+(on?d.c:'transparent')+';color:'+(on?'#fff':d.c)+'">'+esc(d.l)+'</button>';}).join('');
+  var chips=allLabelDefs().map(function(d){var on=PF_LABELS.indexOf(d.k)>=0;var del=d.custom?(' <span onclick="event.stopPropagation();deleteCustomLabel('+d.id+')" title="Label verwijderen" style="margin-left:4px;opacity:.8">&times;</span>'):'';return '<button type="button" onclick="togglePfLabel(\''+d.k+'\')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+d.c+';background:'+(on?d.c:'transparent')+';color:'+(on?'#fff':d.c)+'">'+esc(d.l)+del+'</button>';}).join('');
+  box.innerHTML=chips+'<button type="button" onclick="createCustomLabel()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px dashed var(--muted);background:transparent;color:var(--muted)">+ Nieuw label</button>';
 }
 function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);renderPfLabels();}
+async function createCustomLabel(){
+  var name=prompt('Naam van het nieuwe label:'); if(name==null)return; name=name.trim(); if(!name)return;
+  var color=prompt('Kleur (hex, bv. #16a34a). Leeg = standaard paars:','#16a34a')||'';
+  try{
+    var r=await fetch('/api/mkt/label-defs',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name,color:color.trim()})});
+    var d=await r.json();
+    if(r.ok&&d.success){await loadCustomLabels();renderPfLabels();}else{alert(d.error||'Kon label niet aanmaken.');}
+  }catch(e){alert('Netwerkfout.');}
+}
+async function deleteCustomLabel(id){
+  if(!confirm('Dit label verwijderen? Het verdwijnt van alle kaarten.'))return;
+  try{var r=await fetch('/api/mkt/label-defs/'+id,{method:'DELETE',credentials:'include'});var d=await r.json();
+    if(r.ok&&d.success){var k='c'+id;var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);await loadCustomLabels();renderPfLabels();}else{alert(d.error||'Kon label niet verwijderen.');}
+  }catch(e){alert('Netwerkfout.');}
+}
 function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
 function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
 function kanbanLeave(e){e.currentTarget.style.outline='';}
@@ -3092,6 +3113,7 @@ async function loadPosts(){
     var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
     _CONTENT_POSTS=d.posts||[];
+    await loadCustomLabels();
     renderContentView();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
