@@ -2381,13 +2381,17 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         out.account = { username: a.username || null, followers: a.followers_count ?? null, following: a.follows_count ?? null, media: a.media_count ?? null };
       } catch (e) { out.errors.account = e.message; }
 
-      // --- Recente posts (top op likes) ---
+      // --- Recente posts. We halen een set recente posts op, verrijken ZE ALLEMAAL
+      // met per-post cijfers (weergaven, bereik, opgeslagen, gedeeld) en ranken pas
+      // daarna op weergaven. Zo staat de best BEKEKEN post ook echt bovenaan (niet
+      // die met toevallig de meeste likes). ---
+      let allPosts = [];
       try {
         const m = await graphGet(`${creds.igUserId}/media`, {
           fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
-          limit: '25', access_token: token,
+          limit: '18', access_token: token,
         });
-        const posts = (m.data || []).map((p) => ({
+        allPosts = (m.data || []).map((p) => ({
           id: p.id,
           caption: (p.caption || '').slice(0, 140),
           media_type: p.media_type,
@@ -2397,11 +2401,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           comments: p.comments_count ?? 0,
           thumb: p.thumbnail_url || p.media_url || null,
         }));
-        posts.sort((x, y) => (y.likes + y.comments) - (x.likes + x.comments));
-        out.topPosts = posts.slice(0, 9);
         // Verdeling per contenttype (aantal + interacties), uit alle opgehaalde posts.
         const byType = {};
-        for (const p of posts) {
+        for (const p of allPosts) {
           const t = p.media_type || 'ONBEKEND';
           if (!byType[t]) byType[t] = { type: t, count: 0, interactions: 0 };
           byType[t].count += 1;
@@ -2410,11 +2412,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         out.contentTypes = Object.values(byType).sort((a, b) => b.count - a.count);
       } catch (e) { out.errors.topPosts = e.message; }
 
-      // --- Per-post cijfers voor de ranglijst (bereik, weergaven, opgeslagen,
-      // gedeeld, interacties + berekende engagement). Instagram-insights vallen
-      // niet onder de strenge advertentielimiet, dus dit mag parallel. Mislukt
-      // een post, dan houden we gewoon de basiscijfers (likes/reacties).
-      if (out.topPosts && out.topPosts.length) {
+      // Per-post cijfers ophalen (Instagram-insights, niet onder de strenge
+      // advertentielimiet). Mislukt een post, dan houden we de basiscijfers.
+      if (allPosts.length) {
         const enrichPost = async (p) => {
           const trySet = async (metric) => {
             const pin = await graphGet(`${p.id}/insights`, { metric, access_token: token });
@@ -2426,15 +2426,21 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           };
           try { await trySet('reach,views,saved,shares,total_interactions'); }
           catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
-          // Nieuwe volgers vanuit deze post ("follows"). Apart en afgeschermd, want
-          // deze metric is niet voor elke post/accounttype beschikbaar; mislukt hij,
-          // dan blijven de andere cijfers gewoon staan.
           try { await trySet('follows'); } catch (_) { /* follows niet beschikbaar */ }
-          if (p.reach != null && p.total_interactions != null && p.reach > 0) {
-            p.engagement = Math.round((p.total_interactions / p.reach) * 10000) / 100;
+          // Engagement rate volgens de DHC-formule:
+          // (likes + reacties + opgeslagen + gedeeld) / bereik * 100.
+          if (p.reach != null && p.reach > 0) {
+            const inter = (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
+            p.engagement = Math.round((inter / p.reach) * 10000) / 100;
           }
         };
-        try { await Promise.all(out.topPosts.map(enrichPost)); } catch (_) { /* rapport blijft heel */ }
+        try { await Promise.all(allPosts.map(enrichPost)); } catch (_) { /* rapport blijft heel */ }
+        // Ranken op prestatie: weergaven eerst, dan bereik, dan interacties.
+        const perf = (p) => (p.views != null ? p.views : (p.reach != null ? p.reach : ((p.likes || 0) + (p.comments || 0))));
+        allPosts.sort((x, y) => perf(y) - perf(x));
+        out.topPosts = allPosts.slice(0, 10);
+      } else {
+        out.topPosts = [];
       }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
