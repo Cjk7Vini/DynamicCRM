@@ -4892,7 +4892,11 @@
             if (!/^[0-9]{10,}$/.test(tel.replace(/\s/g, ''))) { msg.style.color = '#dc2626'; msg.textContent = 'Vul een geldig telefoonnummer in (min. 10 cijfers).'; return; }
             if (bron === 'Fysiotherapie' && !behandelaar) { msg.style.color = '#dc2626'; msg.textContent = 'Vul de behandelaar in.'; return; }
             const nlStatusEl = document.getElementById('nlStatus');
-            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, behandelaar: (bron === 'Fysiotherapie' ? behandelaar : null), status: (nlStatusEl ? nlStatusEl.value : '') || null, praktijk_code: getPracticeCode() };
+            const activePc = getActivePracticeCode();
+            if (currentUser && currentUser.role !== 'practice' && !activePc) {
+                msg.style.color = '#dc2626'; msg.textContent = 'Selecteer eerst een locatie/praktijk bovenaan voordat je een lead toevoegt.'; return;
+            }
+            const payload = { volledige_naam: naam, emailadres: email, telefoon: tel, bron: bron, doel: doel || null, behandelaar: (bron === 'Fysiotherapie' ? behandelaar : null), status: (nlStatusEl ? nlStatusEl.value : '') || null, praktijk_code: activePc || getPracticeCode() };
             if (metAfspraak) {
                 const date = document.getElementById('nlDatum').value;
                 const time = document.getElementById('nlTijd').value;

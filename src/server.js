@@ -1512,6 +1512,14 @@ app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
     if (req.session.role === 'admin') {
       praktijkCode = (req.body.praktijk_code || '').trim();
       if (!praktijkCode) return res.status(400).json({ error: 'Selecteer eerst een praktijk' });
+    } else if (req.session.role === 'organisation') {
+      // Organisatie beheert meerdere locaties: neem de gekozen locatie uit de body,
+      // maar alleen als die echt bij deze organisatie hoort (anti-datalek).
+      const wanted = (req.body.praktijk_code || '').trim();
+      const codes = (req.session.organisationCodes || '').split(',').map((c) => c.trim()).filter(Boolean);
+      if (!wanted) return res.status(400).json({ error: 'Selecteer eerst een locatie voordat je een lead toevoegt' });
+      if (!codes.includes(wanted)) return res.status(403).json({ error: 'Deze locatie hoort niet bij je organisatie' });
+      praktijkCode = wanted;
     } else {
       praktijkCode = req.session.practiceCode;
       if (!praktijkCode) return res.status(400).json({ error: 'Geen praktijk aan dit account gekoppeld' });
