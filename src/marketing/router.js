@@ -3830,14 +3830,11 @@ router.post('/api/mkt/clients/:clientId/meta/extend-token', requireMkt, async (r
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const intg = await withReadConnection(async (c) => (await c.query(
-      'SELECT meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    if (!intg) return res.status(400).json({ error: 'Geen koppelingen ingesteld' });
-    const appId = intg.meta_app_id || process.env.META_APP_ID || null;
-    const appSecret = decryptSecret(intg.meta_app_secret) || process.env.META_APP_SECRET || null;
-    const shortTok = decryptSecret(intg.meta_access_token);
-    if (!appId || !appSecret) return res.status(400).json({ error: 'Vul Meta App ID en App Secret in bij de koppelingen, of stel ze centraal in (META_APP_ID / META_APP_SECRET)' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const appId = creds.appId || null;
+    const appSecret = creds.appSecret || null;
+    const shortTok = creds.token || null;
+    if (!appId || !appSecret) return res.status(400).json({ error: 'Vul Meta App ID en App Secret in bij de Werkplek-koppeling (eenmalig voor je hele workspace), of per klant bij Koppelingen.' });
     if (!shortTok) return res.status(400).json({ error: 'Er is nog geen access token ingevuld om te verlengen' });
 
     const r = await graphGet('oauth/access_token', {
