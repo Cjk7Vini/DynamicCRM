@@ -1633,10 +1633,18 @@ router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res)
     if (!shortTok) return res.status(400).json({ error: 'Er is nog geen access token ingevuld om te verlengen' });
     const r = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: shortTok });
     if (!r.access_token) return res.status(400).json({ error: 'Meta gaf geen langlevend token terug' });
-    await withWriteConnection(async (c) => c.query(
-      'UPDATE marketing.workspace_integrations SET meta_access_token=$1, updated_at=now() WHERE workspace_id=$2',
-      [encryptSecret(r.access_token), wsId]
-    ));
+    const expSecsWs = r.expires_in ? Number(r.expires_in) : 60 * 24 * 3600;
+    await withWriteConnection(async (c) => {
+      await c.query('ALTER TABLE marketing.workspace_integrations ADD COLUMN IF NOT EXISTS meta_token_expires_at TIMESTAMPTZ').catch(() => {});
+      try {
+        await c.query(
+          "UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_token_expires_at=now() + ($2 || ' seconds')::interval, updated_at=now() WHERE workspace_id=$3",
+          [encryptSecret(r.access_token), String(expSecsWs), wsId]
+        );
+      } catch (_) {
+        await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1, updated_at=now() WHERE workspace_id=$2', [encryptSecret(r.access_token), wsId]);
+      }
+    });
     res.json({ success: true, days: r.expires_in ? Math.round(r.expires_in / 86400) : 60 });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -3836,10 +3844,18 @@ router.post('/api/mkt/clients/:clientId/meta/extend-token', requireMkt, async (r
       grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: shortTok,
     });
     if (!r.access_token) return res.status(400).json({ error: 'Meta gaf geen langlevend token terug' });
-    await withWriteConnection(async (c) => c.query(
-      'UPDATE marketing.client_integrations SET meta_access_token=$1, updated_at=now() WHERE client_id=$2 AND workspace_id=$3',
-      [encryptSecret(r.access_token), okClient, wsId]
-    ));
+    const expSecs = r.expires_in ? Number(r.expires_in) : 60 * 24 * 3600;
+    await withWriteConnection(async (c) => {
+      await c.query('ALTER TABLE marketing.client_integrations ADD COLUMN IF NOT EXISTS meta_token_expires_at TIMESTAMPTZ').catch(() => {});
+      try {
+        await c.query(
+          "UPDATE marketing.client_integrations SET meta_access_token=$1, meta_token_expires_at=now() + ($2 || ' seconds')::interval, updated_at=now() WHERE client_id=$3 AND workspace_id=$4",
+          [encryptSecret(r.access_token), String(expSecs), okClient, wsId]
+        );
+      } catch (_) {
+        await c.query('UPDATE marketing.client_integrations SET meta_access_token=$1, updated_at=now() WHERE client_id=$2 AND workspace_id=$3', [encryptSecret(r.access_token), okClient, wsId]);
+      }
+    });
     const days = r.expires_in ? Math.round(r.expires_in / 86400) : 60;
     res.json({ success: true, days });
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -3936,18 +3952,37 @@ router.get('/api/mkt/koppelingen/overview', requireMkt, async (req, res) => {
       'SELECT id, name, brand_color FROM marketing.clients WHERE workspace_id=$1 AND archived=false ORDER BY name ASC',
       [wsId]
     )).rows);
+    // Vervaldatum per klant + van het werkplek-token (voor de verleng-herinnering).
+    // Best-effort: ontbreekt de kolom nog, dan blijft de vervaldatum leeg.
+    let expByClient = {}; let wsExpiry = null;
+    try {
+      const rows = await withReadConnection(async (c) => (await c.query(
+        'SELECT client_id, (meta_access_token IS NOT NULL) AS has_tok, meta_token_expires_at FROM marketing.client_integrations WHERE workspace_id=$1', [wsId]
+      )).rows);
+      rows.forEach((r) => { expByClient[r.client_id] = { hasTok: r.has_tok, exp: r.meta_token_expires_at }; });
+    } catch (_) { expByClient = {}; }
+    try {
+      const w = await withReadConnection(async (c) => (await c.query(
+        'SELECT meta_token_expires_at FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+      )).rows[0]);
+      wsExpiry = w ? w.meta_token_expires_at : null;
+    } catch (_) { wsExpiry = null; }
     const out = [];
     for (const cl of clients) {
       let creds = {};
       try { creds = await resolveClientMeta(wsId, cl.id); } catch (_) { creds = {}; }
+      const ce = expByClient[cl.id];
+      // Eigen token -> eigen vervaldatum; valt de klant terug op het werkplek-token -> werkplek-vervaldatum.
+      const tokenExpiresAt = (ce && ce.hasTok) ? (ce.exp || null) : (creds.token ? (wsExpiry || null) : null);
       out.push({
         id: cl.id, name: cl.name, brand_color: cl.brand_color,
         token: !!creds.token,
         adAccount: creds.adAccount || null, pageId: creds.pageId || null,
         igUserId: creds.igUserId || null, pixelId: creds.pixelId || null,
+        tokenExpiresAt,
       });
     }
-    res.json({ success: true, clients: out });
+    res.json({ success: true, clients: out, workspaceTokenExpiresAt: wsExpiry });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
