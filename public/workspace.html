@@ -1823,12 +1823,20 @@ async function loadCampSections(){
     if(scheduled.length){html+='<div class="section-h"><h4>Geplande campagnes</h4><span style="font-size:12px;color:var(--muted)">starten op een toekomstige datum</span></div>'+scheduled.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');}
     html+='<div class="section-h" style="margin-top:'+(scheduled.length?'18px':'0')+'"><h4>Live op Meta</h4></div>'+(liveOnes.length?liveOnes.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen live of actieve campagnes.</div>');
     box.innerHTML=html;
-    if(adsData)loadKpiAnalyse(adsData);
+    if(adsData)renderKpiAnalyseStart(adsData);
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
 }
 // ---- Claude KPI-analyse tussen "Campagne data algemeen" en de campagnes ----
 function kpiStatusStyle(s){var m={sterk:['#166534','#dcfce7'],goed:['#166534','#dcfce7'],aandacht:['#92400e','#fef3c7'],zwak:['#991b1b','#fee2e2']};return m[s]||['#334155','#e2e8f0'];}
+function renderKpiAnalyseStart(ads){
+  var box=document.getElementById('kpiAnalyseBox'); if(!box)return;
+  window.__lastAdsData=ads;
+  box.innerHTML='<div class="card" style="margin-bottom:16px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(99,102,241,.06),transparent);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+    +'<div><div style="font-size:15px;font-weight:700;margin-bottom:2px">Claude analyse</div>'
+    +'<div style="font-size:13px;color:var(--muted)">Laat Claude de campagnecijfers langs de KPI-normen leggen en de knelpunten benoemen.</div></div>'
+    +'<button class="btn btn-ghost" style="padding:7px 14px;font-size:13px;white-space:nowrap" onclick="loadKpiAnalyse(window.__lastAdsData,true)">Analyse genereren</button></div>';
+}
 function renderKpiAnalyse(a){
   var box=document.getElementById('kpiAnalyseBox'); if(!box)return;
   var st=kpiStatusStyle(a.status);
