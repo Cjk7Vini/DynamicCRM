@@ -2547,6 +2547,313 @@ router.post('/api/mkt/clients/:clientId/ai/kpi-analysis', requireMkt, async (req
 });
 
 // =======================================================================
+// AD MACHINE - creatie- en keuringsskills (Claude) in de workspace
+// =======================================================================
+
+// Strip HTML naar leesbare tekst (voor de conversielek-keuring van een URL).
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Haalt best-effort de tekst van een publieke landingspagina op. Blokkeert interne hosts.
+async function fetchPageText(rawUrl) {
+  let u;
+  try { u = new URL(String(rawUrl).trim()); } catch (_) { throw new Error('Ongeldige URL'); }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('Alleen http of https');
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || /\.local$/.test(host)
+      || /^(127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) {
+    throw new Error('Interne host geblokkeerd');
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 9000);
+  try {
+    const r = await fetch(u.toString(), {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; DHC-Workspace/1.0)' },
+    });
+    if (!r.ok) throw new Error('Pagina gaf status ' + r.status);
+    const html = await r.text();
+    const text = htmlToText(html);
+    if (!text) throw new Error('Geen leesbare tekst gevonden');
+    return text.slice(0, 12000);
+  } finally { clearTimeout(timer); }
+}
+
+const ADM_COMMON = [
+  '',
+  'Uitvoerregels (altijd):',
+  '- Schrijf in natuurlijk Nederlands, zoals iemand praat, niet zoals een merk schrijft.',
+  '- Gebruik NOOIT em-dashes of koppeltekens (-) in lopende of creatieve tekst.',
+  '- Vermijd AI-woorden: krachtig, optimaal, effectief, naadloos, moeiteloos, transformeer, ontdek, gamechanger, ultiem. En geen openers die eerlijkheid aankondigen zoals "eerlijk" of "even onder ons".',
+  '- Lever het resultaat in Markdown: koppen met ##, nadruk met **vet**, lijsten met - of met 1. Gebruik GEEN tabellen en GEEN HTML. Zet labels zoals Shot of Script op een eigen regel met **vet**.',
+  '- Verzin nooit cijfers, resultaten, beeld of tekst die je niet hebt gekregen. Weet je iets niet, zeg dat kort en vraag door.',
+  '- Noem geen tool-, skill- of merkherkomst in de output.',
+];
+
+// key -> publieke config (voor het formulier) + system (prompt voor Claude)
+const ADSKILLS = {
+  'concurrentie-analyse': {
+    title: 'Concurrentie-analyse',
+    desc: 'Zie welke invalshoeken in de markt al bezet zijn en waar het gat zit, op basis van wat jij in de Meta Ad Library ziet.',
+    note: 'Open de Meta Ad Library, zoek de concurrent of markt en plak hieronder wat je ziet: welke advertenties lopen er, hoe lang al, welke invalshoeken en teksten. De analyse werkt op wat jij aanlevert.',
+    maxTokens: 2200,
+    fields: [
+      { name: 'concurrent', label: 'Concurrent of markt', type: 'text', required: true, ph: 'bv. fysiotherapie Zeeland, of een concurrentnaam' },
+      { name: 'observaties', label: 'Wat je in de Ad Library ziet', type: 'textarea', ph: 'Welke advertenties lopen er, hoe lang al, welke invalshoeken, welke teksten op beeld, welke formats...' },
+    ],
+    system: [
+      'Je bent een ervaren Nederlandse ads-strateeg die concurrentie in kaart brengt.',
+      'Het kernidee: een advertentie die al weken of maanden draait kost elke dag geld, dus looptijd is het beste publieke signaal voor wat werkt.',
+      'Je krijgt geen live Ad Library; je werkt met wat de gebruiker aanlevert. Vraag om meer observaties als het te dun is, maar lever met wat er ligt een zo scherp mogelijke analyse.',
+      'Structuur van je antwoord:',
+      '1. Wie er adverteert en wat opvalt.',
+      '2. Welke creatives het langst lijken te lopen en waarom dat een signaal is.',
+      '3. Welke invalshoeken (pijn, verlangen, vijand, bewijs, mechanisme, herkenning, status) al bezet zijn.',
+      '4. Welke invalshoek vrij ligt (de witte plek) en waarom die kans biedt.',
+      '5. Een concreet advies welke hoek de gebruiker zou pakken om zich te onderscheiden.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+  'advertentieconcept': {
+    title: 'Advertentieconcept',
+    desc: 'Complete creatieve concepten: het verhaal onder de campagne, de rode draad en drie uitwerkingen per concept, plus een rauwe ugly-variant.',
+    note: 'Een concept is het verhaal waar een hele campagne aan hangt, niet een losse ad. Geef minimaal het aanbod en de doelgroep.',
+    maxTokens: 2600,
+    fields: [
+      { name: 'aanbod', label: 'Wat verkoop je? (aanbod en prijs)', type: 'text', required: true, ph: 'bv. 4-weken leefstijltraject, 149 euro' },
+      { name: 'doelgroep', label: 'Aan wie precies?', type: 'text', required: true, ph: 'de groep die zichzelf herkent, niet "iedereen"' },
+      { name: 'pijn', label: 'Grootste pijn en diepste verlangen', type: 'text', ph: '' },
+      { name: 'mechanisme', label: 'Wat maakt het anders (uniek mechanisme)?', type: 'text', ph: '' },
+      { name: 'platform', label: 'Waar draait de ad?', type: 'select', options: ['Meerdere', 'Reels', 'Feed', 'Stories', 'TikTok'] },
+      { name: 'beeld', label: 'Heb je al beeld of een winnende stijl?', type: 'text', ph: '' },
+    ],
+    system: [
+      'Je bent een ervaren creative strategist en creative director. Je bedenkt advertentieconcepten die opvallen, blijven plakken en verkopen.',
+      'Je gelooft dat een rauwe, echte advertentie het vaak wint van een gladde. Een concept is een hoek op het product die de juiste persoon raakt op het juiste gevoel, in een vorm die native aanvoelt op de feed.',
+      'Kies per concept eerst de invalshoek (pijn, verlangen, vijand, bewijs, mechanisme, herkenning, status), nooit vijf keer dezelfde. Bouw dan het verhaal, zoek het herkenbare element (de rode draad), en werk het pas daarna uit in formats.',
+      'Formats om uit te kiezen: static, carrousel, meme-ad, UGC-foto, voor-na, screenshot-ad, tekstpost, demo.',
+      'Lever 3 concepten. Gebruik per concept deze opbouw met vette labels op aparte regels:',
+      'Het verhaal, De omslag (wat de kijker nu gelooft naar wat hij gelooft na drie ads), Invalshoek, Voor wie precies, Waarom nu, Rode draad, Uitwerkingen (3 stuks: format, wat je in beeld ziet, en de tekst op beeld tussen aanhalingstekens), Ugly-variant, Rek (hoe je het uitbouwt als het werkt).',
+      'Sluit af met "Mijn top 3": de concepten op volgorde, per stuk een zin waarom hij wint en welke uitwerking je eerst test.',
+      'Zit het aanbod in gezondheid, afvallen of uiterlijk: geen voor-na van een lichaam, geen resultaatbelofte als claim, en spreek de lezer niet aan op een aandoening. Kies dan bij voorkeur bewijs, mechanisme, herkenning of identiteit als hoek en noem onder de top 3 kort welke uitwerking kans op afkeuring heeft en wat je verandert.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+  'hook-generator': {
+    title: 'Hooks',
+    desc: 'Nederlandse hooks en scroll stoppers voor ads en short-form video, per categorie, met een top 3.',
+    note: 'Een hook is geen intro maar een patroononderbreker. In de eerste vijf woorden moet duidelijk zijn voor wie het is, en er moet iets op het spel staan.',
+    maxTokens: 2200,
+    fields: [
+      { name: 'product', label: 'Product of aanbod', type: 'text', required: true, ph: '' },
+      { name: 'doelgroep', label: 'Doelgroep', type: 'text', required: true, ph: '' },
+      { name: 'pijn', label: 'Grootste pijnpunt', type: 'text', ph: '' },
+      { name: 'verlangen', label: 'Wat willen ze het liefst bereiken?', type: 'text', ph: '' },
+      { name: 'tone', label: 'Tone of voice', type: 'text', ph: 'speels, premium, confronterend, founder, UGC, bold' },
+      { name: 'platform', label: 'Platform', type: 'select', options: ['Meta', 'Reels', 'TikTok', 'YouTube Shorts'] },
+      { name: 'winhook', label: 'Bestaande winnende hook (optioneel)', type: 'textarea', ph: 'Lever een hook aan en ik maak varianten. Double down on your winners.' },
+    ],
+    system: [
+      'Je bent een ervaren ads-specialist en hook-expert. Je bedenkt Nederlandse hooks die in de eerste 2 tot 3 seconden de aandacht pakken.',
+      'Een goede hook is een patroononderbreker. De kijker moet binnen 2 seconden denken: dit gaat over mij. In de eerste vijf woorden staat het onderwerp, de klacht of de groep, zodat de juiste persoon zich aangesproken voelt en de rest doorscrollt.',
+      'Er moet iets op het spel staan: benoem wat het nu kost, confronteer met iets wat de kijker over zichzelf weet, laat zien wat verdwijnt, of maak het specifiek met een concreet getal of moment. Een vlakke constatering is geen hook.',
+      'Lever minimaal vier categorieen, elk minimaal vijf hooks, met gemengde invalshoeken (controversieel, FOMO, probleemgericht, verlangen, curiosity, myth-busting, status, directe command):',
+      'Founder of expert hooks (als er geen uitgesproken founder is, kies expert- of klanthooks en zeg welke en waarom), UGC hooks, Branded hooks, POV hooks.',
+      'Krijg je een bestaande winnende hook, lever dan minimaal vijf varianten daarop onder het kopje Winning iteraties.',
+      'Sluit af met "Mijn top 3", elk met een zin waarom hij wint.',
+      'Nooit trage openers zoals "In deze video", "Vandaag wil ik het hebben over", "Misschien herken je dit". Kort genoeg om in een adem te zeggen. In gevoelige markten spreek je de lezer niet aan op een aandoening; draai het naar de eerste persoon of een algemene observatie.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+  'ad-scripts': {
+    title: 'Video-scripts',
+    desc: 'Scripts voor video ads volgens Hook, Rehook, Pijnpunt, Body, CTA, met shot per onderdeel. Eerst een voorbeeld, daarna vier varianten.',
+    note: 'Eerst krijg je een script ter goedkeuring. Pas daarna de vier extra varianten. De spreker is altijd zelf gebruiker van het product, nooit verkoper.',
+    maxTokens: 2600,
+    fields: [
+      { name: 'merk', label: 'Merk of product', type: 'text', required: true, ph: '' },
+      { name: 'pagina', label: 'Landingspagina (plak de tekst of een URL)', type: 'textarea', required: true, ph: 'Wat wordt verkocht, voor wie, wat is de belofte en de pijn' },
+      { name: 'doelgroep', label: 'Doelgroep', type: 'text', ph: '' },
+      { name: 'pijn', label: 'Specifieke pijn of invalshoek', type: 'text', ph: '' },
+    ],
+    phased: true,
+    system: [
+      'Je bent een ervaren creative strategist die scripts schrijft voor video ads. Je schrijft scripts die voelen als content, niet als reclame. De spreker is altijd zelf gebruiker van het product, nooit verkoper.',
+      'Elk script volgt deze opbouw, met per onderdeel een regel Shot (hoe het shot wordt opgenomen) en een regel Script:',
+      'Hook (0 tot 3 sec, 1 tot 2 zinnen): direct erin, mid-sentence, geen intro. Pijn-variant of realisatie-variant.',
+      'Rehook (3 tot 9 sec): het probleem groter en concreter maken.',
+      'Pijnpunt (9 tot 15 sec): de emotionele laag, alledaagse taal.',
+      'Body (15 tot 24 sec): de kentering, 1 tot 2 concrete features of waarom de standaardroute niet werkt.',
+      'CTA (24 tot 30 sec): productnaam, kort wat het is, wat het oplevert. Nooit een command zoals "klik nu", altijd een uitnodiging.',
+      'Totale gesproken lengte 20 tot 30 seconden, ongeveer 55 tot 75 gesproken woorden. Zinnen mogen lang zijn en in elkaar overlopen; het moet klinken als praten, niet als een opsomming. Tijdsmarkers komen NIET in de output.',
+      'Geen emoji, geen vakjargon, geen marketingtaal.',
+    ].concat(ADM_COMMON).join('\n'),
+    systemFirst: 'Lever nu EERST een enkel script ter goedkeuring, niet meer dan een. Dit is het voorbeeld waar de gebruiker feedback op geeft.',
+    systemVariants: 'De gebruiker heeft het eerste script gezien. Lever nu VIER extra varianten. Elke hook echt anders (andere invalshoek, andere openingszin, ander openingsshot). Body mag feiten delen. Geef Facebook vier nieuwe ingangen, geen versies van hetzelfde.',
+  },
+  'advertentieteksten': {
+    title: 'Advertentieteksten',
+    desc: 'Complete set: 5 primaire teksten (2 lang en verhalend), 5 headlines en 1 beschrijving, in de juiste lengtes per platform.',
+    note: 'Connect first, sell second. De eerste zin bepaalt alles. De aantallen liggen vast: altijd 5 primaire teksten, 5 headlines en 1 beschrijving.',
+    maxTokens: 3000,
+    fields: [
+      { name: 'aanbod', label: 'Wat verkoop je? (aanbod en prijs)', type: 'text', required: true, ph: '' },
+      { name: 'doelgroep', label: 'Aan wie precies?', type: 'text', required: true, ph: '' },
+      { name: 'pijn', label: 'Grootste pijn of verlangen', type: 'text', ph: '' },
+      { name: 'belofte', label: 'Belofte of resultaat', type: 'text', ph: '' },
+      { name: 'mechanisme', label: 'Uniek mechanisme of invalshoek', type: 'text', ph: '' },
+      { name: 'actie', label: 'Gewenste actie', type: 'text', ph: 'bv. gratis kennismaking aanvragen' },
+      { name: 'tone', label: 'Tone of voice', type: 'text', ph: '' },
+      { name: 'platform', label: 'Platform', type: 'select', options: ['Meta', 'TikTok', 'Pinterest', 'LinkedIn'] },
+    ],
+    system: [
+      'Je bent een ervaren creative performance strategist. Je maakt advertenties die voelen als content, niet als promotie. Connect first, sell second. Je schrijft alsof je een persoon recht aankijkt.',
+      'Lever altijd een complete set: 5 primaire teksten, 5 headlines en 1 beschrijving. Die aantallen liggen vast, ook als de brief dun is. Lever nooit in delen.',
+      'De 5 primaire teksten: 2 korte (5 tot 6 zinnen), 1 middellange (100 tot 150 woorden), 2 lange verhalende (echt 250 tot 400 woorden, met een scene, niet een samenvatting).',
+      'Lange teksten: begin in een scene, blijf lang in het probleem, laat iemand iets zeggen, een klein kantelpunt, het aanbod pas in de laatste alinea als uitnodiging, eindig laag en concreet. Geen opsommingen of tussenkopjes in de lange teksten.',
+      'Elke tekst pakt een andere invalshoek. De eerste zin is een scroll stopper en het onderwerp of de doelgroep staat in de eerste regel. Bij Meta werken de eerste twee regels los van elkaar (voor het afkappunt rond 125 tekens).',
+      'Headlines: 5 stuks, maximaal 5 woorden, prikkelend, een tweede haakje, geen samenvatting. Beschrijving: 1, maximaal 5 woorden, licht conversiegericht.',
+      'Houd je aan de platformlengtes (Meta, TikTok, Pinterest of LinkedIn). Sluit af met een top 3 van de sterkste primaire teksten, elk met een zin waarom en welke invalshoek.',
+      'In gevoelige markten: spreek de lezer niet aan op een aandoening, beloof geen resultaat, geen voor-na van een lichaam, en beloof niet harder dan de pagina waarmaakt.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+  'ad-analyse': {
+    title: 'Ad-analyse (static)',
+    desc: 'Diagnose van een bestaande statische advertentie: waarom hij niet stopt, niet klikt of niet schaalt, met cijfer per onderdeel en een eindoordeel.',
+    note: 'Beeld uploaden kan hier nog niet. Beschrijf de static zo precies mogelijk (alles wat in beeld staat en alle tekst letterlijk), dan is de diagnose scherp. Alleen voor statics, niet voor video.',
+    maxTokens: 2400,
+    fields: [
+      { name: 'omschrijving', label: 'Beschrijf de static (beeld en alle tekst letterlijk)', type: 'textarea', required: true, ph: 'Wat staat er in beeld, wie, welke uitsnede, en alle tekst, badges en knoppen letterlijk' },
+      { name: 'product', label: 'Product', type: 'text', ph: '' },
+      { name: 'doelgroep', label: 'Doelgroep', type: 'text', ph: '' },
+      { name: 'link', label: 'Waar linkt de ad heen', type: 'text', ph: '' },
+      { name: 'cijfers', label: 'Bekende cijfers (CTR, kosten, conversie)', type: 'text', ph: '' },
+      { name: 'primair', label: 'Primaire tekst en headline (optioneel)', type: 'textarea', ph: '' },
+    ],
+    system: [
+      'Je diagnosticeert een bestaande statische advertentie zoals iemand die duizenden statics heeft zien draaien. Geen beschouwing maar een diagnose: waar lekt deze ad aandacht of conversie en wat doe je eraan. Wees beslissend en eerlijk, niet aardig om het aardig zijn.',
+      'Dit werkt alleen voor statics. Gaat het om video of een Reel, zeg dat dit niet de juiste analyse is.',
+      'Begin met het kopje "Wat er in de ad staat": neem letterlijk over wat de gebruiker beschrijft (tekst, beeld, opmaak). Keur alleen wat je echt hebt gekregen; verzin geen element dat er niet staat.',
+      'Keur dan deze zes onderdelen, elk met een cijfer 1 tot 10, een oordeel (FOUT, ZWAK of GOED met een zin waarom) en een concrete fix (bij tekst een kant-en-klare herschrijving tussen aanhalingstekens, nooit "overweeg om"):',
+      'Beeld en scroll-stop, De invalshoek, Tekst op beeld, Native of advertentie, Aanbod en claim, Call to action.',
+      'Krijg je ook de primaire tekst en headline, keur die als twee extra onderdelen (eerste regel voor het afkappunt, headline als tweede haakje).',
+      'Wees streng; de meeste statics scoren 4 tot 6. Geef bovenaan een verdict: KILLEN (hoek klopt niet of beeld stopt structureel niet, zeg wat er mis was aan de hoek), ITEREREN (hoek staat, uitvoering lekt) of SCHALEN (alles staat). Sluit af met "Test als eerste": drie concrete varianten met wat je ermee checkt.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+  'conversielek-keuring': {
+    title: 'Conversielek-keuring',
+    desc: 'Keurt een landingspagina als een CRO-specialist: elk tekstelement met cijfer, wat er fout is en een kant-en-klaar voorstel.',
+    note: 'Geef de URL (ik probeer de pagina op te halen) of plak de pagina-tekst. Plakken is het betrouwbaarst.',
+    maxTokens: 3000,
+    fields: [
+      { name: 'url', label: 'URL van de landingspagina', type: 'text', ph: 'https://...' },
+      { name: 'paginatekst', label: 'Of plak de pagina-tekst hier', type: 'textarea', ph: 'Kopieer de teksten van de pagina van boven naar beneden' },
+      { name: 'doel', label: 'Doel van de pagina', type: 'select', options: ['Onbekend', 'Verkoop', 'Lead', 'Aanmelding'] },
+      { name: 'bron', label: 'Welke ad of mail stuurt hierheen', type: 'text', ph: 'voor de message match' },
+    ],
+    system: [
+      'Je keurt een landingspagina zoals een ervaren conversiespecialist (CRO): niet als beschouwing, maar als keuringsrapport. Je loopt de pagina van boven naar beneden langs en keurt elk tekst- en structuurelement. Wees beslissend en eerlijk; een 5 is gemiddeld, inflateer niet.',
+      'Keur alleen wat je echt in de aangeleverde pagina-inhoud ziet. Is er geen inhoud opgehaald of geplakt, zeg dan eerlijk dat je de pagina-tekst nodig hebt en keur niet op aannames.',
+      'Je denkraam is het LIFT-model (waardepropositie, relevantie, helderheid, urgentie, angst en twijfel, afleiding) en de fundamenten above the fold, CTA en frictie. Toets ook de message match met de advertentie of mail die het verkeer stuurt.',
+      'Per element lever je: Huidig (letterlijk geciteerd), Cijfer (1 tot 10), Oordeel (FOUT, ZWAK of GOED met een zin waarom, gekoppeld aan een LIFT-factor of fundament), Voorstel (een kant-en-klare herschrijving tussen aanhalingstekens, dit is het belangrijkste) en Waarom (een zin waarom dat beter converteert). Een goed element keur je kort af en je gaat door.',
+      'Opbouw: een korte samenvatting bovenaan met het gemiddelde cijfer en waar het lekt, dan de keuringskaarten van boven naar beneden, dan een top 3 fixes (hoogste impact eerst) en een lijstje quick wins. Prioriteer waardepropositie en relevantie eerst, dan frictie en afleiding, dan urgentie, twijfel en helderheid.',
+    ].concat(ADM_COMMON).join('\n'),
+  },
+};
+
+// Publieke config voor de formulieren (zonder de prompts).
+router.get('/api/mkt/admachine/skills', requireMkt, (req, res) => {
+  const out = Object.keys(ADSKILLS).map((key) => {
+    const s = ADSKILLS[key];
+    return {
+      key,
+      title: s.title,
+      desc: s.desc,
+      note: s.note || '',
+      phased: !!s.phased,
+      fields: (s.fields || []).map((f) => ({
+        name: f.name, label: f.label, type: f.type || 'text',
+        required: !!f.required, ph: f.ph || '', options: f.options || null,
+      })),
+    };
+  });
+  res.json({ success: true, skills: out });
+});
+
+// Draait een skill via Claude en geeft Markdown terug.
+router.post('/api/mkt/clients/:clientId/ai/admachine', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const skillKey = String((req.body && req.body.skill) || '').trim();
+    const skill = ADSKILLS[skillKey];
+    if (!skill) return res.status(400).json({ error: 'Onbekende skill' });
+
+    const brief = (req.body && typeof req.body.brief === 'object' && req.body.brief) ? req.body.brief : {};
+    const fase = String((req.body && req.body.fase) || '').trim();
+    const previous = String((req.body && req.body.previous) || '').slice(0, 8000);
+
+    // Verplichte velden controleren.
+    const missing = (skill.fields || [])
+      .filter((f) => f.required && !String(brief[f.name] || '').trim())
+      .map((f) => f.label);
+    if (missing.length) return res.status(400).json({ error: 'Vul eerst in: ' + missing.join(', ') });
+
+    const client = await withReadConnection(async (c) => (await c.query(
+      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
+    )).rows[0]) || {};
+
+    const briefLines = [];
+    (skill.fields || []).forEach((f) => {
+      if (f.name === 'paginatekst' || f.name === 'url') return; // apart afgehandeld
+      const v = String(brief[f.name] || '').trim();
+      if (v) briefLines.push(f.label + ': ' + v.slice(0, 2000));
+    });
+
+    // Conversielek-keuring: pagina-inhoud bepalen (geplakt heeft voorrang, anders ophalen).
+    if (skillKey === 'conversielek-keuring') {
+      const pasted = String(brief.paginatekst || '').trim();
+      const url = String(brief.url || '').trim();
+      if (!pasted && !url) return res.status(400).json({ error: 'Geef een URL of plak de pagina-tekst' });
+      if (url) briefLines.push('URL: ' + url.slice(0, 500));
+      let pageText = '';
+      if (pasted) {
+        pageText = pasted.slice(0, 12000);
+      } else if (url) {
+        try { pageText = await fetchPageText(url); } catch (_) { pageText = ''; }
+      }
+      if (pageText) briefLines.push('Pagina-inhoud (letterlijk, mogelijk ingekort):\n' + pageText);
+      else briefLines.push('Pagina-inhoud: kon niet worden opgehaald. Vraag de gebruiker de pagina-tekst te plakken en keur niet op aannames.');
+    }
+
+    let system = skill.system;
+    if (skill.phased) {
+      if (fase === 'varianten') system += '\n\n' + (skill.systemVariants || '');
+      else system += '\n\n' + (skill.systemFirst || '');
+    }
+
+    let userText = 'Klant: ' + (client.name || 'onbekend') + '\n\n' + briefLines.join('\n');
+    if (skill.phased && fase === 'varianten' && previous) {
+      userText += '\n\nHet eerste script dat de gebruiker heeft gezien:\n' + previous;
+    }
+
+    const raw = await callClaude(system, userText, skill.maxTokens || 2000);
+    res.json({ success: true, output: raw, phased: !!skill.phased, fase: fase || (skill.phased ? 'eerste' : '') });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // STAP 6 - RAPPORTAGE per klant (cijfers uit eigen data)
 // =======================================================================
 router.get('/api/mkt/clients/:clientId/stats', requireMkt, async (req, res) => {
