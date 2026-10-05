@@ -549,6 +549,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabTodo" onclick="dTab(this,'todo')">To do</button>
           <button id="tabDocs" onclick="dTab(this,'docs')">Documenten</button>
           <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
+          <button id="tabAdMachine" onclick="dTab(this,'admachine')">Ad Machine</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnebeheer</button>
           <button id="tabIntegrations" onclick="dTab(this,'integrations')" style="display:none">Koppelingen</button>
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
@@ -557,6 +558,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div id="dCampReview" style="display:none">
           <div id="campReviewMsg" class="inline-msg"></div>
           <div id="campReviewBody"><div class="empty">Laden...</div></div>
+        </div>
+        <div id="dAdMachine" style="display:none">
+          <div class="section-h"><span class="pill">Ad Machine</span></div>
+          <div style="font-size:13px;color:var(--muted);margin:-4px 0 14px">Creatie en keuring met Claude: van concurrentie-analyse en concept tot hooks, scripts, teksten en de keuring van je ad en landingspagina. Kies een onderdeel.</div>
+          <div id="admBody"><div class="empty">Laden...</div></div>
         </div>
         <div id="dInfo">
           <div id="dEditMsg" class="inline-msg"></div>
@@ -1522,6 +1528,7 @@ function renderClientDetail(c){
   document.getElementById('dDeleteBtn').style.display=isOwnerMgr?'':'none';
   document.getElementById('tabIntegrations').style.display=isOwnerMgr?'':'none';
   document.getElementById('tabCampaigns').style.display=isOwnerMgr?'':'none';
+  var tam=document.getElementById('tabAdMachine'); if(tam)tam.style.display=(ME.role!=='client')?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
 function dTabShow(which){
@@ -1530,12 +1537,14 @@ function dTabShow(which){
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
   document.getElementById('dCampaigns').style.display=which==='campaigns'?'':'none';
   var dcr=document.getElementById('dCampReview'); if(dcr)dcr.style.display=which==='campreview'?'':'none';
+  var dam=document.getElementById('dAdMachine'); if(dam)dam.style.display=which==='admachine'?'':'none';
   document.getElementById('dIntegrations').style.display=which==='integrations'?'':'none';
   document.getElementById('dReport').style.display=which==='report'?'':'none';
   var dtd=document.getElementById('dTodo'); if(dtd)dtd.style.display=which==='todo'?'':'none';
   var ddc=document.getElementById('dDocs'); if(ddc)ddc.style.display=which==='docs'?'':'none';
   if(which==='integrations'){loadIntegrations();}
   if(which==='campreview'){loadCampReview();}
+  if(which==='admachine'){loadAdMachine();}
   if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
   if(which==='todo'){loadClientItems('todo');}
@@ -1823,12 +1832,20 @@ async function loadCampSections(){
     if(scheduled.length){html+='<div class="section-h"><h4>Geplande campagnes</h4><span style="font-size:12px;color:var(--muted)">starten op een toekomstige datum</span></div>'+scheduled.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join('');}
     html+='<div class="section-h" style="margin-top:'+(scheduled.length?'18px':'0')+'"><h4>Live op Meta</h4></div>'+(liveOnes.length?liveOnes.map(function(c){return campReviewCard(c,treeById[String(c.id)]);}).join(''):'<div class="card" style="color:var(--muted);font-size:14px">Nog geen live of actieve campagnes.</div>');
     box.innerHTML=html;
-    if(adsData)loadKpiAnalyse(adsData);
+    if(adsData)renderKpiAnalyseStart(adsData);
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
 }
 // ---- Claude KPI-analyse tussen "Campagne data algemeen" en de campagnes ----
 function kpiStatusStyle(s){var m={sterk:['#166534','#dcfce7'],goed:['#166534','#dcfce7'],aandacht:['#92400e','#fef3c7'],zwak:['#991b1b','#fee2e2']};return m[s]||['#334155','#e2e8f0'];}
+function renderKpiAnalyseStart(ads){
+  var box=document.getElementById('kpiAnalyseBox'); if(!box)return;
+  window.__lastAdsData=ads;
+  box.innerHTML='<div class="card" style="margin-bottom:16px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(99,102,241,.06),transparent);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+    +'<div><div style="font-size:15px;font-weight:700;margin-bottom:2px">Claude analyse</div>'
+    +'<div style="font-size:13px;color:var(--muted)">Laat Claude de campagnecijfers langs de KPI-normen leggen en de knelpunten benoemen.</div></div>'
+    +'<button class="btn btn-ghost" style="padding:7px 14px;font-size:13px;white-space:nowrap" onclick="loadKpiAnalyse(window.__lastAdsData,true)">Analyse genereren</button></div>';
+}
 function renderKpiAnalyse(a){
   var box=document.getElementById('kpiAnalyseBox'); if(!box)return;
   var st=kpiStatusStyle(a.status);
@@ -1857,6 +1874,113 @@ async function loadKpiAnalyse(ads,force){
     if(!r.ok||!d.success||!d.analysis){box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13px">Analyse niet beschikbaar'+(d&&d.error?': '+esc(d.error):'')+'. <a href="#" onclick="loadKpiAnalyse(window.__lastAdsData,true);return false;">Opnieuw proberen</a></div>';return;}
     renderKpiAnalyse(d.analysis);
   }catch(e){box.innerHTML='<div class="card" style="margin-bottom:16px;color:var(--muted);font-size:13px">Netwerkfout bij de analyse. <a href="#" onclick="loadKpiAnalyse(window.__lastAdsData,true);return false;">Opnieuw proberen</a></div>';}
+}
+// ---- Ad Machine: creatie- en keuringsskills (Claude) ----
+var ADM_CONFIG=null, ADM_LAST_OUTPUT='';
+function admMdInline(t){
+  t=esc(t);
+  t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/`([^`]+)`/g,'<code style="background:rgba(99,102,241,.1);padding:1px 4px;border-radius:4px;font-size:12.5px">$1</code>');
+  return t;
+}
+function admMd(md){
+  var lines=String(md||'').replace(/\r/g,'').split('\n');
+  var out=[], buf=[], listType=null;
+  function closeList(){ if(listType){ out.push('<'+listType+' style="margin:6px 0 12px;padding-left:22px;line-height:1.55;font-size:14px">'+buf.join('')+'</'+listType+'>'); buf=[]; listType=null; } }
+  for(var i=0;i<lines.length;i++){
+    var raw=lines[i].trim();
+    if(!raw){ closeList(); continue; }
+    var h=raw.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ closeList(); var lvl=h[1].length; var sz=[0,19,16.5,15,14][lvl]||14; out.push('<div style="font-weight:700;font-size:'+sz+'px;margin:16px 0 6px">'+admMdInline(h[2])+'</div>'); continue; }
+    var ol=raw.match(/^\d+[\.\)]\s+(.*)$/);
+    if(ol){ if(listType!=='ol'){closeList();listType='ol';} buf.push('<li style="margin-bottom:4px">'+admMdInline(ol[1])+'</li>'); continue; }
+    var ul=raw.match(/^[-*]\s+(.*)$/);
+    if(ul){ if(listType!=='ul'){closeList();listType='ul';} buf.push('<li style="margin-bottom:4px">'+admMdInline(ul[1])+'</li>'); continue; }
+    closeList();
+    out.push('<div style="margin:5px 0;line-height:1.55;font-size:14px">'+admMdInline(raw)+'</div>');
+  }
+  closeList();
+  return out.join('');
+}
+async function loadAdMachine(){
+  var body=document.getElementById('admBody'); if(!body||!CURRENT_CLIENT)return;
+  if(ME&&ME.role==='client'){ body.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">De Ad Machine is beschikbaar voor het team.</div>'; return; }
+  if(ADM_CONFIG){ admRenderList(); return; }
+  body.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/admachine/skills',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){ body.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Kon de Ad Machine niet laden.</div>'; return; }
+    ADM_CONFIG=d.skills||[];
+    admRenderList();
+  }catch(e){ body.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden.</div>'; }
+}
+function admRenderList(){
+  var body=document.getElementById('admBody'); if(!body)return;
+  var cards=(ADM_CONFIG||[]).map(function(s){
+    return '<div class="card" style="cursor:pointer;margin:0" onclick="admOpen(\''+esc(s.key)+'\')">'
+      +'<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+esc(s.title)+'</div>'
+      +'<div style="font-size:13px;color:var(--muted);line-height:1.5">'+esc(s.desc)+'</div></div>';
+  }).join('');
+  body.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+cards+'</div>';
+}
+function admField(f){
+  var id='adm_'+f.name;
+  var lbl='<label style="display:block;font-size:12.5px;font-weight:600;margin:0 0 4px">'+esc(f.label)+(f.required?' <span style="color:#dc2626">*</span>':'')+'</label>';
+  var style='width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font-size:13.5px;font-family:inherit';
+  var ctrl;
+  if(f.type==='textarea'){ ctrl='<textarea id="'+id+'" rows="4" placeholder="'+esc(f.ph||'')+'" style="'+style+';resize:vertical"></textarea>'; }
+  else if(f.type==='select'){ ctrl='<select id="'+id+'" style="'+style+'">'+(f.options||[]).map(function(o){return '<option value="'+esc(o)+'">'+esc(o)+'</option>';}).join('')+'</select>'; }
+  else { ctrl='<input id="'+id+'" type="text" placeholder="'+esc(f.ph||'')+'" style="'+style+'">'; }
+  return '<div style="margin-bottom:12px">'+lbl+ctrl+'</div>';
+}
+function admOpen(key){
+  var body=document.getElementById('admBody'); if(!body)return;
+  var s=(ADM_CONFIG||[]).filter(function(x){return x.key===key;})[0]; if(!s)return;
+  ADM_LAST_OUTPUT='';
+  var note=s.note?'<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;padding:10px 12px;background:rgba(99,102,241,.06);border-radius:8px">'+esc(s.note)+'</div>':'';
+  var fields=(s.fields||[]).map(admField).join('');
+  body.innerHTML='<div style="margin-bottom:12px"><a href="#" onclick="admRenderList();return false;" style="font-size:13px;color:var(--muted)">&larr; Terug naar de Ad Machine</a></div>'
+    +'<div class="card" style="max-width:640px">'
+    +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">'+esc(s.title)+'</div>'
+    +'<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px">'+esc(s.desc)+'</div>'
+    +note+fields
+    +'<div id="admMsg" style="font-size:12.5px;color:#dc2626;margin-bottom:8px"></div>'
+    +'<button class="btn btn-primary" id="admRunBtn" onclick="admRun(\''+esc(key)+'\',\'\')">Genereren</button>'
+    +'</div>'
+    +'<div id="admOutput" style="margin-top:16px"></div>';
+}
+async function admRun(key,fase){
+  var s=(ADM_CONFIG||[]).filter(function(x){return x.key===key;})[0]; if(!s||!CURRENT_CLIENT)return;
+  var msg=document.getElementById('admMsg'); if(msg)msg.textContent='';
+  var brief={};
+  (s.fields||[]).forEach(function(f){ var el=document.getElementById('adm_'+f.name); if(el)brief[f.name]=el.value; });
+  var out=document.getElementById('admOutput');
+  var btn=document.getElementById('admRunBtn');
+  if(btn){btn.disabled=true;btn.textContent='Claude werkt...';}
+  if(out)out.innerHTML='<div class="card" style="color:var(--muted);font-size:13.5px">Claude werkt aan '+esc(s.title.toLowerCase())+'...</div>';
+  try{
+    var payload={skill:key,brief:brief};
+    if(fase){payload.fase=fase; if(fase==='varianten')payload.previous=ADM_LAST_OUTPUT;}
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/admachine',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(!r.ok||!d.success){
+      if(out)out.innerHTML='';
+      if(msg)msg.textContent=(d&&d.error)?d.error:'Er ging iets mis.';
+      return;
+    }
+    ADM_LAST_OUTPUT=d.output||'';
+    var extra='';
+    if(s.phased && fase!=='varianten'){
+      extra='<div style="margin-top:14px"><button class="btn btn-ghost" onclick="admRun(\''+esc(key)+'\',\'varianten\')">Genereer 4 extra varianten</button></div>';
+    }
+    if(out)out.innerHTML='<div class="card">'+admMd(d.output||'')+extra+'</div>';
+  }catch(e){
+    if(out)out.innerHTML='';
+    if(msg)msg.textContent='Netwerkfout. Probeer het opnieuw.';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Genereren';}
+  }
 }
 // ---- Geplande (concept) campagnes: klaarzetten + goedkeuren ----
 var DRAFTS_CACHE={}, DRAFTS_CANMANAGE=false, EDIT_DRAFT_ID=null;
