@@ -3927,6 +3927,65 @@ router.delete('/api/mkt/clients/:clientId/meta-ads/:adId', requireMkt, async (re
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// Naam van een advertentie aanpassen (bij Meta).
+router.post('/api/mkt/clients/:clientId/meta-ads/:adId/rename', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const name = String((req.body && req.body.name) || '').trim().slice(0, 200);
+    if (!name) return res.status(400).json({ error: 'Vul een advertentienaam in' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.adId}`, { name, access_token: token });
+    res.json({ success: true, name });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Extra advertentie toevoegen aan een bestaande advertentieset. Wordt
+// gepauzeerd aangemaakt, zodat er niets gaat uitgeven tot je het activeert.
+router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Naam van de advertentie is verplicht' });
+    const link = String(b.link || '').trim();
+    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
+    const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
+    const caption = String(b.caption || '').slice(0, 2000);
+
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const adAccount = creds.adAccount;
+    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
+    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
+    if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
+
+    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding of video voor de advertentie' });
+    const asset = await withReadConnection(async (c) => (await c.query(
+      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+      [b.assetId, okClient, wsId]
+    )).rows[0]);
+    if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
+
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
+    const creative = await graphPost(`${adAccount}/adcreatives`, {
+      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
+    });
+    const ad = await graphPost(`${adAccount}/ads`, {
+      name, adset_id: req.params.adsetId, creative: JSON.stringify({ creative_id: creative.id }),
+      status: 'PAUSED', access_token: token,
+    });
+    res.json({ success: true, ad_id: ad.id });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // Advertentieset verwijderen.
 router.delete('/api/mkt/clients/:clientId/meta-adsets/:adsetId', requireMkt, async (req, res) => {
   try {
