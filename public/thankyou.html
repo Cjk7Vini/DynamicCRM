@@ -19,7 +19,7 @@
   <!-- Praktijk-specifiek font wordt indien nodig dynamisch toegevoegd -->
 
   <style>
-    /* Standaard (neutrale) branding — wordt per praktijk overschreven via JS */
+    /* Standaard (neutrale) branding, wordt per praktijk overschreven via JS */
     :root {
       --th-primary: #111827;
       --th-accent:  #10b981;
@@ -283,40 +283,28 @@
     }
     loadPracticeName();
 
-    // Meta conversie tracking — Lead event op thankyou pagina
-    // Verifieert submit_token zodat Lead event ALLEEN vuurt bij echte formulierinzendingen
-    // Directe URL-toegang zonder token triggert geen Lead event
+    // Meta conversie tracking: Lead event op de bedankpagina.
+    // Het Lead event vuurt ALLEEN na een echte inzending: dan zet het formulier
+    // een lead-id (lid) en een uniek event-id (eid) in de URL. Opent iemand de
+    // bedankpagina rechtstreeks (zonder die parameters), dan gebeurt er niets.
+    // Een cookie voorkomt dubbel tellen bij herladen of de terugknop, en het
+    // event-id is hetzelfde als dat van het server-side Conversions API event,
+    // zodat Meta het browser- en server-event ontdubbelt tot EEN lead.
     var eventId = params.get('eid') || null;
-    var submitToken = params.get('st') || null;
     var leadId = params.get('lid') || null;
 
-    async function fireLeadEvent() {
-      // Geen token = directe URL-toegang = geen Lead event
-      if (!submitToken || !leadId || !practiceCode) return;
+    function fireLeadEvent() {
+      if (!leadId || !eventId || !practiceCode) return;
+      if (typeof fbq === 'undefined') return;
 
-      try {
-        var verifyRes = await fetch(
-          '/api/verify-submit?lead_id=' + encodeURIComponent(leadId) +
-          '&practice_code=' + encodeURIComponent(practiceCode) +
-          '&token=' + encodeURIComponent(submitToken)
-        );
-        var verifyData = await verifyRes.json();
+      var cookieName = 'dhc_lead_tracked_' + practiceCode + '_' + eventId;
+      var alreadyTracked = document.cookie.split(';').some(function(c) {
+        return c.trim().indexOf(cookieName + '=') === 0;
+      });
+      if (alreadyTracked) return;
 
-        if (!verifyData.valid) return; // Ongeldige token, geen Lead event
-
-        if (typeof fbq !== 'undefined') {
-          var cookieName = 'dhc_lead_tracked_' + practiceCode + (eventId ? '_' + eventId : '_' + leadId);
-          var alreadyTracked = document.cookie.split(';').some(function(c) {
-            return c.trim().startsWith(cookieName + '=');
-          });
-          if (!alreadyTracked) {
-            var fbqOptions = {};
-            if (eventId) fbqOptions.eventID = eventId;
-            fbq('track', 'Lead', {}, fbqOptions);
-            document.cookie = cookieName + '=1; path=/; SameSite=Lax';
-          }
-        }
-      } catch(e) {}
+      fbq('track', 'Lead', {}, { eventID: eventId });
+      document.cookie = cookieName + '=1; path=/; Max-Age=2592000; SameSite=Lax';
     }
     fireLeadEvent();
 
