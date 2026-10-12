@@ -877,6 +877,35 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: extra advertentie toevoegen aan een bestaande ad set -->
+<div class="modal-ov" id="addAdModal">
+  <div class="modal">
+    <h3>Advertentie toevoegen</h3>
+    <div class="sub" id="addAdSub">Voegt een extra advertentie toe aan deze ad set. Wordt gepauzeerd aangemaakt.</div>
+    <div id="addAdMsg" class="inline-msg"></div>
+    <div class="field"><label>Naam advertentie *</label><input id="aaName" placeholder="Bijv. Variant video 1"></div>
+    <div class="field"><label>Bestemmings-URL *</label><input id="aaLink" placeholder="https://..."></div>
+    <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
+      <select id="aaAsset"><option value="">Kies een afbeelding of video</option></select>
+    </div>
+    <div class="field"><label>Call-to-action</label>
+      <select id="aaCta">
+        <option value="LEARN_MORE">Meer informatie</option>
+        <option value="SHOP_NOW">Nu shoppen</option>
+        <option value="SIGN_UP">Aanmelden</option>
+        <option value="CONTACT_US">Neem contact op</option>
+        <option value="GET_OFFER">Bekijk aanbod</option>
+        <option value="SUBSCRIBE">Abonneren</option>
+      </select>
+    </div>
+    <div class="field"><label>Advertentietekst</label><textarea id="aaCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAddAdModal()">Annuleren</button>
+      <button class="btn btn-primary" id="aaBtn" onclick="submitAddAd()">Advertentie toevoegen</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: targeting van een ad set bewerken -->
 <div class="modal-ov" id="etModal">
   <div class="modal">
@@ -2660,8 +2689,10 @@ async function renderCampDetail(){
       var sActive=(s.status==='ACTIVE');
       var ads=(s.ads&&s.ads.length)?s.ads.map(function(a){
         var aActive=(a.status==='ACTIVE');
+        var aname=esc(String(a.name||'').replace(/"/g,'').replace(/\x27/g,''));
         return '<div class="post-row" style="padding:10px 12px"><div class="post-main"><h5 style="font-size:13.5px">'+esc(a.name||'Advertentie')+'</h5>'+
           '<div class="post-meta">'+badge(a.status)+'</div></div><div class="post-acts">'+
+          '<button class="icon-btn" title="Naam aanpassen" onclick="renameAd(\''+a.id+'\',\''+aname+'\')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'+
           '<button class="icon-btn" title="'+(aActive?'Pauzeren':'Activeren')+'" onclick="adStatus(\''+a.id+'\',\''+(aActive?'PAUSED':'ACTIVE')+'\')">'+(aActive?'&#10073;&#10073;':'&#9658;')+'</button>'+
           '<button class="icon-btn del" title="Verwijderen" onclick="adDelete(\''+a.id+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
           '</div></div>';
@@ -2673,6 +2704,7 @@ async function renderCampDetail(){
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetStatus(\''+s.id+'\',\''+(sActive?'PAUSED':'ACTIVE')+'\')">'+(sActive?'Pauzeren':'Activeren')+'</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetBudget(\''+s.id+'\')">Budget</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openEtModal(\''+s.id+'\',\''+esc(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Targeting</button>'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openAddAd(\''+s.id+'\',\''+esc(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Advertentie toevoegen</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;color:#dc2626" onclick="adsetDelete(\''+s.id+'\')">Verwijderen</button>'+
           '</div>'+
         '</div>'+
@@ -2823,6 +2855,58 @@ async function adDelete(id){
   if(!confirm('Deze advertentie verwijderen?'))return;
   try{ var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
     if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Mislukt.');} }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+async function renameAd(id,current){
+  var v=prompt('Nieuwe advertentienaam:',current||'');
+  if(v===null)return; v=String(v).trim();
+  if(!v){showMsg('cdMsg',false,'Vul een advertentienaam in.');return;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+id+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name:v})});
+    var d=await r.json();
+    if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Naam aanpassen mislukt.');}
+  }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+// ---- Extra advertentie toevoegen aan een bestaande ad set ----
+var AA_ADSET=null;
+function closeAddAdModal(){document.getElementById('addAdModal').classList.remove('open');}
+async function openAddAd(adsetId,adsetName){
+  AA_ADSET=adsetId; hideMsg('addAdMsg');
+  document.getElementById('aaName').value='';
+  document.getElementById('aaCaption').value='';
+  document.getElementById('aaCta').value='LEARN_MORE';
+  document.getElementById('aaLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
+  var sub=document.getElementById('addAdSub'); if(sub)sub.textContent=adsetName?('Voegt een extra advertentie toe aan "'+adsetName+'". Wordt gepauzeerd aangemaakt.'):'Voegt een extra advertentie toe aan deze ad set. Wordt gepauzeerd aangemaakt.';
+  try{
+    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
+    var sel=document.getElementById('aaAsset');var opts='<option value="">Kies een afbeelding of video</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var tag=(a.resource_type==='video')?' (video)':''; opts+='<option value="'+a.id+'">'+esc(a.filename)+tag+'</option>'; } });
+    sel.innerHTML=opts;
+  }catch(e){}
+  document.getElementById('addAdModal').classList.add('open');
+  document.getElementById('aaName').focus();
+}
+async function submitAddAd(){
+  var btn=document.getElementById('aaBtn'); hideMsg('addAdMsg');
+  var payload={
+    name:document.getElementById('aaName').value.trim(),
+    link:document.getElementById('aaLink').value.trim(),
+    assetId:document.getElementById('aaAsset').value||null,
+    cta:document.getElementById('aaCta').value,
+    caption:document.getElementById('aaCaption').value
+  };
+  if(!payload.name){showMsg('addAdMsg',false,'Naam is verplicht.');return;}
+  if(!payload.assetId){showMsg('addAdMsg',false,'Kies een afbeelding of video.');return;}
+  if(!/^https?:\/\//i.test(payload.link)){showMsg('addAdMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  var aaSel=document.getElementById('aaAsset');var aaIsVideo=aaSel&&aaSel.options[aaSel.selectedIndex]&&/\(video\)\s*$/.test(aaSel.options[aaSel.selectedIndex].text);
+  btn.disabled=true; btn.textContent='Toevoegen...';
+  if(aaIsVideo)showMsg('addAdMsg',true,'De video wordt naar Meta geupload en verwerkt. Dit kan tot een minuut duren, blijf even op deze pagina.');
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+AA_ADSET+'/ads',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('addAdMsg',true,'Advertentie toegevoegd (gepauzeerd).');setTimeout(function(){closeAddAdModal();renderCampDetail();},1100);}
+    else {showMsg('addAdMsg',false,d.error||'Toevoegen mislukt.');}
+  }catch(e){showMsg('addAdMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Advertentie toevoegen';
 }
 async function loadMetaCampaigns(){
   var box=document.getElementById('metaCampaigns'); if(!box)return;
