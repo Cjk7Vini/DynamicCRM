@@ -1741,6 +1741,55 @@ async function graphGet(pathAndId, params) {
   return j;
 }
 
+// Thumbnail-URL voor een Cloudinary-video: Cloudinary levert een stilstaand
+// voorbeeldframe als je dezelfde URL met een afbeeldings-extensie opvraagt.
+function cloudinaryVideoThumb(url) {
+  let t = String(url || '').replace(/\.(mp4|mov|webm|m4v|avi|mkv)(\?.*)?$/i, '.jpg');
+  if (t === String(url || '')) t = String(url || '').replace(/\.[a-z0-9]+(\?.*)?$/i, '.jpg');
+  return t;
+}
+
+// Upload een video (via publieke URL) naar Meta en wacht tot Meta klaar is met
+// verwerken. Een video-advertentie kan pas gemaakt worden als de video 'ready' is.
+async function uploadMetaVideoAndWait(adAccount, token, videoUrl) {
+  const up = await graphPost(`${adAccount}/advideos`, { file_url: videoUrl, access_token: token });
+  const videoId = up && up.id;
+  if (!videoId) throw new Error('Video-upload naar Meta is mislukt');
+  const deadline = Date.now() + 80 * 1000; // max ~80 seconden wachten (onder de proxy-timeout)
+  while (Date.now() < deadline) {
+    let st = null;
+    try {
+      const info = await graphGet(`${videoId}`, { fields: 'status', access_token: token });
+      st = info && info.status && info.status.video_status;
+    } catch (_) { st = null; }
+    if (st === 'ready') return videoId;
+    if (st === 'error') throw new Error('Meta kon de video niet verwerken. Probeer een ander videobestand.');
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  throw new Error('De video wordt nog door Meta verwerkt. Wacht een halve minuut en maak de advertentie opnieuw aan.');
+}
+
+// Bouwt de object_story_spec voor een advertentie-creatief, voor zowel een
+// afbeelding (link_data) als een video (video_data met thumbnail).
+async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, link, cta) {
+  if (asset.resource_type === 'video') {
+    const videoId = await uploadMetaVideoAndWait(adAccount, token, asset.url);
+    return JSON.stringify({
+      page_id: pageId,
+      video_data: {
+        video_id: videoId,
+        message: caption,
+        image_url: cloudinaryVideoThumb(asset.url),
+        call_to_action: { type: cta, value: { link } },
+      },
+    });
+  }
+  return JSON.stringify({
+    page_id: pageId,
+    link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
+  });
+}
+
 // Publiceert naar Meta. Gebruikt door de handmatige knop en de planner.
 // Gooit een fout met een leesbare melding als er iets misgaat.
 // Vertaalt ruwe Meta-fouten naar een duidelijke, bruikbare melding. Vooral
@@ -1962,14 +2011,13 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
     if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
 
-    // Creatief-beeld ophalen
-    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding voor de advertentie' });
+    // Creatief-beeld ophalen (afbeelding of video)
+    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding of video voor de advertentie' });
     const asset = await withReadConnection(async (c) => (await c.query(
       'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
       [b.assetId, okClient, wsId]
     )).rows[0]);
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
-    if (asset.resource_type === 'video') return res.status(400).json({ error: 'Video-advertenties komen later. Kies voor nu een afbeelding.' });
 
     // Detailtargeting + bieden (fase 1).
     const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
@@ -2047,11 +2095,8 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
-    // 3) Creatief (afbeelding-link-advertentie)
-    const storySpec = JSON.stringify({
-      page_id: creds.pageId,
-      link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
-    });
+    // 3) Creatief (afbeelding of video)
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
     const creative = await graphPost(`${adAccount}/adcreatives`, {
       name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
     });
@@ -2101,13 +2146,12 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
     if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
 
-    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding voor de advertentie' });
+    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding of video voor de advertentie' });
     const asset = await withReadConnection(async (c) => (await c.query(
       'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
       [b.assetId, okClient, wsId]
     )).rows[0]);
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
-    if (asset.resource_type === 'video') return res.status(400).json({ error: 'Video-advertenties komen later. Kies voor nu een afbeelding.' });
 
     // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen.
     let optimizationGoal = 'LINK_CLICKS';
@@ -2155,10 +2199,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
-    const storySpec = JSON.stringify({
-      page_id: creds.pageId,
-      link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
-    });
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
     const creative = await graphPost(`${adAccount}/adcreatives`, {
       name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
     });

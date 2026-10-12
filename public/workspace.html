@@ -860,8 +860,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="asIntChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
     </div>
     <div class="field"><label>Bestemmings-URL *</label><input id="asLink" placeholder="https://..."></div>
-    <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
-      <select id="asAsset"><option value="">Kies een afbeelding</option></select>
+    <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
+      <select id="asAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
     <div class="field"><label>Advertentietekst</label><textarea id="asCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
     <div class="field"><label>Status na aanmaken</label>
@@ -925,8 +925,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Campagnenaam *</label><input id="cpName" placeholder="Bijv. Zomeractie juli"></div>
     <div class="field"><label>Dagbudget (euro) *</label><input id="cpBudget" type="number" min="1" step="1" value="10"></div>
     <div class="field"><label>Bestemmings-URL *</label><input id="cpLink" placeholder="https://..."></div>
-    <div class="field"><label>Advertentiebeeld (afbeelding) *</label>
-      <select id="cpAsset"><option value="">Kies een afbeelding</option></select>
+    <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
+      <select id="cpAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
 
@@ -2715,8 +2715,8 @@ async function openAsModal(){
   MKT_INT.as=[]; intChips('as');
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
-    var sel=document.getElementById('asAsset');var opts='<option value="">Kies een afbeelding</option>';
-    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
+    var sel=document.getElementById('asAsset');var opts='<option value="">Kies een afbeelding of video</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var tag=(a.resource_type==='video')?' (video)':''; opts+='<option value="'+a.id+'">'+esc(a.filename)+tag+'</option>'; } });
     sel.innerHTML=opts;
   }catch(e){}
   document.getElementById('asModal').classList.add('open');document.getElementById('asName').focus();
@@ -2739,10 +2739,12 @@ async function submitAsModal(){
     launch:document.getElementById('asLaunch').value
   };
   if(!payload.name){showMsg('asMsg',false,'Naam is verplicht.');return;}
-  if(!payload.assetId){showMsg('asMsg',false,'Kies een afbeelding.');return;}
+  if(!payload.assetId){showMsg('asMsg',false,'Kies een afbeelding of video.');return;}
   if(!/^https?:\/\//i.test(payload.link)){showMsg('asMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
   if(payload.launch==='active'&&!confirm('Deze ad set direct live zetten? Gaat meteen geld uitgeven.'))return;
+  var asSel=document.getElementById('asAsset');var asIsVideo=asSel&&asSel.options[asSel.selectedIndex]&&/\(video\)\s*$/.test(asSel.options[asSel.selectedIndex].text);
   btn.disabled=true; btn.textContent='Toevoegen...';
+  if(asIsVideo)showMsg('asMsg',true,'De video wordt naar Meta geupload en verwerkt. Dit kan tot een minuut duren, blijf even op deze pagina.');
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/adsets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
@@ -2882,8 +2884,8 @@ async function openCampaign(){
   var aip=document.getElementById('cpAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('cpAiHint'); if(aih)aih.textContent='';
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
-    var sel=document.getElementById('cpAsset');var opts='<option value="">Kies een afbeelding</option>';
-    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url&&a.resource_type!=='video'){ opts+='<option value="'+a.id+'">'+esc(a.filename)+'</option>'; } });
+    var sel=document.getElementById('cpAsset');var opts='<option value="">Kies een afbeelding of video</option>';
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var tag=(a.resource_type==='video')?' (video)':''; opts+='<option value="'+a.id+'">'+esc(a.filename)+tag+'</option>'; } });
     sel.innerHTML=opts;
   }catch(e){}
   document.getElementById('campModal').classList.add('open');document.getElementById('cpName').focus();
@@ -3019,10 +3021,12 @@ async function createCampaign2(){
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
   function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
   if(!payload.name){campShowErr('Campagnenaam is verplicht.');return;}
-  if(!payload.assetId){campShowErr('Kies een afbeelding.');return;}
+  if(!payload.assetId){campShowErr('Kies een afbeelding of video.');return;}
   if(!/^https?:\/\//i.test(payload.link)){campShowErr('Vul een geldige bestemmings-URL in (https://...).');return;}
   if(payload.launch==='active'&&!confirm('De campagne direct live zetten? Deze gaat meteen geld uitgeven bij Meta.'))return;
+  var cpSel=document.getElementById('cpAsset');var cpIsVideo=cpSel&&cpSel.options[cpSel.selectedIndex]&&/\(video\)\s*$/.test(cpSel.options[cpSel.selectedIndex].text);
   btn.disabled=true; btn.textContent='Aanmaken...';
+  if(cpIsVideo)showMsg('campModalMsg',true,'De video wordt naar Meta geupload en verwerkt. Dit kan tot een minuut duren, blijf even op deze pagina.');
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
