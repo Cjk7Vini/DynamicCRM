@@ -2035,7 +2035,8 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     // Locatie: straal rondom een gekozen plaats, of anders het hele land.
     const geoKey = String(b.geoKey || '').trim();
     let geoRadius = parseInt(b.geoRadius, 10);
-    if (!Number.isFinite(geoRadius) || geoRadius < 1) geoRadius = 25;
+    if (!Number.isFinite(geoRadius)) geoRadius = 25;
+    if (geoRadius < 17) geoRadius = 17; // Meta hanteert 17 km als minimale straal
     if (geoRadius > 80) geoRadius = 80;
     const targetingObj = { age_min: ageMin, age_max: ageMax };
     if (geoKey) targetingObj.geo_locations = { cities: [{ key: geoKey, radius: geoRadius, distance_unit: 'kilometer' }] };
@@ -3758,6 +3759,29 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/budget', requ
     for (const id of ids) { try { await graphPost(`${id}`, { daily_budget: cents, access_token: token }); done++; } catch (_) { /* ga door */ } }
     if (!done) return res.status(400).json({ error: 'Budget aanpassen is niet gelukt (mogelijk CBO of geen rechten)' });
     res.json({ success: true, updated: done });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Naam van een campagne aanpassen (bij Meta en in onze eigen database).
+router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/rename', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const name = String((req.body && req.body.name) || '').trim().slice(0, 200);
+    if (!name) return res.status(400).json({ error: 'Vul een campagnenaam in' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    await graphPost(`${req.params.campaignId}`, { name, access_token: token });
+    // Eigen database bijwerken (best effort: alleen als deze campagne van ons is).
+    try {
+      await withWriteConnection(async (c) => c.query(
+        'UPDATE marketing.campaigns SET name=$1 WHERE meta_campaign_id=$2 AND workspace_id=$3 AND client_id=$4',
+        [name, req.params.campaignId, wsId, okClient]
+      ));
+    } catch (_) { /* database-update niet kritiek */ }
+    res.json({ success: true, name });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
