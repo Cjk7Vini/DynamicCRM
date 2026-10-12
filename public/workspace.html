@@ -911,7 +911,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <div class="modal-ov" id="campModal">
   <div class="modal" style="max-width:900px">
     <h3>Nieuwe advertentiecampagne</h3>
-    <div class="sub">Wordt gepauzeerd aangemaakt bij Meta. Er wordt niets uitgegeven tot jij hem in Meta activeert.</div>
+    <div class="sub">Je maakt in een keer een campagne met een eerste ad set en advertentie. Na opslaan ga je direct door naar de ad sets, waar je extra ad sets kunt toevoegen. Alles wordt gepauzeerd aangemaakt bij Meta, er wordt niets uitgegeven tot jij het activeert.</div>
     <div id="campModalMsg" class="inline-msg"></div>
     <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
       <label>AI-assistent</label>
@@ -934,8 +934,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Locatie</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input id="cpGeoSearch" placeholder="Heel Nederland (typ een plaats voor een straal)" oninput="searchGeo()" style="flex:1;min-width:220px">
-        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input id="cpGeoRadius" type="number" min="1" max="80" value="25" oninput="renderGeoChosen()" style="width:70px"> km straal</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input id="cpGeoRadius" type="number" min="17" max="80" value="25" oninput="renderGeoChosen()" style="width:70px"> km straal</div>
       </div>
+      <div style="margin-top:4px;font-size:11.5px;color:var(--muted)">Meta hanteert een minimale straal van 17 km.</div>
       <div id="cpGeoResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
       <div id="cpGeoChosen" style="margin-top:6px;font-size:12.5px;color:var(--muted)">Geen plaats gekozen: hele land (NL).</div>
     </div>
@@ -2558,11 +2559,17 @@ async function loadCampaigns(){
       own='<div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><h4>Nog geen eigen campagnes</h4><p>Maak een gepauzeerde advertentiecampagne aan bij Meta.</p><button class="btn btn-primary" onclick="openCampaign()">+ Nieuwe campagne</button></div>';
     } else {
       own='<div class="section-h"><h4>Via de workspace aangemaakt</h4></div><div class="post-list">'+d.campaigns.map(function(c){
+        var cid=esc(String(c.meta_campaign_id));
+        var cname=esc(String(c.name||'').replace(/"/g,'').replace(/\x27/g,''));
         return '<div class="post-row"><div class="post-main"><h5>'+esc(c.name)+'</h5>'+
           '<div class="post-meta"><span class="chan">'+esc(CAMP_OBJ_LABEL[c.objective]||c.objective)+'</span>'+
           '<span class="status scheduled">'+esc(c.status)+'</span>'+
           '<span class="when">'+(c.daily_budget_cents/100).toFixed(0)+' euro/dag</span></div>'+
-          '<div class="cap" style="margin-top:8px">Campagne-ID: '+esc(c.meta_campaign_id)+'. Activeer in Meta Ads Manager.</div></div></div>';
+          '<div class="cap" style="margin-top:8px">Campagne-ID: '+cid+'</div></div>'+
+          '<div class="post-acts" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'+
+            '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="openCampDetail(\''+cid+'\',\''+cname+'\')">Details / ad sets</button>'+
+            '<button class="icon-btn" title="Naam aanpassen" onclick="renameCampaign(\''+cid+'\',\''+cname+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'+
+          '</div></div>';
       }).join('')+'</div>';
     }
     body.innerHTML=own+'<div id="metaCampaigns" style="margin-top:24px"><div class="section-h"><h4>Live op Meta</h4></div><div class="card" style="color:var(--muted);font-size:14px">Bestaande campagnes ophalen...</div></div>';
@@ -2585,6 +2592,17 @@ async function campBudget(id){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+id+'/budget',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({daily:n})});
     var d=await r.json();
     if(r.ok&&d.success){showMsg('campMsg',true,'Budget aangepast.');loadCampaigns();} else {showMsg('campMsg',false,d.error||'Budget aanpassen mislukt.');}
+  }catch(e){showMsg('campMsg',false,'Netwerkfout.');}
+}
+async function renameCampaign(id,current){
+  var v=prompt('Nieuwe campagnenaam:',current||'');
+  if(v===null)return; v=String(v).trim();
+  if(!v){showMsg('campMsg',false,'Vul een campagnenaam in.');return;}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+id+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name:v})});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('campMsg',true,'Naam aangepast.');loadCampaigns();}
+    else {showMsg('campMsg',false,d.error||'Naam aanpassen mislukt.');}
   }catch(e){showMsg('campMsg',false,'Netwerkfout.');}
 }
 var CD_CAMP=null;
@@ -3016,7 +3034,10 @@ async function createCampaign2(){
     };
   }
   payload.geoKey = CP_GEO ? CP_GEO.key : '';
-  payload.geoRadius = document.getElementById('cpGeoRadius') ? document.getElementById('cpGeoRadius').value : '25';
+  var cpRadEl=document.getElementById('cpGeoRadius');
+  var cpRad=cpRadEl?parseInt(cpRadEl.value,10):25; if(!(cpRad>=17))cpRad=17; if(cpRad>80)cpRad=80;
+  if(cpRadEl)cpRadEl.value=cpRad;
+  payload.geoRadius = String(cpRad);
   payload.startTime = document.getElementById('cpStartTime') ? document.getElementById('cpStartTime').value : '';
   // Toon de fout en scroll het venster naar boven zodat de melding zichtbaar is.
   function campShowErr(m){showMsg('campModalMsg',false,m);var mm=document.querySelector('#campModal .modal');if(mm)mm.scrollTop=0;var ov=document.getElementById('campModal');if(ov)ov.scrollTop=0;}
