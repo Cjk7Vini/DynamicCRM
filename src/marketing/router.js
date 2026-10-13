@@ -3344,7 +3344,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           if (rows.length) {
             let spend = 0; let impressions = 0; let reach = 0; let clicks = 0;
             let linkClicks = 0; let uLinkClicks = 0; let landingViews = 0; let leads = 0;
-            let uCtrWeighted = 0; // Meta's eigen unieke-CTR, gewogen op vertoningen (exact voor 1 campagne).
+            let uCtrWeighted = 0; // Terugval: Meta's unieke-CTR (alle klikken), gewogen op vertoningen.
             for (const r of rows) {
               const rowImpr = parseInt(r.impressions || 0, 10) || 0;
               spend += parseFloat(r.spend || 0) || 0;
@@ -3366,7 +3366,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
               link_clicks: linkClicks, landing_page_views: landingViews, leads,
               ctr: impressions ? (clicks / impressions * 100).toFixed(2) : '0.00',
               link_ctr: impressions ? (linkClicks / impressions * 100).toFixed(2) : '0.00',
-              unique_ctr: impressions ? (uCtrWeighted / impressions).toFixed(2) : ((reach && uLinkClicks) ? (uLinkClicks / reach * 100).toFixed(2) : null),
+              // Unieke CTR = unieke LINKklikken / bereik, net als Meta's kolom "Unieke CTR (koppeling)".
+              // Niet Meta's unique_ctr (alle klikken), want dat telt ook reacties, profielklikken en uitklappen mee en staat te hoog.
+              unique_ctr: reach ? (uLinkClicks / reach * 100).toFixed(2) : (impressions ? (uCtrWeighted / impressions).toFixed(2) : null),
               cpc: linkClicks ? (spend / linkClicks).toFixed(2) : (clicks ? (spend / clicks).toFixed(2) : null),
               cpm: impressions ? (spend / impressions * 1000).toFixed(2) : '0.00',
               frequency: reach ? (impressions / reach).toFixed(2) : null,
