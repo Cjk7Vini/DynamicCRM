@@ -3804,10 +3804,15 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
       fields: 'name,effective_status,daily_budget,optimization_goal,billing_event', limit: '50', access_token: token,
     });
     const adsRes = await graphGet(`${cid}/ads`, {
-      fields: 'name,effective_status,adset_id', limit: '100', access_token: token,
+      fields: 'name,effective_status,adset_id,created_time', limit: '100', access_token: token,
     });
     const adsBySet = {};
-    (adsRes.data || []).forEach((a) => { (adsBySet[a.adset_id] = adsBySet[a.adset_id] || []).push({ id: a.id, name: a.name, status: a.effective_status }); });
+    const adById = {};
+    (adsRes.data || []).forEach((a) => {
+      const adObj = { id: a.id, name: a.name, status: a.effective_status, created_time: a.created_time || null, stats: null };
+      adById[a.id] = adObj;
+      (adsBySet[a.adset_id] = adsBySet[a.adset_id] || []).push(adObj);
+    });
     // Resultaten per advertentieset (hele looptijd), defensief opgehaald.
     const statsBySet = {};
     try {
@@ -3837,6 +3842,39 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/detail', requi
         });
       });
     } catch (_) { /* geen verdeling beschikbaar */ }
+
+    // Resultaten per advertentie (hele looptijd). Attributie 7 dagen klik + 1 dag
+    // weergave, zodat leads overeenkomen met hoe wij de campagnes beoordelen.
+    try {
+      const adi = await graphGet(`${cid}/insights`, {
+        level: 'ad',
+        fields: 'ad_id,spend,impressions,reach,inline_link_clicks,unique_inline_link_clicks,actions',
+        action_attribution_windows: JSON.stringify(['7d_click', '1d_view']),
+        date_preset: 'maximum', limit: '200', access_token: token,
+      });
+      (adi.data || []).forEach((r) => {
+        const adObj = adById[r.ad_id];
+        if (!adObj) return;
+        const spend = parseFloat(r.spend || 0) || 0;
+        const reach = parseInt(r.reach || 0, 10) || 0;
+        const linkClicks = parseInt(r.inline_link_clicks || 0, 10) || 0;
+        const uLinkClicks = parseInt(r.unique_inline_link_clicks || 0, 10) || 0;
+        let landingViews = 0;
+        if (Array.isArray(r.actions)) {
+          for (const a of r.actions) { if (a && a.action_type === 'landing_page_view') landingViews += Number(a.value) || 0; }
+        }
+        const leads = pickLeadCount(r.actions) || 0;
+        adObj.stats = {
+          spend: spend.toFixed(2),
+          link_clicks: linkClicks,
+          unique_ctr: reach ? (uLinkClicks / reach * 100).toFixed(2) : null,
+          cpc: linkClicks ? (spend / linkClicks).toFixed(2) : null,
+          landing_page_views: landingViews,
+          leads,
+          cost_per_lead: leads > 0 ? (spend / leads).toFixed(2) : null,
+        };
+      });
+    } catch (_) { /* geen cijfers per advertentie beschikbaar */ }
 
     const adsets = (setsRes.data || []).map((s) => ({
       id: s.id, name: s.name, status: s.effective_status,
