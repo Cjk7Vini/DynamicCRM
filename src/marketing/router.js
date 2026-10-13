@@ -4084,6 +4084,9 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
     const newSpec = { page_id: spec.page_id };
     if (spec.video_data) {
       const v = { ...spec.video_data };
+      // Meta geeft soms zowel image_url als image_hash terug, maar accepteert er bij het
+      // opnieuw aanmaken maar een. Houd de hash (Meta's eigen thumbnail) als beide er zijn.
+      if (v.image_hash && v.image_url) delete v.image_url;
       if (headline !== undefined) { if (headline) v.title = headline; else delete v.title; }
       if (caption !== undefined) v.message = caption;
       v.call_to_action = v.call_to_action || { type: 'LEARN_MORE', value: {} };
@@ -4092,6 +4095,8 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
       newSpec.video_data = v;
     } else {
       const l = { ...spec.link_data };
+      // Zelfde regel voor afbeeldingen: maar een van picture/image_hash mag mee.
+      if (l.image_hash && l.picture) delete l.picture;
       if (headline !== undefined) { if (headline) l.name = headline; else delete l.name; }
       if (caption !== undefined) l.message = caption;
       if (link !== undefined) {
