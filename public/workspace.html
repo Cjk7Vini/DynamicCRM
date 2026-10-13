@@ -908,6 +908,34 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: een bestaande advertentie bewerken (naam en inhoud) -->
+<div class="modal-ov" id="editAdModal">
+  <div class="modal">
+    <h3>Advertentie bewerken</h3>
+    <div class="sub">Pas de naam, Kop, tekst, call to action of bestemmings-URL aan. Het beeld blijft hetzelfde.</div>
+    <div id="editAdMsg" class="inline-msg"></div>
+    <div id="eaThumbWrap" style="display:none;margin-bottom:12px"><img id="eaThumb" alt="" style="max-height:120px;border-radius:8px;border:1px solid var(--line)"> <span id="eaMediaType" style="font-size:12px;color:var(--muted);margin-left:8px"></span></div>
+    <div class="field"><label>Naam advertentie *</label><input id="eaName" maxlength="200"></div>
+    <div class="field"><label>Kop</label><input id="eaHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
+    <div class="field"><label>Call-to-action</label>
+      <select id="eaCta">
+        <option value="LEARN_MORE">Meer informatie</option>
+        <option value="SHOP_NOW">Nu shoppen</option>
+        <option value="SIGN_UP">Aanmelden</option>
+        <option value="CONTACT_US">Neem contact op</option>
+        <option value="GET_OFFER">Bekijk aanbod</option>
+        <option value="SUBSCRIBE">Abonneren</option>
+      </select>
+    </div>
+    <div class="field"><label>Bestemmings-URL</label><input id="eaLink" placeholder="https://..."></div>
+    <div class="field"><label>Advertentietekst</label><textarea id="eaCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEditAdModal()">Annuleren</button>
+      <button class="btn btn-primary" id="eaBtn" onclick="submitEditAd()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: targeting van een ad set bewerken -->
 <div class="modal-ov" id="etModal">
   <div class="modal">
@@ -2707,7 +2735,7 @@ async function renderCampDetail(){
           '<div class="post-meta">'+badge(a.status)+liveSince+'</div>'+
           cdAdStatsStrip(a.stats)+
           '</div><div class="post-acts">'+
-          '<button class="icon-btn" title="Naam aanpassen" onclick="renameAd(\''+a.id+'\',\''+aname+'\')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'+
+          '<button class="icon-btn" title="Advertentie bewerken" onclick="openEditAd(\''+a.id+'\')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'+
           '<button class="icon-btn" title="'+(aActive?'Pauzeren':'Activeren')+'" onclick="adStatus(\''+a.id+'\',\''+(aActive?'PAUSED':'ACTIVE')+'\')">'+(aActive?'&#10073;&#10073;':'&#9658;')+'</button>'+
           '<button class="icon-btn del" title="Verwijderen" onclick="adDelete(\''+a.id+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
           '</div></div>';
@@ -2881,6 +2909,51 @@ async function renameAd(id,current){
     var d=await r.json();
     if(r.ok&&d.success){renderCampDetail();}else{showMsg('cdMsg',false,d.error||'Naam aanpassen mislukt.');}
   }catch(e){showMsg('cdMsg',false,'Netwerkfout.');}
+}
+// ---- Advertentie bewerken: naam + inhoud (Kop, tekst, CTA, link) ----
+var EA_AD=null, EA_ORIG_NAME='';
+function closeEditAdModal(){document.getElementById('editAdModal').classList.remove('open');}
+async function openEditAd(id){
+  EA_AD=id; hideMsg('editAdMsg');
+  var tw=document.getElementById('eaThumbWrap'); if(tw)tw.style.display='none';
+  document.getElementById('eaName').value=''; document.getElementById('eaHeadline').value='';
+  document.getElementById('eaCaption').value=''; document.getElementById('eaLink').value=''; document.getElementById('eaCta').value='LEARN_MORE';
+  document.getElementById('editAdModal').classList.add('open');
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+id+'/creative',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){showMsg('editAdMsg',false,(d&&d.error)||'Kon de inhoud niet laden.');return;}
+    EA_ORIG_NAME=d.name||'';
+    document.getElementById('eaName').value=d.name||'';
+    var c=d.creative||{};
+    document.getElementById('eaHeadline').value=c.headline||'';
+    document.getElementById('eaCaption').value=c.caption||'';
+    document.getElementById('eaLink').value=c.link||'';
+    if(c.cta)document.getElementById('eaCta').value=c.cta;
+    if(c.thumb){var img=document.getElementById('eaThumb');img.src=c.thumb;document.getElementById('eaMediaType').textContent=(c.mediaType==='video'?'Video':'Afbeelding')+' (blijft hetzelfde)';if(tw)tw.style.display='';}
+  }catch(e){showMsg('editAdMsg',false,'Netwerkfout bij het laden.');}
+}
+async function submitEditAd(){
+  var btn=document.getElementById('eaBtn'); hideMsg('editAdMsg');
+  var name=document.getElementById('eaName').value.trim();
+  if(!name){showMsg('editAdMsg',false,'Naam is verplicht.');return;}
+  var link=document.getElementById('eaLink').value.trim();
+  if(link&&!/^https?:\/\//i.test(link)){showMsg('editAdMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
+  btn.disabled=true; btn.textContent='Opslaan...';
+  try{
+    if(name!==EA_ORIG_NAME){
+      var rn=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+EA_AD+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name:name})});
+      var dn=await rn.json();
+      if(!rn.ok||!dn.success){showMsg('editAdMsg',false,(dn&&dn.error)||'Naam aanpassen mislukt.');btn.disabled=false;btn.textContent='Opslaan';return;}
+    }
+    var payload={headline:document.getElementById('eaHeadline').value,caption:document.getElementById('eaCaption').value,cta:document.getElementById('eaCta').value};
+    if(link)payload.link=link;
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-ads/'+EA_AD+'/creative',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(r.ok&&d.success){showMsg('editAdMsg',true,'Advertentie bijgewerkt.');setTimeout(function(){closeEditAdModal();renderCampDetail();},1000);}
+    else {showMsg('editAdMsg',false,d.error||'Aanpassen mislukt.');}
+  }catch(e){showMsg('editAdMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent='Opslaan';
 }
 // ---- Extra advertentie toevoegen aan een bestaande ad set ----
 var AA_ADSET=null;

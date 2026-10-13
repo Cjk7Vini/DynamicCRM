@@ -4012,6 +4012,106 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/rename', requireMkt, asyn
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// Haalt de huidige inhoud (Kop, tekst, CTA, link, beeldtype) van een advertentie op.
+function parseStorySpec(spec) {
+  if (!spec) return null;
+  if (spec.video_data) {
+    const v = spec.video_data;
+    return {
+      mediaType: 'video',
+      headline: v.title || '',
+      caption: v.message || '',
+      cta: (v.call_to_action && v.call_to_action.type) || 'LEARN_MORE',
+      link: (v.call_to_action && v.call_to_action.value && v.call_to_action.value.link) || '',
+      thumb: v.image_url || null,
+    };
+  }
+  if (spec.link_data) {
+    const l = spec.link_data;
+    return {
+      mediaType: 'image',
+      headline: l.name || '',
+      caption: l.message || '',
+      cta: (l.call_to_action && l.call_to_action.type) || 'LEARN_MORE',
+      link: l.link || (l.call_to_action && l.call_to_action.value && l.call_to_action.value.link) || '',
+      thumb: l.picture || null,
+    };
+  }
+  return null;
+}
+
+router.get('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const token = await metaTokenForClient(wsId, okClient);
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
+    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec}', access_token: token });
+    const spec = ad.creative && ad.creative.object_story_spec;
+    const creative = parseStorySpec(spec);
+    if (!creative) return res.status(400).json({ error: 'Kan de inhoud van deze advertentie niet ophalen (mogelijk niet via de workspace gemaakt).' });
+    res.json({ success: true, name: ad.name || '', creative });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Past de inhoud van een advertentie aan: bouwt een nieuwe creative met de
+// nieuwe Kop/tekst/CTA/link maar hetzelfde beeld, en zet die op de advertentie.
+router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const adAccount = creds.adAccount;
+    if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt' });
+    if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt' });
+
+    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec}', access_token: token });
+    const spec = ad.creative && ad.creative.object_story_spec;
+    if (!spec || (!spec.video_data && !spec.link_data)) {
+      return res.status(400).json({ error: 'Kan de inhoud van deze advertentie niet ophalen om aan te passen.' });
+    }
+    const b = req.body || {};
+    const headline = (b.headline != null) ? String(b.headline).slice(0, 255) : undefined;
+    const caption = (b.caption != null) ? String(b.caption).slice(0, 2000) : undefined;
+    const cta = CTA_TYPES.includes(b.cta) ? b.cta : undefined;
+    const link = (b.link && /^https?:\/\//i.test(String(b.link))) ? String(b.link).trim() : undefined;
+
+    const newSpec = { page_id: spec.page_id };
+    if (spec.video_data) {
+      const v = { ...spec.video_data };
+      if (headline !== undefined) { if (headline) v.title = headline; else delete v.title; }
+      if (caption !== undefined) v.message = caption;
+      v.call_to_action = v.call_to_action || { type: 'LEARN_MORE', value: {} };
+      if (cta !== undefined) v.call_to_action.type = cta;
+      if (link !== undefined) v.call_to_action.value = { ...(v.call_to_action.value || {}), link };
+      newSpec.video_data = v;
+    } else {
+      const l = { ...spec.link_data };
+      if (headline !== undefined) { if (headline) l.name = headline; else delete l.name; }
+      if (caption !== undefined) l.message = caption;
+      if (link !== undefined) {
+        l.link = link;
+        l.call_to_action = l.call_to_action || { type: 'LEARN_MORE', value: {} };
+        l.call_to_action.value = { ...(l.call_to_action.value || {}), link };
+      }
+      if (cta !== undefined) {
+        l.call_to_action = l.call_to_action || { type: 'LEARN_MORE', value: { link: l.link } };
+        l.call_to_action.type = cta;
+      }
+      newSpec.link_data = l;
+    }
+
+    const creative = await createAdCreativeNoAI(adAccount, token, (ad.name || 'advertentie') + ' - creatief', JSON.stringify(newSpec));
+    await graphPost(`${req.params.adId}`, { creative: JSON.stringify({ creative_id: creative.id }), access_token: token });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // Extra advertentie toevoegen aan een bestaande advertentieset. Wordt
 // gepauzeerd aangemaakt, zodat er niets gaat uitgeven tot je het activeert.
 router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, async (req, res) => {
