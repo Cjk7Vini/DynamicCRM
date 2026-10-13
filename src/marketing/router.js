@@ -1770,24 +1770,55 @@ async function uploadMetaVideoAndWait(adAccount, token, videoUrl) {
 }
 
 // Bouwt de object_story_spec voor een advertentie-creatief, voor zowel een
-// afbeelding (link_data) als een video (video_data met thumbnail).
-async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, link, cta) {
+// afbeelding (link_data) als een video (video_data met thumbnail). 'headline' is
+// de Kop die naast de call to action verschijnt; leeg laten valt terug op de paginanaam.
+async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, link, cta, headline) {
+  const head = String(headline || '').trim().slice(0, 255);
   if (asset.resource_type === 'video') {
     const videoId = await uploadMetaVideoAndWait(adAccount, token, asset.url);
-    return JSON.stringify({
-      page_id: pageId,
-      video_data: {
-        video_id: videoId,
-        message: caption,
-        image_url: cloudinaryVideoThumb(asset.url),
-        call_to_action: { type: cta, value: { link } },
-      },
-    });
+    const videoData = {
+      video_id: videoId,
+      message: caption,
+      image_url: cloudinaryVideoThumb(asset.url),
+      call_to_action: { type: cta, value: { link } },
+    };
+    if (head) videoData.title = head;
+    return JSON.stringify({ page_id: pageId, video_data: videoData });
   }
-  return JSON.stringify({
-    page_id: pageId,
-    link_data: { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } },
-  });
+  const linkData = { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } };
+  if (head) linkData.name = head;
+  return JSON.stringify({ page_id: pageId, link_data: linkData });
+}
+
+// Maakt een adcreative aan en zet Meta's Advantage+ creatieve verbeteringen (AI)
+// uit. Als Meta dat opt-out-formaat afwijst (de API hiervoor is in 2025 veranderd),
+// maken we de creative zonder die instelling aan zodat het aanmaken nooit breekt.
+async function createAdCreativeNoAI(adAccount, token, name, storySpec) {
+  const base = { name, object_story_spec: storySpec, access_token: token };
+  try {
+    return await graphPost(`${adAccount}/adcreatives`, {
+      ...base,
+      degrees_of_freedom_spec: JSON.stringify({ creative_features_spec: { standard_enhancements: { enroll_status: 'OPT_OUT' } } }),
+    });
+  } catch (_) {
+    return await graphPost(`${adAccount}/adcreatives`, base);
+  }
+}
+
+// Attributie zoals wij campagnes beoordelen: 7 dagen klik, 1 dag betrokkenheid
+// (video), 1 dag weergave. Als Meta dit voor dit ad-set-type afwijst, maken we de
+// ad set zonder attributie-instelling aan (Meta gebruikt dan zijn standaard).
+const ATTRIBUTION_SPEC = [
+  { event_type: 'CLICK_THROUGH', window_days: 7 },
+  { event_type: 'ENGAGED_VIDEO_VIEW', window_days: 1 },
+  { event_type: 'VIEW_THROUGH', window_days: 1 },
+];
+async function createAdSetWithAttribution(adAccount, token, params) {
+  try {
+    return await graphPost(`${adAccount}/adsets`, { ...params, attribution_spec: JSON.stringify(ATTRIBUTION_SPEC) });
+  } catch (_) {
+    return await graphPost(`${adAccount}/adsets`, params);
+  }
 }
 
 // Publiceert naar Meta. Gebruikt door de handmatige knop en de planner.
@@ -2002,6 +2033,7 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
     const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
     const caption = String(b.caption || '').slice(0, 2000);
+    const headline = String(b.headline || '').slice(0, 255);
 
     // Koppelingen ophalen (client met terugval op workspace).
     const creds = await resolveClientMeta(wsId, okClient);
@@ -2095,12 +2127,10 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     };
     if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
-    const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
-    // 3) Creatief (afbeelding of video)
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
-    const creative = await graphPost(`${adAccount}/adcreatives`, {
-      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
-    });
+    const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
+    // 3) Creatief (afbeelding of video), met Kop en AI-verbeteringen uit
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
     // 4) Advertentie
     const ad = await graphPost(`${adAccount}/ads`, {
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
@@ -2139,6 +2169,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
     const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
     const caption = String(b.caption || '').slice(0, 2000);
+    const headline = String(b.headline || '').slice(0, 255);
 
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
@@ -2199,11 +2230,9 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
-    const adset = await graphPost(`${adAccount}/adsets`, adsetParams);
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
-    const creative = await graphPost(`${adAccount}/adcreatives`, {
-      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
-    });
+    const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
     const ad = await graphPost(`${adAccount}/ads`, {
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
       status: launchStatus, access_token: token,
@@ -3999,6 +4028,7 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
     if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
     const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
     const caption = String(b.caption || '').slice(0, 2000);
+    const headline = String(b.headline || '').slice(0, 255);
 
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
@@ -4014,10 +4044,8 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
     )).rows[0]);
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
 
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta);
-    const creative = await graphPost(`${adAccount}/adcreatives`, {
-      name: name + ' - creatief', object_story_spec: storySpec, access_token: token,
-    });
+    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
     const ad = await graphPost(`${adAccount}/ads`, {
       name, adset_id: req.params.adsetId, creative: JSON.stringify({ creative_id: creative.id }),
       status: 'PAUSED', access_token: token,

@@ -863,6 +863,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
       <select id="asAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
+    <div class="field"><label>Kop</label><input id="asHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
     <div class="field"><label>Advertentietekst</label><textarea id="asCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
     <div class="field"><label>Status na aanmaken</label>
       <select id="asLaunch">
@@ -898,6 +899,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <option value="SUBSCRIBE">Abonneren</option>
       </select>
     </div>
+    <div class="field"><label>Kop</label><input id="aaHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
     <div class="field"><label>Advertentietekst</label><textarea id="aaCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAddAdModal()">Annuleren</button>
@@ -957,6 +959,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
       <select id="cpAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
+    <div class="field"><label>Kop</label><input id="cpHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
     <div class="field"><label>Advertentietekst</label><textarea id="cpCaption" rows="7" placeholder="De tekst boven de advertentie" style="min-height:150px;line-height:1.5;font-size:14px"></textarea></div>
 
     <!-- Targeting en status: per campagne verschillend, dus altijd zichtbaar -->
@@ -2771,7 +2774,7 @@ async function openAsModal(){
   document.getElementById('asName').value='';document.getElementById('asBudget').value='10';
   document.getElementById('asCountry').value='NL';document.getElementById('asAgeMin').value='18';document.getElementById('asAgeMax').value='65';
   document.getElementById('asGenders').value='all';document.getElementById('asCta').value='LEARN_MORE';
-  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('asCaption').value='';
+  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('asCaption').value='';var asH=document.getElementById('asHeadline');if(asH)asH.value='';
   document.getElementById('asLaunch').value='paused';
   document.getElementById('asIntSearch').value='';document.getElementById('asIntResults').style.display='none';
   MKT_INT.as=[]; intChips('as');
@@ -2797,6 +2800,7 @@ async function submitAsModal(){
     link:document.getElementById('asLink').value.trim(),
     assetId:document.getElementById('asAsset').value||null,
     caption:document.getElementById('asCaption').value,
+    headline:(document.getElementById('asHeadline')?document.getElementById('asHeadline').value:''),
     interests:MKT_INT.as,
     launch:document.getElementById('asLaunch').value
   };
@@ -2885,6 +2889,7 @@ async function openAddAd(adsetId,adsetName){
   AA_ADSET=adsetId; hideMsg('addAdMsg');
   document.getElementById('aaName').value='';
   document.getElementById('aaCaption').value='';
+  document.getElementById('aaHeadline').value='';
   document.getElementById('aaCta').value='LEARN_MORE';
   document.getElementById('aaLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
   var sub=document.getElementById('addAdSub'); if(sub)sub.textContent=adsetName?('Voegt een extra advertentie toe aan "'+adsetName+'". Wordt gepauzeerd aangemaakt.'):'Voegt een extra advertentie toe aan deze ad set. Wordt gepauzeerd aangemaakt.';
@@ -2904,6 +2909,7 @@ async function submitAddAd(){
     link:document.getElementById('aaLink').value.trim(),
     assetId:document.getElementById('aaAsset').value||null,
     cta:document.getElementById('aaCta').value,
+    headline:document.getElementById('aaHeadline').value,
     caption:document.getElementById('aaCaption').value
   };
   if(!payload.name){showMsg('addAdMsg',false,'Naam is verplicht.');return;}
@@ -2985,7 +2991,7 @@ async function openCampaign(){
   hideMsg('campModalMsg');
   document.getElementById('cpName').value='';document.getElementById('cpBudget').value='10';
   document.getElementById('cpCountry').value='NL';document.getElementById('cpAgeMin').value='18';document.getElementById('cpAgeMax').value='65';
-  document.getElementById('cpLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('cpCaption').value='';
+  document.getElementById('cpLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('cpCaption').value='';var cpH=document.getElementById('cpHeadline');if(cpH)cpH.value='';
   document.getElementById('cpGenders').value='all';document.getElementById('cpPlacement').value='automatic';
   document.getElementById('cpBidStrategy').value='LOWEST_COST_WITHOUT_CAP';document.getElementById('cpBidCapWrap').style.display='none';
   var cpl=document.getElementById('cpLaunch'); if(cpl)cpl.value='paused';
@@ -3101,6 +3107,7 @@ async function createCampaign2(){
       link:document.getElementById('cpLink').value.trim(),
       assetId:document.getElementById('cpAsset').value||null,
       caption:document.getElementById('cpCaption').value,
+      headline:(document.getElementById('cpHeadline')?document.getElementById('cpHeadline').value:''),
       genders:document.getElementById('cpGenders').value,
       placement:document.getElementById('cpPlacement').value,
       bidStrategy:document.getElementById('cpBidStrategy').value,
@@ -3121,6 +3128,7 @@ async function createCampaign2(){
       link:document.getElementById('cpLink').value.trim(),
       assetId:document.getElementById('cpAsset').value||null,
       caption:document.getElementById('cpCaption').value,
+      headline:(document.getElementById('cpHeadline')?document.getElementById('cpHeadline').value:''),
       genders:'all',
       placement:'automatic',
       bidStrategy:'LOWEST_COST_WITHOUT_CAP',
