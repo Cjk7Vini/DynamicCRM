@@ -4018,7 +4018,7 @@
 
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9090a8;margin-bottom:8px;">Afspraak inplannen</div>
                 <div style="display:flex;gap:8px;margin-bottom:8px;">
-                    <input type="date" id="lpApptDate" style="flex:1;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+                    <input type="date" id="lpApptDate" min="${apptTodayStr()}" style="flex:1;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
                     <input type="time" id="lpApptTime" style="padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
                 </div>
                 <select id="lpApptType" style="width:100%;padding:8px 10px;border:1px solid #e4e4e8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">
@@ -4100,6 +4100,9 @@
         }
 
         // Afspraak inplannen vanuit het leadprofiel (zelfde flow als de belpoging-modal).
+        // Datumgrens voor afspraken: je kunt geen datum in het verleden kiezen.
+        function apptTodayStr() { const d = new Date(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return d.getFullYear() + '-' + m + '-' + day; }
+        function apptDateInPast(dateStr) { return !!dateStr && String(dateStr) < apptTodayStr(); }
         async function leadPlanAppointment(id) {
             const l = _leadsData.find(x => String(x.id) === String(id));
             const date = document.getElementById('lpApptDate')?.value;
@@ -4108,6 +4111,7 @@
             const msg = document.getElementById('lpApptMsg');
             const show = (t, c) => { if (msg) { msg.style.display = 'block'; msg.style.color = c; msg.textContent = t; } };
             if (!date || !time) { show('Vul datum en tijd in.', '#b45309'); return; }
+            if (apptDateInPast(date)) { show('De afspraakdatum ligt in het verleden. Kies een datum vanaf vandaag.', '#b91c1c'); return; }
             const pc = (l && l.praktijk_code) || getActivePracticeCode();
             if (!pc) { show('Geen praktijkcode bekend voor deze lead.', '#b91c1c'); return; }
             try {
@@ -4862,6 +4866,7 @@
         // ── HANDMATIGE LEAD (walk-in) ─────────────────────────────────
         function openNieuweLead() {
             ['nlNaam', 'nlEmail', 'nlTel', 'nlDoel', 'nlDatum', 'nlTijd', 'nlBehandelaar'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            const _nlD = document.getElementById('nlDatum'); if (_nlD) _nlD.min = apptTodayStr();
             document.getElementById('nlBron').value = 'Walk-in';
             toggleNlBehandelaar();
             document.getElementById('nlAfspraakToggle').checked = true;
@@ -4901,6 +4906,7 @@
                 const date = document.getElementById('nlDatum').value;
                 const time = document.getElementById('nlTijd').value;
                 if (!date || !time) { msg.style.color = '#dc2626'; msg.textContent = 'Vul datum en tijd in, of vink de afspraak uit.'; return; }
+                if (apptDateInPast(date)) { msg.style.color = '#dc2626'; msg.textContent = 'De afspraakdatum ligt in het verleden. Kies een datum vanaf vandaag.'; return; }
                 payload.afspraak = { date, time, type: document.getElementById('nlType').value };
             }
             msg.style.color = 'var(--text-3)'; msg.textContent = 'Opslaan...';
@@ -5056,6 +5062,7 @@
                 document.getElementById('apptLeadDropdown').value = '';
             }
             document.getElementById('apptModalDate').value = '';
+            document.getElementById('apptModalDate').min = apptTodayStr();
             document.getElementById('apptModalTime').value = '';
             document.getElementById('apptModalNotes').value = '';
             // Reset uitkomst knoppen
@@ -5112,6 +5119,7 @@
 
                 if (!lid) { showApptMsg('Selecteer een lead.', 'amber'); return; }
                 if (!date || !time) { showApptMsg('Vul datum en tijd in.', 'amber'); return; }
+                if (apptDateInPast(date)) { showApptMsg('De afspraakdatum ligt in het verleden. Kies een datum vanaf vandaag.', 'red'); return; }
 
                 const pc = getActivePracticeCode();
                 btn.disabled = true; btn.textContent = 'Opslaan...';
