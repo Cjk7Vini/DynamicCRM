@@ -1769,44 +1769,112 @@ async function uploadMetaVideoAndWait(adAccount, token, videoUrl) {
   throw new Error('De video wordt nog door Meta verwerkt. Wacht een halve minuut en maak de advertentie opnieuw aan.');
 }
 
-// Bouwt de object_story_spec voor een advertentie-creatief, voor zowel een
-// afbeelding (link_data) als een video (video_data met thumbnail). 'headline' is
-// de Kop die naast de call to action verschijnt.
-// BELANGRIJK: we zetten ALTIJD een titel. Laten we die leeg, dan pakt Meta de
-// (vaak gecachete) titel van de bestemmingspagina erbij, en dan verschijnt
-// bijvoorbeeld "Aanmelden - Dynamic Health Consultancy". Daarom valt een lege Kop
-// terug op een neutrale standaardkop in plaats van op de paginatitel.
+// We zetten op elke advertentie ALTIJD een titel (Kop). Laten we die leeg, dan
+// pakt Meta de (vaak gecachete) titel van de bestemmingspagina erbij, en dan
+// verschijnt bijvoorbeeld "Aanmelden - Dynamic Health Consultancy". Daarom valt
+// een lege Kop terug op deze neutrale standaardkop. De creative zelf wordt
+// opgebouwd in buildCreative hieronder.
 const DEFAULT_AD_HEADLINE = 'Meld je hier aan';
-async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, link, cta, headline) {
-  const head = (String(headline || '').trim().slice(0, 255)) || DEFAULT_AD_HEADLINE;
-  if (asset.resource_type === 'video') {
-    const videoId = await uploadMetaVideoAndWait(adAccount, token, asset.url);
-    const videoData = {
-      video_id: videoId,
-      message: caption,
-      image_url: cloudinaryVideoThumb(asset.url),
-      call_to_action: { type: cta, value: { link } },
-      title: head,
-    };
-    return JSON.stringify({ page_id: pageId, video_data: videoData });
-  }
-  const linkData = { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } }, name: head };
-  return JSON.stringify({ page_id: pageId, link_data: linkData });
-}
 
 // Maakt een adcreative aan en zet Meta's Advantage+ creatieve verbeteringen (AI)
 // uit. Als Meta dat opt-out-formaat afwijst (de API hiervoor is in 2025 veranderd),
 // maken we de creative zonder die instelling aan zodat het aanmaken nooit breekt.
-async function createAdCreativeNoAI(adAccount, token, name, storySpec) {
-  const base = { name, object_story_spec: storySpec, access_token: token };
+// 'built' is of een object_story_spec (string), of een object { primary, fallback? }
+// waarbij primary/fallback elk de losse creative-velden zijn ({ object_story_spec,
+// asset_feed_spec? }). Weigert Meta de flexibele creative (meerdere teksten), dan
+// valt hij terug op de enkele-tekst-variant, zodat het aanmaken nooit stuk gaat.
+async function createAdCreativeNoAI(adAccount, token, name, built) {
+  const norm = (typeof built === 'string')
+    ? { primary: { object_story_spec: built } }
+    : (built && built.primary ? built : { primary: built });
+  const attempt = async (fields) => {
+    const base = { name, ...fields, access_token: token };
+    try {
+      return await graphPost(`${adAccount}/adcreatives`, {
+        ...base,
+        degrees_of_freedom_spec: JSON.stringify({ creative_features_spec: { standard_enhancements: { enroll_status: 'OPT_OUT' } } }),
+      });
+    } catch (_) {
+      return await graphPost(`${adAccount}/adcreatives`, base);
+    }
+  };
   try {
-    return await graphPost(`${adAccount}/adcreatives`, {
-      ...base,
-      degrees_of_freedom_spec: JSON.stringify({ creative_features_spec: { standard_enhancements: { enroll_status: 'OPT_OUT' } } }),
-    });
-  } catch (_) {
-    return await graphPost(`${adAccount}/adcreatives`, base);
+    return await attempt(norm.primary);
+  } catch (e) {
+    if (norm.fallback) {
+      try { console.warn('[MKT] flexibele creative (meerdere teksten) geweigerd, terugval op 1 tekst:', e && e.message); } catch (_) { /* noop */ }
+      const r = await attempt(norm.fallback);
+      if (r && typeof r === 'object') r._usedFallback = true;
+      return r;
+    }
+    throw e;
   }
+}
+
+// Upload een afbeelding (via publieke URL) naar de advertentierekening en geef de
+// image-hash terug. Nodig voor een flexibele creative (asset_feed_spec) met een afbeelding.
+async function uploadMetaImageHash(adAccount, token, imageUrl) {
+  const r = await fetch(imageUrl);
+  if (!r.ok) throw new Error('Kon de afbeelding niet ophalen voor Meta');
+  const buf = Buffer.from(await r.arrayBuffer());
+  const form = new FormData();
+  form.append('access_token', token);
+  form.append('filename', new Blob([buf]), 'ad-image.jpg');
+  const up = await fetch(`${GRAPH}/${adAccount}/adimages`, { method: 'POST', body: form });
+  const j = await up.json().catch(() => ({}));
+  if (!up.ok || j.error) throw new Error(metaErrorMessage(j));
+  const first = Object.values(j.images || {})[0];
+  if (!first || !first.hash) throw new Error('Meta gaf geen image-hash terug');
+  return first.hash;
+}
+
+// Bouwt de creative-velden voor een advertentie. Bij 1 tekst een gewone creative;
+// bij 2 tot 5 teksten een flexibele creative (asset_feed_spec) zodat Meta tussen
+// de teksten afwisselt. Geeft { primary, fallback? } terug voor createAdCreativeNoAI.
+// Video wordt eenmalig geupload en hergebruikt in beide varianten.
+async function buildCreative(adAccount, token, pageId, asset, captions, link, cta, headline) {
+  const head = (String(headline || '').trim().slice(0, 255)) || DEFAULT_AD_HEADLINE;
+  const texts = (Array.isArray(captions) ? captions : [captions])
+    .map((t) => String(t || '').trim()).filter(Boolean).slice(0, 5);
+  const isVideo = asset.resource_type === 'video';
+
+  let videoId = null;
+  if (isVideo) videoId = await uploadMetaVideoAndWait(adAccount, token, asset.url);
+
+  // Enkele-tekst creative (ook de terugval als Meta het flexibele formaat weigert).
+  const singleSpec = () => {
+    if (isVideo) {
+      return JSON.stringify({ page_id: pageId, video_data: {
+        video_id: videoId, message: texts[0] || '', image_url: cloudinaryVideoThumb(asset.url),
+        call_to_action: { type: cta, value: { link } }, title: head,
+      } });
+    }
+    return JSON.stringify({ page_id: pageId, link_data: {
+      message: texts[0] || '', link, picture: asset.url,
+      call_to_action: { type: cta, value: { link } }, name: head,
+    } });
+  };
+
+  if (texts.length <= 1) {
+    return { primary: { object_story_spec: singleSpec() } };
+  }
+
+  const afs = {
+    ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'SINGLE_IMAGE'],
+    bodies: texts.map((t) => ({ text: t })),
+    titles: [{ text: head }],
+    link_urls: [{ website_url: link }],
+    call_to_action_types: [cta],
+  };
+  if (isVideo) {
+    afs.videos = [{ video_id: videoId, thumbnail_url: cloudinaryVideoThumb(asset.url) }];
+  } else {
+    afs.images = [{ hash: await uploadMetaImageHash(adAccount, token, asset.url) }];
+  }
+  return {
+    primary: { object_story_spec: JSON.stringify({ page_id: pageId }), asset_feed_spec: JSON.stringify(afs) },
+    fallback: { object_story_spec: singleSpec() },
+  };
 }
 
 // Attributie zoals wij campagnes beoordelen: 7 dagen klik, 1 dag betrokkenheid
@@ -2133,8 +2201,9 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
     // 3) Creatief (afbeelding of video), met Kop en AI-verbeteringen uit
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
-    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
+    const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
+    const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
     // 4) Advertentie
     const ad = await graphPost(`${adAccount}/ads`, {
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
@@ -2235,8 +2304,9 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     };
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
-    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
+    const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
+    const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
     const ad = await graphPost(`${adAccount}/ads`, {
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
       status: launchStatus, access_token: token,
@@ -4155,13 +4225,16 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
     )).rows[0]);
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
 
-    const storySpec = await buildCreativeStorySpec(adAccount, token, creds.pageId, asset, caption, link, cta, headline);
-    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', storySpec);
+    const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
+    const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
+    const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
+    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
     const ad = await graphPost(`${adAccount}/ads`, {
       name, adset_id: req.params.adsetId, creative: JSON.stringify({ creative_id: creative.id }),
       status: 'PAUSED', access_token: token,
     });
-    res.json({ success: true, ad_id: ad.id });
+    // multiTextApplied: null = geen meerdere teksten gevraagd; true/false = of Meta de afwisseling accepteerde.
+    res.json({ success: true, ad_id: ad.id, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
