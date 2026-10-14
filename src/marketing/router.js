@@ -1771,9 +1771,14 @@ async function uploadMetaVideoAndWait(adAccount, token, videoUrl) {
 
 // Bouwt de object_story_spec voor een advertentie-creatief, voor zowel een
 // afbeelding (link_data) als een video (video_data met thumbnail). 'headline' is
-// de Kop die naast de call to action verschijnt; leeg laten valt terug op de paginanaam.
+// de Kop die naast de call to action verschijnt.
+// BELANGRIJK: we zetten ALTIJD een titel. Laten we die leeg, dan pakt Meta de
+// (vaak gecachete) titel van de bestemmingspagina erbij, en dan verschijnt
+// bijvoorbeeld "Aanmelden - Dynamic Health Consultancy". Daarom valt een lege Kop
+// terug op een neutrale standaardkop in plaats van op de paginatitel.
+const DEFAULT_AD_HEADLINE = 'Meld je hier aan';
 async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, link, cta, headline) {
-  const head = String(headline || '').trim().slice(0, 255);
+  const head = (String(headline || '').trim().slice(0, 255)) || DEFAULT_AD_HEADLINE;
   if (asset.resource_type === 'video') {
     const videoId = await uploadMetaVideoAndWait(adAccount, token, asset.url);
     const videoData = {
@@ -1781,12 +1786,11 @@ async function buildCreativeStorySpec(adAccount, token, pageId, asset, caption, 
       message: caption,
       image_url: cloudinaryVideoThumb(asset.url),
       call_to_action: { type: cta, value: { link } },
+      title: head,
     };
-    if (head) videoData.title = head;
     return JSON.stringify({ page_id: pageId, video_data: videoData });
   }
-  const linkData = { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } } };
-  if (head) linkData.name = head;
+  const linkData = { message: caption, link, picture: asset.url, call_to_action: { type: cta, value: { link } }, name: head };
   return JSON.stringify({ page_id: pageId, link_data: linkData });
 }
 
@@ -4087,7 +4091,8 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
       // Meta geeft soms zowel image_url als image_hash terug, maar accepteert er bij het
       // opnieuw aanmaken maar een. Houd de hash (Meta's eigen thumbnail) als beide er zijn.
       if (v.image_hash && v.image_url) delete v.image_url;
-      if (headline !== undefined) { if (headline) v.title = headline; else delete v.title; }
+      if (headline !== undefined) v.title = headline || DEFAULT_AD_HEADLINE;
+      if (!v.title) v.title = DEFAULT_AD_HEADLINE;
       if (caption !== undefined) v.message = caption;
       v.call_to_action = v.call_to_action || { type: 'LEARN_MORE', value: {} };
       if (cta !== undefined) v.call_to_action.type = cta;
@@ -4097,7 +4102,8 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
       const l = { ...spec.link_data };
       // Zelfde regel voor afbeeldingen: maar een van picture/image_hash mag mee.
       if (l.image_hash && l.picture) delete l.picture;
-      if (headline !== undefined) { if (headline) l.name = headline; else delete l.name; }
+      if (headline !== undefined) l.name = headline || DEFAULT_AD_HEADLINE;
+      if (!l.name) l.name = DEFAULT_AD_HEADLINE;
       if (caption !== undefined) l.message = caption;
       if (link !== undefined) {
         l.link = link;
