@@ -900,7 +900,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </select>
     </div>
     <div class="field"><label>Kop</label><input id="aaHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
-    <div class="field"><label>Advertentietekst</label><textarea id="aaCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div class="field"><label>Advertentietekst(en)</label>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Voeg 3 tot 5 teksten toe, dan wisselt Meta ertussen en toont de best presterende vaker.</div>
+      <div id="aaCapWrap"></div>
+      <button type="button" class="btn btn-ghost" id="aaAddCapBtn" style="padding:5px 11px;font-size:12px;margin-top:2px" onclick="aaAddCap()">+ Tekst toevoegen</button>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAddAdModal()">Annuleren</button>
       <button class="btn btn-primary" id="aaBtn" onclick="submitAddAd()">Advertentie toevoegen</button>
@@ -2958,10 +2962,47 @@ async function submitEditAd(){
 // ---- Extra advertentie toevoegen aan een bestaande ad set ----
 var AA_ADSET=null;
 function closeAddAdModal(){document.getElementById('addAdModal').classList.remove('open');}
+// Meerdere advertentieteksten (1 tot 5). Bij 2 of meer wisselt Meta ertussen.
+function aaAddCap(){
+  var wrap=document.getElementById('aaCapWrap'); if(!wrap)return;
+  if(wrap.querySelectorAll('.aa-cap-row').length>=5)return;
+  var row=document.createElement('div');
+  row.className='aa-cap-row';
+  row.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:flex-start';
+  var ta=document.createElement('textarea');
+  ta.className='aa-cap'; ta.rows=2; ta.placeholder='De tekst boven de advertentie';
+  ta.style.cssText='flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font-size:13.5px;font-family:inherit;resize:vertical';
+  var del=document.createElement('button');
+  del.type='button'; del.className='icon-btn del'; del.title='Tekst verwijderen'; del.textContent='✕'; del.style.flexShrink='0';
+  del.onclick=function(){ aaRemoveCap(del); };
+  row.appendChild(ta); row.appendChild(del);
+  wrap.appendChild(row);
+  aaUpdateCapUI();
+}
+function aaRemoveCap(btn){
+  var wrap=document.getElementById('aaCapWrap'); if(!wrap)return;
+  if(wrap.querySelectorAll('.aa-cap-row').length<=1)return;
+  var row=btn.closest('.aa-cap-row'); if(row)row.remove();
+  aaUpdateCapUI();
+}
+function aaUpdateCapUI(){
+  var wrap=document.getElementById('aaCapWrap'); if(!wrap)return;
+  var rows=wrap.querySelectorAll('.aa-cap-row');
+  rows.forEach(function(r){ var d=r.querySelector('.icon-btn.del'); if(d)d.style.visibility=(rows.length>1)?'visible':'hidden'; });
+  var addBtn=document.getElementById('aaAddCapBtn'); if(addBtn)addBtn.style.display=(rows.length>=5)?'none':'';
+}
+function aaResetCaps(){
+  var wrap=document.getElementById('aaCapWrap'); if(!wrap)return;
+  wrap.innerHTML=''; aaAddCap();
+}
+function aaCollectCaps(){
+  var wrap=document.getElementById('aaCapWrap'); if(!wrap)return [];
+  return [].slice.call(wrap.querySelectorAll('.aa-cap')).map(function(t){return t.value.trim();}).filter(Boolean);
+}
 async function openAddAd(adsetId,adsetName){
   AA_ADSET=adsetId; hideMsg('addAdMsg');
   document.getElementById('aaName').value='';
-  document.getElementById('aaCaption').value='';
+  aaResetCaps();
   document.getElementById('aaHeadline').value='';
   document.getElementById('aaCta').value='LEARN_MORE';
   document.getElementById('aaLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
@@ -2977,13 +3018,15 @@ async function openAddAd(adsetId,adsetName){
 }
 async function submitAddAd(){
   var btn=document.getElementById('aaBtn'); hideMsg('addAdMsg');
+  var caps=aaCollectCaps();
   var payload={
     name:document.getElementById('aaName').value.trim(),
     link:document.getElementById('aaLink').value.trim(),
     assetId:document.getElementById('aaAsset').value||null,
     cta:document.getElementById('aaCta').value,
     headline:document.getElementById('aaHeadline').value,
-    caption:document.getElementById('aaCaption').value
+    captions:caps,
+    caption:caps[0]||''
   };
   if(!payload.name){showMsg('addAdMsg',false,'Naam is verplicht.');return;}
   if(!payload.assetId){showMsg('addAdMsg',false,'Kies een afbeelding of video.');return;}
@@ -2994,7 +3037,15 @@ async function submitAddAd(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+AA_ADSET+'/ads',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('addAdMsg',true,'Advertentie toegevoegd (gepauzeerd).');setTimeout(function(){closeAddAdModal();renderCampDetail();},1100);}
+    if(r.ok&&d.success){
+      if(d.multiTextApplied===false){
+        showMsg('addAdMsg',false,'Advertentie toegevoegd, maar Meta accepteerde de meerdere teksten nog niet; er is 1 tekst gebruikt. Stuur dit door, dan stel ik het bij.');
+        setTimeout(function(){closeAddAdModal();renderCampDetail();},2800);
+      } else {
+        showMsg('addAdMsg',true,'Advertentie toegevoegd (gepauzeerd).');
+        setTimeout(function(){closeAddAdModal();renderCampDetail();},1100);
+      }
+    }
     else {showMsg('addAdMsg',false,d.error||'Toevoegen mislukt.');}
   }catch(e){showMsg('addAdMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Advertentie toevoegen';
