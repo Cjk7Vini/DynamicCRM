@@ -245,7 +245,15 @@
       
       const submitBtn = document.getElementById('submitBtn');
       const message = document.getElementById('message');
-      
+
+      const dateVal = document.getElementById('date').value;
+      if (dateVal && dateVal < new Date().toISOString().split('T')[0]) {
+        message.textContent = '❌ De afspraakdatum ligt in het verleden. Kies een datum vanaf vandaag.';
+        message.className = 'message error';
+        message.style.display = 'block';
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Bezig met opslaan...';
       message.style.display = 'none';
