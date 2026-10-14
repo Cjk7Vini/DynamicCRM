@@ -4235,7 +4235,13 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
     });
     // multiTextApplied: null = geen meerdere teksten gevraagd; true/false = of Meta de afwisseling accepteerde.
     res.json({ success: true, ad_id: ad.id, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) {
+    const m = String((e && e.message) || '');
+    if (/1885553/.test(m) || /dynamisch advertentiemateriaal/i.test(m)) {
+      return res.status(400).json({ error: 'Deze ad set bevat al een advertentie met meerdere teksten (dynamisch materiaal). Meta staat dan maar een advertentie per ad set toe. Wil je meerdere advertenties? Maak een nieuwe ad set aan, of gebruik per advertentie een enkele tekst.' });
+    }
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // Advertentieset verwijderen.
