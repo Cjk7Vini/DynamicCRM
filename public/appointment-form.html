@@ -157,6 +157,12 @@
       const btn = document.getElementById('submitBtn');
       const msg = document.getElementById('message');
       msg.className = 'msg';
+      const dateVal = document.getElementById('date').value;
+      if (dateVal && dateVal < new Date().toISOString().split('T')[0]) {
+        msg.textContent = 'De afspraakdatum ligt in het verleden. Kies een datum vanaf vandaag.';
+        msg.className = 'msg error';
+        return;
+      }
       btn.disabled = true;
       btn.textContent = 'Bezig...';
 
