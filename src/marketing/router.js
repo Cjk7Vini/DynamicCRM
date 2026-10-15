@@ -1776,9 +1776,29 @@ async function uploadMetaVideoAndWait(adAccount, token, videoUrl) {
 // opgebouwd in buildCreative hieronder.
 const DEFAULT_AD_HEADLINE = 'Meld je hier aan';
 
-// Maakt een adcreative aan en zet Meta's Advantage+ creatieve verbeteringen (AI)
-// uit. Als Meta dat opt-out-formaat afwijst (de API hiervoor is in 2025 veranderd),
-// maken we de creative zonder die instelling aan zodat het aanmaken nooit breekt.
+// Alle Advantage+ creatieve verbeteringen (AI) die we willen uitzetten. De oude
+// verzamelsleutel 'standard_enhancements' is door Meta afgeschaft (fout 3858504),
+// dus zetten we elke verbetering los op OPT_OUT.
+const AI_ENHANCEMENT_KEYS = [
+  'add_text_overlay', 'creative_stickers', 'description_automation', 'image_animation', 'image_background_gen',
+  'image_templates', 'image_touchups', 'image_uncrop', 'inline_comment', 'media_type_automation',
+  'music_generation', 'pac_relaxation', 'product_extensions', 'profile_card', 'reveal_details_over_time',
+  'show_destination_blurbs', 'show_summary', 'site_extensions', 'text_optimizations', 'text_translation',
+  'translate_voiceover', 'video_auto_crop', 'video_highlights',
+];
+function aiOptOutSpec() {
+  const cfs = {};
+  for (const k of AI_ENHANCEMENT_KEYS) cfs[k] = { enroll_status: 'OPT_OUT' };
+  return JSON.stringify({ creative_features_spec: cfs });
+}
+// contextual_multi_ads OPT_OUT = 'Advertenties van meerdere adverteerders' staat uit.
+// Dit is een veld bovenin de creative (niet in creative_features_spec).
+const MULTI_ADS_OFF = JSON.stringify({ enroll_status: 'OPT_OUT' });
+
+// Maakt een adcreative aan en zet Meta's Advantage+ creatieve verbeteringen (AI) en
+// 'advertenties van meerdere adverteerders' uit. Dit gebeurt in laagjes, zodat het
+// aanmaken nooit breekt: lukt de volledige opt-out niet, dan proberen we minstens
+// 'meerdere adverteerders' uit te zetten, en anders een kale creative.
 // 'built' is of een object_story_spec (string), of een object { primary, fallback? }
 // waarbij primary/fallback elk de losse creative-velden zijn ({ object_story_spec,
 // asset_feed_spec? }). Weigert Meta de flexibele creative (meerdere teksten), dan
@@ -1789,14 +1809,20 @@ async function createAdCreativeNoAI(adAccount, token, name, built) {
     : (built && built.primary ? built : { primary: built });
   const attempt = async (fields) => {
     const base = { name, ...fields, access_token: token };
+    // 1) AI-verbeteringen uit EN meerdere-adverteerders uit.
     try {
       return await graphPost(`${adAccount}/adcreatives`, {
         ...base,
-        degrees_of_freedom_spec: JSON.stringify({ creative_features_spec: { standard_enhancements: { enroll_status: 'OPT_OUT' } } }),
+        degrees_of_freedom_spec: aiOptOutSpec(),
+        contextual_multi_ads: MULTI_ADS_OFF,
       });
-    } catch (_) {
-      return await graphPost(`${adAccount}/adcreatives`, base);
-    }
+    } catch (_) { /* door naar stap 2 */ }
+    // 2) Minstens meerdere-adverteerders uit (AI-opt-out desnoods overslaan).
+    try {
+      return await graphPost(`${adAccount}/adcreatives`, { ...base, contextual_multi_ads: MULTI_ADS_OFF });
+    } catch (_) { /* door naar stap 3 */ }
+    // 3) Kale creative, zodat het aanmaken nooit breekt.
+    return await graphPost(`${adAccount}/adcreatives`, base);
   };
   try {
     return await attempt(norm.primary);
