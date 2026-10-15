@@ -1877,9 +1877,13 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
     afs.images = [{ hash: await uploadMetaImageHash(adAccount, token, asset.url) }];
   }
   return {
-    // object_story_spec met de link erin; Meta weigert hem zonder link (fout 2061015).
+    // Bij een flexibele creative (asset_feed_spec) bevat object_story_spec ALLEEN de
+    // page_id. De bestemmings-URL staat in asset_feed_spec.link_urls. Zetten we hier
+    // link_data neer, dan gebruikt Meta dat als basisverhaal (zonder video en zonder
+    // knop) en negeert het de video en CTA uit de asset_feed_spec. Gevolg: de
+    // video/afbeelding en de knop verdwijnen, terwijl de teksten wel doorkomen.
     primary: {
-      object_story_spec: JSON.stringify({ page_id: pageId, link_data: { link } }),
+      object_story_spec: JSON.stringify({ page_id: pageId }),
       asset_feed_spec: JSON.stringify(afs),
     },
     fallback: { object_story_spec: singleSpec() },
@@ -4131,6 +4135,32 @@ function parseStorySpec(spec) {
   return null;
 }
 
+// Leest de inhoud van een flexibele creative (asset_feed_spec) uit, zodat de
+// workspace ook voor advertenties met meerdere teksten de Kop/tekst/CTA/link toont.
+// Bij een flexibele creative staat de inhoud niet in object_story_spec maar hierin.
+function parseAssetFeed(afs) {
+  if (!afs) return null;
+  const bodies = Array.isArray(afs.bodies) ? afs.bodies.map((x) => (x && x.text) || '').filter(Boolean) : [];
+  const titles = Array.isArray(afs.titles) ? afs.titles.map((x) => (x && x.text) || '').filter(Boolean) : [];
+  const ctas = Array.isArray(afs.call_to_action_types) ? afs.call_to_action_types : [];
+  const links = Array.isArray(afs.link_urls) ? afs.link_urls : [];
+  const isVideo = Array.isArray(afs.videos) && afs.videos.length > 0;
+  let thumb = null;
+  if (isVideo) thumb = (afs.videos[0] && afs.videos[0].thumbnail_url) || null;
+  else if (Array.isArray(afs.images) && afs.images[0]) thumb = afs.images[0].url || null;
+  if (!bodies.length && !titles.length && !isVideo && !(Array.isArray(afs.images) && afs.images.length)) return null;
+  return {
+    mediaType: isVideo ? 'video' : 'image',
+    headline: titles[0] || '',
+    caption: bodies[0] || '',
+    captions: bodies,
+    cta: ctas[0] || 'LEARN_MORE',
+    link: (links[0] && links[0].website_url) || '',
+    thumb,
+    flexible: true,
+  };
+}
+
 router.get('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, async (req, res) => {
   try {
     if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
@@ -4139,9 +4169,12 @@ router.get('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, asy
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const token = await metaTokenForClient(wsId, okClient);
     if (!token) return res.status(400).json({ error: 'Geen Meta access token ingesteld' });
-    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec}', access_token: token });
+    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec,asset_feed_spec}', access_token: token });
     const spec = ad.creative && ad.creative.object_story_spec;
-    const creative = parseStorySpec(spec);
+    // Flexibele creatives (meerdere teksten) hebben hun inhoud in asset_feed_spec; die
+    // heeft voorrang. Oudere flexibele ads hebben in object_story_spec nog een lege
+    // link_data-anker, dus zonder deze voorrang zou de workspace die leeg tonen.
+    const creative = parseAssetFeed(ad.creative && ad.creative.asset_feed_spec) || parseStorySpec(spec);
     if (!creative) return res.status(400).json({ error: 'Kan de inhoud van deze advertentie niet ophalen (mogelijk niet via de workspace gemaakt).' });
     res.json({ success: true, name: ad.name || '', creative });
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -4161,9 +4194,12 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
     if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt' });
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt' });
 
-    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec}', access_token: token });
+    const ad = await graphGet(`${req.params.adId}`, { fields: 'name,creative{object_story_spec,asset_feed_spec}', access_token: token });
     const spec = ad.creative && ad.creative.object_story_spec;
-    if (!spec || (!spec.video_data && !spec.link_data)) {
+    const afsOld = ad.creative && ad.creative.asset_feed_spec;
+    const hasStory = spec && (spec.video_data || spec.link_data);
+    const hasFlex = afsOld && (Array.isArray(afsOld.videos) || Array.isArray(afsOld.images) || Array.isArray(afsOld.bodies));
+    if (!hasStory && !hasFlex) {
       return res.status(400).json({ error: 'Kan de inhoud van deze advertentie niet ophalen om aan te passen.' });
     }
     const b = req.body || {};
@@ -4171,6 +4207,44 @@ router.post('/api/mkt/clients/:clientId/meta-ads/:adId/creative', requireMkt, as
     const caption = (b.caption != null) ? String(b.caption).slice(0, 2000) : undefined;
     const cta = CTA_TYPES.includes(b.cta) ? b.cta : undefined;
     const link = (b.link && /^https?:\/\//i.test(String(b.link))) ? String(b.link).trim() : undefined;
+
+    // Flexibele advertentie (meerdere teksten): de inhoud zit in asset_feed_spec. Die
+    // heeft voorrang, ook als er nog een leeg link_data-anker in object_story_spec staat
+    // (oudere ads). We bouwen de asset_feed_spec opnieuw op met de nieuwe Kop/tekst/CTA/
+    // link en hetzelfde beeld. De eerste tekst wordt aangepast; extra teksten blijven.
+    if (hasFlex) {
+      const pageId = (spec && spec.page_id) || creds.pageId;
+      const isVideo = Array.isArray(afsOld.videos) && afsOld.videos.length > 0;
+      const head = (headline !== undefined ? (headline || DEFAULT_AD_HEADLINE)
+        : ((Array.isArray(afsOld.titles) && afsOld.titles[0] && afsOld.titles[0].text) || DEFAULT_AD_HEADLINE));
+      const newLink = (link !== undefined) ? link
+        : ((Array.isArray(afsOld.link_urls) && afsOld.link_urls[0] && afsOld.link_urls[0].website_url) || '');
+      const newCta = (cta !== undefined) ? cta
+        : ((Array.isArray(afsOld.call_to_action_types) && afsOld.call_to_action_types[0]) || 'LEARN_MORE');
+      let bodies = Array.isArray(afsOld.bodies) ? afsOld.bodies.map((x) => ({ text: (x && x.text) || '' })).filter((x) => x.text) : [];
+      if (caption !== undefined) bodies = bodies.length ? [{ text: caption }, ...bodies.slice(1)] : [{ text: caption }];
+      if (!bodies.length) bodies = [{ text: '' }];
+      const newAfs = {
+        optimization_type: afsOld.optimization_type || 'DEGREES_OF_FREEDOM',
+        ad_formats: afsOld.ad_formats || [isVideo ? 'SINGLE_VIDEO' : 'AUTOMATIC_FORMAT'],
+        bodies,
+        titles: [{ text: head }],
+        call_to_action_types: [newCta],
+      };
+      if (newLink) newAfs.link_urls = [{ website_url: newLink }];
+      if (isVideo) newAfs.videos = afsOld.videos.filter((v) => v && v.video_id).map((v) => ({ video_id: v.video_id, thumbnail_url: v.thumbnail_url }));
+      else if (Array.isArray(afsOld.images)) newAfs.images = afsOld.images.filter((im) => im && im.hash).map((im) => ({ hash: im.hash }));
+      const firstVid = (newAfs.videos && newAfs.videos[0]) || null;
+      const firstImg = (newAfs.images && newAfs.images[0]) || null;
+      // Terugval op een enkele-tekst creative als Meta het flexibele formaat weigert.
+      const fb = isVideo
+        ? JSON.stringify({ page_id: pageId, video_data: { video_id: firstVid && firstVid.video_id, message: bodies[0].text, image_url: firstVid && firstVid.thumbnail_url, call_to_action: { type: newCta, value: { link: newLink } }, title: head } })
+        : JSON.stringify({ page_id: pageId, link_data: { message: bodies[0].text, link: newLink, image_hash: firstImg && firstImg.hash, call_to_action: { type: newCta, value: { link: newLink } }, name: head } });
+      const built = { primary: { object_story_spec: JSON.stringify({ page_id: pageId }), asset_feed_spec: JSON.stringify(newAfs) }, fallback: { object_story_spec: fb } };
+      const creativeF = await createAdCreativeNoAI(adAccount, token, (ad.name || 'advertentie') + ' - creatief', built);
+      await graphPost(`${req.params.adId}`, { creative: JSON.stringify({ creative_id: creativeF.id }), access_token: token });
+      return res.json({ success: true });
+    }
 
     const newSpec = { page_id: spec.page_id };
     if (spec.video_data) {
