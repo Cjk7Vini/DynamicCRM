@@ -1108,16 +1108,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3>Publiceren</h3>
     <div class="sub">Plaats deze content rechtstreeks op het social account van de klant.</div>
     <div id="publishMsg" class="inline-msg"></div>
-    <div class="field"><label>Kanaal</label>
+    <div class="field" id="pubChannelField"><label>Kanaal</label>
       <select id="pubChannel" onchange="pubChannelChanged()">
         <option value="instagram">Instagram</option>
         <option value="facebook">Facebook</option>
       </select>
     </div>
-    <div class="field"><label>Bestand (afbeelding of video)</label>
+    <div class="field" id="pubAssetField"><label>Bestand (afbeelding of video)</label>
       <select id="pubAsset"><option value="">Geen bestand</option></select>
       <div id="pubAssetHint" style="font-size:12px;color:var(--muted);margin-top:6px">Instagram vereist een bestand. Facebook kan ook zonder.</div>
     </div>
+    <div class="field" id="pubCarouselNote" style="display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px"></div>
     <div class="field"><label>Tekst / caption</label><textarea id="pubCaption" rows="4"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePublish()">Annuleren</button>
@@ -1165,16 +1166,21 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="field"><label>Type post</label>
-      <select id="pfType">
+      <select id="pfType" onchange="pfTypeChanged()">
         <option value="bericht">Bericht</option>
         <option value="reel">Reel</option>
         <option value="story">Story</option>
+        <option value="carrousel">Carrousel</option>
       </select>
     </div>
     <div class="field"><label>Inplannen op (optioneel)</label><input id="pfWhen" type="datetime-local"></div>
-    <div class="field"><label>Beeld (afbeelding of video)</label>
+    <div class="field" id="pfAssetField"><label>Beeld (afbeelding of video)</label>
       <select id="pfAsset" onchange="updatePfMedia()"><option value="">Geen beeld</option></select>
       <div style="font-size:12px;color:var(--muted);margin-top:6px">De klant ziet dit beeld bij de goedkeuring.</div>
+    </div>
+    <div class="field" id="pfCarouselField" style="display:none"><label>Carrousel-bestanden <span style="color:var(--muted);font-weight:400;font-size:12px">(klik om toe te voegen; volgorde = nummer; 2 tot 10)</span></label>
+      <div id="pfCarousel" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Wordt als 1 carousel organisch op Instagram geplaatst.</div>
     </div>
     <div class="field" style="background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
       <label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin:0">
@@ -3428,6 +3434,13 @@ async function openPublish(postId){
     var opts='<option value="">Geen bestand</option>';
     (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ opts+='<option value="'+a.id+'">'+esc(a.filename)+' ('+(a.resource_type==='video'?'video':'foto')+')</option>'; } });
     sel.innerHTML=opts;
+    // Carousel-post: alleen Instagram, geen los bestand kiezen.
+    var isCar=!!(post&&post.post_type==='carrousel'&&Array.isArray(post.carousel_asset_ids)&&post.carousel_asset_ids.length>=2);
+    document.getElementById('pubChannelField').style.display=isCar?'none':'';
+    document.getElementById('pubAssetField').style.display=isCar?'none':'';
+    var note=document.getElementById('pubCarouselNote');
+    if(isCar){document.getElementById('pubChannel').value='instagram';note.style.display='';note.textContent='Carousel met '+post.carousel_asset_ids.length+' bestanden. Wordt als 1 organische post op Instagram geplaatst. Video\'s kunnen even verwerkt worden.';}
+    else{note.style.display='none';}
     pubChannelChanged();
     document.getElementById('publishModal').classList.add('open');
   }catch(e){ showMsg('postsMsg',false,'Kon publiceren niet voorbereiden.'); }
@@ -3435,15 +3448,22 @@ async function openPublish(postId){
 function closePublish(){document.getElementById('publishModal').classList.remove('open');}
 async function publishNow(){
   var btn=document.getElementById('pubBtn'); hideMsg('publishMsg');
-  var channel=document.getElementById('pubChannel').value;
-  var assetId=document.getElementById('pubAsset').value;
   var caption=document.getElementById('pubCaption').value;
-  if(channel==='instagram'&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
-  btn.disabled=true; btn.textContent='Publiceren...';
+  var isCar=!!(PUBLISH_POST&&PUBLISH_POST.post_type==='carrousel'&&Array.isArray(PUBLISH_POST.carousel_asset_ids)&&PUBLISH_POST.carousel_asset_ids.length>=2);
+  var body;
+  if(isCar){
+    body={channel:'instagram',caption:caption,carouselAssetIds:PUBLISH_POST.carousel_asset_ids,postId:PUBLISH_POST.id};
+  } else {
+    var channel=document.getElementById('pubChannel').value;
+    var assetId=document.getElementById('pubAsset').value;
+    if(channel==='instagram'&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
+    body={channel:channel,caption:caption,assetId:assetId||null,postId:PUBLISH_POST?PUBLISH_POST.id:null};
+  }
+  btn.disabled=true; btn.textContent=isCar?'Carousel plaatsen (kan even duren)...':'Publiceren...';
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({channel:channel,caption:caption,assetId:assetId||null,postId:PUBLISH_POST?PUBLISH_POST.id:null})});
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('publishMsg',true,'Gepubliceerd op '+channel+'. Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
+    if(r.ok&&d.success){showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':'Gepubliceerd.')+' Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
     else {showMsg('publishMsg',false,d.error||'Publiceren mislukt.');}
   }catch(e){showMsg('publishMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Nu publiceren';
@@ -3871,13 +3891,33 @@ async function loadPosts(){
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
 var PF_ASSETS={};
+var PF_CAROUSEL=[], PF_ASSET_LIST=[];
 async function fillPostAssetSelect(selectedId){
-  var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>'; PF_ASSETS={};
+  var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>'; PF_ASSETS={}; PF_ASSET_LIST=[];
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
-    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ PF_ASSETS[String(a.id)]={url:a.url,type:a.resource_type}; var o=document.createElement('option');o.value=a.id;o.textContent=a.filename+' ('+(a.resource_type==='video'?'video':'foto')+')';if(String(a.id)===String(selectedId))o.selected=true;sel.appendChild(o); } });
+    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ PF_ASSETS[String(a.id)]={url:a.url,type:a.resource_type}; PF_ASSET_LIST.push({id:a.id,url:a.url,type:a.resource_type,name:a.filename||''}); var o=document.createElement('option');o.value=a.id;o.textContent=a.filename+' ('+(a.resource_type==='video'?'video':'foto')+')';if(String(a.id)===String(selectedId))o.selected=true;sel.appendChild(o); } });
   }catch(e){}
   updatePfMedia();
+  renderPfCarousel();
+}
+function renderPfCarousel(){
+  var box=document.getElementById('pfCarousel'); if(!box)return;
+  if(!PF_ASSET_LIST.length){box.innerHTML='<span style="font-size:12px;color:var(--muted)">Nog geen bestanden. Upload eerst in het tabblad Content.</span>';return;}
+  box.innerHTML=PF_ASSET_LIST.map(function(a){
+    var idx=PF_CAROUSEL.map(String).indexOf(String(a.id));
+    var sel=idx>=0;
+    var thumb=(a.type==='video')?videoPoster(a.url):a.url;
+    var badge=sel?('<span style="position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(idx+1)+'</span>'):'';
+    return '<div onclick="togglePfCarousel('+a.id+')" title="'+esc(a.name||'')+'" style="position:relative;width:64px;height:64px;border-radius:9px;overflow:hidden;cursor:pointer;border:2px solid '+(sel?'var(--accent)':'var(--line)')+'"><img src="'+esc(thumb)+'" alt="" style="width:100%;height:100%;object-fit:cover">'+badge+'</div>';
+  }).join('');
+}
+function togglePfCarousel(id){var s=PF_CAROUSEL.map(String);var k=String(id);var i=s.indexOf(k);if(i>=0)PF_CAROUSEL.splice(i,1);else{if(PF_CAROUSEL.length>=10)return;PF_CAROUSEL.push(id);}renderPfCarousel();}
+function pfTypeChanged(){
+  var tv=document.getElementById('pfType'); var isCar=(tv&&tv.value==='carrousel');
+  var af=document.getElementById('pfAssetField'); if(af)af.style.display=isCar?'none':'';
+  var cf=document.getElementById('pfCarouselField'); if(cf)cf.style.display=isCar?'':'none';
+  if(isCar)renderPfCarousel();
 }
 function updatePfMedia(){ renderPfBlocks(); }
 // ---- Sleepbare inhoudsblokken (beeld + tekstblokken) in de kaart ----
@@ -3913,7 +3953,7 @@ function openNewPost(){
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
-  document.getElementById('pfType').value='bericht';
+  document.getElementById('pfType').value='bericht';PF_CAROUSEL=[];
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
@@ -3921,7 +3961,7 @@ function openNewPost(){
   var pa=document.getElementById('pfActivity');if(pa)pa.innerHTML='';
   PF_BLOCKS=[{type:'media'},{type:'text',text:''}];
   document.getElementById('pfCommentsWrap').style.display='none';
-  fillPostAssetSelect('');
+  fillPostAssetSelect('');pfTypeChanged();
   document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
 }
 function openEditPost(id){
@@ -3933,7 +3973,7 @@ function openEditPost(id){
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
-    document.getElementById('pfType').value=p.post_type||'bericht';
+    document.getElementById('pfType').value=p.post_type||'bericht';PF_CAROUSEL=Array.isArray(p.carousel_asset_ids)?p.carousel_asset_ids.slice():[];
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
@@ -3944,7 +3984,7 @@ function openEditPost(id){
     document.getElementById('pfCommentsWrap').style.display='block';
     loadContentComments(p.id);
     loadPostActivity(p.id);
-    fillPostAssetSelect(p.asset_id||'');
+    fillPostAssetSelect(p.asset_id||'');pfTypeChanged();
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
   });
 }
@@ -3956,7 +3996,7 @@ async function savePost(){
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
-  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST};
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:(document.getElementById('pfType').value==='carrousel'?PF_CAROUSEL:[])};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{

@@ -875,6 +875,31 @@ async function postBoardPosAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Zijn carousel-posts beschikbaar (migratie 018)?
+let _hasCarousel = null;
+async function postCarouselAvailable() {
+  if (_hasCarousel === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='carousel_asset_ids'"
+    )).rows);
+    if (r.length > 0) _hasCarousel = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Controleert dat een lijst asset-ids bij deze klant hoort en publiek (Cloudinary) is;
+// geeft ze terug in dezelfde volgorde als gevraagd, met url + type.
+async function resolveCarouselAssets(wsId, clientId, ids) {
+  const clean = (Array.isArray(ids) ? ids : []).map((x) => parseInt(x, 10)).filter(Number.isInteger).slice(0, 10);
+  if (!clean.length) return [];
+  const rows = await withReadConnection(async (c) => (await c.query(
+    "SELECT id, url, resource_type, provider FROM marketing.assets WHERE id = ANY($1::int[]) AND client_id=$2 AND workspace_id=$3",
+    [clean, clientId, wsId]
+  )).rows);
+  const byId = {}; rows.forEach((a) => { byId[a.id] = a; });
+  return clean.map((id) => byId[id]).filter((a) => a && a.provider === 'cloudinary' && a.url)
+    .map((a) => ({ id: a.id, url: a.url, mediaType: a.resource_type === 'video' ? 'video' : 'image' }));
+}
 // Is het activiteiten-log beschikbaar (migratie 016)?
 let _hasPostActivity = null;
 async function postActivityAvailable() {
@@ -956,6 +981,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasType = await postTypeAvailable();
     const hasExtras = await postExtrasAvailable();
     const hasBoardPos = await postBoardPosAvailable();
+    const hasCarousel = await postCarouselAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
@@ -965,6 +991,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasType ? 'p.post_type,' : ''}
               ${hasExtras ? 'p.assignees, p.checklist,' : ''}
               ${hasBoardPos ? 'p.board_position,' : ''}
+              ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -1022,6 +1049,12 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
         ? [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null, assignees, JSON.stringify(checklist)]
         : [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null]
     )).rows[0]);
+    // Carousel-bestanden opslaan (als meegegeven en de kolom beschikbaar is).
+    if (Array.isArray(req.body && req.body.carousel_asset_ids) && await postCarouselAvailable()) {
+      const items = await resolveCarouselAssets(wsId, okClient, req.body.carousel_asset_ids);
+      const cids = items.map((x) => x.id);
+      try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET carousel_asset_ids=$1 WHERE id=$2 AND workspace_id=$3', [cids, row.id, wsId])); row.carousel_asset_ids = cids; } catch (_) { /* niet blokkerend */ }
+    }
     await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'created', null);
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1048,6 +1081,10 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && await isValidPostStatus(wsId, b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
     if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
+    if (b.carousel_asset_ids !== undefined && await postCarouselAvailable()) {
+      const prow = await withReadConnection(async (c) => (await c.query('SELECT client_id FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId])).rows[0]);
+      if (prow) { const items = await resolveCarouselAssets(wsId, prow.client_id, b.carousel_asset_ids); sets.push(`carousel_asset_ids=$${i++}`); vals.push(items.map((x) => x.id)); }
+    }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
       sets.push(`labels=$${i++}`); vals.push(clean);
@@ -2364,6 +2401,54 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption)
   return { id: pub.id, channel: 'facebook' };
 }
 
+// Publiceert een carousel (meerdere foto's/video's) als organische Instagram-post.
+// Elk item wordt eerst een container; video's worden verwerkt; daarna een carousel-
+// container en dan publiceren. items = [{ url, mediaType }]. Alleen Instagram.
+async function publishCarouselToInstagram(igId, token, items, caption) {
+  if (!igId) throw new Error('Instagram user ID ontbreekt in de koppelingen');
+  const list = (Array.isArray(items) ? items : []).slice(0, 10);
+  if (list.length < 2) throw new Error('Een carousel heeft minimaal 2 bestanden nodig (maximaal 10)');
+  // 1) Item-containers aanmaken (parallel).
+  const containers = await Promise.all(list.map(async (it) => {
+    const params = (it.mediaType === 'video')
+      ? { media_type: 'VIDEO', video_url: it.url, is_carousel_item: 'true', access_token: token }
+      : { image_url: it.url, is_carousel_item: 'true', access_token: token };
+    const c = await graphPost(`${igId}/media`, params);
+    return { id: c.id, isVideo: it.mediaType === 'video' };
+  }));
+  // 2) Wachten tot alle video-containers klaar zijn (parallel, max ~75s totaal).
+  const deadline = Date.now() + 75 * 1000;
+  await Promise.all(containers.map(async (c) => {
+    if (!c.isVideo) return;
+    while (Date.now() < deadline) {
+      const st = await graphGet(`${c.id}`, { fields: 'status_code', access_token: token });
+      if (st.status_code === 'FINISHED') return;
+      if (st.status_code === 'ERROR') throw new Error('Een van de video\'s kon niet door Instagram verwerkt worden. Probeer een ander/korter videobestand.');
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    throw new Error('De video-verwerking bij Instagram duurt te lang. Probeer het over een halve minuut opnieuw of gebruik kortere/kleinere video\'s.');
+  }));
+  // 3) Carousel-container aanmaken.
+  const carousel = await graphPost(`${igId}/media`, {
+    media_type: 'CAROUSEL',
+    children: containers.map((c) => c.id).join(','),
+    caption: (caption != null) ? String(caption) : '',
+    access_token: token,
+  });
+  // 4) Carousel-container kan (bij video's) nog verwerkt worden; kort wachten.
+  const d2 = Date.now() + 30 * 1000;
+  while (Date.now() < d2) {
+    let sc = null;
+    try { const st = await graphGet(`${carousel.id}`, { fields: 'status_code', access_token: token }); sc = st.status_code; } catch (_) { sc = null; }
+    if (sc === 'FINISHED') break;
+    if (sc === 'ERROR') throw new Error('De carousel kon niet door Instagram verwerkt worden');
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  // 5) Publiceren.
+  const pub = await graphPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token });
+  return { id: pub.id, channel: 'instagram', carousel: true, items: list.length };
+}
+
 router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) => {
   try {
     if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om te publiceren' });
@@ -2371,7 +2456,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
-    const { channel, caption, assetId, postId } = req.body || {};
+    const { channel, caption, assetId, postId, carouselAssetIds } = req.body || {};
     if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
 
     // Client-koppeling met terugval op de workspace-koppeling.
@@ -2379,22 +2464,30 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     const token = creds.token;
     if (!token) return res.status(400).json({ error: 'Geen Meta access token (niet bij de klant en niet op de workspace)' });
     const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
-
-    // Media-URL (moet publiek zijn: Cloudinary).
-    let mediaUrl = null, mediaType = 'image';
-    if (assetId) {
-      const asset = await withReadConnection(async (c) => (await c.query(
-        'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
-        [assetId, okClient, wsId]
-      )).rows[0]);
-      if (!asset) return res.status(404).json({ error: 'Gekozen bestand niet gevonden' });
-      if (asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Alleen bestanden met een publieke URL kunnen worden gepubliceerd' });
-      mediaUrl = asset.url;
-      mediaType = asset.resource_type === 'video' ? 'video' : 'image';
-    }
     const cap = (caption != null) ? String(caption) : '';
 
-    const result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap);
+    let result;
+    if (Array.isArray(carouselAssetIds) && carouselAssetIds.length >= 2) {
+      // Carousel: alleen op Instagram.
+      if (channel !== 'instagram') return res.status(400).json({ error: 'Een carousel kan alleen op Instagram geplaatst worden' });
+      const items = await resolveCarouselAssets(wsId, okClient, carouselAssetIds);
+      if (items.length < 2) return res.status(400).json({ error: 'Kies minimaal 2 publieke bestanden (uit Content) voor de carousel' });
+      result = await publishCarouselToInstagram(creds.igUserId, token, items, cap);
+    } else {
+      // Enkel bestand (foto/video) of alleen tekst (Facebook).
+      let mediaUrl = null, mediaType = 'image';
+      if (assetId) {
+        const asset = await withReadConnection(async (c) => (await c.query(
+          'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+          [assetId, okClient, wsId]
+        )).rows[0]);
+        if (!asset) return res.status(404).json({ error: 'Gekozen bestand niet gevonden' });
+        if (asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Alleen bestanden met een publieke URL kunnen worden gepubliceerd' });
+        mediaUrl = asset.url;
+        mediaType = asset.resource_type === 'video' ? 'video' : 'image';
+      }
+      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap);
+    }
 
     // Post markeren als gepubliceerd.
     if (postId) {
