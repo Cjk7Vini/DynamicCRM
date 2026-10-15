@@ -600,7 +600,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="section-h">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div id="contentViewSwitch" style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden">
-                <button id="cvBoard" class="cvbtn" onclick="setContentView('board')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:var(--accent);color:#fff">Bord</button>
+                <button id="cvBoard" class="cvbtn" onclick="setContentView('board')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:var(--accent);color:#fff">Planning</button>
                 <button id="cvCal" class="cvbtn" onclick="setContentView('calendar')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Kalender</button>
                 <button id="cvPub" class="cvbtn" onclick="setContentView('published')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Gepubliceerd</button>
                 <button id="cvList" class="cvbtn" onclick="setContentView('list')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Lijst</button>
@@ -3456,15 +3456,38 @@ function boardCard(p,canManage){
     labelChips(p.labels)+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+commentChip(p)+'</div>'+when+acts+'</div>';
 }
+// Planning per maand. Standaard de huidige maand, zodat niet alles op 1 hoop staat.
+// Posts zonder datum horen bij de nog-in-te-plannen backlog en zijn altijd zichtbaar.
+var _BOARD_MONTH=(function(){var n=new Date();return new Date(n.getFullYear(),n.getMonth(),1);})();
+function boardShift(delta){
+  if(_BOARD_MONTH===null){var n=new Date();_BOARD_MONTH=new Date(n.getFullYear(),n.getMonth(),1);}
+  _BOARD_MONTH=new Date(_BOARD_MONTH.getFullYear(),_BOARD_MONTH.getMonth()+delta,1);renderContentView();
+}
+function boardAllMonths(){_BOARD_MONTH=null;renderContentView();}
+function boardInMonth(p){
+  if(_BOARD_MONTH===null)return true;
+  if(!p.scheduled_at)return true; // nog geen datum: altijd tonen (backlog)
+  var d=new Date(p.scheduled_at); if(isNaN(d.getTime()))return true;
+  return d.getFullYear()===_BOARD_MONTH.getFullYear()&&d.getMonth()===_BOARD_MONTH.getMonth();
+}
 function renderBoard(posts){
   var canManage=ME.role!=='client';
-  return '<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+CONTENT_COLS.map(function(c){
+  var bar;
+  if(_BOARD_MONTH===null){
+    bar='<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Alle maanden</span><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="boardShift(0)">Plan per maand</button></div>';
+  } else {
+    var mLbl=_BOARD_MONTH.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});
+    bar='<div class="card" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-ghost" style="padding:6px 12px" onclick="boardShift(-1)">&larr;</button><strong style="text-transform:capitalize;min-width:130px;text-align:center">'+esc(mLbl)+'</strong><button class="btn btn-ghost" style="padding:6px 12px" onclick="boardShift(1)">&rarr;</button></div><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="boardAllMonths()">Alle maanden</button></div>';
+  }
+  var shown=posts.filter(boardInMonth);
+  var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+CONTENT_COLS.map(function(c){
     var key=c[0],label=c[1];
-    var items=posts.filter(function(p){return p.status===key;});
+    var items=shown.filter(function(p){return p.status===key;});
     var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
     return '<div class="kcol" data-status="'+key+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+key+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span>'+esc(label)+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+'</div>';
   }).join('')+'</div>';
+  return bar+kb;
 }
 // ---- Gepubliceerd (eigen weergave) ----
 var _PUB_MONTH=null; // null = alle maanden, anders Date (eerste van de maand)
@@ -3525,7 +3548,7 @@ function renderCalendar(posts){
     grid+='<div style="min-height:84px;border:1px solid var(--line);border-radius:8px;padding:5px;'+(isToday?'outline:2px solid var(--accent);outline-offset:-2px':'')+'"><div style="font-size:11px;color:var(--muted);font-weight:600">'+dnum+'</div><div style="display:flex;flex-wrap:wrap">'+chips+'</div></div>';
   }
   grid+='</div>';
-  return '<div class="card">'+head+grid+'<div style="font-size:12px;color:var(--muted);margin-top:10px">Alleen posts met een ingeplande datum staan in de kalender. Sleep in het Bord een post naar "Ingepland" en zet een datum via Bewerken.</div></div>';
+  return '<div class="card">'+head+grid+'<div style="font-size:12px;color:var(--muted);margin-top:10px">Alleen posts met een ingeplande datum staan in de kalender. Sleep in de Planning een post naar "Ingepland" en zet een datum via Bewerken.</div></div>';
 }
 function renderList(posts){
   var canManage=ME.role!=='client';
