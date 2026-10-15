@@ -1134,6 +1134,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div id="postMsg" class="inline-msg"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
     <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
+    <div class="field" id="pfAssigneesField" style="display:none"><label>Personen</label><div id="pfAssignees" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
+    <div class="field" id="pfChecklistField" style="display:none"><label>Checklist</label><div id="pfChecklist"></div>
+      <div style="display:flex;gap:6px;margin-top:6px"><input id="pfChkNew" placeholder="Nieuw checklist-item" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();pfAddChecklistItem();}"><button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;white-space:nowrap" onclick="pfAddChecklistItem()">+ Item</button></div>
+    </div>
     <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
       <div id="pfBlocks"></div>
       <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
@@ -1188,9 +1192,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <button class="btn btn-primary" id="pfSaveBtn" onclick="savePost()">Opslaan</button>
     </div>
     <div id="pfCommentsWrap" style="display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
-      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Opmerkingen</label>
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Opmerkingen en activiteit</label>
       <div id="pfComments" style="max-height:240px;overflow-y:auto;margin-bottom:10px"></div>
       <div style="display:flex;gap:8px"><input id="pfCommentInput" placeholder="Plaats een opmerking of feedback..." style="flex:1"><button class="btn btn-primary" style="padding:8px 14px" onclick="postContentComment()">Plaats</button></div>
+      <div id="pfActivity" style="margin-top:12px"></div>
     </div>
   </div>
 </div>
@@ -3531,6 +3536,58 @@ function renderPfLabels(){
   box.innerHTML=chips+'<button type="button" onclick="createCustomLabel()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px dashed var(--muted);background:transparent;color:var(--muted)">+ Nieuw label</button>';
 }
 function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);renderPfLabels();}
+// ---- Kaart: personen, checklist en activiteit (Trello-achtig) ----
+var POST_EXTRAS=false, POST_ACTIVITY=false, PF_ASSIGNEES=[], PF_CHECKLIST=[];
+function renderPfAssignees(){
+  var box=document.getElementById('pfAssignees'); if(!box)return;
+  box.innerHTML=MKT_MEMBERS.length?MKT_MEMBERS.map(function(m){var on=PF_ASSIGNEES.map(String).indexOf(String(m.id))>=0;return '<button type="button" onclick="togglePfAssignee('+m.id+')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--accent);background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--accent)')+'">'+esc(m.name||m.email)+'</button>';}).join(''):'<span style="font-size:12px;color:var(--muted)">Geen teamleden gevonden.</span>';
+}
+function togglePfAssignee(id){var s=PF_ASSIGNEES.map(String);var k=String(id);var i=s.indexOf(k);if(i>=0)PF_ASSIGNEES.splice(i,1);else PF_ASSIGNEES.push(id);renderPfAssignees();}
+function renderPfChecklist(){
+  var box=document.getElementById('pfChecklist'); if(!box)return;
+  if(!PF_CHECKLIST.length){box.innerHTML='<div style="font-size:12px;color:var(--muted)">Nog geen checklist-items.</div>';return;}
+  var done=PF_CHECKLIST.filter(function(x){return x.done;}).length;
+  box.innerHTML='<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">'+done+'/'+PF_CHECKLIST.length+' afgerond</div>'+
+    PF_CHECKLIST.map(function(it,idx){return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><input type="checkbox" '+(it.done?'checked':'')+' onchange="pfToggleChecklist('+idx+',this.checked)" style="width:auto;flex:none"><input value="'+esc(it.text)+'" onchange="pfEditChecklist('+idx+',this.value)" style="flex:1;padding:6px 8px;font-size:13px;'+(it.done?'text-decoration:line-through;color:var(--muted)':'')+'"><button type="button" class="icon-btn del" title="Verwijderen" onclick="pfRemoveChecklist('+idx+')" style="width:26px;height:26px">&times;</button></div>';}).join('');
+}
+function pfAddChecklistItem(){var inp=document.getElementById('pfChkNew');var t=(inp&&inp.value||'').trim();if(!t)return;PF_CHECKLIST.push({text:t,done:false});if(inp)inp.value='';renderPfChecklist();}
+function pfToggleChecklist(idx,on){if(PF_CHECKLIST[idx]){PF_CHECKLIST[idx].done=!!on;renderPfChecklist();}}
+function pfEditChecklist(idx,val){if(PF_CHECKLIST[idx]){PF_CHECKLIST[idx].text=String(val||'').trim();}}
+function pfRemoveChecklist(idx){PF_CHECKLIST.splice(idx,1);renderPfChecklist();}
+function actorLabel(a){
+  if(a.actor_account_id){for(var i=0;i<MKT_MEMBERS.length;i++){if(String(MKT_MEMBERS[i].id)===String(a.actor_account_id))return MKT_MEMBERS[i].name||MKT_MEMBERS[i].email;}}
+  return a.actor_name||'Iemand';
+}
+function activityText(a){
+  if(a.action==='created')return 'heeft de kaart aangemaakt';
+  if(a.action==='moved'){var lbl=a.detail;var cols=boardCols();for(var i=0;i<cols.length;i++){if(cols[i].key===a.detail){lbl=cols[i].label;break;}}return 'verplaatste de kaart naar '+(lbl||a.detail||'');}
+  if(a.action==='published')return 'heeft de kaart gepubliceerd';
+  return esc(a.action);
+}
+async function loadPostActivity(postId){
+  var box=document.getElementById('pfActivity'); if(!box)return; box.innerHTML='';
+  if(!POST_ACTIVITY)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+postId+'/activity',{credentials:'include'});
+    var d=await r.json(); var acts=(d&&d.success&&d.activity)?d.activity:[];
+    if(!acts.length)return;
+    box.innerHTML='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">Activiteit</div>'+
+      acts.map(function(a){return '<div style="font-size:12px;color:var(--muted);padding:3px 0"><strong style="color:var(--ink-2)">'+esc(actorLabel(a))+'</strong> '+activityText(a)+' <span style="opacity:.7">&middot; '+esc(fmtWhen(a.created_at))+'</span></div>';}).join('');
+  }catch(e){}
+}
+function pfShowExtras(){
+  var af=document.getElementById('pfAssigneesField'); if(af)af.style.display=POST_EXTRAS?'':'none';
+  var cf=document.getElementById('pfChecklistField'); if(cf)cf.style.display=POST_EXTRAS?'':'none';
+}
+function assigneeAvatars(ids){
+  if(!Array.isArray(ids)||!ids.length)return '';
+  return '<span style="display:inline-flex">'+ids.slice(0,4).map(function(id){var nm='';for(var i=0;i<MKT_MEMBERS.length;i++){if(String(MKT_MEMBERS[i].id)===String(id)){nm=MKT_MEMBERS[i].name||MKT_MEMBERS[i].email;break;}}var ini=nm?initials(nm):'?';return '<span title="'+esc(nm)+'" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:700;border:1px solid var(--panel);margin-left:-4px">'+esc(ini)+'</span>';}).join('')+'</span>';
+}
+function checklistBadge(cl){
+  if(!Array.isArray(cl)||!cl.length)return '';
+  var done=cl.filter(function(x){return x&&x.done;}).length;
+  return '<span title="checklist" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line);padding:2px 7px;border-radius:20px">&#10003; '+done+'/'+cl.length+'</span>';
+}
 async function createCustomLabel(){
   var name=prompt('Naam van het nieuwe label:'); if(name==null)return; name=name.trim(); if(!name)return;
   var color=prompt('Kleur (hex, bv. #16a34a). Leeg = standaard paars:','#16a34a')||'';
@@ -3571,7 +3628,7 @@ function boardCard(p,canManage){
     thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+commentChip(p)+'</div>'+when+acts+'</div>';
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+commentChip(p)+checklistBadge(p.checklist)+assigneeAvatars(p.assignees)+'</div>'+when+acts+'</div>';
 }
 // Planning per maand. Standaard de huidige maand, zodat niet alles op 1 hoop staat.
 // Posts zonder datum horen bij de nog-in-te-plannen backlog en zijn altijd zichtbaar.
@@ -3759,8 +3816,10 @@ async function loadPosts(){
     var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
     _CONTENT_POSTS=d.posts||[];
+    POST_EXTRAS=!!d.extras; POST_ACTIVITY=!!d.activity;
     await loadCustomLabels();
     await loadBoardColumns();
+    if(POST_EXTRAS&&!MKT_MEMBERS.length)await loadMembers();
     renderContentView();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
@@ -3811,6 +3870,8 @@ function openNewPost(){
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
+  PF_ASSIGNEES=[];PF_CHECKLIST=[];pfShowExtras();renderPfAssignees();renderPfChecklist();
+  var pa=document.getElementById('pfActivity');if(pa)pa.innerHTML='';
   PF_BLOCKS=[{type:'media'},{type:'text',text:''}];
   document.getElementById('pfCommentsWrap').style.display='none';
   fillPostAssetSelect('');
@@ -3829,9 +3890,13 @@ function openEditPost(id){
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
+    PF_ASSIGNEES=Array.isArray(p.assignees)?p.assignees.slice():[];
+    PF_CHECKLIST=Array.isArray(p.checklist)?p.checklist.map(function(x){return {text:String((x&&x.text)||''),done:!!(x&&x.done)};}):[];
+    pfShowExtras();renderPfAssignees();renderPfChecklist();
     PF_BLOCKS=(Array.isArray(p.content_blocks)&&p.content_blocks.length)?p.content_blocks.map(function(b){return b&&b.type==='media'?{type:'media'}:{type:'text',text:(b&&b.text)||''};}):[{type:'media'},{type:'text',text:p.body||''}];
     document.getElementById('pfCommentsWrap').style.display='block';
     loadContentComments(p.id);
+    loadPostActivity(p.id);
     fillPostAssetSelect(p.asset_id||'');
     document.getElementById('postModal').classList.add('open');document.getElementById('pfTitle').focus();
   });
@@ -3844,7 +3909,7 @@ async function savePost(){
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
-  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS};
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
