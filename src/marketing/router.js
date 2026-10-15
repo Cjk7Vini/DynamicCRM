@@ -851,6 +851,58 @@ async function isValidPostStatus(wsId, status) {
   )).rows[0]);
   return !!ok;
 }
+// Zijn de kaart-extra's (toegewezen personen + checklist) beschikbaar (migratie 016)?
+let _hasPostExtras = null;
+async function postExtrasAvailable() {
+  if (_hasPostExtras === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='checklist'"
+    )).rows);
+    if (r.length > 0) _hasPostExtras = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Is het activiteiten-log beschikbaar (migratie 016)?
+let _hasPostActivity = null;
+async function postActivityAvailable() {
+  if (_hasPostActivity === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='content_post_activity'"
+    )).rows);
+    if (r.length > 0) _hasPostActivity = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Een activiteit vastleggen (best-effort; nooit de hoofdactie laten mislukken).
+async function logPostActivity(wsId, postId, actorId, actorName, action, detail) {
+  try {
+    if (!(await postActivityAvailable())) return;
+    await withWriteConnection(async (c) => c.query(
+      'INSERT INTO marketing.content_post_activity (workspace_id, post_id, actor_account_id, actor_name, action, detail) VALUES ($1,$2,$3,$4,$5,$6)',
+      [wsId, postId, actorId || null, actorName || null, String(action).slice(0, 40), detail != null ? String(detail).slice(0, 300) : null]
+    ));
+  } catch (_) { /* log is bijzaak */ }
+}
+// Opschonen van een checklist uit de client: [{text, done}], max 50 items.
+function sanitizeChecklist(input) {
+  if (!Array.isArray(input)) return null;
+  return input.slice(0, 50).map((x) => ({
+    text: String((x && x.text) || '').slice(0, 300),
+    done: !!(x && x.done),
+  })).filter((x) => x.text);
+}
+// Alleen geldige workspace-leden (geen klant-login) als toegewezen personen.
+async function sanitizeAssignees(wsId, input) {
+  if (!Array.isArray(input) || !input.length) return [];
+  const ids = [...new Set(input.map((x) => parseInt(x, 10)).filter(Number.isInteger))];
+  if (!ids.length) return [];
+  const rows = await withReadConnection(async (c) => (await c.query(
+    "SELECT id FROM marketing.accounts WHERE workspace_id=$1 AND role <> 'client' AND id = ANY($2::int[])", [wsId, ids]
+  )).rows);
+  return rows.map((r) => r.id);
+}
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
   if (!Array.isArray(input)) return null;
@@ -890,6 +942,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasComments = await contentCommentsAvailable();
     const hasBlocks = await contentBlocksAvailable();
     const hasType = await postTypeAvailable();
+    const hasExtras = await postExtrasAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
@@ -897,6 +950,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasLabels ? 'p.labels,' : ''}
               ${hasBlocks ? 'p.content_blocks,' : ''}
               ${hasType ? 'p.post_type,' : ''}
+              ${hasExtras ? 'p.assignees, p.checklist,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -907,7 +961,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
-    res.json({ success: true, posts: rows });
+    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -939,12 +993,22 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     }
     const autoPub = auto_publish === true && !!when;
     const pubCh = (publish_channel === 'facebook') ? 'facebook' : 'instagram';
+    const extras = await postExtrasAvailable();
+    const assignees = extras ? await sanitizeAssignees(wsId, req.body && req.body.assignees) : [];
+    const checklist = extras ? (sanitizeChecklist(req.body && req.body.checklist) || []) : [];
     const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, approval, approval_note, approval_at, created_at, updated_at`,
-      [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null]
+      extras
+        ? `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, created_by, assignees, checklist)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+             RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, approval, approval_note, approval_at, created_at, updated_at, assignees, checklist`
+        : `INSERT INTO marketing.content_posts (workspace_id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, approval, approval_note, approval_at, created_at, updated_at`,
+      extras
+        ? [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null, assignees, JSON.stringify(checklist)]
+        : [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null]
     )).rows[0]);
+    await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'created', null);
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -955,6 +1019,12 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om content te beheren' });
     const wsId = req.session.mkt.workspaceId;
     const b = req.body || {};
+    const extras = await postExtrasAvailable();
+    // Oude status onthouden om een verplaatsing in het activiteiten-log te zetten.
+    let oldStatus = null;
+    if (b.status !== undefined) {
+      oldStatus = await withReadConnection(async (c) => { const r = (await c.query('SELECT status FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId])).rows[0]; return r ? r.status : null; });
+    }
     const sets = [], vals = []; let i = 1;
     if (b.title !== undefined) {
       if (!String(b.title).trim()) return res.status(400).json({ error: 'Titel mag niet leeg zijn' });
@@ -979,6 +1049,8 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
         }
       }
     }
+    if (extras && b.assignees !== undefined) { const a = await sanitizeAssignees(wsId, b.assignees); sets.push(`assignees=$${i++}`); vals.push(a); }
+    if (extras && b.checklist !== undefined) { const cl = sanitizeChecklist(b.checklist) || []; sets.push(`checklist=$${i++}::jsonb`); vals.push(JSON.stringify(cl)); }
     // Marketeer mag alleen 'ter goedkeuring' zetten of intrekken; goedkeuren doet de klant via de portal.
     if (b.approval !== undefined && (b.approval === 'pending' || b.approval === 'none')) {
       sets.push(`approval=$${i++}`); vals.push(b.approval);
@@ -1019,9 +1091,12 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     const row = await withWriteConnection(async (c) => (await c.query(
       `UPDATE marketing.content_posts SET ${sets.join(', ')}
         WHERE id=$${i++} AND workspace_id=$${i}
-       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, published_at, publish_error, approval, approval_note, approval_at, created_at, updated_at`, vals
+       RETURNING id, client_id, title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel, published_at, publish_error, approval, approval_note, approval_at, created_at, updated_at${extras ? ', assignees, checklist' : ''}`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Post niet gevonden' });
+    if (b.status !== undefined && oldStatus !== null && row.status !== oldStatus) {
+      await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'moved', row.status);
+    }
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1036,6 +1111,25 @@ router.delete('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Post niet gevonden' });
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Activiteiten-log van een kaart (aangemaakt, verplaatst, ...).
+router.get('/api/mkt/clients/:clientId/posts/:postId/activity', requireMkt, async (req, res) => {
+  try {
+    if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await postActivityAvailable())) return res.json({ success: true, activity: [] });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    if (!(await postInClient(req.params.postId, okClient, wsId))) return res.status(404).json({ error: 'Kaart niet gevonden' });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, actor_account_id, actor_name, action, detail, created_at
+         FROM marketing.content_post_activity
+        WHERE workspace_id=$1 AND post_id=$2
+        ORDER BY created_at DESC LIMIT 50`, [wsId, req.params.postId]
+    )).rows);
+    res.json({ success: true, activity: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
