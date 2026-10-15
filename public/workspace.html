@@ -2915,7 +2915,12 @@ async function submitAsModal(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/adsets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('asMsg',true,'Ad set toegevoegd.');setTimeout(function(){closeAsModal();renderCampDetail();},1100);}
+    if(r.ok&&d.success){
+      var asN=(Array.isArray(payload.captions)?payload.captions.filter(function(x){return (x||'').trim();}).length:0);
+      if(d.multiTextApplied===false){showMsg('asMsg',false,'Ad set toegevoegd, maar Meta accepteerde de meerdere teksten niet; er is 1 tekst gebruikt.');setTimeout(function(){closeAsModal();renderCampDetail();},3000);}
+      else if(d.multiTextApplied===true){showMsg('asMsg',true,'Ad set toegevoegd met '+(asN>1?(asN+' teksten'):'meerdere teksten')+'; Meta wisselt ze af.');setTimeout(function(){closeAsModal();renderCampDetail();},3500);}
+      else {showMsg('asMsg',true,'Ad set toegevoegd.');setTimeout(function(){closeAsModal();renderCampDetail();},1100);}
+    }
     else {showMsg('asMsg',false,d.error||'Toevoegen mislukt.');}
   }catch(e){showMsg('asMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Ad set toevoegen';
@@ -3107,9 +3112,13 @@ async function submitAddAd(){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-adsets/'+AA_ADSET+'/ads',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
     if(r.ok&&d.success){
+      var nCaps=caps.filter(function(x){return (x||'').trim();}).length;
       if(d.multiTextApplied===false){
         showMsg('addAdMsg',false,'Advertentie toegevoegd, maar Meta accepteerde de meerdere teksten nog niet; er is 1 tekst gebruikt. Stuur dit door, dan stel ik het bij.');
-        setTimeout(function(){closeAddAdModal();renderCampDetail();},2800);
+        setTimeout(function(){closeAddAdModal();renderCampDetail();},3000);
+      } else if(d.multiTextApplied===true){
+        showMsg('addAdMsg',true,'Advertentie toegevoegd met '+nCaps+' teksten. Meta wisselt ze af en toont de best presterende (dat is de rotatie). In de Meta-weergave zie je standaard de eerste tekst; de andere zitten wel in de advertentie.');
+        setTimeout(function(){closeAddAdModal();renderCampDetail();},4000);
       } else {
         showMsg('addAdMsg',true,'Advertentie toegevoegd (gepauzeerd).');
         setTimeout(function(){closeAddAdModal();renderCampDetail();},1100);
@@ -3349,7 +3358,11 @@ async function createCampaign2(){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
     if(r.ok&&d.success){
-      showMsg('campModalMsg',true,payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).');
+      var cpN=(Array.isArray(payload.captions)?payload.captions.filter(function(x){return (x||'').trim();}).length:0);
+      var cpBase=payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).';
+      if(d.multiTextApplied===false){cpBase+=' Let op: Meta accepteerde de meerdere teksten niet; er is 1 tekst gebruikt.';}
+      else if(d.multiTextApplied===true){cpBase+=' '+(cpN>1?(cpN+' teksten'):'Meerdere teksten')+' toegepast; Meta wisselt ze af en toont de best presterende.';}
+      showMsg('campModalMsg',d.multiTextApplied!==false,cpBase);
       var camp=d.campaign||{};
       setTimeout(function(){
         closeCampaign();

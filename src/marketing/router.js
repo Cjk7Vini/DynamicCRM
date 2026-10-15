@@ -2578,7 +2578,8 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
        RETURNING id, name, objective, daily_budget_cents, status, meta_campaign_id, link, created_at`,
       [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
     )).rows[0]);
-    res.json({ success: true, campaign: row });
+    const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
+    res.json({ success: true, campaign: row, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -2680,7 +2681,8 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
       name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
       status: launchStatus, access_token: token,
     });
-    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus });
+    const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
+    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
