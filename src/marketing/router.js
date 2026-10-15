@@ -1859,8 +1859,13 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
     return { primary: { object_story_spec: singleSpec() } };
   }
 
+  // optimization_type DEGREES_OF_FREEDOM = een FLEXIBELE advertentie (meerdere
+  // tekstopties die Meta afwisselt). Dit maakt de ad set NIET dynamisch, dus je
+  // kunt gewoon meerdere advertenties in dezelfde ad set houden. Zonder dit veld
+  // behandelt Meta het als dynamisch materiaal (max 1 advertentie per ad set).
   const afs = {
-    ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'SINGLE_IMAGE'],
+    optimization_type: 'DEGREES_OF_FREEDOM',
+    ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'AUTOMATIC_FORMAT'],
     bodies: texts.map((t) => ({ text: t })),
     titles: [{ text: head }],
     link_urls: [{ website_url: link }],
@@ -1872,7 +1877,11 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
     afs.images = [{ hash: await uploadMetaImageHash(adAccount, token, asset.url) }];
   }
   return {
-    primary: { object_story_spec: JSON.stringify({ page_id: pageId }), asset_feed_spec: JSON.stringify(afs) },
+    // object_story_spec met de link erin; Meta weigert hem zonder link (fout 2061015).
+    primary: {
+      object_story_spec: JSON.stringify({ page_id: pageId, link_data: { link } }),
+      asset_feed_spec: JSON.stringify(afs),
+    },
     fallback: { object_story_spec: singleSpec() },
   };
 }
@@ -4238,7 +4247,7 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
   } catch (e) {
     const m = String((e && e.message) || '');
     if (/1885553/.test(m) || /dynamisch advertentiemateriaal/i.test(m)) {
-      return res.status(400).json({ error: 'Deze ad set bevat al een advertentie met meerdere teksten (dynamisch materiaal). Meta staat dan maar een advertentie per ad set toe. Wil je meerdere advertenties? Maak een nieuwe ad set aan, of gebruik per advertentie een enkele tekst.' });
+      return res.status(400).json({ error: 'Deze ad set is eerder dynamisch geworden en mag daardoor maar een advertentie bevatten. Maak een nieuwe ad set aan voor extra advertenties; nieuwe ad sets hebben deze beperking niet meer.' });
     }
     res.status(400).json({ error: e.message });
   }
