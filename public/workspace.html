@@ -1541,9 +1541,11 @@ async function loadClients(){
     }
     body.innerHTML='<div class="cl-grid">'+d.clients.map(function(c){
       var col=c.brand_color||'#6366f1';
-      return '<div class="cl-card" onclick="openClient('+c.id+')"><div class="cl-top">'+
+      var oa=Number(c.open_actions)||0;
+      var bell=oa>0?('<span title="'+oa+' post(s) waar de klant wijzigingen heeft gevraagd" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#fff;background:#dc2626;padding:3px 8px;border-radius:20px;margin-left:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:block"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>'+oa+'</span>'):'';
+      return '<div class="cl-card" onclick="openClient('+c.id+')"><div class="cl-top" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
         '<div class="cl-ava" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
-        '<span class="status '+esc(c.status)+'">'+esc(c.status)+'</span></div>'+
+        '<span class="status '+esc(c.status)+'">'+esc(c.status)+'</span>'+bell+'</div>'+
         '<h4>'+esc(c.name)+'</h4><div class="mut">'+esc(c.contact_name||c.contact_email||'Geen contact')+'</div></div>';
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('clientsMsg',false,'Netwerkfout.');}

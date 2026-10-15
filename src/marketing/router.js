@@ -611,11 +611,13 @@ router.get('/api/mkt/clients', requireMkt, async (req, res) => {
     // Klant-account ziet uitsluitend de eigen klant-brand.
     const lock = mktClientLocked(req) ? mktLockedClientId(req) : null;
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT id, name, contact_name, contact_email, website, brand_color, status, archived, created_at
-         FROM marketing.clients
-        WHERE workspace_id = $1 ${includeArchived ? '' : 'AND archived = false'}
-          ${lock ? 'AND id = $2' : ''}
-        ORDER BY name ASC`,
+      `SELECT cl.id, cl.name, cl.contact_name, cl.contact_email, cl.website, cl.brand_color, cl.status, cl.archived, cl.created_at,
+              (SELECT COUNT(*)::int FROM marketing.content_posts p
+                 WHERE p.workspace_id = cl.workspace_id AND p.client_id = cl.id AND p.approval = 'changes') AS open_actions
+         FROM marketing.clients cl
+        WHERE cl.workspace_id = $1 ${includeArchived ? '' : 'AND cl.archived = false'}
+          ${lock ? 'AND cl.id = $2' : ''}
+        ORDER BY cl.name ASC`,
       lock ? [req.session.mkt.workspaceId, lock] : [req.session.mkt.workspaceId]
     )).rows);
     res.json({ success: true, clients: rows });
