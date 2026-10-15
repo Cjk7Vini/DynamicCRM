@@ -1622,28 +1622,75 @@ function dTabShow(which){
 
 // ---- Client-items: To do / Documenten ----
 function clientItemsCtx(kind){return kind==='document'?{body:'docsBody',msg:'docsMsg',ph:'Naam (bv. Contract, Bedrijfsinfo)',urlPh:'Link (Google Drive, bestand...)',empty:'Nog geen documenten.'}:{body:'todoBody',msg:'todoMsg',ph:'Wat moet er gebeuren?',urlPh:'Optionele link (bv. vragenlijst)',empty:'Nog geen to do-items.'};}
+var MKT_MEMBERS=[];
+async function loadMembers(){
+  try{var r=await fetch('/api/mkt/members',{credentials:'include'});var d=await r.json();MKT_MEMBERS=(d&&d.success&&d.members)?d.members:[];}catch(e){MKT_MEMBERS=[];}
+}
+function memberOptions(sel){
+  return '<option value="">Niemand</option>'+MKT_MEMBERS.map(function(m){return '<option value="'+m.id+'"'+((String(sel)===String(m.id))?' selected':'')+'>'+esc(m.name||m.email)+'</option>';}).join('');
+}
+function setTodoBadge(myOpen){
+  var tab=document.getElementById('tabTodo'); if(!tab)return;
+  var ex=tab.querySelector('.todo-badge'); if(ex)ex.remove();
+  if(myOpen>0){var b=document.createElement('span');b.className='todo-badge';b.textContent=myOpen;b.style.cssText='margin-left:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px';tab.appendChild(b);}
+}
 async function loadClientItems(kind){
   if(!CURRENT_CLIENT)return; var c=clientItemsCtx(kind); var body=document.getElementById(c.body); if(!body)return;
   body.innerHTML='<div class="empty">Laden...</div>';
+  if(kind==='todo'&&!MKT_MEMBERS.length)await loadMembers();
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items?kind='+kind,{credentials:'include'}); var d=await r.json();
     var items=(d&&d.success&&d.items)?d.items:[];
-    var add='<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><input id="ci_title_'+kind+'" placeholder="'+esc(c.ph)+'" style="flex:2;min-width:180px"><input id="ci_url_'+kind+'" placeholder="'+esc(c.urlPh)+'" style="flex:2;min-width:160px"><button class="btn btn-primary" style="padding:8px 14px" onclick="addClientItem(\''+kind+'\')">Toevoegen</button></div>';
+    var enh=!!(d&&d.enhanced);
+    var add;
+    if(kind==='todo'&&enh){
+      add='<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+
+        '<input id="ci_title_todo" placeholder="'+esc(c.ph)+'" style="flex:2;min-width:150px">'+
+        '<select id="ci_assignee_todo" style="flex:1;min-width:120px;width:auto" title="Toewijzen aan">'+memberOptions('')+'</select>'+
+        '<input type="date" id="ci_due_todo" style="flex:0 0 150px;width:auto" title="Deadline">'+
+        '<input id="ci_url_todo" placeholder="'+esc(c.urlPh)+'" style="flex:1;min-width:120px">'+
+        '<button class="btn btn-primary" style="padding:8px 14px" onclick="addClientItem(\'todo\')">Toevoegen</button></div>';
+    } else {
+      add='<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><input id="ci_title_'+kind+'" placeholder="'+esc(c.ph)+'" style="flex:2;min-width:180px"><input id="ci_url_'+kind+'" placeholder="'+esc(c.urlPh)+'" style="flex:2;min-width:160px"><button class="btn btn-primary" style="padding:8px 14px" onclick="addClientItem(\''+kind+'\')">Toevoegen</button></div>';
+    }
+    var today=new Date().toISOString().slice(0,10);
+    var myId=(ME&&ME.id)?ME.id:null; var myOpen=0;
     var list=items.length?items.map(function(it){
       var check=(kind==='todo')?('<input type="checkbox" '+(it.done?'checked':'')+' onchange="toggleClientItem('+it.id+',\''+kind+'\',this.checked)" style="width:auto;margin-right:10px;flex:none">'):'';
       var title='<span style="font-size:14px;'+(it.done?'text-decoration:line-through;color:var(--muted)':'')+'">'+esc(it.title)+'</span>';
       var link=it.url?(' <a href="'+esc(it.url)+'" target="_blank" style="color:var(--accent-2);font-size:12.5px;margin-left:8px">openen</a>'):'';
-      return '<div class="card" style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="flex:1;display:flex;align-items:center">'+check+'<div>'+title+link+'</div></div><button class="icon-btn del" title="Verwijderen" onclick="delClientItem('+it.id+',\''+kind+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button></div>';
+      var second='';
+      if(kind==='todo'&&enh){
+        if(!it.done&&myId&&String(it.assignee_account_id)===String(myId))myOpen++;
+        var overdue=(it.due_date&&!it.done&&it.due_date<today);
+        var asSel='<select onchange="updateItemField('+it.id+',\'todo\',\'assignee_account_id\',this.value)" style="width:auto;flex:0 0 auto;min-width:120px" title="Toewijzen aan">'+memberOptions(it.assignee_account_id)+'</select>';
+        var dueInput='<input type="date" value="'+esc(it.due_date||'')+'" onchange="updateItemField('+it.id+',\'todo\',\'due_date\',this.value)" style="width:auto;flex:0 0 150px;'+(overdue?'border-color:#dc2626;color:#dc2626':'')+'" title="Deadline">';
+        second='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">'+asSel+dueInput+(overdue?'<span style="font-size:11px;color:#dc2626;font-weight:700">Over tijd</span>':'')+'</div>';
+      }
+      return '<div class="card" style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;display:flex;align-items:center">'+check+'<div>'+title+link+'</div></div><button class="icon-btn del" title="Verwijderen" onclick="delClientItem('+it.id+',\''+kind+'\')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button></div>'+second+'</div>';
     }).join(''):'<div class="empty">'+esc(c.empty)+'</div>';
     body.innerHTML=add+list;
+    if(kind==='todo')setTodoBadge(myOpen);
   }catch(e){body.innerHTML='<div class="empty">Kon niet laden.</div>';}
 }
 async function addClientItem(kind){
   var title=(document.getElementById('ci_title_'+kind).value||'').trim(); if(!title)return;
   var url=(document.getElementById('ci_url_'+kind).value||'').trim();
+  var payload={kind:kind,title:title,url:url};
+  if(kind==='todo'){
+    var asEl=document.getElementById('ci_assignee_todo'); if(asEl)payload.assignee_account_id=asEl.value||'';
+    var dueEl=document.getElementById('ci_due_todo'); if(dueEl)payload.due_date=dueEl.value||'';
+  }
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({kind:kind,title:title,url:url})});
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json(); if(r.ok&&d.success){loadClientItems(kind);}else{showMsg(clientItemsCtx(kind).msg,false,d.error||'Toevoegen mislukt.');}
+  }catch(e){showMsg(clientItemsCtx(kind).msg,false,'Netwerkfout.');}
+}
+async function updateItemField(id,kind,field,value){
+  var payload={}; payload[field]=value;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+    var d=await r.json(); if(r.ok&&d.success){loadClientItems(kind);}else{showMsg(clientItemsCtx(kind).msg,false,(d&&d.error)||'Bijwerken mislukt.');}
   }catch(e){showMsg(clientItemsCtx(kind).msg,false,'Netwerkfout.');}
 }
 async function toggleClientItem(id,kind,done){
