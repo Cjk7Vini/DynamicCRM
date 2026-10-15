@@ -2146,16 +2146,34 @@ async function createAdCreativeNoAI(adAccount, token, name, built) {
     // 3) Kale creative, zodat het aanmaken nooit breekt.
     return await graphPost(`${adAccount}/adcreatives`, base);
   };
+  // 1e poging: standaard flexibele creative (beeld in asset_feed_spec).
   try {
     return await attempt(norm.primary);
-  } catch (e) {
+  } catch (e1) {
+    const flexErr1 = (e1 && e1.message) || '';
+    // 2e poging: beeld + knop in object_story_spec, teksten in asset_feed_spec.
+    // Blijft een meerdere-teksten-creative (geen terugval).
+    if (norm.altFlex) {
+      try { return await attempt(norm.altFlex); }
+      catch (e2) {
+        const flexErr2 = (e2 && e2.message) || flexErr1;
+        if (norm.fallback) {
+          try { console.warn('[MKT] flexibele creative geweigerd, terugval op 1 tekst:', flexErr2); } catch (_) { /* noop */ }
+          const r = await attempt(norm.fallback);
+          if (r && typeof r === 'object') { r._usedFallback = true; r._flexError = flexErr2; }
+          return r;
+        }
+        throw e2;
+      }
+    }
+    // 3e poging: enkele-tekst creative, zodat het aanmaken nooit breekt.
     if (norm.fallback) {
-      try { console.warn('[MKT] flexibele creative (meerdere teksten) geweigerd, terugval op 1 tekst:', e && e.message); } catch (_) { /* noop */ }
+      try { console.warn('[MKT] flexibele creative geweigerd, terugval op 1 tekst:', flexErr1); } catch (_) { /* noop */ }
       const r = await attempt(norm.fallback);
-      if (r && typeof r === 'object') r._usedFallback = true;
+      if (r && typeof r === 'object') { r._usedFallback = true; r._flexError = flexErr1; }
       return r;
     }
-    throw e;
+    throw e1;
   }
 }
 
@@ -2211,6 +2229,7 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
   // tekstopties die Meta afwisselt). Dit maakt de ad set NIET dynamisch, dus je
   // kunt gewoon meerdere advertenties in dezelfde ad set houden. Zonder dit veld
   // behandelt Meta het als dynamisch materiaal (max 1 advertentie per ad set).
+  const mediaHash = isVideo ? null : await uploadMetaImageHash(adAccount, token, asset.url);
   const afs = {
     optimization_type: 'DEGREES_OF_FREEDOM',
     ad_formats: [isVideo ? 'SINGLE_VIDEO' : 'AUTOMATIC_FORMAT'],
@@ -2222,17 +2241,27 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
   if (isVideo) {
     afs.videos = [{ video_id: videoId, thumbnail_url: cloudinaryVideoThumb(asset.url) }];
   } else {
-    afs.images = [{ hash: await uploadMetaImageHash(adAccount, token, asset.url) }];
+    afs.images = [{ hash: mediaHash }];
   }
+  // Tweede poging als Meta het bovenstaande weigert: het beeld (video/afbeelding) en
+  // de knop in object_story_spec, en ALLEEN de tekstvarianten in asset_feed_spec. Zo
+  // blijven zowel het beeld + de knop als de meerdere teksten behouden.
+  const altStory = isVideo
+    ? { page_id: pageId, video_data: { video_id: videoId, image_url: cloudinaryVideoThumb(asset.url), call_to_action: { type: cta, value: { link } }, title: head } }
+    : { page_id: pageId, link_data: { link, image_hash: mediaHash, call_to_action: { type: cta, value: { link } }, name: head } };
+  const altFeed = { bodies: texts.map((t) => ({ text: t })), optimization_type: 'DEGREES_OF_FREEDOM' };
   return {
     // Bij een flexibele creative (asset_feed_spec) bevat object_story_spec ALLEEN de
     // page_id. De bestemmings-URL staat in asset_feed_spec.link_urls. Zetten we hier
     // link_data neer, dan gebruikt Meta dat als basisverhaal (zonder video en zonder
-    // knop) en negeert het de video en CTA uit de asset_feed_spec. Gevolg: de
-    // video/afbeelding en de knop verdwijnen, terwijl de teksten wel doorkomen.
+    // knop) en negeert het de video en CTA uit de asset_feed_spec.
     primary: {
       object_story_spec: JSON.stringify({ page_id: pageId }),
       asset_feed_spec: JSON.stringify(afs),
+    },
+    altFlex: {
+      object_story_spec: JSON.stringify(altStory),
+      asset_feed_spec: JSON.stringify(altFeed),
     },
     fallback: { object_story_spec: singleSpec() },
   };
@@ -2579,7 +2608,7 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
     )).rows[0]);
     const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
-    res.json({ success: true, campaign: row, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
+    res.json({ success: true, campaign: row, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -2682,7 +2711,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
       status: launchStatus, access_token: token,
     });
     const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
-    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
+    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -4703,7 +4732,7 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
       }
     }
     // multiTextApplied: null = geen meerdere teksten gevraagd; true/false = of Meta de afwisseling accepteerde.
-    res.json({ success: true, ad_id: ad.id, adsetHealed, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
+    res.json({ success: true, ad_id: ad.id, adsetHealed, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
   } catch (e) {
     const m = String((e && e.message) || '');
     if (/1885553/.test(m) || /dynamisch advertentiemateriaal/i.test(m)) {
