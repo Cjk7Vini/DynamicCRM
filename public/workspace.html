@@ -316,6 +316,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="stat"><div class="k">Licentie</div><div class="v" id="stLicense" style="font-size:20px">-</div></div>
           <div class="stat"><div class="k">Seats</div><div class="v" id="stSeats">-</div></div>
         </div>
+        <div id="ovPanels"></div>
         <div class="section-h"><h4>Modules</h4></div>
         <div class="grid">
           <div class="mod live" onclick="navTo('clients')"><h5>Klanten</h5><p>Beheer per klant een eigen space.</p><span class="tag on">Actief</span></div>
@@ -1356,7 +1357,27 @@ function navTo(view){
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
-  else {document.getElementById('viewOverzicht').classList.add('active');}
+  else {document.getElementById('viewOverzicht').classList.add('active');loadOverzicht();}
+}
+async function loadOverzicht(){
+  var el=document.getElementById('ovPanels'); if(!el)return;
+  if(ME&&ME.role==='client'){el.innerHTML='';return;}
+  var tasks=[],posts=[],clients=[];
+  try{var r=await fetch('/api/mkt/my-tasks',{credentials:'include'});var d=await r.json();if(d&&d.success)tasks=d.tasks||[];}catch(e){}
+  try{var r2=await fetch('/api/mkt/upcoming-posts',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)posts=d2.posts||[];}catch(e){}
+  try{var r3=await fetch('/api/mkt/clients',{credentials:'include'});var d3=await r3.json();if(d3&&d3.success)clients=(d3.clients||[]).filter(function(c){return (Number(c.open_actions)||0)>0;});}catch(e){}
+  var today=new Date().toISOString().slice(0,10);
+  function panel(title,inner){return '<div class="card" style="flex:1;min-width:250px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">'+esc(title)+'</div>'+inner+'</div>';}
+  var tHtml=tasks.length?tasks.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<today);return '<div onclick="openClient('+t.client_id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(t.title)+'<span style="color:var(--muted)"> &middot; '+esc(t.client_name||'')+'</span></span><span style="font-size:12px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+(t.due_date?esc(t.due_date):'')+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen openstaande taken voor jou.</div>';
+  var pHtml=posts.length?posts.slice(0,6).map(function(p){return '<div onclick="openClient('+p.client_id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted)"> &middot; '+esc(p.client_name||'')+'</span></span><span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen geplande posts.</div>';
+  var cHtml=clients.length?clients.map(function(c){return '<div onclick="openClient('+c.id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(c.name)+'</span><span style="font-size:11px;font-weight:700;color:#fff;background:#dc2626;padding:1px 8px;border-radius:20px">'+(Number(c.open_actions)||0)+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen openstaande acties.</div>';
+  el.innerHTML='<div class="section-h" style="margin-top:4px"><h4>Overzicht</h4></div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">'+
+      panel('Jouw eerstvolgende taken',tHtml)+
+      panel('Eerstvolgende geplande posts',pHtml)+
+      panel('Klanten met openstaande actie',cHtml)+
+    '</div>'+
+    '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Best presterende posts per klant vind je in Rapportage (op engagement rate).</div>';
 }
 function wsiTab(p){
   ['meta','google','tiktok','linkedin'].forEach(function(x){

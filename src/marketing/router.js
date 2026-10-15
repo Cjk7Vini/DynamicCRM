@@ -1224,6 +1224,26 @@ router.get('/api/mkt/my-tasks', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Eerstvolgende geplande posts over alle klanten, voor de overzichtspagina.
+router.get('/api/mkt/upcoming-posts', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const lock = mktClientLocked(req) ? mktLockedClientId(req) : null;
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT p.id, p.client_id, p.title, p.channel, p.status, p.scheduled_at, cl.name AS client_name
+         FROM marketing.content_posts p
+         JOIN marketing.clients cl ON cl.id = p.client_id
+        WHERE p.workspace_id=$1 AND p.scheduled_at IS NOT NULL AND p.scheduled_at >= now()
+          AND p.status <> 'published'
+          ${lock ? 'AND p.client_id = $2' : ''}
+        ORDER BY p.scheduled_at ASC
+        LIMIT 8`,
+      lock ? [wsId, lock] : [wsId]
+    )).rows);
+    res.json({ success: true, posts: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ---- Eigen (custom) labels per werkplek ----
 router.get('/api/mkt/label-defs', requireMkt, async (req, res) => {
   try {
