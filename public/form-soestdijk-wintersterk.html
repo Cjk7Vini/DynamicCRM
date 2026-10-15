@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wintersterk Programma - Fysiotherapie Soestdijk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #e7cba7 0%, #e7cba7 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            max-width: 600px;
+            width: 100%;
+            padding: 50px;
+        }
+
+        .form-header { text-align: center; margin-bottom: 32px; }
+
+        .practice-badge {
+            background: #e7cba7;
+            color: #393939;
+            padding: 8px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 18px;
+            font-weight: 600;
+            font-size: 14px;
+            border: 1px solid rgba(57,57,57,0.22);
+        }
+
+        h1 {
+            color: #393939;
+            font-size: 26px;
+            margin-bottom: 12px;
+            line-height: 1.35;
+        }
+
+        .form-subtitle {
+            color: #393939;
+            font-size: 15px;
+            font-weight: 600;
+            background: #e7cba7;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-top: 4px;
+        }
+
+        .intro-text {
+            color: #4b5563;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-top: 16px;
+            text-align: left;
+        }
+
+        .benefits-list {
+            background: #e7cba7;
+            border-radius: 12px;
+            padding: 20px 22px;
+            margin: 24px 0;
+            border-left: 4px solid #393939;
+        }
+
+        .benefits-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #393939;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .benefit-item:last-child { margin-bottom: 0; }
+
+        .green-check {
+            color: #393939;
+            font-weight: bold;
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .benefits-note {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(57,57,57,0.22);
+            font-size: 15px;
+            color: #393939;
+            font-weight: 700;
+        }
+
+        .signup-line {
+            font-size: 15px;
+            font-weight: 600;
+            color: #393939;
+            margin-bottom: 18px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: 600;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .required { color: #e74c3c; }
+
+        input, select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 9px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            color: #111;
+            background: #fafafa;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #e7cba7;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(57,57,57, 0.15);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+            font-weight: normal;
+        }
+
+        .submit-button {
+            background: #393939;
+            color: white;
+            padding: 16px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(57,57,57, 0.35);
+            font-family: inherit;
+        }
+
+        .submit-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(57,57,57, 0.45);
+        }
+
+        .submit-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 16px;
+            color: #9ca3af;
+            font-size: 12px;
+            gap: 6px;
+        }
+
+        #msg {
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            text-align: center;
+            display: none;
+        }
+        #msg.success { background: #4CAF50; color: white; display: block; }
+        #msg.error   { background: #f44336; color: white; display: block; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .success-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: slideUp 0.4s ease;
+        }
+
+        .success-icon {
+            width: 76px; height: 76px;
+            background: #393939;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 24px rgba(57,57,57, 0.3);
+        }
+        .success-icon svg {
+            width: 44px; height: 44px;
+            stroke: white; stroke-width: 3;
+            stroke-linecap: round; stroke-linejoin: round; fill: none;
+        }
+
+        .success-modal h2 { color: #393939; font-size: 26px; margin-bottom: 14px; }
+        .success-modal p  { color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 8px; }
+        .practice-name-highlight { color: #393939; font-weight: 700; }
+
+        .success-modal .close-button {
+            background: #393939;
+            color: white; border: none;
+            padding: 12px 32px; border-radius: 50px;
+            font-size: 15px; font-weight: 600;
+            cursor: pointer; margin-top: 22px;
+            transition: all 0.3s ease; font-family: inherit;
+        }
+        .success-modal .close-button:hover { transform: translateY(-2px); }
+        .auto-close-note { color: #999; font-size: 13px; margin-top: 12px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            .form-container { padding: 30px 22px; }
+            h1 { font-size: 22px; }
+        }
+    </style>
+
+    <!-- Meta Pixel -->
+    <script src="/js/meta-pixel.js"></script>
+    <noscript>
+        <img height="1" width="1" style="display:none"
+             src="https://www.facebook.com/tr?id=662300986944267&ev=PageView&noscript=1"/>
+    </noscript>
+    <!-- End Meta Pixel -->
+</head>
+<body>
+    <div class="form-container">
+
+        <div class="form-header">
+            <div class="practice-badge">Fysiotherapie Soestdijk</div>
+            <h1>Blijf deze winter sterk en fit met het 12-weekse Wintersterk Programma!</h1>
+            <p class="form-subtitle">Werk 12 weken lang onder begeleiding aan je kracht en conditie. Met twee groepslessen per week en verschillende meetmomenten krijg je de mogelijkheid om gericht aan je fitheid te werken en je voortgang bij te houden.</p>
+            <p class="intro-text">Wil je graag (weer) beginnen met sporten of ook tijdens de winter actief blijven, maar vind je het lastig om daar zelf structuur in aan te brengen? Dan is het Wintersterk Programma van Fysiotherapie Soestdijk misschien iets voor jou!</p>
+        </div>
+
+        <div class="benefits-list">
+            <div class="benefits-title">Dit is het programma:</div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>12 weken trainen: twee groepslessen per week naar keuze onder begeleiding.</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Werken aan kracht en conditie: samen trainen en actief bezig zijn met je fitheid.</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Intake en bodyscan bij de start: om inzicht te krijgen waar je nu staat.</span>
+            </div>
+            <div class="benefit-item">
+                <span class="green-check">✓</span>
+                <span>Tussentijdse meting en eindmeting: om je voortgang tijdens en na het traject inzichtelijk te maken.</span>
+            </div>
+            <div class="benefits-note">
+                Nu voor slechts &euro;99,-
+            </div>
+        </div>
+
+        <p class="signup-line">Laat hieronder je gegevens achter om je aan te melden:</p>
+
+        <div id="msg"></div>
+
+        <form id="leadForm">
+            <input type="hidden" id="praktijk_code" name="praktijk_code" value="S7F2MW">
+
+            <div class="form-group">
+                <label for="volledige_naam">Volledige naam <span class="required">*</span></label>
+                <input type="text" id="volledige_naam" name="volledige_naam" required placeholder="Voor- en achternaam">
+            </div>
+
+            <div class="form-group">
+                <label for="emailadres">E-mailadres <span class="required">*</span></label>
+                <input type="email" id="emailadres" name="emailadres" required placeholder="je.email@voorbeeld.nl">
+            </div>
+
+            <div class="form-group">
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+            </div>
+
+            <div class="form-group">
+                <label for="bron">Hoe heb je ons gevonden?</label>
+                <select id="bron" name="bron">
+                    <option value="">Selecteer...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Google">Google</option>
+                    <option value="Vrienden/Familie">Vrienden/Familie</option>
+                    <option value="Voucher">Voucher</option>
+                </select>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="toestemming" name="toestemming" value="true" required>
+                <label for="toestemming" class="checkbox-label">
+                    Ik ga akkoord met de privacyverklaring en geef toestemming om contact met mij op te nemen voor meer informatie over het Wintersterk Programma. <span class="required">*</span>
+                </label>
+            </div>
+
+            <button type="submit" class="submit-button" id="submitButton">
+                Verstuur aanvraag
+            </button>
+
+            <div class="security-note">
+                Je gegevens worden veilig verwerkt en nooit gedeeld met derden
+            </div>
+        </form>
+
+        <p style="text-align:center;margin-top:24px;font-size:12px;color:#9ca3af;">
+            Copyright &copy; Dynamic Health Consultancy
+        </p>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="successModal">
+        <div class="success-modal">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52"><polyline points="14 27 22 35 38 19"/></svg>
+            </div>
+            <h2>Gegevens succesvol verstuurd!</h2>
+            <p>Je aanmelding voor het Wintersterk Programma is ontvangen door</p>
+            <p class="practice-name-highlight" id="modalPracticeName">Fysiotherapie Soestdijk</p>
+            <p style="margin-top:16px;">We nemen binnen 1 werkdag contact met je op.</p>
+            <button class="close-button" onclick="closeSuccessModal()">Sluiten</button>
+            <p class="auto-close-note">Dit venster sluit automatisch over <span id="countdown">10</span> seconden</p>
+        </div>
+    </div>
+
+    <script>
+        var PRACTICE_CODE = 'S7F2MW';
+        var CAMPAGNE = 'Wintersterk Programma';
+        var countdownTimer;
+
+        function showSuccessModal(practiceName) {
+            document.getElementById('modalPracticeName').textContent = practiceName || 'Fysiotherapie Soestdijk';
+            document.getElementById('successModal').classList.add('active');
+            var s = 10;
+            countdownTimer = setInterval(function() {
+                s--;
+                document.getElementById('countdown').textContent = s;
+                if (s <= 0) closeSuccessModal();
+            }, 1000);
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').classList.remove('active');
+            if (countdownTimer) clearInterval(countdownTimer);
+            document.getElementById('leadForm').reset();
+            document.getElementById('praktijk_code').value = PRACTICE_CODE;
+        }
+
+        document.getElementById('leadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            var btn = document.getElementById('submitButton');
+            btn.disabled = true;
+            btn.textContent = 'Bezig met versturen...';
+
+            var email     = document.getElementById('emailadres').value.trim();
+            var telefoon  = document.getElementById('telefoon').value.trim();
+            var naam      = document.getElementById('volledige_naam').value.trim();
+            var hoeGevonden = document.getElementById('bron').value;
+            var consent   = document.getElementById('toestemming').checked;
+
+            if (!naam || !email || !telefoon || !consent) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Vul alle verplichte velden in.';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Verstuur aanvraag';
+                return;
+            }
+
+            var phoneDigits = telefoon.replace(/\D/g, '');
+            if (phoneDigits.length < 10) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Voer een geldig telefoonnummer in (minimaal 10 cijfers).';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Verstuur aanvraag';
+                return;
+            }
+
+            // Genereer event_id voor Meta deduplicatie
+            var eventId = 'dhc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            var data = {
+                praktijk_code:   PRACTICE_CODE,
+                volledige_naam:  naam,
+                emailadres:      email,
+                telefoon:        phoneDigits,
+                doel:            hoeGevonden,
+                bron:            CAMPAGNE,
+                toestemming:     true,
+                meta_event_id:   eventId,
+                event_source_url: window.location.href
+            };
+
+            try {
+                var res  = await fetch('/leads', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                var json = await res.json().catch(function() { return {}; });
+
+                if (res.ok) {
+                    var submitToken  = json.submit_token || '';
+                    var leadId       = json.lead && json.lead.id ? json.lead.id : '';
+                    window.location.href = '/thankyou.html?s=' + PRACTICE_CODE +
+                        '&eid=' + encodeURIComponent(eventId) +
+                        '&st='  + encodeURIComponent(submitToken) +
+                        '&lid=' + encodeURIComponent(leadId);
+                } else {
+                    document.getElementById('msg').className = 'error';
+                    document.getElementById('msg').textContent = json.error || 'Er is iets misgegaan. Probeer het opnieuw.';
+                    document.getElementById('msg').style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Verstuur aanvraag';
+                }
+            } catch (err) {
+                document.getElementById('msg').className = 'error';
+                document.getElementById('msg').textContent = 'Geen verbinding. Controleer je internet en probeer opnieuw.';
+                document.getElementById('msg').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Verstuur aanvraag';
+            }
+        });
+    </script>
+
+
+</body>
+</html>
