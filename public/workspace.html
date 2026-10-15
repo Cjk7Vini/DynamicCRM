@@ -1132,11 +1132,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="sub">Plan content voor deze klant.</div>
     <div id="postMsg" class="inline-msg"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
+    <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
       <div id="pfBlocks"></div>
       <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
     </div>
-    <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="row2">
       <div class="field"><label>Kanaal</label>
         <select id="pfChannel">
@@ -2371,12 +2371,6 @@ async function loadMetaInsights(){
       html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per contenttype</h4></div><div class="card">';
       html+=d.views_by_type.map(function(x){var w=Math.round((x.value/mvt)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+' weergaven</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
     }
-    // Verdeling per contenttype (posts + interacties)
-    if(d.contentTypes&&d.contentTypes.length){
-      var maxc=Math.max.apply(null,d.contentTypes.map(function(c){return c.count;}))||1;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Verdeling per contenttype</h4></div><div class="card">';
-      html+=d.contentTypes.map(function(c){var w=Math.round((c.count/maxc)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(RTL[c.type]||c.type)+'</span><span style="color:var(--muted)">'+c.count+' posts &middot; '+iv(c.interactions)+' interacties</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
-    }
     // Demografie van de volgers
     if(d.demographics){
       var dm=d.demographics;
@@ -2395,7 +2389,7 @@ async function loadMetaInsights(){
     // Ranking of posts (tabel met per-post cijfers)
     if(d.topPosts&&d.topPosts.length){
       _METAPOSTS=d.topPosts;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Ranking of posts</h4><span style="font-size:12px;color:var(--muted)">'+d.topPosts.length+' best presterende posts (op weergaven)</span></div>';
+      html+='<div class="section-h" style="margin-top:16px"><h4>Ranking of posts</h4><span style="font-size:12px;color:var(--muted)">'+d.topPosts.length+' best presterende posts (op engagement rate: likes + reacties + opgeslagen + gedeeld / bereik)</span></div>';
       html+='<div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Datum</th><th style="text-align:left;padding:8px 6px">Type</th><th style="text-align:left;padding:8px 6px">Tekst</th><th style="padding:8px 6px">Weergaven</th><th style="padding:8px 6px">Kijkers</th><th style="padding:8px 6px">Nieuwe volgers</th><th style="padding:8px 6px">Likes</th><th style="padding:8px 6px">Reacties</th><th style="padding:8px 6px">Opgeslagen</th><th style="padding:8px 6px">Gedeeld</th><th style="padding:8px 6px">Engagement</th></tr>';
       html+=d.topPosts.map(function(p){
         var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:cover;display:block">'):'<div style="width:40px;height:40px;border-radius:7px;background:var(--line)"></div>';

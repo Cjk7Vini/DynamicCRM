@@ -3306,9 +3306,15 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           }
         };
         try { await Promise.all(allPosts.map(enrichPost)); } catch (_) { /* rapport blijft heel */ }
-        // Ranken op prestatie: weergaven eerst, dan bereik, dan interacties.
-        const perf = (p) => (p.views != null ? p.views : (p.reach != null ? p.reach : ((p.likes || 0) + (p.comments || 0))));
-        allPosts.sort((x, y) => perf(y) - perf(x));
+        // Ranken op engagement rate (DHC-formule). Posts zonder bereik/engagement
+        // komen onderaan; bij gelijke engagement rangschikken we op aantal interacties.
+        const interCount = (p) => (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
+        allPosts.sort((x, y) => {
+          const ex = x.engagement != null ? x.engagement : -1;
+          const ey = y.engagement != null ? y.engagement : -1;
+          if (ey !== ex) return ey - ex;
+          return interCount(y) - interCount(x);
+        });
         out.topPosts = allPosts.slice(0, 10);
       } else {
         out.topPosts = [];
