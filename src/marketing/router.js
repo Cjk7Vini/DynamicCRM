@@ -777,6 +777,38 @@ async function clientItemsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Zijn de extra to-do-kolommen (toegewezen persoon + deadline) al aanwezig?
+// (migratie 014). Zo niet, dan werkt de to-do als voorheen (zonder taggen/deadline).
+let _hasClientItemsExtra = null;
+async function clientItemsEnhancedAvailable() {
+  if (_hasClientItemsExtra === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='client_items' AND column_name='due_date'"
+    )).rows);
+    if (r.length > 0) _hasClientItemsExtra = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Alleen een account uit deze workspace dat geen klant-login is kan een taak krijgen.
+// Ongeldige waarde valt terug op null (niet toegewezen).
+async function validateAssignee(wsId, val) {
+  if (val === undefined || val === null || val === '') return null;
+  const id = parseInt(val, 10);
+  if (!Number.isInteger(id)) return null;
+  const ok = await withReadConnection(async (c) => (await c.query(
+    "SELECT 1 FROM marketing.accounts WHERE id=$1 AND workspace_id=$2 AND role <> 'client'", [id, wsId]
+  )).rows[0]);
+  return ok ? id : null;
+}
+function validateDueDate(val) {
+  if (val === undefined || val === null || val === '') return null;
+  const s = String(val).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + 'T00:00:00Z');
+  if (isNaN(d.getTime())) return null;
+  return s;
+}
 let _hasContentLabelDefs = null;
 async function contentLabelDefsAvailable() {
   if (_hasContentLabelDefs === true) return true;
@@ -1064,16 +1096,25 @@ router.delete('/api/mkt/clients/:clientId/posts/:postId/comments/:commentId', re
 router.get('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => {
   try {
     if (!mktClientAllowed(req, req.params.clientId)) return res.status(403).json({ error: 'Geen toegang' });
-    if (!(await clientItemsAvailable())) return res.json({ success: true, items: [] });
+    if (!(await clientItemsAvailable())) return res.json({ success: true, items: [], enhanced: false });
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const kind = (req.query.kind === 'document') ? 'document' : 'todo';
+    const enhanced = await clientItemsEnhancedAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
-      'SELECT id, kind, title, url, done, created_at FROM marketing.client_items WHERE workspace_id=$1 AND client_id=$2 AND kind=$3 ORDER BY done ASC, created_at DESC',
+      enhanced
+        ? `SELECT ci.id, ci.kind, ci.title, ci.url, ci.done, ci.created_at,
+                  ci.assignee_account_id, to_char(ci.due_date,'YYYY-MM-DD') AS due_date,
+                  COALESCE(ac.full_name, ac.email) AS assignee_name
+             FROM marketing.client_items ci
+             LEFT JOIN marketing.accounts ac ON ac.id = ci.assignee_account_id
+            WHERE ci.workspace_id=$1 AND ci.client_id=$2 AND ci.kind=$3
+            ORDER BY ci.done ASC, ci.due_date ASC NULLS LAST, ci.created_at DESC`
+        : 'SELECT id, kind, title, url, done, created_at FROM marketing.client_items WHERE workspace_id=$1 AND client_id=$2 AND kind=$3 ORDER BY done ASC, created_at DESC',
       [wsId, okClient, kind]
     )).rows);
-    res.json({ success: true, items: rows });
+    res.json({ success: true, items: rows, enhanced });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 router.post('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => {
@@ -1088,10 +1129,19 @@ router.post('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => 
     if (!title) return res.status(400).json({ error: 'Titel is verplicht' });
     let url = String((req.body && req.body.url) || '').trim().slice(0, 2000) || null;
     if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const enhanced = await clientItemsEnhancedAvailable();
+    const assignee = enhanced ? await validateAssignee(wsId, req.body && req.body.assignee_account_id) : null;
+    const due = enhanced ? validateDueDate(req.body && req.body.due_date) : null;
     const row = await withWriteConnection(async (c) => (await c.query(
-      `INSERT INTO marketing.client_items (workspace_id, client_id, kind, title, url, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, kind, title, url, done, created_at`,
-      [wsId, okClient, kind, title.slice(0, 500), url, req.session.mkt.accountId || null]
+      enhanced
+        ? `INSERT INTO marketing.client_items (workspace_id, client_id, kind, title, url, created_by, assignee_account_id, due_date)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             RETURNING id, kind, title, url, done, created_at, assignee_account_id, to_char(due_date,'YYYY-MM-DD') AS due_date`
+        : `INSERT INTO marketing.client_items (workspace_id, client_id, kind, title, url, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, kind, title, url, done, created_at`,
+      enhanced
+        ? [wsId, okClient, kind, title.slice(0, 500), url, req.session.mkt.accountId || null, assignee, due]
+        : [wsId, okClient, kind, title.slice(0, 500), url, req.session.mkt.accountId || null]
     )).rows[0]);
     res.json({ success: true, item: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1103,14 +1153,20 @@ router.patch('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, res
     const wsId = req.session.mkt.workspaceId;
     const okClient = await clientInWorkspace(req.params.clientId, wsId);
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const enhanced = await clientItemsEnhancedAvailable();
     const b = req.body || {}; const sets = []; const vals = []; let i = 1;
     if (b.title !== undefined) { if (!String(b.title).trim()) return res.status(400).json({ error: 'Titel mag niet leeg zijn' }); sets.push(`title=$${i++}`); vals.push(String(b.title).trim().slice(0, 500)); }
     if (b.url !== undefined) { let u = String(b.url || '').trim().slice(0, 2000); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; sets.push(`url=$${i++}`); vals.push(u || null); }
     if (b.done !== undefined) { sets.push(`done=$${i++}`); vals.push(b.done === true); }
+    if (enhanced && b.assignee_account_id !== undefined) { const a = await validateAssignee(wsId, b.assignee_account_id); sets.push(`assignee_account_id=$${i++}`); vals.push(a); }
+    if (enhanced && b.due_date !== undefined) { const dd = validateDueDate(b.due_date); sets.push(`due_date=$${i++}`); vals.push(dd); }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     vals.push(req.params.id, wsId, okClient);
+    const ret = enhanced
+      ? `id, kind, title, url, done, created_at, assignee_account_id, to_char(due_date,'YYYY-MM-DD') AS due_date`
+      : `id, kind, title, url, done, created_at`;
     const row = await withWriteConnection(async (c) => (await c.query(
-      `UPDATE marketing.client_items SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i++} AND client_id=$${i} RETURNING id, kind, title, url, done, created_at`, vals
+      `UPDATE marketing.client_items SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i++} AND client_id=$${i} RETURNING ${ret}`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Item niet gevonden' });
     res.json({ success: true, item: row });
@@ -1128,6 +1184,43 @@ router.delete('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, re
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Item niet gevonden' });
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Teamleden van deze workspace (geen klant-logins). Voor het taggen van een to-do.
+router.get('/api/mkt/members', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const rows = await withReadConnection(async (c) => (await c.query(
+      "SELECT id, COALESCE(full_name, email) AS name, email FROM marketing.accounts WHERE workspace_id=$1 AND role <> 'client' AND active=true ORDER BY COALESCE(full_name, email) ASC",
+      [wsId]
+    )).rows);
+    res.json({ success: true, members: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Mijn openstaande to-do's (aan mij toegewezen, nog niet afgevinkt) over alle
+// klanten in deze workspace. Voedt het meldingen-badge en de overzichtspagina.
+router.get('/api/mkt/my-tasks', requireMkt, async (req, res) => {
+  try {
+    if (!(await clientItemsAvailable()) || !(await clientItemsEnhancedAvailable())) {
+      return res.json({ success: true, tasks: [], total: 0, overdue: 0 });
+    }
+    const wsId = req.session.mkt.workspaceId;
+    const me = req.session.mkt.accountId;
+    if (!me) return res.json({ success: true, tasks: [], total: 0, overdue: 0 });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT ci.id, ci.client_id, ci.title, ci.url, to_char(ci.due_date,'YYYY-MM-DD') AS due_date,
+              cl.name AS client_name
+         FROM marketing.client_items ci
+         JOIN marketing.clients cl ON cl.id = ci.client_id
+        WHERE ci.workspace_id=$1 AND ci.kind='todo' AND ci.done=false AND ci.assignee_account_id=$2
+        ORDER BY ci.due_date ASC NULLS LAST, ci.created_at DESC`,
+      [wsId, me]
+    )).rows);
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = rows.filter((r) => r.due_date && r.due_date < today).length;
+    res.json({ success: true, tasks: rows, total: rows.length, overdue });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
