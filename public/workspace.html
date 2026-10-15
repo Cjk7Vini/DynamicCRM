@@ -3587,6 +3587,28 @@ function boardInMonth(p){
   var d=new Date(p.scheduled_at); if(isNaN(d.getTime()))return true;
   return d.getFullYear()===_BOARD_MONTH.getFullYear()&&d.getMonth()===_BOARD_MONTH.getMonth();
 }
+// Kaart snel toevoegen onderaan een kolom (zoals in Trello).
+function quickAddHtml(key){
+  return '<div class="qa-wrap" style="margin-top:6px">'+
+    '<button type="button" class="qa-btn" onclick="boardQuickShow(this)" style="width:100%;text-align:left;background:transparent;border:1px dashed var(--line);color:var(--muted);padding:7px 9px;border-radius:8px;cursor:pointer;font-size:12.5px">+ Kaart toevoegen</button>'+
+    '<div class="qa-form" style="display:none">'+
+      '<textarea class="qa-input" rows="2" placeholder="Titel van de kaart" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font-size:13px;font-family:inherit;resize:vertical"></textarea>'+
+      '<div style="display:flex;gap:6px;margin-top:5px"><button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="boardQuickAdd(\''+esc(key)+'\',this)">Toevoegen</button><button type="button" class="icon-btn" onclick="boardQuickCancel(this)" title="Annuleren">&times;</button></div>'+
+    '</div></div>';
+}
+function boardQuickShow(btn){var w=btn.closest('.qa-wrap');btn.style.display='none';var f=w.querySelector('.qa-form');f.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.focus();}
+function boardQuickCancel(btn){var w=btn.closest('.qa-wrap');var f=w.querySelector('.qa-form');if(f)f.style.display='none';var b=w.querySelector('.qa-btn');if(b)b.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.value='';}
+async function boardQuickAdd(key,btn){
+  var w=btn.closest('.qa-wrap');var ta=w.querySelector('.qa-input');var title=(ta&&ta.value||'').trim();if(!title)return;
+  var when='';
+  if(_BOARD_MONTH){var m=_BOARD_MONTH;when=new Date(m.getFullYear(),m.getMonth(),1,12,0,0).toISOString();}
+  btn.disabled=true;
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:title,status:key,scheduled_at:when,channel:'instagram'})});
+    var d=await r.json();
+    if(r.ok&&d.success){loadPosts();}else{btn.disabled=false;showMsg('postsMsg',false,(d&&d.error)||'Kon kaart niet toevoegen.');}
+  }catch(e){btn.disabled=false;showMsg('postsMsg',false,'Netwerkfout.');}
+}
 function renderBoard(posts){
   var canManage=ME.role!=='client';
   var bar;
@@ -3618,7 +3640,7 @@ function renderBoard(posts){
       '</span>';
     }
     return '<div class="kcol" data-status="'+esc(key)+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+'</div>';
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
   }).join('')+
   (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="addBoardColumn()">+ Kolom</button></div>'):'')+
   '</div>';
