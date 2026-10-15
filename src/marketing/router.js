@@ -2126,9 +2126,13 @@ const MULTI_ADS_OFF = JSON.stringify({ enroll_status: 'OPT_OUT' });
 // asset_feed_spec? }). Weigert Meta de flexibele creative (meerdere teksten), dan
 // valt hij terug op de enkele-tekst-variant, zodat het aanmaken nooit stuk gaat.
 async function createAdCreativeNoAI(adAccount, token, name, built) {
-  const norm = (typeof built === 'string')
-    ? { primary: { object_story_spec: built } }
-    : (built && built.primary ? built : { primary: built });
+  // Normaliseer naar { tries: [velden...], fallback? }. 'tries' zijn de meerdere-
+  // teksten-varianten die op volgorde geprobeerd worden; 'fallback' is 1 tekst.
+  let norm;
+  if (typeof built === 'string') norm = { tries: [{ object_story_spec: built }] };
+  else if (built && Array.isArray(built.tries)) norm = { tries: built.tries, fallback: built.fallback };
+  else if (built && built.primary) norm = { tries: [built.primary].concat(built.altFlex ? [built.altFlex] : []), fallback: built.fallback };
+  else norm = { tries: [built] };
   const attempt = async (fields) => {
     const base = { name, ...fields, access_token: token };
     // 1) AI-verbeteringen uit EN meerdere-adverteerders uit.
@@ -2146,35 +2150,20 @@ async function createAdCreativeNoAI(adAccount, token, name, built) {
     // 3) Kale creative, zodat het aanmaken nooit breekt.
     return await graphPost(`${adAccount}/adcreatives`, base);
   };
-  // 1e poging: standaard flexibele creative (beeld in asset_feed_spec).
-  try {
-    return await attempt(norm.primary);
-  } catch (e1) {
-    const flexErr1 = (e1 && e1.message) || '';
-    // 2e poging: beeld + knop in object_story_spec, teksten in asset_feed_spec.
-    // Blijft een meerdere-teksten-creative (geen terugval).
-    if (norm.altFlex) {
-      try { return await attempt(norm.altFlex); }
-      catch (e2) {
-        const flexErr2 = (e2 && e2.message) || flexErr1;
-        if (norm.fallback) {
-          try { console.warn('[MKT] flexibele creative geweigerd, terugval op 1 tekst:', flexErr2); } catch (_) { /* noop */ }
-          const r = await attempt(norm.fallback);
-          if (r && typeof r === 'object') { r._usedFallback = true; r._flexError = flexErr2; }
-          return r;
-        }
-        throw e2;
-      }
-    }
-    // 3e poging: enkele-tekst creative, zodat het aanmaken nooit breekt.
-    if (norm.fallback) {
-      try { console.warn('[MKT] flexibele creative geweigerd, terugval op 1 tekst:', flexErr1); } catch (_) { /* noop */ }
-      const r = await attempt(norm.fallback);
-      if (r && typeof r === 'object') { r._usedFallback = true; r._flexError = flexErr1; }
-      return r;
-    }
-    throw e1;
+  // Probeer elke meerdere-teksten-variant; de eerste die Meta accepteert wint.
+  let lastErr = '';
+  for (const fields of (norm.tries || [])) {
+    try { return await attempt(fields); }
+    catch (e) { lastErr = (e && e.message) || lastErr; }
   }
+  // Alle flexibele varianten geweigerd: terugval op 1 tekst (indien beschikbaar).
+  if (norm.fallback) {
+    try { console.warn('[MKT] flexibele creative geweigerd, terugval op 1 tekst:', lastErr); } catch (_) { /* noop */ }
+    const r = await attempt(norm.fallback);
+    if (r && typeof r === 'object') { r._usedFallback = true; r._flexError = lastErr; }
+    return r;
+  }
+  throw new Error(lastErr || 'Creatief aanmaken mislukt');
 }
 
 // Upload een afbeelding (via publieke URL) naar de advertentierekening en geef de
@@ -2243,26 +2232,30 @@ async function buildCreative(adAccount, token, pageId, asset, captions, link, ct
   } else {
     afs.images = [{ hash: mediaHash }];
   }
-  // Tweede poging als Meta het bovenstaande weigert: het beeld (video/afbeelding) en
-  // de knop in object_story_spec, en ALLEEN de tekstvarianten in asset_feed_spec. Zo
-  // blijven zowel het beeld + de knop als de meerdere teksten behouden.
-  const altStory = isVideo
-    ? { page_id: pageId, video_data: { video_id: videoId, image_url: cloudinaryVideoThumb(asset.url), call_to_action: { type: cta, value: { link } }, title: head } }
-    : { page_id: pageId, link_data: { link, image_hash: mediaHash, call_to_action: { type: cta, value: { link } }, name: head } };
-  const altFeed = { bodies: texts.map((t) => ({ text: t })), optimization_type: 'DEGREES_OF_FREEDOM' };
+  const cta2 = { type: cta, value: { link } };
+  // 2e poging: beeld ZONDER kop in object_story_spec, en de kop (titels) + teksten in
+  // asset_feed_spec. Zo wordt ook het 'Kop'-veld in de Meta-editor gevuld.
+  const altStoryNoHead = isVideo
+    ? { page_id: pageId, video_data: { video_id: videoId, image_url: cloudinaryVideoThumb(asset.url), call_to_action: cta2 } }
+    : { page_id: pageId, link_data: { link, image_hash: mediaHash, call_to_action: cta2 } };
+  const altFeedTitles = { bodies: texts.map((t) => ({ text: t })), titles: [{ text: head }], optimization_type: 'DEGREES_OF_FREEDOM' };
+  // 3e poging (huidige werkende variant): beeld + kop in object_story_spec, alleen de
+  // teksten in asset_feed_spec. Hierop valt hij terug als de 2e poging wordt geweigerd,
+  // zodat de meerdere teksten altijd behouden blijven.
+  const altStoryHead = isVideo
+    ? { page_id: pageId, video_data: { video_id: videoId, image_url: cloudinaryVideoThumb(asset.url), call_to_action: cta2, title: head } }
+    : { page_id: pageId, link_data: { link, image_hash: mediaHash, call_to_action: cta2, name: head } };
+  const altFeedBodies = { bodies: texts.map((t) => ({ text: t })), optimization_type: 'DEGREES_OF_FREEDOM' };
   return {
-    // Bij een flexibele creative (asset_feed_spec) bevat object_story_spec ALLEEN de
-    // page_id. De bestemmings-URL staat in asset_feed_spec.link_urls. Zetten we hier
-    // link_data neer, dan gebruikt Meta dat als basisverhaal (zonder video en zonder
-    // knop) en negeert het de video en CTA uit de asset_feed_spec.
-    primary: {
-      object_story_spec: JSON.stringify({ page_id: pageId }),
-      asset_feed_spec: JSON.stringify(afs),
-    },
-    altFlex: {
-      object_story_spec: JSON.stringify(altStory),
-      asset_feed_spec: JSON.stringify(altFeed),
-    },
+    // Op volgorde geprobeerd; de eerste die Meta accepteert wint. Pas als alle
+    // meerdere-teksten-varianten falen, valt hij terug op 1 tekst (fallback).
+    // 1) standaard flexibel (beeld in asset_feed_spec) 2) kop+teksten in de feed,
+    // beeld in object_story_spec 3) kop+beeld in object_story_spec, teksten in de feed.
+    tries: [
+      { object_story_spec: JSON.stringify({ page_id: pageId }), asset_feed_spec: JSON.stringify(afs) },
+      { object_story_spec: JSON.stringify(altStoryNoHead), asset_feed_spec: JSON.stringify(altFeedTitles) },
+      { object_story_spec: JSON.stringify(altStoryHead), asset_feed_spec: JSON.stringify(altFeedBodies) },
+    ],
     fallback: { object_story_spec: singleSpec() },
   };
 }
