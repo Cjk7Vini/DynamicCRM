@@ -3619,7 +3619,40 @@ async function deleteCustomLabel(id){
 function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
 function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
 function kanbanLeave(e){e.currentTarget.style.outline='';}
-async function kanbanDrop(e,status){e.preventDefault();e.currentTarget.style.outline='';var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await setPostStatus(id,status);}
+async function kanbanDrop(e,status){e.preventDefault();e.currentTarget.style.outline='';clearCardIndicators();var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await moveCardTo(id,status,null);}
+// Sorteer kaarten in een kolom op handmatige volgorde (board_position); kaarten
+// zonder volgorde komen daarna, in hun bestaande volgorde (stabiele sortering).
+function boardSort(items){
+  return items.slice().sort(function(a,b){
+    var pa=(a.board_position==null)?Infinity:a.board_position;
+    var pb=(b.board_position==null)?Infinity:b.board_position;
+    return pa-pb;
+  });
+}
+function kcardDragOver(e){e.preventDefault();e.stopPropagation();try{e.currentTarget.style.borderTop='3px solid var(--accent)';}catch(_){}}
+function kcardDragLeave(e){try{e.currentTarget.style.borderTop='';}catch(_){}}
+function clearCardIndicators(){try{document.querySelectorAll('.kcard').forEach(function(c){c.style.borderTop='';});}catch(_){}}
+function kcardDrop(e,targetId,targetStatus){
+  e.preventDefault();e.stopPropagation();clearCardIndicators();
+  var id=_DRAG_POST;_DRAG_POST=null;
+  if(id==null||String(id)===String(targetId))return;
+  moveCardTo(id,targetStatus,targetId);
+}
+// Verplaats kaart naar een kolom op een bepaalde plek (beforeId=null => onderaan).
+// Wijzigt zo nodig de kolom (status) en slaat de nieuwe volgorde op.
+async function moveCardTo(dragged,targetStatus,beforeId){
+  var dp=_CONTENT_POSTS.filter(function(p){return String(p.id)===String(dragged);})[0]; if(!dp)return;
+  var statusChanged=(dp.status!==targetStatus);
+  var colItems=boardSort(_CONTENT_POSTS.filter(function(p){return p.status===targetStatus&&String(p.id)!==String(dragged);}));
+  var ids=colItems.map(function(p){return p.id;});
+  var ti=-1; if(beforeId!=null){for(var k=0;k<ids.length;k++){if(String(ids[k])===String(beforeId)){ti=k;break;}}}
+  if(ti<0)ids.push(dragged); else ids.splice(ti,0,dragged);
+  try{
+    if(statusChanged){var rs=await fetch('/api/mkt/posts/'+dragged,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:targetStatus})});var ds=await rs.json();if(!rs.ok||!ds.success){showMsg('postsMsg',false,(ds&&ds.error)||'Kon kolom niet wijzigen.');return;}}
+    await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/reorder',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({ids:ids})});
+    loadPosts();
+  }catch(err){showMsg('postsMsg',false,'Kon de volgorde niet opslaan.');}
+}
 async function setPostStatus(id,status){
   try{var r=await fetch('/api/mkt/posts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:status})});var d=await r.json();
     if(r.ok&&d.success){var p=_CONTENT_POSTS.filter(function(x){return String(x.id)===String(id);})[0];if(p)p.status=status;renderContentView();}
@@ -3637,7 +3670,7 @@ function boardCard(p,canManage){
       '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
     '</div>'):'';
   var chan='<span class="status '+esc(p.status)+'" style="font-size:10px">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>';
-  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')" '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
+  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+esc(p.status)+'\')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
     thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
@@ -3699,6 +3732,7 @@ function renderBoard(posts){
     var key=c.key,label=c.label;
     var items=shown.filter(function(p){return p.status===key;});
     if(ci===0)items=orphans.concat(items);
+    items=boardSort(items);
     var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
     var ctrls='';
     if(canEditCols){

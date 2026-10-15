@@ -863,6 +863,18 @@ async function postExtrasAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Is de handmatige kolom-volgorde (board_position) beschikbaar (migratie 017)?
+let _hasBoardPos = null;
+async function postBoardPosAvailable() {
+  if (_hasBoardPos === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='board_position'"
+    )).rows);
+    if (r.length > 0) _hasBoardPos = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Is het activiteiten-log beschikbaar (migratie 016)?
 let _hasPostActivity = null;
 async function postActivityAvailable() {
@@ -943,6 +955,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasBlocks = await contentBlocksAvailable();
     const hasType = await postTypeAvailable();
     const hasExtras = await postExtrasAvailable();
+    const hasBoardPos = await postBoardPosAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
@@ -951,6 +964,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasBlocks ? 'p.content_blocks,' : ''}
               ${hasType ? 'p.post_type,' : ''}
               ${hasExtras ? 'p.assignees, p.checklist,' : ''}
+              ${hasBoardPos ? 'p.board_position,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -1131,6 +1145,30 @@ router.get('/api/mkt/clients/:clientId/posts/:postId/activity', requireMkt, asyn
     )).rows);
     res.json({ success: true, activity: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Handmatige volgorde van kaarten binnen een kolom opslaan (verticaal slepen).
+// Ontvangt de volledige volgorde van post-ids van een kolom en zet board_position.
+router.post('/api/mkt/clients/:clientId/posts/reorder', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om content te beheren' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    if (!(await postBoardPosAvailable())) return res.json({ success: true, saved: false });
+    const ids = Array.isArray(req.body && req.body.ids)
+      ? req.body.ids.map((x) => parseInt(x, 10)).filter(Number.isInteger) : [];
+    if (!ids.length) return res.json({ success: true, saved: true });
+    await withWriteConnection(async (c) => {
+      for (let i = 0; i < ids.length; i++) {
+        await c.query(
+          'UPDATE marketing.content_posts SET board_position=$1 WHERE id=$2 AND workspace_id=$3 AND client_id=$4',
+          [i, ids[i], wsId, okClient]
+        );
+      }
+    });
+    res.json({ success: true, saved: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // ---- Opmerkingen op een contentkaart (agency <-> klant) ----
