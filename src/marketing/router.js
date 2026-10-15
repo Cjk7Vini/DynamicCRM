@@ -820,6 +820,37 @@ async function contentLabelDefsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Zijn de eigen Planning-kolommen beschikbaar (migratie 015)?
+let _hasContentColumns = null;
+async function contentColumnsAvailable() {
+  if (_hasContentColumns === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='content_columns'"
+    )).rows);
+    if (r.length > 0) _hasContentColumns = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// De vier standaardkolommen van het Planning-bord. Worden de eerste keer in de
+// database gezet (per werkplek) zodat ze daarna te hernoemen/verplaatsen/verwijderen zijn.
+const DEFAULT_CONTENT_COLS = [
+  { col_key: 'idea', label: 'Ideeen' },
+  { col_key: 'draft', label: 'Concept' },
+  { col_key: 'scheduled', label: 'Ingepland' },
+  { col_key: 'approved', label: 'Goedgekeurd' },
+];
+// Een post-status is geldig als het een standaardstatus is (POST_STATUS) of een
+// eigen kolom-sleutel van deze werkplek. Zo kun je posts naar eigen kolommen slepen.
+async function isValidPostStatus(wsId, status) {
+  if (status == null) return false;
+  if (POST_STATUS.includes(status)) return true;
+  if (!(await contentColumnsAvailable())) return false;
+  const ok = await withReadConnection(async (c) => (await c.query(
+    'SELECT 1 FROM marketing.content_columns WHERE workspace_id=$1 AND col_key=$2', [wsId, String(status)]
+  )).rows[0]);
+  return !!ok;
+}
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
   if (!Array.isArray(input)) return null;
@@ -891,7 +922,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     const { title, body, channel, status, scheduled_at, asset_id, auto_publish, publish_channel } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'Titel is verplicht' });
     const ch = POST_CHANNELS.includes(channel) ? channel : 'other';
-    const st = POST_STATUS.includes(status) ? status : 'idea';
+    const st = (await isValidPostStatus(wsId, status)) ? status : 'idea';
     let when = null;
     if (scheduled_at) {
       const d = new Date(scheduled_at);
@@ -931,7 +962,7 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     }
     if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
-    if (b.status !== undefined && POST_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
+    if (b.status !== undefined && await isValidPostStatus(wsId, b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
     if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
@@ -1278,6 +1309,88 @@ router.delete('/api/mkt/label-defs/:id', requireMkt, async (req, res) => {
       'DELETE FROM marketing.content_labels WHERE id=$1 AND workspace_id=$2 RETURNING id', [req.params.id, req.session.mkt.workspaceId]
     )).rows[0]);
     if (!done) return res.status(404).json({ error: 'Label niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- Eigen kolommen voor de Planning (contentplanning-bord) ----
+// Zet de standaardkolommen eenmalig neer als de werkplek er nog geen heeft.
+async function ensureContentColumns(wsId) {
+  const cnt = await withReadConnection(async (c) => (await c.query(
+    'SELECT COUNT(*)::int AS n FROM marketing.content_columns WHERE workspace_id=$1', [wsId]
+  )).rows[0].n);
+  if (cnt === 0) {
+    await withWriteConnection(async (c) => {
+      for (let i = 0; i < DEFAULT_CONTENT_COLS.length; i++) {
+        const d = DEFAULT_CONTENT_COLS[i];
+        await c.query(
+          'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position) VALUES ($1,$2,$3,$4) ON CONFLICT (workspace_id, col_key) DO NOTHING',
+          [wsId, d.col_key, d.label, i]
+        );
+      }
+    });
+  }
+}
+router.get('/api/mkt/columns', requireMkt, async (req, res) => {
+  try {
+    if (!(await contentColumnsAvailable())) {
+      return res.json({ success: true, columns: DEFAULT_CONTENT_COLS.map((d, i) => ({ id: null, col_key: d.col_key, label: d.label, position: i })), custom: false });
+    }
+    const wsId = req.session.mkt.workspaceId;
+    await ensureContentColumns(wsId);
+    const rows = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, col_key, label, position FROM marketing.content_columns WHERE workspace_id=$1 ORDER BY position ASC, id ASC', [wsId]
+    )).rows);
+    res.json({ success: true, columns: rows, custom: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/columns', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentColumnsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld (migratie 015 nog niet gedraaid).' });
+    const wsId = req.session.mkt.workspaceId;
+    await ensureContentColumns(wsId);
+    const label = String((req.body && req.body.label) || '').trim().slice(0, 40);
+    if (!label) return res.status(400).json({ error: 'Kolomnaam is verplicht' });
+    const colKey = 'col_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const row = await withWriteConnection(async (c) => {
+      const pos = (await c.query('SELECT COALESCE(MAX(position),-1)+1 AS p FROM marketing.content_columns WHERE workspace_id=$1', [wsId])).rows[0].p;
+      return (await c.query(
+        'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position) VALUES ($1,$2,$3,$4) RETURNING id, col_key, label, position',
+        [wsId, colKey, label, pos]
+      )).rows[0];
+    });
+    res.json({ success: true, column: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/api/mkt/columns/:id', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentColumnsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {}; const sets = []; const vals = []; let i = 1;
+    if (b.label !== undefined) { const l = String(b.label).trim().slice(0, 40); if (!l) return res.status(400).json({ error: 'Kolomnaam mag niet leeg zijn' }); sets.push(`label=$${i++}`); vals.push(l); }
+    if (b.position !== undefined) { const p = parseInt(b.position, 10); if (Number.isInteger(p)) { sets.push(`position=$${i++}`); vals.push(p); } }
+    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    vals.push(req.params.id, wsId);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `UPDATE marketing.content_columns SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i} RETURNING id, col_key, label, position`, vals
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Kolom niet gevonden' });
+    res.json({ success: true, column: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/columns/:id', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!(await contentColumnsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
+    const wsId = req.session.mkt.workspaceId;
+    const cnt = await withReadConnection(async (c) => (await c.query('SELECT COUNT(*)::int AS n FROM marketing.content_columns WHERE workspace_id=$1', [wsId])).rows[0].n);
+    if (cnt <= 1) return res.status(400).json({ error: 'Er moet minstens een kolom overblijven' });
+    const done = await withWriteConnection(async (c) => (await c.query(
+      'DELETE FROM marketing.content_columns WHERE id=$1 AND workspace_id=$2 RETURNING id', [req.params.id, wsId]
+    )).rows[0]);
+    if (!done) return res.status(404).json({ error: 'Kolom niet gevonden' });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

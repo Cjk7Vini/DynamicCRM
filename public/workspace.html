@@ -3452,6 +3452,53 @@ function renderContentView(){
 // ---- Bord (kanban) ----
 var _DRAG_POST=null;
 var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'],['approved','Goedgekeurd']];
+// Eigen Planning-kolommen (migratie 015). null = nog niet geladen; dan vallen we
+// terug op de vaste standaardkolommen hierboven.
+var BOARD_COLS=null, BOARD_COLS_CUSTOM=false;
+function boardCols(){
+  if(BOARD_COLS&&BOARD_COLS.length)return BOARD_COLS.map(function(c){return {id:c.id,key:c.col_key,label:c.label};});
+  return CONTENT_COLS.map(function(c){return {id:null,key:c[0],label:c[1]};});
+}
+async function loadBoardColumns(){
+  try{var r=await fetch('/api/mkt/columns',{credentials:'include'});var d=await r.json();if(d&&d.success){BOARD_COLS=d.columns||[];BOARD_COLS_CUSTOM=!!d.custom;}}catch(e){}
+}
+async function addBoardColumn(){
+  var name=prompt('Naam van de nieuwe kolom:'); if(name==null)return; name=name.trim(); if(!name)return;
+  try{var r=await fetch('/api/mkt/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name})});var d=await r.json();if(r.ok&&d.success){await loadBoardColumns();renderContentView();}else{alert((d&&d.error)||'Kon kolom niet toevoegen.');}}catch(e){alert('Netwerkfout.');}
+}
+async function renameBoardColumn(id){
+  if(id==null||!BOARD_COLS)return;
+  var cur=''; for(var k=0;k<BOARD_COLS.length;k++){if(String(BOARD_COLS[k].id)===String(id)){cur=BOARD_COLS[k].label;break;}}
+  var name=prompt('Nieuwe naam voor de kolom:',cur); if(name==null)return; name=name.trim(); if(!name)return;
+  try{var r=await fetch('/api/mkt/columns/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name})});var d=await r.json();if(r.ok&&d.success){await loadBoardColumns();renderContentView();}else{alert((d&&d.error)||'Kon kolom niet hernoemen.');}}catch(e){alert('Netwerkfout.');}
+}
+async function deleteBoardColumn(id){
+  if(id==null)return;
+  if(!confirm('Deze kolom verwijderen? Posts in deze kolom blijven bestaan en verschijnen in de eerste kolom.'))return;
+  try{var r=await fetch('/api/mkt/columns/'+id,{method:'DELETE',credentials:'include'});var d=await r.json();if(r.ok&&d.success){await loadBoardColumns();renderContentView();}else{alert((d&&d.error)||'Kon kolom niet verwijderen.');}}catch(e){alert('Netwerkfout.');}
+}
+async function moveBoardColumn(id,dir){
+  if(id==null||!BOARD_COLS)return;
+  var idx=-1; for(var k=0;k<BOARD_COLS.length;k++){if(String(BOARD_COLS[k].id)===String(id)){idx=k;break;}}
+  if(idx<0)return; var j=idx+dir; if(j<0||j>=BOARD_COLS.length)return;
+  var a=BOARD_COLS[idx],b=BOARD_COLS[j];
+  try{
+    await fetch('/api/mkt/columns/'+a.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({position:b.position})});
+    await fetch('/api/mkt/columns/'+b.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({position:a.position})});
+    await loadBoardColumns();renderContentView();
+  }catch(e){alert('Netwerkfout.');}
+}
+function fillStatusOptions(selected){
+  var sel=document.getElementById('pfStatus'); if(!sel)return;
+  var cols=boardCols();
+  var html=cols.map(function(c){return '<option value="'+esc(c.key)+'">'+esc(c.label)+'</option>';}).join('');
+  html+='<option value="published">Gepubliceerd</option>';
+  if(selected&&selected!=='published'&&!cols.some(function(c){return c.key===selected;})){
+    html='<option value="'+esc(selected)+'">'+esc(selected)+'</option>'+html;
+  }
+  sel.innerHTML=html;
+  if(selected)sel.value=selected;
+}
 // Vaste labels (moeten matchen met CONTENT_LABEL_KEYS in de backend).
 var CONTENT_LABELS=[
   {k:'tekst_geschreven',l:'Tekst geschreven',c:'#2563eb'},
@@ -3550,13 +3597,31 @@ function renderBoard(posts){
     bar='<div class="card" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-ghost" style="padding:6px 12px" onclick="boardShift(-1)">&larr;</button><strong style="text-transform:capitalize;min-width:130px;text-align:center">'+esc(mLbl)+'</strong><button class="btn btn-ghost" style="padding:6px 12px" onclick="boardShift(1)">&rarr;</button></div><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="boardAllMonths()">Alle maanden</button></div>';
   }
   var shown=posts.filter(boardInMonth);
-  var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+CONTENT_COLS.map(function(c){
-    var key=c[0],label=c[1];
+  var cols=boardCols();
+  var keys={}; cols.forEach(function(c){keys[c.key]=true;});
+  // Posts waarvan de kolom is verwijderd (status hoort bij geen enkele kolom en is
+  // niet 'published') tonen we in de eerste kolom, zodat ze nooit verdwijnen.
+  var orphans=shown.filter(function(p){return p.status!=='published'&&!keys[p.status];});
+  var canEditCols=canManage&&BOARD_COLS_CUSTOM;
+  var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+cols.map(function(c,ci){
+    var key=c.key,label=c.label;
     var items=shown.filter(function(p){return p.status===key;});
+    if(ci===0)items=orphans.concat(items);
     var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
-    return '<div class="kcol" data-status="'+key+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+key+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span>'+esc(label)+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+'</div>';
-  }).join('')+'</div>';
+    var ctrls='';
+    if(canEditCols){
+      ctrls='<span style="display:inline-flex;gap:2px;margin-left:6px">'+
+        '<button class="icon-btn" title="Naar links" onclick="moveBoardColumn('+c.id+',-1)" style="width:22px;height:22px;font-size:12px">&larr;</button>'+
+        '<button class="icon-btn" title="Naar rechts" onclick="moveBoardColumn('+c.id+',1)" style="width:22px;height:22px;font-size:12px">&rarr;</button>'+
+        '<button class="icon-btn" title="Hernoemen" onclick="renameBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:11px">&#9998;</button>'+
+        '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
+      '</span>';
+    }
+    return '<div class="kcol" data-status="'+esc(key)+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+'</div>';
+  }).join('')+
+  (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="addBoardColumn()">+ Kolom</button></div>'):'')+
+  '</div>';
   return bar+kb;
 }
 // ---- Gepubliceerd (eigen weergave) ----
@@ -3673,6 +3738,7 @@ async function loadPosts(){
     if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
     _CONTENT_POSTS=d.posts||[];
     await loadCustomLabels();
+    await loadBoardColumns();
     renderContentView();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
@@ -3718,7 +3784,7 @@ function openNewPost(){
   EDIT_POST=null; hideMsg('postMsg');
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
-  document.getElementById('pfChannel').value='instagram';document.getElementById('pfStatus').value='idea';
+  document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
   document.getElementById('pfType').value='bericht';
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
@@ -3736,7 +3802,7 @@ function openEditPost(id){
     EDIT_POST=p; hideMsg('postMsg');
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
-    document.getElementById('pfChannel').value=p.channel||'other';document.getElementById('pfStatus').value=p.status||'idea';
+    document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
     document.getElementById('pfType').value=p.post_type||'bericht';
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
