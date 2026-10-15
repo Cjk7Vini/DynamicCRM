@@ -2267,11 +2267,18 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     )).rows[0]);
     if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
 
-    // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen.
+    // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen. Bij een
+    // conversie-doel (Leads/Verkoop) met pixel optimaliseren we op conversies en
+    // zetten we het gepromote object (pixel + Lead), anders weigert Meta de ad set.
     let optimizationGoal = 'LINK_CLICKS';
+    let promotedObject = null;
     try {
       const camp = await graphGet(`${req.params.campaignId}`, { fields: 'objective', access_token: token });
       if (camp && camp.objective && CAMPAIGN_OBJECTIVES[camp.objective]) optimizationGoal = CAMPAIGN_OBJECTIVES[camp.objective];
+      if (camp && (camp.objective === 'OUTCOME_LEADS' || camp.objective === 'OUTCOME_SALES') && creds.pixelId) {
+        optimizationGoal = 'OFFSITE_CONVERSIONS';
+        promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
+      }
     } catch (_) { /* val terug op LINK_CLICKS */ }
 
     const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
@@ -2311,6 +2318,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
       dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
     };
+    if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
     const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
     const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
@@ -4238,16 +4246,41 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/ads', requireMkt, a
     const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
     const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
     const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
-    const ad = await graphPost(`${adAccount}/ads`, {
+    const makeAd = () => graphPost(`${adAccount}/ads`, {
       name, adset_id: req.params.adsetId, creative: JSON.stringify({ creative_id: creative.id }),
       status: 'PAUSED', access_token: token,
     });
+    let ad;
+    let adsetHealed = false;
+    try {
+      ad = await makeAd();
+    } catch (adErr) {
+      // Zelf-herstel: bestaande ad sets die zijn aangemaakt voor de pixel was
+      // ingesteld, missen een conversiebron. Meta weigert de advertentie dan
+      // met 1487888 (trackingpixel vereist). Zet de pixel alsnog op deze ad set
+      // en probeer de advertentie opnieuw, zodat de klant niets hoeft te doen.
+      const em = String((adErr && adErr.message) || '');
+      if (/1487888/.test(em) && creds.pixelId) {
+        await graphPost(`${req.params.adsetId}`, {
+          promoted_object: JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' }),
+          optimization_goal: 'OFFSITE_CONVERSIONS',
+          access_token: token,
+        });
+        adsetHealed = true;
+        ad = await makeAd();
+      } else {
+        throw adErr;
+      }
+    }
     // multiTextApplied: null = geen meerdere teksten gevraagd; true/false = of Meta de afwisseling accepteerde.
-    res.json({ success: true, ad_id: ad.id, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
+    res.json({ success: true, ad_id: ad.id, adsetHealed, multiTextApplied: wantedMulti ? !creative._usedFallback : null });
   } catch (e) {
     const m = String((e && e.message) || '');
     if (/1885553/.test(m) || /dynamisch advertentiemateriaal/i.test(m)) {
       return res.status(400).json({ error: 'Deze ad set is eerder dynamisch geworden en mag daardoor maar een advertentie bevatten. Maak een nieuwe ad set aan voor extra advertenties; nieuwe ad sets hebben deze beperking niet meer.' });
+    }
+    if (/1487888/.test(m)) {
+      return res.status(400).json({ error: 'Deze campagne is een conversiecampagne, maar er is geen Meta-pixel gekoppeld aan deze klant. Vul het Meta Pixel ID in bij de koppelingen, bewaar, en probeer opnieuw.' });
     }
     res.status(400).json({ error: e.message });
   }
