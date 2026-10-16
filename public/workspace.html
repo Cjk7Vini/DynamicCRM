@@ -3493,8 +3493,9 @@ var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'
 // Eigen Planning-kolommen (migratie 015). null = nog niet geladen; dan vallen we
 // terug op de vaste standaardkolommen hierboven.
 var BOARD_COLS=null, BOARD_COLS_CUSTOM=false;
+// De statussen zijn vast (de werkstroom). De weken staan hier los van: die zijn
+// de rijen (swimlanes) in renderBoard.
 function boardCols(){
-  if(BOARD_COLS&&BOARD_COLS.length)return BOARD_COLS.map(function(c){return {id:c.id,key:c.col_key,label:c.label};});
   return CONTENT_COLS.map(function(c){return {id:null,key:c[0],label:c[1]};});
 }
 async function loadBoardColumns(){
@@ -3639,9 +3640,6 @@ async function deleteCustomLabel(id){
 function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
 function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
 function kanbanLeave(e){e.currentTarget.style.outline='';}
-async function kanbanDrop(e,status){e.preventDefault();e.currentTarget.style.outline='';clearCardIndicators();var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await moveCardTo(id,status,null);}
-// Sorteer kaarten in een kolom op handmatige volgorde (board_position); kaarten
-// zonder volgorde komen daarna, in hun bestaande volgorde (stabiele sortering).
 function boardSort(items){
   return items.slice().sort(function(a,b){
     var pa=(a.board_position==null)?Infinity:a.board_position;
@@ -3649,26 +3647,35 @@ function boardSort(items){
     return pa-pb;
   });
 }
+function sameWeek(a,b){var x=(a==null)?null:Number(a);var y=(b==null)?null:Number(b);return x===y;}
 function kcardDragOver(e){e.preventDefault();e.stopPropagation();try{e.currentTarget.style.borderTop='3px solid var(--accent)';}catch(_){}}
 function kcardDragLeave(e){try{e.currentTarget.style.borderTop='';}catch(_){}}
 function clearCardIndicators(){try{document.querySelectorAll('.kcard').forEach(function(c){c.style.borderTop='';});}catch(_){}}
-function kcardDrop(e,targetId,targetStatus){
+function cellOver(e){e.preventDefault();try{e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}catch(_){}}
+function cellLeave(e){try{e.currentTarget.style.outline='';}catch(_){}}
+function cellDrop(e,status,week){e.preventDefault();e.stopPropagation();try{e.currentTarget.style.outline='';}catch(_){}clearCardIndicators();var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;moveCardTo(id,status,week,null);}
+function kcardDrop(e,targetId,targetStatus,targetWeek){
   e.preventDefault();e.stopPropagation();clearCardIndicators();
   var id=_DRAG_POST;_DRAG_POST=null;
   if(id==null||String(id)===String(targetId))return;
-  moveCardTo(id,targetStatus,targetId);
+  moveCardTo(id,targetStatus,targetWeek,targetId);
 }
-// Verplaats kaart naar een kolom op een bepaalde plek (beforeId=null => onderaan).
-// Wijzigt zo nodig de kolom (status) en slaat de nieuwe volgorde op.
-async function moveCardTo(dragged,targetStatus,beforeId){
+// Verplaats kaart naar een cel (status-kolom + week-rij) op een plek. Wijzigt zo
+// nodig de status en/of de week, en slaat de volgorde binnen de cel op.
+async function moveCardTo(dragged,targetStatus,targetWeek,beforeId){
   var dp=_CONTENT_POSTS.filter(function(p){return String(p.id)===String(dragged);})[0]; if(!dp)return;
   var statusChanged=(dp.status!==targetStatus);
-  var colItems=boardSort(_CONTENT_POSTS.filter(function(p){return p.status===targetStatus&&String(p.id)!==String(dragged);}));
-  var ids=colItems.map(function(p){return p.id;});
+  var weekChanged=!sameWeek(dp.board_week,targetWeek);
+  var cellItems=boardSort(_CONTENT_POSTS.filter(function(p){return p.status===targetStatus&&sameWeek(p.board_week,targetWeek)&&String(p.id)!==String(dragged);}));
+  var ids=cellItems.map(function(p){return p.id;});
   var ti=-1; if(beforeId!=null){for(var k=0;k<ids.length;k++){if(String(ids[k])===String(beforeId)){ti=k;break;}}}
   if(ti<0)ids.push(dragged); else ids.splice(ti,0,dragged);
   try{
-    if(statusChanged){var rs=await fetch('/api/mkt/posts/'+dragged,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({status:targetStatus})});var ds=await rs.json();if(!rs.ok||!ds.success){showMsg('postsMsg',false,(ds&&ds.error)||'Kon kolom niet wijzigen.');return;}}
+    if(statusChanged||weekChanged){
+      var patch={}; if(statusChanged)patch.status=targetStatus; if(weekChanged)patch.board_week=(targetWeek==null?null:targetWeek);
+      var rs=await fetch('/api/mkt/posts/'+dragged,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(patch)});var ds=await rs.json();
+      if(!rs.ok||!ds.success){showMsg('postsMsg',false,(ds&&ds.error)||'Kon verplaatsen niet opslaan.');return;}
+    }
     await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/reorder',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({ids:ids})});
     loadPosts();
   }catch(err){showMsg('postsMsg',false,'Kon de volgorde niet opslaan.');}
@@ -3690,7 +3697,7 @@ function boardCard(p,canManage){
       '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
     '</div>'):'';
   var chan='<span class="status '+esc(p.status)+'" style="font-size:10px">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>';
-  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+esc(p.status)+'\')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
+  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+esc(p.status)+'\','+(p.board_week==null?'null':p.board_week)+')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
     thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
@@ -3710,28 +3717,31 @@ function boardInMonth(p){
   var d=new Date(p.scheduled_at); if(isNaN(d.getTime()))return true;
   return d.getFullYear()===_BOARD_MONTH.getFullYear()&&d.getMonth()===_BOARD_MONTH.getMonth();
 }
-// Kaart snel toevoegen onderaan een kolom (zoals in Trello).
-function quickAddHtml(key){
+// Kaart snel toevoegen in een cel (status-kolom + week-rij), zoals in Trello.
+function quickAddHtml(key,week){
+  var wk=(week==null?'null':week);
   return '<div class="qa-wrap" style="margin-top:6px">'+
-    '<button type="button" class="qa-btn" onclick="boardQuickShow(this)" style="width:100%;text-align:left;background:transparent;border:1px dashed var(--line);color:var(--muted);padding:7px 9px;border-radius:8px;cursor:pointer;font-size:12.5px">+ Kaart toevoegen</button>'+
+    '<button type="button" class="qa-btn" onclick="boardQuickShow(this)" style="width:100%;text-align:left;background:transparent;border:1px dashed var(--line);color:var(--muted);padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px">+ Kaart</button>'+
     '<div class="qa-form" style="display:none">'+
       '<textarea class="qa-input" rows="2" placeholder="Titel van de kaart" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font-size:13px;font-family:inherit;resize:vertical"></textarea>'+
-      '<div style="display:flex;gap:6px;margin-top:5px"><button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="boardQuickAdd(\''+esc(key)+'\',this)">Toevoegen</button><button type="button" class="icon-btn" onclick="boardQuickCancel(this)" title="Annuleren">&times;</button></div>'+
+      '<div style="display:flex;gap:6px;margin-top:5px"><button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="boardQuickAdd(\''+esc(key)+'\','+wk+',this)">Toevoegen</button><button type="button" class="icon-btn" onclick="boardQuickCancel(this)" title="Annuleren">&times;</button></div>'+
     '</div></div>';
 }
 function boardQuickShow(btn){var w=btn.closest('.qa-wrap');btn.style.display='none';var f=w.querySelector('.qa-form');f.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.focus();}
 function boardQuickCancel(btn){var w=btn.closest('.qa-wrap');var f=w.querySelector('.qa-form');if(f)f.style.display='none';var b=w.querySelector('.qa-btn');if(b)b.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.value='';}
-async function boardQuickAdd(key,btn){
+async function boardQuickAdd(key,week,btn){
   var w=btn.closest('.qa-wrap');var ta=w.querySelector('.qa-input');var title=(ta&&ta.value||'').trim();if(!title)return;
   var when='';
   if(_BOARD_MONTH){var m=_BOARD_MONTH;when=new Date(m.getFullYear(),m.getMonth(),1,12,0,0).toISOString();}
   btn.disabled=true;
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:title,status:key,scheduled_at:when,channel:'instagram'})});
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:title,status:key,scheduled_at:when,channel:'instagram',board_week:(week==null?null:week)})});
     var d=await r.json();
     if(r.ok&&d.success){loadPosts();}else{btn.disabled=false;showMsg('postsMsg',false,(d&&d.error)||'Kon kaart niet toevoegen.');}
   }catch(e){btn.disabled=false;showMsg('postsMsg',false,'Netwerkfout.');}
 }
+// De weken zijn de rijen (swimlanes); de statussen zijn de kolommen.
+var BOARD_WEEKS=[{w:null,label:'Zonder week'},{w:1,label:'Week 1'},{w:2,label:'Week 2'},{w:3,label:'Week 3'},{w:4,label:'Week 4'},{w:5,label:'Week 5'}];
 function renderBoard(posts){
   var canManage=ME.role!=='client';
   var bar;
@@ -3744,31 +3754,28 @@ function renderBoard(posts){
   var shown=posts.filter(boardInMonth);
   var cols=boardCols();
   var keys={}; cols.forEach(function(c){keys[c.key]=true;});
-  // Posts waarvan de kolom is verwijderd (status hoort bij geen enkele kolom en is
-  // niet 'published') tonen we in de eerste kolom, zodat ze nooit verdwijnen.
+  // Posts met een onbekende status (niet 'published') tonen we in de eerste kolom,
+  // in de bijbehorende week-rij, zodat ze nooit verdwijnen.
   var orphans=shown.filter(function(p){return p.status!=='published'&&!keys[p.status];});
-  var canEditCols=canManage&&BOARD_COLS_CUSTOM;
-  var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+cols.map(function(c,ci){
-    var key=c.key,label=c.label;
-    var items=shown.filter(function(p){return p.status===key;});
-    if(ci===0)items=orphans.concat(items);
-    items=boardSort(items);
-    var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
-    var ctrls='';
-    if(canEditCols){
-      ctrls='<span style="display:inline-flex;gap:2px;margin-left:6px">'+
-        '<button class="icon-btn" title="Naar links" onclick="moveBoardColumn('+c.id+',-1)" style="width:22px;height:22px;font-size:12px">&larr;</button>'+
-        '<button class="icon-btn" title="Naar rechts" onclick="moveBoardColumn('+c.id+',1)" style="width:22px;height:22px;font-size:12px">&rarr;</button>'+
-        '<button class="icon-btn" title="Hernoemen" onclick="renameBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:11px">&#9998;</button>'+
-        '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
-      '</span>';
-    }
-    return '<div class="kcol" data-status="'+esc(key)+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
-  }).join('')+
-  (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="addBoardColumn()">+ Kolom</button></div>'):'')+
-  '</div>';
-  return bar+kb;
+  var WL=92, CW=228;
+  var rowMinW=WL+cols.length*(CW+10);
+  var header='<div style="display:flex;gap:10px;margin-bottom:8px;min-width:'+rowMinW+'px"><div style="flex:0 0 '+WL+'px"></div>'+
+    cols.map(function(c){return '<div style="flex:0 0 '+CW+'px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">'+esc(c.label)+'</div>';}).join('')+'</div>';
+  var rowsHtml=BOARD_WEEKS.map(function(row){
+    var cells=cols.map(function(c,ci){
+      var items=shown.filter(function(p){return p.status===c.key&&sameWeek(p.board_week,row.w);});
+      if(ci===0){var orf=orphans.filter(function(p){return sameWeek(p.board_week,row.w);});items=orf.concat(items);}
+      items=boardSort(items);
+      var cards=items.map(function(p){return boardCard(p,canManage);}).join('');
+      var qa=(canManage&&ci===0)?quickAddHtml(c.key,row.w):'';
+      var empty=(!cards&&!qa)?'<div style="font-size:11px;color:var(--muted);padding:2px">Leeg</div>':'';
+      var wk=(row.w===null?'null':row.w);
+      return '<div class="kcell" '+(canManage?'ondragover="cellOver(event)" ondragleave="cellLeave(event)" ondrop="cellDrop(event,\''+esc(c.key)+'\','+wk+')"':'')+' style="flex:0 0 '+CW+'px;min-height:60px;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:10px;padding:8px">'+cards+empty+qa+'</div>';
+    }).join('');
+    return '<div style="display:flex;gap:10px;align-items:stretch;margin-bottom:10px;min-width:'+rowMinW+'px"><div style="flex:0 0 '+WL+'px;font-weight:700;font-size:13px;display:flex;align-items:center;color:var(--ink-2)">'+esc(row.label)+'</div>'+cells+'</div>';
+  }).join('');
+  return bar+'<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Sleep een kaart opzij om de status te wijzigen, of naar een andere week-rij om de week te wijzigen.</div>'+
+    '<div style="overflow-x:auto;padding-bottom:10px">'+header+rowsHtml+'</div>';
 }
 // ---- Gepubliceerd (eigen weergave) ----
 var _PUB_MONTH=null; // null = alle maanden, anders Date (eerste van de maand)

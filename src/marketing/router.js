@@ -887,6 +887,18 @@ async function postCarouselAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Is de week-indeling (board_week, los van de status) beschikbaar (migratie 019)?
+let _hasBoardWeek = null;
+async function postBoardWeekAvailable() {
+  if (_hasBoardWeek === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='board_week'"
+    )).rows);
+    if (r.length > 0) _hasBoardWeek = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Controleert dat een lijst asset-ids bij deze klant hoort en publiek (Cloudinary) is;
 // geeft ze terug in dezelfde volgorde als gevraagd, met url + type.
 async function resolveCarouselAssets(wsId, clientId, ids) {
@@ -982,6 +994,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasExtras = await postExtrasAvailable();
     const hasBoardPos = await postBoardPosAvailable();
     const hasCarousel = await postCarouselAvailable();
+    const hasBoardWeek = await postBoardWeekAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
@@ -992,6 +1005,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasExtras ? 'p.assignees, p.checklist,' : ''}
               ${hasBoardPos ? 'p.board_position,' : ''}
               ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
+              ${hasBoardWeek ? 'p.board_week,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -1055,6 +1069,11 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
       const cids = items.map((x) => x.id);
       try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET carousel_asset_ids=$1 WHERE id=$2 AND workspace_id=$3', [cids, row.id, wsId])); row.carousel_asset_ids = cids; } catch (_) { /* niet blokkerend */ }
     }
+    // Week (los van de status) opslaan.
+    if (req.body && req.body.board_week !== undefined && await postBoardWeekAvailable()) {
+      let wk = null; const n = parseInt(req.body.board_week, 10); if (Number.isInteger(n) && n >= 1 && n <= 5) wk = n;
+      try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET board_week=$1 WHERE id=$2 AND workspace_id=$3', [wk, row.id, wsId])); row.board_week = wk; } catch (_) { /* niet blokkerend */ }
+    }
     await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'created', null);
     res.json({ success: true, post: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1084,6 +1103,10 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.carousel_asset_ids !== undefined && await postCarouselAvailable()) {
       const prow = await withReadConnection(async (c) => (await c.query('SELECT client_id FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId])).rows[0]);
       if (prow) { const items = await resolveCarouselAssets(wsId, prow.client_id, b.carousel_asset_ids); sets.push(`carousel_asset_ids=$${i++}`); vals.push(items.map((x) => x.id)); }
+    }
+    if (b.board_week !== undefined && await postBoardWeekAvailable()) {
+      let wk = null; const n = parseInt(b.board_week, 10); if (Number.isInteger(n) && n >= 1 && n <= 5) wk = n;
+      sets.push(`board_week=$${i++}`); vals.push(wk);
     }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
