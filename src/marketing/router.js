@@ -1815,15 +1815,22 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
     const token = String((req.body && req.body.token) || '').trim();
     if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
     const pageMap = {};
+    // Een Instagram-account kan op twee manieren aan een pagina hangen: als
+    // instagram_business_account (gekoppeld via Meta Business, nodig om te
+    // publiceren) of als connected_instagram_account (via de pagina-instellingen).
+    // We nemen het eerste dat er is, zodat we de koppeling in beide gevallen zien.
+    const igFrom = (p) => {
+      const b = p && p.instagram_business_account;
+      const c = p && p.connected_instagram_account;
+      const src = (b && b.id) ? b : ((c && c.id) ? c : null);
+      return { id: src ? src.id : null, username: src ? (src.username || null) : null };
+    };
     const addPage = (p) => {
       if (!p || !p.id || pageMap[p.id]) return;
-      pageMap[p.id] = {
-        id: p.id, name: p.name || '(zonder naam)',
-        ig_id: (p.instagram_business_account && p.instagram_business_account.id) || null,
-        ig_username: (p.instagram_business_account && p.instagram_business_account.username) || null,
-      };
+      const ig = igFrom(p);
+      pageMap[p.id] = { id: p.id, name: p.name || '(zonder naam)', ig_id: ig.id, ig_username: ig.username };
     };
-    const PF = 'name,id,instagram_business_account{id,username}';
+    const PF = 'name,id,instagram_business_account{id,username},connected_instagram_account{id,username}';
     // 1. Pagina's met een directe rol.
     try {
       const r = await graphGet('me/accounts', { fields: PF, limit: '200', access_token: token });
@@ -1841,6 +1848,17 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
         }
       }
     } catch (_) { /* geen business-toegang: alleen directe pagina's */ }
+    // Terugval: voor pagina's waar de lijst-expansie geen Instagram teruggaf, de
+    // pagina nog een keer direct bevragen. Soms levert een directe call het
+    // gekoppelde account wel op terwijl de lijst dat niet deed.
+    for (const pg of Object.values(pageMap)) {
+      if (pg.ig_id) continue;
+      try {
+        const d = await graphGet(`${pg.id}`, { fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', access_token: token });
+        const ig = igFrom(d);
+        if (ig.id) { pg.ig_id = ig.id; pg.ig_username = ig.username; }
+      } catch (_) { /* terugval mislukt: laat leeg */ }
+    }
     const out = { pages: Object.values(pageMap), adaccounts: [] };
     try {
       const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });

@@ -2625,7 +2625,7 @@ function metaFillFromDiscover(){
   document.getElementById('int_meta_ig_user_id').value=p.ig_id||'';
   document.getElementById('int_meta_access_token').value=(document.getElementById('mqToken').value||'').trim();
   var ad=document.getElementById('mqAd').value; if(ad)document.getElementById('int_meta_ad_account_id').value=ad;
-  if(!p.ig_id){showMsg('intMsg',false,'Let op: deze pagina heeft geen gekoppeld Instagram-bedrijfsaccount. Koppel Instagram aan de pagina en probeer opnieuw.');}
+  if(!p.ig_id){showMsg('intMsg',false,'Let op: er is geen Instagram-account gevonden bij deze pagina. Controleer dat (1) het Instagram-account een professioneel account is (Bedrijf of Creator) en aan deze pagina gekoppeld, en (2) je access token de permissie instagram_basic heeft (genereer het token anders opnieuw met die permissie erbij). Je kunt het Instagram user ID (begint met 1784...) ook handmatig in het veld hieronder plakken.');}
   else{showMsg('intMsg',true,'Velden ingevuld voor '+(p.ig_username?('@'+p.ig_username):p.name)+'. Klik op Koppelingen opslaan om te bewaren.');}
 }
 async function loadIntegrations(){
