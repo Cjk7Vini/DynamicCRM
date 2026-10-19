@@ -2596,7 +2596,7 @@ async function clearPlatform(p, btn){
   }catch(e){showMsg('intMsg',false,'Netwerkfout.');}
   if(btn)btn.disabled=false;
 }
-var _MQ_PAGES=[], _MQ_ADS=[];
+var _MQ_PAGES=[], _MQ_ADS=[], _MQ_IG_HINT=null;
 async function metaDiscover(btn){
   var token=(document.getElementById('mqToken').value||'').trim();
   var box=document.getElementById('mqResult');
@@ -2607,12 +2607,14 @@ async function metaDiscover(btn){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-discover',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({token:token})});
     var d=await r.json();
     if(!r.ok||!d.success){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">'+esc(d.error||'Ophalen mislukt.')+'</div>';return;}
-    _MQ_PAGES=d.pages||[]; _MQ_ADS=d.adaccounts||[];
+    _MQ_PAGES=d.pages||[]; _MQ_ADS=d.adaccounts||[]; _MQ_IG_HINT=d.ig_hint||null;
     if(!_MQ_PAGES.length){box.innerHTML='<div style="font-size:12.5px;color:#b45309">Geen pagina\'s gevonden voor dit token. Zorg dat je token toegang heeft tot de pagina van de klant (zie handleiding: paginatoegang).</div>';return;}
     var pageOpts=_MQ_PAGES.map(function(p,i){var lbl=p.name+(p.ig_username?(' (@'+p.ig_username+')'):' (geen Instagram gekoppeld)');return '<option value="'+i+'">'+esc(lbl)+'</option>';}).join('');
     var adOpts='<option value="">Geen / later</option>'+_MQ_ADS.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name+' - '+a.id)+'</option>';}).join('');
+    var hintHtml=_MQ_IG_HINT?('<div style="font-size:12px;color:#b45309;background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.3);border-radius:8px;padding:8px 10px">'+esc(_MQ_IG_HINT)+'</div>'):'';
     box.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+
       '<label style="font-size:12.5px;color:var(--muted)">Account (pagina + Instagram)<select id="mqPage" style="margin-top:3px">'+pageOpts+'</select></label>'+
+      hintHtml+
       '<label style="font-size:12.5px;color:var(--muted)">Advertentieaccount (optioneel)<select id="mqAd" style="margin-top:3px">'+adOpts+'</select></label>'+
       '<button class="btn btn-primary" style="padding:8px 14px;align-self:flex-start" onclick="metaFillFromDiscover()">Velden invullen</button>'+
     '</div>';
@@ -2625,7 +2627,7 @@ function metaFillFromDiscover(){
   document.getElementById('int_meta_ig_user_id').value=p.ig_id||'';
   document.getElementById('int_meta_access_token').value=(document.getElementById('mqToken').value||'').trim();
   var ad=document.getElementById('mqAd').value; if(ad)document.getElementById('int_meta_ad_account_id').value=ad;
-  if(!p.ig_id){showMsg('intMsg',false,'Let op: er is geen Instagram-account gevonden bij deze pagina. Controleer dat (1) het Instagram-account een professioneel account is (Bedrijf of Creator) en aan deze pagina gekoppeld, en (2) je access token de permissie instagram_basic heeft (genereer het token anders opnieuw met die permissie erbij). Je kunt het Instagram user ID (begint met 1784...) ook handmatig in het veld hieronder plakken.');}
+  if(!p.ig_id){showMsg('intMsg',false,'Let op: er is geen Instagram-account gevonden bij deze pagina. '+(_MQ_IG_HINT||'Controleer dat het Instagram-account een professioneel account is (Bedrijf of Creator) en aan deze pagina gekoppeld, en dat je token de permissie instagram_basic heeft.')+' Je kunt het Instagram user ID (begint met 1784...) ook handmatig in het veld hieronder plakken.');}
   else{showMsg('intMsg',true,'Velden ingevuld voor '+(p.ig_username?('@'+p.ig_username):p.name)+'. Klik op Koppelingen opslaan om te bewaren.');}
 }
 async function loadIntegrations(){
