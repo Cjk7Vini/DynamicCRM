@@ -1815,6 +1815,7 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
     const token = String((req.body && req.body.token) || '').trim();
     if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
     const pageMap = {};
+    const igMap = {}; // alle gevonden Instagram-accounts: id -> { id, username }
     // Een Instagram-account kan op twee manieren aan een pagina hangen: als
     // instagram_business_account (gekoppeld via Meta Business, nodig om te
     // publiceren) of als connected_instagram_account (via de pagina-instellingen).
@@ -1839,7 +1840,11 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
       const r = await graphGet('me/accounts', { fields: PF, limit: '200', access_token: token });
       (r.data || []).forEach(addPage);
     } catch (e) { return res.status(400).json({ error: 'Kon accounts niet ophalen: ' + e.message }); }
-    // 2. Pagina's die via haar account/business zijn toegewezen (owned + client pages).
+    const addIg = (x) => { if (x && x.id && !igMap[x.id]) igMap[x.id] = { id: x.id, username: x.username || null }; };
+    // 2. Pagina's die via haar account/business zijn toegewezen (owned + client pages),
+    //    EN de Instagram-accounts die direct onder de Business vallen. Zo vinden we
+    //    een Instagram ook als Meta die niet via de pagina teruggeeft (bv. bij een
+    //    client-pagina waar we geen pagina-token voor krijgen).
     try {
       const b = await graphGet('me/businesses', { fields: 'id,name', limit: '100', access_token: token });
       for (const biz of (b.data || [])) {
@@ -1847,6 +1852,12 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
           try {
             const pr = await graphGet(`${biz.id}/${edge}`, { fields: PF, limit: '200', access_token: token });
             (pr.data || []).forEach(addPage);
+          } catch (_) { /* deze edge overslaan */ }
+        }
+        for (const edge of ['owned_instagram_accounts', 'client_instagram_accounts']) {
+          try {
+            const ir = await graphGet(`${biz.id}/${edge}`, { fields: 'id,username', limit: '200', access_token: token });
+            (ir.data || []).forEach(addIg);
           } catch (_) { /* deze edge overslaan */ }
         }
       }
@@ -1862,28 +1873,31 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
         if (ig.id) { pg.ig_id = ig.id; pg.ig_username = ig.username; }
       } catch (_) { /* terugval mislukt: laat leeg */ }
     }
-    // Diagnose als er pagina's zonder Instagram overblijven: ligt het aan een
-    // ontbrekende permissie (instagram_basic) of aan een ontbrekende koppeling?
+    // Instagram-accounts die via een pagina gevonden zijn ook in de lijst opnemen.
+    Object.values(pageMap).forEach((p) => { if (p.ig_id) addIg({ id: p.ig_id, username: p.ig_username }); });
+    // Diagnose alleen als er helemaal geen Instagram-account gevonden is: ligt het
+    // aan een ontbrekende permissie (instagram_basic) of aan een ontbrekende koppeling?
     let ig_hint = null;
-    if (Object.values(pageMap).some((p) => !p.ig_id)) {
+    if (Object.keys(igMap).length === 0) {
       try {
         const perms = await graphGet('me/permissions', { access_token: token });
         const granted = (perms.data || []).filter((x) => x.status === 'granted').map((x) => x.permission);
         if (!granted.includes('instagram_basic')) {
           ig_hint = 'Je access token mist de permissie instagram_basic. Genereer het token opnieuw met instagram_basic (en pages_show_list) erbij; dan vindt Meta het Instagram-account.';
         } else {
-          ig_hint = 'Je token heeft instagram_basic, maar er is geen Instagram-bedrijfsaccount aan deze pagina gekoppeld. Koppel in Meta Business Suite het Instagram-account (als professioneel account: Bedrijf of Creator) aan deze Facebook-pagina en probeer opnieuw.';
+          ig_hint = 'Geen Instagram-account gevonden onder dit token. Zorg dat het Instagram-account een professioneel account is (Bedrijf of Creator) en in Meta Business is toegevoegd of aan een Facebook-pagina gekoppeld, en probeer opnieuw.';
         }
       } catch (_) { /* diagnose optioneel */ }
     }
     // Pagina-tokens NOOIT naar de frontend sturen.
     const pages = Object.values(pageMap).map((p) => ({ id: p.id, name: p.name, ig_id: p.ig_id, ig_username: p.ig_username }));
+    const igaccounts = Object.values(igMap);
     let adaccounts = [];
     try {
       const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });
       adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
     } catch (_) { /* ad accounts optioneel */ }
-    res.json({ success: true, pages, adaccounts, ig_hint });
+    res.json({ success: true, pages, igaccounts, adaccounts, ig_hint });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
