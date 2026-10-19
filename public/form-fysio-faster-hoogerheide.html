@@ -276,13 +276,13 @@
         <!-- Header -->
         <div class="form-header">
             <img src="images/faster-nieuw_witte achtergrond.png" alt="Fysio Faster Hoogerheide" class="form-logo">
-            <h1>Plan jouw gratis adviesgesprek bij Faster</h1>
-            <p>Zet de eerste stap naar een fitter leven.</p>
+            <h1>Plan hier jouw gratis kennismaking bij Fysio Faster</h1>
+            <p>Binnen 1 werkdag nemen we contact met je op.</p>
 
             <div class="benefits">
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
-                    Gratis en vrijblijvend adviesgesprek
+                    Gratis en vrijblijvende kennismaking met een adviesgesprek
                 </div>
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
@@ -290,7 +290,7 @@
                 </div>
                 <div class="benefit-item">
                     <span class="benefit-check">✓</span>
-                    Bij inschrijving starten we altijd met een uitgebreide intake en bodyscan
+                    Ontdek wat Fysio Faster voor jou kan betekenen
                 </div>
             </div>
         </div>
@@ -307,19 +307,19 @@
             </div>
 
             <div class="form-group">
-                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
-                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
-            </div>
-
-            <div class="form-group">
                 <label for="emailadres">E-mailadres <span class="required">*</span></label>
                 <input type="email" id="emailadres" name="emailadres" required placeholder="jouw@email.nl">
             </div>
 
             <div class="form-group">
-                <label for="doel">Wat is jouw voornaamste doel? <span class="required">*</span></label>
+                <label for="telefoon">Telefoonnummer <span class="required">*</span></label>
+                <input type="tel" id="telefoon" name="telefoon" required placeholder="06-12345678">
+            </div>
+
+            <div class="form-group">
+                <label for="doel">Wat is jouw voornaamste doel?</label>
                 <div class="select-wrap">
-                    <select id="doel" name="doel" required>
+                    <select id="doel" name="doel">
                         <option value="">Selecteer een doel...</option>
                         <option value="Fitter worden en meer energie">Fitter worden en meer energie</option>
                         <option value="Afvallen">Afvallen</option>
@@ -352,7 +352,7 @@
             </div>
 
             <button type="button" class="btn-submit" id="submitBtn" onclick="submitForm()">
-                Ja, ik meld me aan
+                Plan mijn gratis kennismaking
             </button>
         </div>
 
@@ -376,7 +376,7 @@
             const volledige_naam = document.getElementById('volledige_naam').value.trim();
             const emailadres     = document.getElementById('emailadres').value.trim();
             const telefoon       = document.getElementById('telefoon').value.trim();
-            const doel           = document.getElementById('doel').value;
+            const doel           = document.getElementById('doel').value || null;
             const bron           = document.getElementById('bron').value || null;
             const toestemming    = document.getElementById('toestemming').checked;
             const praktijk_code  = document.getElementById('praktijk_code').value;
@@ -393,10 +393,6 @@
             }
             if (!emailadres) {
                 alertBox.innerHTML = '<div class="alert alert-error">Vul je e-mailadres in.</div>';
-                return;
-            }
-            if (!doel) {
-                alertBox.innerHTML = '<div class="alert alert-error">Selecteer je voornaamste doel.</div>';
                 return;
             }
             if (!toestemming) {
@@ -439,12 +435,12 @@
                     const data = await res.json().catch(() => ({}));
                     alertBox.innerHTML = `<div class="alert alert-error">${data.error || 'Er is iets misgegaan. Probeer het opnieuw.'}</div>`;
                     btn.disabled = false;
-                    btn.textContent = 'Ja, ik meld me aan';
+                    btn.textContent = 'Plan mijn gratis kennismaking';
                 }
             } catch (e) {
                 alertBox.innerHTML = '<div class="alert alert-error">Netwerkfout. Controleer je verbinding en probeer opnieuw.</div>';
                 btn.disabled = false;
-                btn.textContent = 'Ja, ik meld me aan';
+                btn.textContent = 'Plan mijn gratis kennismaking';
             }
         }
     </script>
