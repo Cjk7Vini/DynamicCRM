@@ -1828,9 +1828,12 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
     const addPage = (p) => {
       if (!p || !p.id || pageMap[p.id]) return;
       const ig = igFrom(p);
-      pageMap[p.id] = { id: p.id, name: p.name || '(zonder naam)', ig_id: ig.id, ig_username: ig.username };
+      // _token = pagina-token: Meta geeft het Instagram-account vaak alleen terug
+      // als je de pagina met HAAR eigen token bevraagt, niet met het gebruikerstoken.
+      pageMap[p.id] = { id: p.id, name: p.name || '(zonder naam)', ig_id: ig.id, ig_username: ig.username, _token: p.access_token || null };
     };
-    const PF = 'name,id,instagram_business_account{id,username},connected_instagram_account{id,username}';
+    // access_token per pagina meevragen zodat we hieronder met het pagina-token kunnen terugvallen.
+    const PF = 'name,id,access_token,instagram_business_account{id,username},connected_instagram_account{id,username}';
     // 1. Pagina's met een directe rol.
     try {
       const r = await graphGet('me/accounts', { fields: PF, limit: '200', access_token: token });
@@ -1848,23 +1851,39 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
         }
       }
     } catch (_) { /* geen business-toegang: alleen directe pagina's */ }
-    // Terugval: voor pagina's waar de lijst-expansie geen Instagram teruggaf, de
-    // pagina nog een keer direct bevragen. Soms levert een directe call het
-    // gekoppelde account wel op terwijl de lijst dat niet deed.
+    // Terugval: voor pagina's zonder gevonden Instagram de pagina direct bevragen,
+    // bij voorkeur met het pagina-token (geeft het gekoppelde IG-account vaker terug).
     for (const pg of Object.values(pageMap)) {
       if (pg.ig_id) continue;
+      const pgToken = pg._token || token;
       try {
-        const d = await graphGet(`${pg.id}`, { fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', access_token: token });
+        const d = await graphGet(`${pg.id}`, { fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', access_token: pgToken });
         const ig = igFrom(d);
         if (ig.id) { pg.ig_id = ig.id; pg.ig_username = ig.username; }
       } catch (_) { /* terugval mislukt: laat leeg */ }
     }
-    const out = { pages: Object.values(pageMap), adaccounts: [] };
+    // Diagnose als er pagina's zonder Instagram overblijven: ligt het aan een
+    // ontbrekende permissie (instagram_basic) of aan een ontbrekende koppeling?
+    let ig_hint = null;
+    if (Object.values(pageMap).some((p) => !p.ig_id)) {
+      try {
+        const perms = await graphGet('me/permissions', { access_token: token });
+        const granted = (perms.data || []).filter((x) => x.status === 'granted').map((x) => x.permission);
+        if (!granted.includes('instagram_basic')) {
+          ig_hint = 'Je access token mist de permissie instagram_basic. Genereer het token opnieuw met instagram_basic (en pages_show_list) erbij; dan vindt Meta het Instagram-account.';
+        } else {
+          ig_hint = 'Je token heeft instagram_basic, maar er is geen Instagram-bedrijfsaccount aan deze pagina gekoppeld. Koppel in Meta Business Suite het Instagram-account (als professioneel account: Bedrijf of Creator) aan deze Facebook-pagina en probeer opnieuw.';
+        }
+      } catch (_) { /* diagnose optioneel */ }
+    }
+    // Pagina-tokens NOOIT naar de frontend sturen.
+    const pages = Object.values(pageMap).map((p) => ({ id: p.id, name: p.name, ig_id: p.ig_id, ig_username: p.ig_username }));
+    let adaccounts = [];
     try {
       const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });
-      out.adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
+      adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
     } catch (_) { /* ad accounts optioneel */ }
-    res.json({ success: true, pages: out.pages, adaccounts: out.adaccounts });
+    res.json({ success: true, pages, adaccounts, ig_hint });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
