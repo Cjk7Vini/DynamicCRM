@@ -2647,6 +2647,11 @@ function metaFillFromDiscover(){
 }
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
+  // Snel-koppelen leegmaken, zodat token en opgehaalde accounts van de vorige klant
+  // niet blijven staan als je naar een andere klant wisselt.
+  var _mqT=document.getElementById('mqToken'); if(_mqT)_mqT.value='';
+  var _mqR=document.getElementById('mqResult'); if(_mqR)_mqR.innerHTML='';
+  _MQ_PAGES=[]; _MQ_ADS=[]; _MQ_IGS=[]; _MQ_IG_HINT=null;
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){showMsg('intMsg',false,d.error||'Kon koppelingen niet laden.');return;}
