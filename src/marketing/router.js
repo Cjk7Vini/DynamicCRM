@@ -2873,7 +2873,15 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     }
     const placement = (b.placement === 'manual') ? 'manual' : 'automatic';
 
-    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    // Locatie: straal rondom een gekozen plaats, of anders het hele land.
+    const geoKey = String(b.geoKey || '').trim();
+    let geoRadius = parseInt(b.geoRadius, 10);
+    if (!Number.isFinite(geoRadius)) geoRadius = 25;
+    if (geoRadius < 17) geoRadius = 17; // Meta hanteert 17 km als minimale straal
+    if (geoRadius > 80) geoRadius = 80;
+    const targetingObj = { age_min: ageMin, age_max: ageMax };
+    if (geoKey) targetingObj.geo_locations = { cities: [{ key: geoKey, radius: geoRadius, distance_unit: 'kilometer' }] };
+    else targetingObj.geo_locations = { countries: [country] };
     if (genders === 'men') targetingObj.genders = [1];
     else if (genders === 'women') targetingObj.genders = [2];
     if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
@@ -2930,7 +2938,15 @@ router.post('/api/mkt/clients/:clientId/meta-adsets/:adsetId/targeting', require
     const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
     const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
 
-    const targetingObj = { geo_locations: { countries: [country] }, age_min: ageMin, age_max: ageMax };
+    // Locatie: straal rondom een gekozen plaats, of anders het hele land.
+    const geoKey = String(b.geoKey || '').trim();
+    let geoRadius = parseInt(b.geoRadius, 10);
+    if (!Number.isFinite(geoRadius)) geoRadius = 25;
+    if (geoRadius < 17) geoRadius = 17; // Meta hanteert 17 km als minimale straal
+    if (geoRadius > 80) geoRadius = 80;
+    const targetingObj = { age_min: ageMin, age_max: ageMax };
+    if (geoKey) targetingObj.geo_locations = { cities: [{ key: geoKey, radius: geoRadius, distance_unit: 'kilometer' }] };
+    else targetingObj.geo_locations = { countries: [country] };
     if (genders === 'men') targetingObj.genders = [1];
     else if (genders === 'women') targetingObj.genders = [2];
     if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];

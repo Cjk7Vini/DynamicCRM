@@ -860,12 +860,21 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="asIntResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
       <div id="asIntChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
     </div>
+    <div class="field"><label>Plaats + straal (optioneel)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="asGeoSearch" placeholder="Heel land (typ een plaats voor een straal)" oninput="searchGeo('as')" style="flex:1;min-width:200px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input id="asGeoRadius" type="number" min="17" max="80" value="25" oninput="renderGeoChosen('as')" style="width:70px"> km straal</div>
+      </div>
+      <div style="margin-top:4px;font-size:11.5px;color:var(--muted)">Meta hanteert een minimale straal van 17 km.</div>
+      <div id="asGeoResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="asGeoChosen" style="margin-top:6px;font-size:12.5px;color:var(--muted)">Geen plaats gekozen: hele land.</div>
+    </div>
     <div class="field"><label>Bestemmings-URL *</label><input id="asLink" placeholder="https://..."></div>
     <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
       <select id="asAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
     <div class="field"><label>Kop</label><input id="asHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
-    <div class="field"><label>Advertentietekst</label><textarea id="asCaption" rows="3" placeholder="De tekst boven de advertentie"></textarea></div>
+    <div style="font-size:12px;color:var(--muted);margin:-6px 0 14px">De advertentietekst stel je in bij de advertentie zelf (via Advertentie toevoegen), daar kun je ook meerdere teksten laten afwisselen.</div>
     <div class="field"><label>Status na aanmaken</label>
       <select id="asLaunch">
         <option value="paused">Gepauzeerd aanmaken (aanrader)</option>
@@ -963,7 +972,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="etIntResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
       <div id="etIntChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Let op: dit vervangt de bestaande interesses van deze ad set. Bestaande interesses worden niet automatisch ingeladen.</div>
+    <div class="field"><label>Plaats + straal (optioneel)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="etGeoSearch" placeholder="Heel land (typ een plaats voor een straal)" oninput="searchGeo('et')" style="flex:1;min-width:200px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)"><input id="etGeoRadius" type="number" min="17" max="80" value="25" oninput="renderGeoChosen('et')" style="width:70px"> km straal</div>
+      </div>
+      <div style="margin-top:4px;font-size:11.5px;color:var(--muted)">Meta hanteert een minimale straal van 17 km.</div>
+      <div id="etGeoResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
+      <div id="etGeoChosen" style="margin-top:6px;font-size:12.5px;color:var(--muted)">Geen plaats gekozen: hele land.</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Let op: dit vervangt de bestaande targeting van deze ad set (interesses en plaats). Bestaande waarden worden niet automatisch ingeladen.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeEtModal()">Annuleren</button>
       <button class="btn btn-primary" id="etBtn" onclick="submitEtModal()">Targeting opslaan</button>
@@ -2903,10 +2921,11 @@ async function openAsModal(){
   document.getElementById('asName').value='';document.getElementById('asBudget').value='10';
   document.getElementById('asCountry').value='NL';document.getElementById('asAgeMin').value='18';document.getElementById('asAgeMax').value='65';
   document.getElementById('asGenders').value='all';document.getElementById('asCta').value='LEARN_MORE';
-  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';document.getElementById('asCaption').value='';var asH=document.getElementById('asHeadline');if(asH)asH.value='';
+  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';var asH=document.getElementById('asHeadline');if(asH)asH.value='';
   document.getElementById('asLaunch').value='paused';
   document.getElementById('asIntSearch').value='';document.getElementById('asIntResults').style.display='none';
   MKT_INT.as=[]; intChips('as');
+  MKT_GEO.as=null; var asgs=document.getElementById('asGeoSearch'); if(asgs)asgs.value=''; var asgr=document.getElementById('asGeoResults'); if(asgr)asgr.style.display='none'; var asgrad=document.getElementById('asGeoRadius'); if(asgrad)asgrad.value='25'; renderGeoChosen('as');
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
     var sel=document.getElementById('asAsset');var opts='<option value="">Kies een afbeelding of video</option>';
@@ -2928,9 +2947,10 @@ async function submitAsModal(){
     cta:document.getElementById('asCta').value,
     link:document.getElementById('asLink').value.trim(),
     assetId:document.getElementById('asAsset').value||null,
-    caption:document.getElementById('asCaption').value,
     headline:(document.getElementById('asHeadline')?document.getElementById('asHeadline').value:''),
     interests:MKT_INT.as,
+    geoKey:(MKT_GEO.as?MKT_GEO.as.key:''),
+    geoRadius:(document.getElementById('asGeoRadius')?document.getElementById('asGeoRadius').value:'25'),
     launch:document.getElementById('asLaunch').value
   };
   if(!payload.name){showMsg('asMsg',false,'Naam is verplicht.');return;}
@@ -2962,6 +2982,7 @@ function openEtModal(id,name){
   document.getElementById('etAgeMin').value='18';document.getElementById('etAgeMax').value='65';
   document.getElementById('etIntSearch').value='';document.getElementById('etIntResults').style.display='none';
   MKT_INT.et=[]; intChips('et');
+  MKT_GEO.et=null; var etgs=document.getElementById('etGeoSearch'); if(etgs)etgs.value=''; var etgr=document.getElementById('etGeoResults'); if(etgr)etgr.style.display='none'; var etgrad=document.getElementById('etGeoRadius'); if(etgrad)etgrad.value='25'; renderGeoChosen('et');
   document.getElementById('etModal').classList.add('open');
 }
 function closeEtModal(){document.getElementById('etModal').classList.remove('open');}
@@ -2974,7 +2995,9 @@ async function submitEtModal(){
     genders:document.getElementById('etGenders').value,
     ageMin:document.getElementById('etAgeMin').value,
     ageMax:document.getElementById('etAgeMax').value,
-    interests:MKT_INT.et
+    interests:MKT_INT.et,
+    geoKey:(MKT_GEO.et?MKT_GEO.et.key:''),
+    geoRadius:(document.getElementById('etGeoRadius')?document.getElementById('etGeoRadius').value:'25')
   };
   btn.disabled=true; btn.textContent='Opslaan...';
   try{
@@ -3227,7 +3250,7 @@ async function openCampaign(){
   var cpl=document.getElementById('cpLaunch'); if(cpl)cpl.value='paused';
   var cpo=document.getElementById('cpObjective'); if(cpo)cpo.value='OUTCOME_LEADS';
   var cpt=document.getElementById('cpAdvToggle'); if(cpt)cpt.checked=false; toggleCampAdvanced(false);
-  CP_GEO=null; var gs=document.getElementById('cpGeoSearch'); if(gs)gs.value=''; var gr=document.getElementById('cpGeoResults'); if(gr)gr.style.display='none'; var grad=document.getElementById('cpGeoRadius'); if(grad)grad.value='25'; renderGeoChosen();
+  MKT_GEO.cp=null; var gs=document.getElementById('cpGeoSearch'); if(gs)gs.value=''; var gr=document.getElementById('cpGeoResults'); if(gr)gr.style.display='none'; var grad=document.getElementById('cpGeoRadius'); if(grad)grad.value='25'; renderGeoChosen('cp');
   var cst=document.getElementById('cpStartTime'); if(cst)cst.value='';
   document.getElementById('cpInterestSearch').value='';document.getElementById('cpInterestResults').style.display='none';
   CP_INTERESTS=[]; renderInterestChips();
@@ -3268,28 +3291,34 @@ function renderInterestChips(){
     return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="removeInterest(\''+esc(i.id)+'\')">×</span></span>';
   }).join('');
 }
-var CP_GEO=null, CP_GEO_TIMER=null;
-function searchGeo(){
-  clearTimeout(CP_GEO_TIMER);
-  var q=document.getElementById('cpGeoSearch').value.trim();
-  var box=document.getElementById('cpGeoResults');
+// Geo-zoeken per formulier (key = cp/as/et). Elementen heten {key}GeoSearch, {key}GeoRadius,
+// {key}GeoResults, {key}GeoChosen; de gekozen plaats staat in MKT_GEO[key].
+var MKT_GEO={cp:null,as:null,et:null}, GEO_TIMER=null;
+function searchGeo(key){
+  key=key||'cp';
+  clearTimeout(GEO_TIMER);
+  var inp=document.getElementById(key+'GeoSearch'); var box=document.getElementById(key+'GeoResults');
+  if(!inp||!box)return;
+  var q=inp.value.trim();
   if(q.length<2){box.style.display='none';return;}
-  CP_GEO_TIMER=setTimeout(async function(){
+  GEO_TIMER=setTimeout(async function(){
     try{
       var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta/geo?q='+encodeURIComponent(q),{credentials:'include'}); var d=await r.json();
       if(!r.ok||d.error){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">'+esc(d.error||('Fout '+r.status))+'</div>';box.style.display='block';return;}
       if(!d.locations||!d.locations.length){box.innerHTML='<div style="padding:8px 10px;color:var(--muted);font-size:13px">Geen plaats gevonden.</div>';box.style.display='block';return;}
-      box.innerHTML=d.locations.map(function(l){var lbl=esc(l.name)+(l.region?(', '+esc(l.region)):'')+(l.country?(' ('+esc(l.country)+')'):'');return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'chooseGeo("'+esc(l.key)+'","'+esc(String(l.name).replace(/"/g,""))+'")\'>'+lbl+'</div>';}).join('');
+      box.innerHTML=d.locations.map(function(l){var lbl=esc(l.name)+(l.region?(', '+esc(l.region)):'')+(l.country?(' ('+esc(l.country)+')'):'');return '<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)" onclick=\'chooseGeo("'+key+'","'+esc(l.key)+'","'+esc(String(l.name).replace(/"/g,""))+'")\'>'+lbl+'</div>';}).join('');
       box.style.display='block';
     }catch(e){box.innerHTML='<div style="padding:8px 10px;color:#b91c1c;font-size:13px">Netwerkfout bij zoeken.</div>';box.style.display='block';}
   },350);
 }
-function chooseGeo(key,name){CP_GEO={key:key,name:name};document.getElementById('cpGeoResults').style.display='none';document.getElementById('cpGeoSearch').value='';renderGeoChosen();}
-function clearGeo(){CP_GEO=null;renderGeoChosen();}
-function renderGeoChosen(){
-  var el=document.getElementById('cpGeoChosen'); if(!el)return;
-  if(CP_GEO){var km=document.getElementById('cpGeoRadius');var r=km?km.value:'25';el.innerHTML='Straal rondom <strong>'+esc(CP_GEO.name)+'</strong> ('+esc(r)+' km) <span style="cursor:pointer;color:#dc2626;font-weight:700" onclick="clearGeo()">wissen</span>';}
-  else{el.textContent='Geen plaats gekozen: hele land (NL).';}
+function chooseGeo(key,geoKey,name){MKT_GEO[key]={key:geoKey,name:name};var box=document.getElementById(key+'GeoResults');if(box)box.style.display='none';var inp=document.getElementById(key+'GeoSearch');if(inp)inp.value='';renderGeoChosen(key);}
+function clearGeo(key){key=key||'cp';MKT_GEO[key]=null;renderGeoChosen(key);}
+function renderGeoChosen(key){
+  key=key||'cp';
+  var el=document.getElementById(key+'GeoChosen'); if(!el)return;
+  var g=MKT_GEO[key];
+  if(g){var km=document.getElementById(key+'GeoRadius');var r=km?km.value:'25';el.innerHTML='Straal rondom <strong>'+esc(g.name)+'</strong> ('+esc(r)+' km) <span style="cursor:pointer;color:#dc2626;font-weight:700" onclick="clearGeo(\''+key+'\')">wissen</span>';}
+  else{el.textContent='Geen plaats gekozen: hele land.';}
 }
 function closeCampaign(){document.getElementById('campModal').classList.remove('open');}
 function toggleCampAdvanced(on){var a=document.getElementById('cpAdvanced');if(a)a.style.display=on?'':'none';}
@@ -3367,7 +3396,7 @@ async function createCampaign2(){
       launch:(document.getElementById('cpLaunch')?document.getElementById('cpLaunch').value:'paused')
     };
   }
-  payload.geoKey = CP_GEO ? CP_GEO.key : '';
+  payload.geoKey = MKT_GEO.cp ? MKT_GEO.cp.key : '';
   var cpRadEl=document.getElementById('cpGeoRadius');
   var cpRad=cpRadEl?parseInt(cpRadEl.value,10):25; if(!(cpRad>=17))cpRad=17; if(cpRad>80)cpRad=80;
   if(cpRadEl)cpRadEl.value=cpRad;
