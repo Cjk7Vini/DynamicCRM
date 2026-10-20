@@ -2836,24 +2836,45 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
 
-    // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen. Bij een
-    // conversie-doel (Leads/Verkoop) met pixel optimaliseren we op conversies en
-    // zetten we het gepromote object (pixel + Lead), anders weigert Meta de ad set.
+    // Een nieuwe ad set moet matchen met de campagne. Betrouwbaarste manier: de
+    // optimalisatie + het gepromote object (pixel + event) OVERNEMEN van een
+    // bestaande ad set in dezelfde campagne. Zo volgt de nieuwe ad set precies wat
+    // er al draait, ook als de campagne handmatig in Meta is gemaakt (met conversies).
+    // We kiezen bij voorkeur een bestaande conversie-ad-set (met gepromote object),
+    // zodat we nooit per ongeluk een eerder fout gemaakte linkklik-ad-set kopieren.
+    // Lukt dat niet (geen bestaande ad set), dan vallen we terug op het campagnedoel.
     let optimizationGoal = 'LINK_CLICKS';
     let promotedObject = null;
+    let billingEvent = 'IMPRESSIONS';
     let pixelWarning = false;
+    let matchedExisting = false;
     try {
-      const camp = await graphGet(`${req.params.campaignId}`, { fields: 'objective', access_token: token });
-      if (camp && camp.objective && CAMPAIGN_OBJECTIVES[camp.objective]) optimizationGoal = CAMPAIGN_OBJECTIVES[camp.objective];
-      if (camp && (camp.objective === 'OUTCOME_LEADS' || camp.objective === 'OUTCOME_SALES')) {
-        if (creds.pixelId) {
-          optimizationGoal = 'OFFSITE_CONVERSIONS';
-          promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
-        } else {
-          pixelWarning = true; // Leads/Verkoop zonder pixel: optimaliseert op linkklikken.
-        }
+      const ex = await graphGet(`${req.params.campaignId}/adsets`, {
+        fields: 'optimization_goal,promoted_object,billing_event', limit: '25', access_token: token,
+      });
+      const list = (ex && ex.data) || [];
+      const pick = list.find((s) => s && s.promoted_object) || list[0];
+      if (pick && pick.optimization_goal) {
+        optimizationGoal = pick.optimization_goal;
+        if (pick.billing_event) billingEvent = pick.billing_event;
+        if (pick.promoted_object) promotedObject = JSON.stringify(pick.promoted_object);
+        matchedExisting = true;
       }
-    } catch (_) { /* val terug op LINK_CLICKS */ }
+    } catch (_) { /* geen bestaande ad set te lezen: val terug op het campagnedoel */ }
+    if (!matchedExisting) {
+      try {
+        const camp = await graphGet(`${req.params.campaignId}`, { fields: 'objective', access_token: token });
+        if (camp && camp.objective && CAMPAIGN_OBJECTIVES[camp.objective]) optimizationGoal = CAMPAIGN_OBJECTIVES[camp.objective];
+        if (camp && (camp.objective === 'OUTCOME_LEADS' || camp.objective === 'OUTCOME_SALES')) {
+          if (creds.pixelId) {
+            optimizationGoal = 'OFFSITE_CONVERSIONS';
+            promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
+          } else {
+            pixelWarning = true; // Leads/Verkoop zonder pixel en geen bestaande ad set om te matchen.
+          }
+        }
+      } catch (_) { /* val terug op LINK_CLICKS */ }
+    }
 
     const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
     const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
@@ -2895,7 +2916,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     const beneficiary = String((benRow && benRow.name) || name).slice(0, 100);
     const adsetParams = {
       name, campaign_id: req.params.campaignId, daily_budget: String(budgetCents),
-      billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
+      billing_event: billingEvent, optimization_goal: optimizationGoal,
       bid_strategy: bidStrategy, targeting, status: launchStatus,
       dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
       start_time: new Date(Date.now() + 3600 * 1000).toISOString(), access_token: token,
