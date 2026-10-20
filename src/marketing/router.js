@@ -2588,9 +2588,9 @@ const CAMPAIGN_OBJECTIVES = {
   OUTCOME_TRAFFIC: 'LINK_CLICKS',
   OUTCOME_AWARENESS: 'REACH',
   OUTCOME_ENGAGEMENT: 'POST_ENGAGEMENT',
-  // Leads en Verkoop optimaliseren we voorlopig veilig op linkklikken zodat het
-  // altijd aanmaakt. Echte conversie-optimalisatie (pixel-event op de thank-you)
-  // volgt in de campagne-herbouw.
+  // Leads en Verkoop: dit is de TERUGVAL (linkklikken) als er geen Meta Pixel is.
+  // Mét een pixel zetten we bij het aanmaken OFFSITE_CONVERSIONS + het LEAD-event,
+  // dus echte conversie-optimalisatie met 7-daagse attributie.
   OUTCOME_LEADS: 'LINK_CLICKS',
   OUTCOME_SALES: 'LINK_CLICKS',
 };
@@ -2806,11 +2806,14 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
       [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
     )).rows[0]);
     const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
-    res.json({ success: true, campaign: row, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
+    // Leads/Verkoop zonder pixel: dan optimaliseert Meta op linkklikken i.p.v. echte
+    // conversies. We melden dat terug zodat de gebruiker de pixel kan instellen.
+    const pixelWarning = (objective === 'OUTCOME_LEADS' || objective === 'OUTCOME_SALES') && !creds.pixelId;
+    res.json({ success: true, campaign: row, pixelWarning, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Extra advertentieset (met 1 advertentie) toevoegen aan een bestaande campagne.
+// Extra advertentieset toevoegen aan een bestaande campagne (alleen de ad set).
 router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requireMkt, async (req, res) => {
   try {
     if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
@@ -2838,12 +2841,17 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     // zetten we het gepromote object (pixel + Lead), anders weigert Meta de ad set.
     let optimizationGoal = 'LINK_CLICKS';
     let promotedObject = null;
+    let pixelWarning = false;
     try {
       const camp = await graphGet(`${req.params.campaignId}`, { fields: 'objective', access_token: token });
       if (camp && camp.objective && CAMPAIGN_OBJECTIVES[camp.objective]) optimizationGoal = CAMPAIGN_OBJECTIVES[camp.objective];
-      if (camp && (camp.objective === 'OUTCOME_LEADS' || camp.objective === 'OUTCOME_SALES') && creds.pixelId) {
-        optimizationGoal = 'OFFSITE_CONVERSIONS';
-        promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
+      if (camp && (camp.objective === 'OUTCOME_LEADS' || camp.objective === 'OUTCOME_SALES')) {
+        if (creds.pixelId) {
+          optimizationGoal = 'OFFSITE_CONVERSIONS';
+          promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
+        } else {
+          pixelWarning = true; // Leads/Verkoop zonder pixel: optimaliseert op linkklikken.
+        }
       }
     } catch (_) { /* val terug op LINK_CLICKS */ }
 
@@ -2897,7 +2905,7 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     // Alleen de advertentieset aanmaken; de advertentie (beeld, kop, tekst) voegt
     // de gebruiker daarna apart toe via "Advertentie toevoegen".
     const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
-    res.json({ success: true, adset_id: adset.id, status: launchStatus });
+    res.json({ success: true, adset_id: adset.id, status: launchStatus, pixelWarning });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
