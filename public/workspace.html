@@ -2931,7 +2931,10 @@ async function submitAsModal(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/adsets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('asMsg',true,'Advertentieset aangemaakt. Voeg nu een advertentie toe met "Advertentie toevoegen".');setTimeout(function(){closeAsModal();renderCampDetail();},1500);}
+    if(r.ok&&d.success){
+      if(d.pixelWarning){showMsg('asMsg',false,'Advertentieset aangemaakt, maar er is geen Meta Pixel ingesteld: deze optimaliseert op linkklikken i.p.v. leads. Stel de Meta Pixel ID in bij Werkplek-koppeling (of bij de klant) voor conversie-optimalisatie.');setTimeout(function(){closeAsModal();renderCampDetail();},6000);}
+      else {showMsg('asMsg',true,'Advertentieset aangemaakt. Voeg nu een advertentie toe met "Advertentie toevoegen".');setTimeout(function(){closeAsModal();renderCampDetail();},1500);}
+    }
     else {showMsg('asMsg',false,d.error||'Toevoegen mislukt.');}
   }catch(e){showMsg('asMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Ad set toevoegen';
@@ -3382,14 +3385,15 @@ async function createCampaign2(){
       var cpBase=payload.launch==='active'?'Campagne aangemaakt en live gezet.':'Campagne aangemaakt (gepauzeerd).';
       if(d.multiTextApplied===false){cpBase+=' Let op: Meta accepteerde de meerdere teksten niet (1 tekst gebruikt). Meta-reden: '+(d.flexError||'onbekend')+'.';}
       else if(d.multiTextApplied===true){cpBase+=' '+(cpN>1?(cpN+' teksten'):'Meerdere teksten')+' toegepast; Meta wisselt ze af en toont de best presterende.';}
-      showMsg('campModalMsg',d.multiTextApplied!==false,cpBase);
+      if(d.pixelWarning){cpBase+=' LET OP: er is geen Meta Pixel ingesteld, dus deze campagne optimaliseert op linkklikken i.p.v. leads. Stel de Meta Pixel ID in bij Werkplek-koppeling (of bij de klant) voor conversie-optimalisatie (leads + Lead-event).';}
+      showMsg('campModalMsg',(d.multiTextApplied!==false&&!d.pixelWarning),cpBase);
       var camp=d.campaign||{};
       setTimeout(function(){
         closeCampaign();
         loadCampaigns();
         // Volgende stap: het ad set-venster van de zojuist gemaakte campagne.
         if(camp.meta_campaign_id&&typeof openCampDetail==='function'){openCampDetail(camp.meta_campaign_id,camp.name);}
-      },1100);
+      },d.pixelWarning?6000:1100);
     } else { campShowErr(d.error||'Aanmaken mislukt.'); }
   }catch(e){ campShowErr('Netwerkfout.'); }
   btn.disabled=false; btn.textContent='Campagne aanmaken';
