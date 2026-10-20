@@ -873,8 +873,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
       <select id="asAsset"><option value="">Kies een afbeelding of video</option></select>
     </div>
-    <div class="field"><label>Kop</label><input id="asHeadline" maxlength="255" placeholder="Titel naast de knop (anders de paginanaam)"></div>
-    <div style="font-size:12px;color:var(--muted);margin:-6px 0 14px">De advertentietekst stel je in bij de advertentie zelf (via Advertentie toevoegen), daar kun je ook meerdere teksten laten afwisselen.</div>
+    <div style="font-size:12px;color:var(--muted);margin:2px 0 14px">De kop en advertentietekst stel je in bij de advertentie zelf (via Advertentie toevoegen); daar kun je ook meerdere teksten laten afwisselen.</div>
     <div class="field"><label>Status na aanmaken</label>
       <select id="asLaunch">
         <option value="paused">Gepauzeerd aanmaken (aanrader)</option>
@@ -2921,7 +2920,7 @@ async function openAsModal(){
   document.getElementById('asName').value='';document.getElementById('asBudget').value='10';
   document.getElementById('asCountry').value='NL';document.getElementById('asAgeMin').value='18';document.getElementById('asAgeMax').value='65';
   document.getElementById('asGenders').value='all';document.getElementById('asCta').value='LEARN_MORE';
-  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';var asH=document.getElementById('asHeadline');if(asH)asH.value='';
+  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
   document.getElementById('asLaunch').value='paused';
   document.getElementById('asIntSearch').value='';document.getElementById('asIntResults').style.display='none';
   MKT_INT.as=[]; intChips('as');
@@ -2947,7 +2946,6 @@ async function submitAsModal(){
     cta:document.getElementById('asCta').value,
     link:document.getElementById('asLink').value.trim(),
     assetId:document.getElementById('asAsset').value||null,
-    headline:(document.getElementById('asHeadline')?document.getElementById('asHeadline').value:''),
     interests:MKT_INT.as,
     geoKey:(MKT_GEO.as?MKT_GEO.as.key:''),
     geoRadius:(document.getElementById('asGeoRadius')?document.getElementById('asGeoRadius').value:'25'),
