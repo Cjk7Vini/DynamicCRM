@@ -829,7 +829,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <div class="modal-ov" id="asModal">
   <div class="modal">
     <h3>Nieuwe advertentieset</h3>
-    <div class="sub">Voegt een extra ad set met een advertentie toe aan deze campagne.</div>
+    <div class="sub">Voegt een lege advertentieset toe. Daarna voeg je er een advertentie aan toe via de knop "Advertentie toevoegen".</div>
     <div id="asMsg" class="inline-msg"></div>
     <div class="field"><label>Naam ad set *</label><input id="asName" placeholder="Bijv. Vrouwen 25-34"></div>
     <div class="row2">
@@ -840,20 +840,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div class="field"><label>Leeftijd van</label><input id="asAgeMin" type="number" min="13" max="65" value="18"></div>
       <div class="field"><label>Leeftijd tot</label><input id="asAgeMax" type="number" min="13" max="65" value="65"></div>
     </div>
-    <div class="row2">
-      <div class="field"><label>Geslacht</label>
-        <select id="asGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
-      </div>
-      <div class="field"><label>Call-to-action</label>
-        <select id="asCta">
-          <option value="LEARN_MORE">Meer informatie</option>
-          <option value="SHOP_NOW">Nu shoppen</option>
-          <option value="SIGN_UP">Aanmelden</option>
-          <option value="CONTACT_US">Neem contact op</option>
-          <option value="GET_OFFER">Bekijk aanbod</option>
-          <option value="SUBSCRIBE">Abonneren</option>
-        </select>
-      </div>
+    <div class="field"><label>Geslacht</label>
+      <select id="asGenders"><option value="all">Iedereen</option><option value="men">Mannen</option><option value="women">Vrouwen</option></select>
     </div>
     <div class="field"><label>Interesses (targeting)</label>
       <input id="asIntSearch" placeholder="Typ om te zoeken, bijv. fitness" oninput="intSearch('as')">
@@ -869,11 +857,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="asGeoResults" style="display:none;border:1px solid var(--line);border-radius:8px;margin-top:4px;max-height:150px;overflow:auto"></div>
       <div id="asGeoChosen" style="margin-top:6px;font-size:12.5px;color:var(--muted)">Geen plaats gekozen: hele land.</div>
     </div>
-    <div class="field"><label>Bestemmings-URL *</label><input id="asLink" placeholder="https://..."></div>
-    <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
-      <select id="asAsset"><option value="">Kies een afbeelding of video</option></select>
-    </div>
-    <div style="font-size:12px;color:var(--muted);margin:2px 0 14px">De kop en advertentietekst stel je in bij de advertentie zelf (via Advertentie toevoegen); daar kun je ook meerdere teksten laten afwisselen.</div>
+    <div style="font-size:12px;color:var(--muted);margin:2px 0 14px">Deze actie maakt alleen de advertentieset (targeting en budget). Het beeld, de kop en de tekst voeg je daarna toe via "Advertentie toevoegen".</div>
     <div class="field"><label>Status na aanmaken</label>
       <select id="asLaunch">
         <option value="paused">Gepauzeerd aanmaken (aanrader)</option>
@@ -2919,18 +2903,11 @@ async function openAsModal(){
   hideMsg('asMsg');
   document.getElementById('asName').value='';document.getElementById('asBudget').value='10';
   document.getElementById('asCountry').value='NL';document.getElementById('asAgeMin').value='18';document.getElementById('asAgeMax').value='65';
-  document.getElementById('asGenders').value='all';document.getElementById('asCta').value='LEARN_MORE';
-  document.getElementById('asLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
+  document.getElementById('asGenders').value='all';
   document.getElementById('asLaunch').value='paused';
   document.getElementById('asIntSearch').value='';document.getElementById('asIntResults').style.display='none';
   MKT_INT.as=[]; intChips('as');
   MKT_GEO.as=null; var asgs=document.getElementById('asGeoSearch'); if(asgs)asgs.value=''; var asgr=document.getElementById('asGeoResults'); if(asgr)asgr.style.display='none'; var asgrad=document.getElementById('asGeoRadius'); if(asgrad)asgrad.value='25'; renderGeoChosen('as');
-  try{
-    var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
-    var sel=document.getElementById('asAsset');var opts='<option value="">Kies een afbeelding of video</option>';
-    (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ var tag=(a.resource_type==='video')?' (video)':''; opts+='<option value="'+a.id+'">'+esc(a.filename)+tag+'</option>'; } });
-    sel.innerHTML=opts;
-  }catch(e){}
   document.getElementById('asModal').classList.add('open');document.getElementById('asName').focus();
 }
 function closeAsModal(){document.getElementById('asModal').classList.remove('open');}
@@ -2943,30 +2920,18 @@ async function submitAsModal(){
     ageMin:document.getElementById('asAgeMin').value,
     ageMax:document.getElementById('asAgeMax').value,
     genders:document.getElementById('asGenders').value,
-    cta:document.getElementById('asCta').value,
-    link:document.getElementById('asLink').value.trim(),
-    assetId:document.getElementById('asAsset').value||null,
     interests:MKT_INT.as,
     geoKey:(MKT_GEO.as?MKT_GEO.as.key:''),
     geoRadius:(document.getElementById('asGeoRadius')?document.getElementById('asGeoRadius').value:'25'),
     launch:document.getElementById('asLaunch').value
   };
   if(!payload.name){showMsg('asMsg',false,'Naam is verplicht.');return;}
-  if(!payload.assetId){showMsg('asMsg',false,'Kies een afbeelding of video.');return;}
-  if(!/^https?:\/\//i.test(payload.link)){showMsg('asMsg',false,'Vul een geldige bestemmings-URL in (https://...).');return;}
-  if(payload.launch==='active'&&!confirm('Deze ad set direct live zetten? Gaat meteen geld uitgeven.'))return;
-  var asSel=document.getElementById('asAsset');var asIsVideo=asSel&&asSel.options[asSel.selectedIndex]&&/\(video\)\s*$/.test(asSel.options[asSel.selectedIndex].text);
+  if(payload.launch==='active'&&!confirm('Deze advertentieset direct live zetten? Zonder advertentie levert hij nog niets; voeg daarna een advertentie toe.'))return;
   btn.disabled=true; btn.textContent='Toevoegen...';
-  if(asIsVideo)showMsg('asMsg',true,'De video wordt naar Meta geupload en verwerkt. Dit kan tot een minuut duren, blijf even op deze pagina.');
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns/'+CD_CAMP+'/adsets',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
-    if(r.ok&&d.success){
-      var asN=(Array.isArray(payload.captions)?payload.captions.filter(function(x){return (x||'').trim();}).length:0);
-      if(d.multiTextApplied===false){showMsg('asMsg',false,'Ad set toegevoegd, maar Meta accepteerde de meerdere teksten niet (1 tekst gebruikt). Meta-reden: '+(d.flexError||'onbekend')+'. Stuur deze melding door.');renderCampDetail();}
-      else if(d.multiTextApplied===true){showMsg('asMsg',true,'Ad set toegevoegd met '+(asN>1?(asN+' teksten'):'meerdere teksten')+'; Meta wisselt ze af.');setTimeout(function(){closeAsModal();renderCampDetail();},3500);}
-      else {showMsg('asMsg',true,'Ad set toegevoegd.');setTimeout(function(){closeAsModal();renderCampDetail();},1100);}
-    }
+    if(r.ok&&d.success){showMsg('asMsg',true,'Advertentieset aangemaakt. Voeg nu een advertentie toe met "Advertentie toevoegen".');setTimeout(function(){closeAsModal();renderCampDetail();},1500);}
     else {showMsg('asMsg',false,d.error||'Toevoegen mislukt.');}
   }catch(e){showMsg('asMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Ad set toevoegen';

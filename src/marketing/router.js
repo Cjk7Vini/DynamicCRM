@@ -2827,25 +2827,11 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     const country = String(b.country || 'NL').trim().toUpperCase().slice(0, 2);
     const ageMin = Math.min(65, Math.max(13, parseInt(b.ageMin, 10) || 18));
     const ageMax = Math.min(65, Math.max(ageMin, parseInt(b.ageMax, 10) || 65));
-    const link = String(b.link || '').trim();
-    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
-    const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
-    const caption = String(b.caption || '').slice(0, 2000);
-    const headline = String(b.headline || '').slice(0, 255);
-
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
     const adAccount = creds.adAccount;
     if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
-    if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
-
-    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding of video voor de advertentie' });
-    const asset = await withReadConnection(async (c) => (await c.query(
-      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
-      [b.assetId, okClient, wsId]
-    )).rows[0]);
-    if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
 
     // Campagnedoel ophalen om het juiste optimalisatiedoel te kiezen. Bij een
     // conversie-doel (Leads/Verkoop) met pixel optimaliseren we op conversies en
@@ -2908,16 +2894,10 @@ router.post('/api/mkt/clients/:clientId/meta-campaigns/:campaignId/adsets', requ
     };
     if (promotedObject) adsetParams.promoted_object = promotedObject;
     if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
+    // Alleen de advertentieset aanmaken; de advertentie (beeld, kop, tekst) voegt
+    // de gebruiker daarna apart toe via "Advertentie toevoegen".
     const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
-    const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
-    const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
-    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
-    const ad = await graphPost(`${adAccount}/ads`, {
-      name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
-      status: launchStatus, access_token: token,
-    });
-    const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
-    res.json({ success: true, adset_id: adset.id, ad_id: ad.id, status: launchStatus, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
+    res.json({ success: true, adset_id: adset.id, status: launchStatus });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
