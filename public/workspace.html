@@ -976,6 +976,28 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: Planning-kolom toevoegen of bewerken (naam + kleur) -->
+<div class="modal-ov" id="colModal">
+  <div class="modal" style="max-width:420px">
+    <h3 id="colModalTitle">Kolom bewerken</h3>
+    <div class="sub">Pas de naam en kleur van deze kolom aan.</div>
+    <div id="colMsg" class="inline-msg"></div>
+    <div class="field"><label>Naam</label><input id="colName" maxlength="40" placeholder="Kolomnaam"></div>
+    <div class="field"><label>Kleur</label>
+      <div id="colSwatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input id="colColor" type="color" value="#6366f1" style="width:46px;height:34px;padding:2px;cursor:pointer;background:var(--panel-2)" oninput="colPickCustom()">
+        <span style="font-size:12.5px;color:var(--muted)">eigen kleur kiezen</span>
+        <button type="button" class="btn btn-ghost" style="padding:5px 10px;font-size:12px;margin-left:auto" onclick="colClearColor()">Geen kleur</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeColModal()">Annuleren</button>
+      <button class="btn btn-primary" id="colSaveBtn" onclick="saveColModal()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
   <div class="modal" style="max-width:900px">
@@ -3516,21 +3538,48 @@ var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'
 // terug op de vaste standaardkolommen hierboven.
 var BOARD_COLS=null, BOARD_COLS_CUSTOM=false;
 function boardCols(){
-  if(BOARD_COLS&&BOARD_COLS.length)return BOARD_COLS.map(function(c){return {id:c.id,key:c.col_key,label:c.label};});
-  return CONTENT_COLS.map(function(c){return {id:null,key:c[0],label:c[1]};});
+  if(BOARD_COLS&&BOARD_COLS.length)return BOARD_COLS.map(function(c){return {id:c.id,key:c.col_key,label:c.label,color:c.color||''};});
+  return CONTENT_COLS.map(function(c){return {id:null,key:c[0],label:c[1],color:''};});
 }
 async function loadBoardColumns(){
   try{var r=await fetch('/api/mkt/columns',{credentials:'include'});var d=await r.json();if(d&&d.success){BOARD_COLS=d.columns||[];BOARD_COLS_CUSTOM=!!d.custom;}}catch(e){}
 }
-async function addBoardColumn(){
-  var name=prompt('Naam van de nieuwe kolom:'); if(name==null)return; name=name.trim(); if(!name)return;
-  try{var r=await fetch('/api/mkt/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name})});var d=await r.json();if(r.ok&&d.success){await loadBoardColumns();renderContentView();}else{alert((d&&d.error)||'Kon kolom niet toevoegen.');}}catch(e){alert('Netwerkfout.');}
+// Kolom toevoegen of bewerken via een echt venster: naam + kleur.
+var COL_EDIT_ID=null, COL_COLOR='';
+var COL_PRESETS=['#6366f1','#2563eb','#0ea5e9','#16a34a','#d97706','#dc2626','#db2777','#7c3aed','#64748b'];
+function openColumnEdit(id){
+  COL_EDIT_ID=(id==null?null:id); hideMsg('colMsg');
+  var cur={label:'',color:''};
+  if(COL_EDIT_ID!=null&&BOARD_COLS){for(var k=0;k<BOARD_COLS.length;k++){if(String(BOARD_COLS[k].id)===String(COL_EDIT_ID)){cur={label:BOARD_COLS[k].label||'',color:BOARD_COLS[k].color||''};break;}}}
+  var t=document.getElementById('colModalTitle'); if(t)t.textContent=(COL_EDIT_ID==null?'Nieuwe kolom':'Kolom bewerken');
+  document.getElementById('colName').value=cur.label;
+  COL_COLOR=cur.color||'';
+  document.getElementById('colColor').value=/^#[0-9a-fA-F]{6}$/.test(COL_COLOR)?COL_COLOR:'#6366f1';
+  renderColSwatches();
+  document.getElementById('colModal').classList.add('open');
+  document.getElementById('colName').focus();
 }
-async function renameBoardColumn(id){
-  if(id==null||!BOARD_COLS)return;
-  var cur=''; for(var k=0;k<BOARD_COLS.length;k++){if(String(BOARD_COLS[k].id)===String(id)){cur=BOARD_COLS[k].label;break;}}
-  var name=prompt('Nieuwe naam voor de kolom:',cur); if(name==null)return; name=name.trim(); if(!name)return;
-  try{var r=await fetch('/api/mkt/columns/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name})});var d=await r.json();if(r.ok&&d.success){await loadBoardColumns();renderContentView();}else{alert((d&&d.error)||'Kon kolom niet hernoemen.');}}catch(e){alert('Netwerkfout.');}
+function renderColSwatches(){
+  var box=document.getElementById('colSwatches'); if(!box)return;
+  box.innerHTML=COL_PRESETS.map(function(c){var on=(String(COL_COLOR).toLowerCase()===c.toLowerCase());return '<span onclick="colPickSwatch(\''+c+'\')" title="'+c+'" style="width:26px;height:26px;border-radius:50%;cursor:pointer;background:'+c+';border:2px solid '+(on?'#fff':'transparent')+';box-shadow:0 0 0 1px var(--line)"></span>';}).join('');
+}
+function colPickSwatch(c){COL_COLOR=c;var el=document.getElementById('colColor');if(el)el.value=c;renderColSwatches();}
+function colPickCustom(){COL_COLOR=document.getElementById('colColor').value;renderColSwatches();}
+function colClearColor(){COL_COLOR='';renderColSwatches();}
+function closeColModal(){document.getElementById('colModal').classList.remove('open');}
+async function saveColModal(){
+  var name=document.getElementById('colName').value.trim();
+  if(!name){showMsg('colMsg',false,'Naam mag niet leeg zijn.');return;}
+  var btn=document.getElementById('colSaveBtn'); var ot=btn.textContent; btn.disabled=true; btn.textContent='Opslaan...';
+  try{
+    var r;
+    if(COL_EDIT_ID==null){ r=await fetch('/api/mkt/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name,color:COL_COLOR})}); }
+    else { r=await fetch('/api/mkt/columns/'+COL_EDIT_ID,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name,color:COL_COLOR})}); }
+    var d=await r.json();
+    if(r.ok&&d.success){closeColModal();await loadBoardColumns();renderContentView();}
+    else{showMsg('colMsg',false,(d&&d.error)||'Opslaan mislukt.');}
+  }catch(e){showMsg('colMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent=ot;
 }
 async function deleteBoardColumn(id){
   if(id==null)return;
@@ -3781,14 +3830,14 @@ function renderBoard(posts){
       ctrls='<span style="display:inline-flex;gap:2px;margin-left:6px">'+
         '<button class="icon-btn" title="Naar links" onclick="moveBoardColumn('+c.id+',-1)" style="width:22px;height:22px;font-size:12px">&larr;</button>'+
         '<button class="icon-btn" title="Naar rechts" onclick="moveBoardColumn('+c.id+',1)" style="width:22px;height:22px;font-size:12px">&rarr;</button>'+
-        '<button class="icon-btn" title="Hernoemen" onclick="renameBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:11px">&#9998;</button>'+
+        '<button class="icon-btn" title="Bewerken" onclick="openColumnEdit('+c.id+')" style="width:22px;height:22px;font-size:11px">&#9998;</button>'+
         '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
       '</span>';
     }
     return '<div class="kcol" data-status="'+esc(key)+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:var(--card,rgba(255,255,255,.02));border:1px solid var(--line);border-radius:12px;padding:10px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
   }).join('')+
-  (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="addBoardColumn()">+ Kolom</button></div>'):'')+
+  (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="openColumnEdit(null)">+ Kolom</button></div>'):'')+
   '</div>';
   return bar+kb;
 }

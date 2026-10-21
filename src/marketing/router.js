@@ -832,6 +832,24 @@ async function contentColumnsAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Kleur per kolom (migratie 020). Degradeert netjes: tot de migratie gedraaid is
+// werkt het hernoemen gewoon, alleen de kleur wordt dan nog niet bewaard.
+let _hasColumnColor = null;
+async function contentColumnsColorAvailable() {
+  if (_hasColumnColor === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_columns' AND column_name='color'"
+    )).rows);
+    if (r.length > 0) _hasColumnColor = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+function validColHexColor(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return null; // leeg = geen kleur
+  return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : undefined; // undefined = ongeldig
+}
 // De vier standaardkolommen van het Planning-bord. Worden de eerste keer in de
 // database gezet (per werkplek) zodat ze daarna te hernoemen/verplaatsen/verwijderen zijn.
 const DEFAULT_CONTENT_COLS = [
@@ -1530,8 +1548,9 @@ router.get('/api/mkt/columns', requireMkt, async (req, res) => {
     }
     const wsId = req.session.mkt.workspaceId;
     await ensureContentColumns(wsId);
+    const hasColor = await contentColumnsColorAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
-      'SELECT id, col_key, label, position FROM marketing.content_columns WHERE workspace_id=$1 ORDER BY position ASC, id ASC', [wsId]
+      `SELECT id, col_key, label, position${hasColor ? ', color' : ''} FROM marketing.content_columns WHERE workspace_id=$1 ORDER BY position ASC, id ASC`, [wsId]
     )).rows);
     res.json({ success: true, columns: rows, custom: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1544,12 +1563,17 @@ router.post('/api/mkt/columns', requireMkt, async (req, res) => {
     await ensureContentColumns(wsId);
     const label = String((req.body && req.body.label) || '').trim().slice(0, 40);
     if (!label) return res.status(400).json({ error: 'Kolomnaam is verplicht' });
+    const hasColor = await contentColumnsColorAvailable();
+    let color = null;
+    if (hasColor) { const cc = validColHexColor(req.body && req.body.color); if (cc === undefined) return res.status(400).json({ error: 'Ongeldige kleur (gebruik #RRGGBB)' }); color = cc; }
     const colKey = 'col_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const row = await withWriteConnection(async (c) => {
       const pos = (await c.query('SELECT COALESCE(MAX(position),-1)+1 AS p FROM marketing.content_columns WHERE workspace_id=$1', [wsId])).rows[0].p;
       return (await c.query(
-        'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position) VALUES ($1,$2,$3,$4) RETURNING id, col_key, label, position',
-        [wsId, colKey, label, pos]
+        hasColor
+          ? 'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position, color) VALUES ($1,$2,$3,$4,$5) RETURNING id, col_key, label, position, color'
+          : 'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position) VALUES ($1,$2,$3,$4) RETURNING id, col_key, label, position',
+        hasColor ? [wsId, colKey, label, pos, color] : [wsId, colKey, label, pos]
       )).rows[0];
     });
     res.json({ success: true, column: row });
@@ -1560,13 +1584,15 @@ router.patch('/api/mkt/columns/:id', requireMkt, async (req, res) => {
     if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
     if (!(await contentColumnsAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld.' });
     const wsId = req.session.mkt.workspaceId;
+    const hasColor = await contentColumnsColorAvailable();
     const b = req.body || {}; const sets = []; const vals = []; let i = 1;
     if (b.label !== undefined) { const l = String(b.label).trim().slice(0, 40); if (!l) return res.status(400).json({ error: 'Kolomnaam mag niet leeg zijn' }); sets.push(`label=$${i++}`); vals.push(l); }
     if (b.position !== undefined) { const p = parseInt(b.position, 10); if (Number.isInteger(p)) { sets.push(`position=$${i++}`); vals.push(p); } }
+    if (hasColor && b.color !== undefined) { const cc = validColHexColor(b.color); if (cc === undefined) return res.status(400).json({ error: 'Ongeldige kleur (gebruik #RRGGBB)' }); sets.push(`color=$${i++}`); vals.push(cc); }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     vals.push(req.params.id, wsId);
     const row = await withWriteConnection(async (c) => (await c.query(
-      `UPDATE marketing.content_columns SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i} RETURNING id, col_key, label, position`, vals
+      `UPDATE marketing.content_columns SET ${sets.join(', ')} WHERE id=$${i++} AND workspace_id=$${i} RETURNING id, col_key, label, position${hasColor ? ', color' : ''}`, vals
     )).rows[0]);
     if (!row) return res.status(404).json({ error: 'Kolom niet gevonden' });
     res.json({ success: true, column: row });
