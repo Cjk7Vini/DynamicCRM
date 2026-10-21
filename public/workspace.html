@@ -1357,7 +1357,7 @@ async function bootstrap(){
   document.getElementById('topNewClient').style.display=canManage?'':'none';
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
   CAN_MANAGE_WS=isOwnerMgr;
-  document.getElementById('navWsSettings').style.display='none'; // Instellingen zit nu in het profiel-menu linksboven
+  document.getElementById('navWsSettings').style.display=isOwnerMgr?'':'none'; // ook in de zijbalk, naast het profiel-menu (Instellingen)
   document.getElementById('wsChipCaret').style.display=isOwnerMgr?'':'none';
   document.getElementById('wsChip').style.cursor=isOwnerMgr?'pointer':'default';
   CLIENT_MODE = (ME.role==='client');
