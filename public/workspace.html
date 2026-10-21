@@ -1162,6 +1162,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div id="postMsg" class="inline-msg"></div>
     <div class="field"><label>Titel *</label><input id="pfTitle" placeholder="Bijv. Zomeractie aankondiging"></div>
     <div class="field"><label>Labels</label><div id="pfLabels" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
+    <div class="field"><label>Omslagkleur <span style="color:var(--muted);font-weight:400;font-size:12px">(optioneel, gekleurde balk bovenop de kaart)</span></label>
+      <div id="pfCoverSwatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input id="pfCoverColor" type="color" value="#6366f1" style="width:46px;height:34px;padding:2px;cursor:pointer;background:var(--panel-2)" oninput="pfCoverPickCustom()">
+        <span style="font-size:12.5px;color:var(--muted)">eigen kleur</span>
+        <button type="button" class="btn btn-ghost" style="padding:5px 10px;font-size:12px;margin-left:auto" onclick="pfCoverClear()">Geen omslag</button>
+      </div>
+    </div>
     <div class="field" id="pfAssigneesField" style="display:none"><label>Personen</label><div id="pfAssignees" style="display:flex;gap:7px;flex-wrap:wrap"></div></div>
     <div class="field" id="pfChecklistField" style="display:none"><label>Checklist</label><div id="pfChecklist"></div>
       <div style="display:flex;gap:6px;margin-top:6px"><input id="pfChkNew" placeholder="Nieuw checklist-item" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();pfAddChecklistItem();}"><button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;white-space:nowrap" onclick="pfAddChecklistItem()">+ Item</button></div>
@@ -3640,6 +3648,15 @@ function renderPfLabels(){
   box.innerHTML=chips+'<button type="button" onclick="createCustomLabel()" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px dashed var(--muted);background:transparent;color:var(--muted)">+ Nieuw label</button>';
 }
 function togglePfLabel(k){var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);else PF_LABELS.push(k);renderPfLabels();}
+// Omslagkleur van een kaart (zoals de Trello-cover). Hergebruikt COL_PRESETS.
+var PF_COVER='';
+function renderPfCover(){
+  var box=document.getElementById('pfCoverSwatches'); if(!box)return;
+  box.innerHTML=COL_PRESETS.map(function(c){var on=(String(PF_COVER).toLowerCase()===c.toLowerCase());return '<span onclick="pfCoverPick(\''+c+'\')" title="'+c+'" style="width:26px;height:26px;border-radius:50%;cursor:pointer;background:'+c+';border:2px solid '+(on?'#fff':'transparent')+';box-shadow:0 0 0 1px var(--line)"></span>';}).join('');
+}
+function pfCoverPick(c){PF_COVER=c;var el=document.getElementById('pfCoverColor');if(el)el.value=c;renderPfCover();}
+function pfCoverPickCustom(){PF_COVER=document.getElementById('pfCoverColor').value;renderPfCover();}
+function pfCoverClear(){PF_COVER='';renderPfCover();}
 // ---- Kaart: personen, checklist en activiteit (Trello-achtig) ----
 var POST_EXTRAS=false, POST_ACTIVITY=false, PF_ASSIGNEES=[], PF_CHECKLIST=[];
 function renderPfAssignees(){
@@ -3761,8 +3778,9 @@ function boardCard(p,canManage){
       '<button class="icon-btn del" title="Verwijderen" onclick="delPost('+p.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'+
     '</div>'):'';
   var chan='<span class="status '+esc(p.status)+'" style="font-size:10px">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>';
+  var cover=(p.cover_color?('<div style="height:26px;background:'+esc(p.cover_color)+';margin:-10px -10px 10px -10px;border-top-left-radius:9px;border-top-right-radius:9px"></div>'):'');
   return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+esc(p.status)+'\')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
-    thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
+    cover+thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+commentChip(p)+checklistBadge(p.checklist)+assigneeAvatars(p.assignees)+'</div>'+when+acts+'</div>';
@@ -4028,6 +4046,7 @@ function openNewPost(){
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
+  PF_COVER='';var pfcc0=document.getElementById('pfCoverColor');if(pfcc0)pfcc0.value='#6366f1';renderPfCover();
   PF_ASSIGNEES=[];PF_CHECKLIST=[];pfShowExtras();renderPfAssignees();renderPfChecklist();
   var pa=document.getElementById('pfActivity');if(pa)pa.innerHTML='';
   PF_BLOCKS=[{type:'media'},{type:'text',text:''}];
@@ -4048,6 +4067,7 @@ function openEditPost(id){
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
     document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
+    PF_COVER=p.cover_color||'';var pfcc1=document.getElementById('pfCoverColor');if(pfcc1)pfcc1.value=/^#[0-9a-fA-F]{6}$/.test(PF_COVER)?PF_COVER:'#6366f1';renderPfCover();
     PF_ASSIGNEES=Array.isArray(p.assignees)?p.assignees.slice():[];
     PF_CHECKLIST=Array.isArray(p.checklist)?p.checklist.map(function(x){return {text:String((x&&x.text)||''),done:!!(x&&x.done)};}):[];
     pfShowExtras();renderPfAssignees();renderPfChecklist();
@@ -4067,7 +4087,7 @@ async function savePost(){
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
-  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:(document.getElementById('pfType').value==='carrousel'?PF_CAROUSEL:[])};
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:(document.getElementById('pfType').value==='carrousel'?PF_CAROUSEL:[]),cover_color:PF_COVER};
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
@@ -4077,7 +4097,7 @@ async function savePost(){
     var d=await r.json();
     if(r.ok&&d.success){
       // Nieuwe post: blokken opslaan via een vervolg-PATCH (create bewaart de blokken nog niet).
-      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText,post_type:document.getElementById('pfType').value})}); }catch(_){} }
+      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText,post_type:document.getElementById('pfType').value,cover_color:PF_COVER})}); }catch(_){} }
       closePost();loadPosts();
     } else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
