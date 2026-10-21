@@ -898,6 +898,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3>Advertentie toevoegen</h3>
     <div class="sub" id="addAdSub">Voegt een extra advertentie toe aan deze ad set. Wordt gepauzeerd aangemaakt.</div>
     <div id="addAdMsg" class="inline-msg"></div>
+    <div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <label>AI-assistent</label>
+      <div style="font-size:12.5px;color:var(--muted);margin:2px 0 8px">Beschrijf kort wat je wilt adverteren. De AI vult de advertentietekst alvast in. Het beeld kies je zelf.</div>
+      <textarea id="aaAiPrompt" rows="2" placeholder="Bijv. Gratis intake voor fysiotherapie in Goes, gericht op mensen met rugklachten van 30 tot 55 jaar"></textarea>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn btn-primary" id="aaAiBtn" onclick="aiSuggestAd()" style="padding:8px 14px;font-size:13px">Genereer voorstel</button>
+        <span id="aaAiHint" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
     <div class="field"><label>Naam advertentie *</label><input id="aaName" placeholder="Bijv. Variant video 1"></div>
     <div class="field"><label>Bestemmings-URL *</label><input id="aaLink" placeholder="https://..."></div>
     <div class="field"><label>Advertentiebeeld (afbeelding of video) *</label>
@@ -3161,6 +3170,7 @@ async function openAddAd(adsetId,adsetName){
   document.getElementById('aaHeadline').value='';
   document.getElementById('aaCta').value='LEARN_MORE';
   document.getElementById('aaLink').value=(CURRENT_CLIENT&&CURRENT_CLIENT.website)||'';
+  var aip=document.getElementById('aaAiPrompt'); if(aip)aip.value=''; var aih=document.getElementById('aaAiHint'); if(aih)aih.textContent='';
   var sub=document.getElementById('addAdSub'); if(sub)sub.textContent=adsetName?('Voegt een extra advertentie toe aan "'+adsetName+'". Wordt gepauzeerd aangemaakt.'):'Voegt een extra advertentie toe aan deze ad set. Wordt gepauzeerd aangemaakt.';
   try{
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
@@ -3170,6 +3180,30 @@ async function openAddAd(adsetId,adsetName){
   }catch(e){}
   document.getElementById('addAdModal').classList.add('open');
   document.getElementById('aaName').focus();
+}
+async function aiSuggestAd(){
+  var brief=document.getElementById('aaAiPrompt').value.trim();
+  var hint=document.getElementById('aaAiHint');
+  var btn=document.getElementById('aaAiBtn');
+  if(brief.length<5){hint.style.color='#b91c1c';hint.textContent='Beschrijf eerst kort wat je wilt adverteren.';return;}
+  btn.disabled=true; btn.textContent='Bezig...'; hint.style.color='var(--muted)'; hint.textContent='AI denkt na...';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/ad-suggestion',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({prompt:brief})});
+    var d=await r.json();
+    if(!r.ok||!d.success){hint.style.color='#b91c1c';hint.textContent=d.error||'AI-voorstel mislukt.';btn.disabled=false;btn.textContent='Genereer voorstel';return;}
+    var s=d.suggestion;
+    if(s.name&&!document.getElementById('aaName').value.trim())document.getElementById('aaName').value=s.name;
+    if(s.cta)document.getElementById('aaCta').value=s.cta;
+    if(s.caption){
+      // Zet de tekst in het eerste tekstveld (of maak er een aan als dat ontbreekt).
+      var first=document.querySelector('#aaCapWrap .aa-cap');
+      if(!first){aaAddCap();first=document.querySelector('#aaCapWrap .aa-cap');}
+      if(first)first.value=s.caption;
+    }
+    hint.style.color='var(--accent-2)';
+    hint.textContent='Voorstel ingevuld. '+(s.rationale||'')+' Controleer de tekst en kies een afbeelding.';
+  }catch(e){hint.style.color='#b91c1c';hint.textContent='Netwerkfout.';}
+  btn.disabled=false; btn.textContent='Genereer voorstel';
 }
 async function submitAddAd(){
   var btn=document.getElementById('aaBtn'); hideMsg('addAdMsg');
