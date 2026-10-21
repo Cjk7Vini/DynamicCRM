@@ -1010,6 +1010,25 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- MODAL: client-login toevoegen voor een klant -->
+<div class="modal-ov" id="clientUserModal">
+  <div class="modal" style="max-width:440px">
+    <h3>Client toevoegen</h3>
+    <div class="sub">Maak een login voor een client van deze klant. De client kan hiermee inloggen, zijn content zien en goedkeuren.</div>
+    <div id="cuMsg" class="inline-msg"></div>
+    <div class="field"><label>Klant</label><input id="cuClientName" disabled></div>
+    <div class="field"><label>Naam <span style="color:var(--muted);font-weight:400;font-size:12px">(optioneel)</span></label><input id="cuName" placeholder="Voor- en achternaam"></div>
+    <div class="field"><label>E-mailadres *</label><input id="cuEmail" type="email" placeholder="client@email.nl"></div>
+    <div class="field"><label>Wachtwoord *</label><input id="cuPassword" type="text" placeholder="Min. 8 tekens, hoofd- en kleine letter en een cijfer">
+      <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Geef dit wachtwoord door aan de client; daarmee logt die in op dezelfde pagina.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeClientUserModal()">Annuleren</button>
+      <button class="btn btn-primary" id="cuSaveBtn" onclick="saveClientUser()">Client aanmaken</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: nieuwe campagne -->
 <div class="modal-ov" id="campModal">
   <div class="modal" style="max-width:900px">
@@ -1444,9 +1463,36 @@ async function loadBeheer(){
         var st=(u.active===false)?'<span class="status scheduled" style="font-size:10px">Inactief</span>':'';
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><div><div style="font-size:13.5px;font-weight:600">'+esc(u.name||u.email)+' '+st+'</div><div style="font-size:12px;color:var(--muted)">'+esc(u.email)+' &middot; '+last+'</div></div></div>';
       }).join(''):'<div style="font-size:13px;color:var(--muted);padding:8px 0;border-top:1px solid var(--line)">Nog geen client-login voor deze klant.</div>';
-      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="font-weight:700;font-size:15px">'+esc(cl.name)+'</div><span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);padding:2px 10px;border-radius:20px">'+users.length+' client'+(users.length===1?'':'en')+'</span></div>'+rows+'</div>';
-    }).join('')+'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Clienten uitnodigen komt binnenkort op deze pagina.</div>';
+      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-weight:700;font-size:15px">'+esc(cl.name)+'</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);padding:2px 10px;border-radius:20px">'+users.length+' client'+(users.length===1?'':'en')+'</span><button class="btn btn-ghost" style="padding:5px 11px;font-size:12.5px" onclick="openClientUserModal('+cl.id+',\''+esc(String(cl.name).replace(/[\x27"]/g,""))+'\')">+ Client toevoegen</button></div></div>'+rows+'</div>';
+    }).join('');
   }catch(e){box.innerHTML='';showMsg('beheerMsg',false,'Netwerkfout.');}
+}
+var CU_CLIENT_ID=null;
+function openClientUserModal(clientId,clientName){
+  CU_CLIENT_ID=clientId; hideMsg('cuMsg');
+  document.getElementById('cuClientName').value=clientName||'';
+  document.getElementById('cuName').value='';
+  document.getElementById('cuEmail').value='';
+  document.getElementById('cuPassword').value='';
+  document.getElementById('clientUserModal').classList.add('open');
+  document.getElementById('cuEmail').focus();
+}
+function closeClientUserModal(){document.getElementById('clientUserModal').classList.remove('open');}
+async function saveClientUser(){
+  if(CU_CLIENT_ID==null)return;
+  var email=document.getElementById('cuEmail').value.trim();
+  var pw=document.getElementById('cuPassword').value;
+  var name=document.getElementById('cuName').value.trim();
+  if(!email){showMsg('cuMsg',false,'Vul een e-mailadres in.');return;}
+  if(!pw){showMsg('cuMsg',false,'Vul een wachtwoord in.');return;}
+  var btn=document.getElementById('cuSaveBtn'); var ot=btn.textContent; btn.disabled=true; btn.textContent='Bezig...';
+  try{
+    var r=await fetch('/api/mkt/client-users',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({client_id:CU_CLIENT_ID,email:email,full_name:name,password:pw})});
+    var d=await r.json();
+    if(r.ok&&d.success){closeClientUserModal();loadBeheer();}
+    else{showMsg('cuMsg',false,(d&&d.error)||'Aanmaken mislukt.');}
+  }catch(e){showMsg('cuMsg',false,'Netwerkfout.');}
+  btn.disabled=false; btn.textContent=ot;
 }
 async function loadOverzicht(){
   var el=document.getElementById('ovPanels'); if(!el)return;
