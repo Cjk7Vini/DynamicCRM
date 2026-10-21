@@ -1458,6 +1458,28 @@ router.get('/api/mkt/members', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Beheer: de client-logins (rol 'client') gegroepeerd per klant. Alleen eigenaar/manager.
+router.get('/api/mkt/client-users', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const data = await withReadConnection(async (c) => {
+      const clients = (await c.query(
+        'SELECT id, name FROM marketing.clients WHERE workspace_id=$1 ORDER BY name ASC', [wsId]
+      )).rows;
+      const users = (await c.query(
+        "SELECT id, client_id, COALESCE(full_name, email) AS name, email, active, to_char(last_login_at,'YYYY-MM-DD') AS last_login FROM marketing.accounts WHERE workspace_id=$1 AND role='client' AND client_id IS NOT NULL ORDER BY COALESCE(full_name, email) ASC",
+        [wsId]
+      )).rows;
+      return { clients, users };
+    });
+    const byClient = {};
+    data.users.forEach((u) => { (byClient[u.client_id] = byClient[u.client_id] || []).push({ id: u.id, name: u.name, email: u.email, active: u.active, last_login: u.last_login }); });
+    const clients = data.clients.map((cl) => ({ id: cl.id, name: cl.name, users: byClient[cl.id] || [] }));
+    res.json({ success: true, clients });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Mijn openstaande to-do's (aan mij toegewezen, nog niet afgevinkt) over alle
 // klanten in deze workspace. Voedt het meldingen-badge en de overzichtspagina.
 router.get('/api/mkt/my-tasks', requireMkt, async (req, res) => {
