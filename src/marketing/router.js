@@ -917,6 +917,18 @@ async function postBoardWeekAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Is de omslagkleur van een kaart beschikbaar (migratie 021)?
+let _hasCoverColor = null;
+async function postCoverAvailable() {
+  if (_hasCoverColor === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='cover_color'"
+    )).rows);
+    if (r.length > 0) _hasCoverColor = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
 // Controleert dat een lijst asset-ids bij deze klant hoort en publiek (Cloudinary) is;
 // geeft ze terug in dezelfde volgorde als gevraagd, met url + type.
 async function resolveCarouselAssets(wsId, clientId, ids) {
@@ -1013,6 +1025,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasBoardPos = await postBoardPosAvailable();
     const hasCarousel = await postCarouselAvailable();
     const hasBoardWeek = await postBoardWeekAvailable();
+    const hasCover = await postCoverAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
@@ -1024,6 +1037,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasBoardPos ? 'p.board_position,' : ''}
               ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
               ${hasBoardWeek ? 'p.board_week,' : ''}
+              ${hasCover ? 'p.cover_color,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
               p.asset_id, a.url AS asset_url, a.resource_type AS asset_type, a.filename AS asset_name
          FROM marketing.content_posts p
@@ -1125,6 +1139,10 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.board_week !== undefined && await postBoardWeekAvailable()) {
       let wk = null; const n = parseInt(b.board_week, 10); if (Number.isInteger(n) && n >= 1 && n <= 5) wk = n;
       sets.push(`board_week=$${i++}`); vals.push(wk);
+    }
+    if (b.cover_color !== undefined && await postCoverAvailable()) {
+      const cc = validColHexColor(b.cover_color); if (cc === undefined) return res.status(400).json({ error: 'Ongeldige omslagkleur (gebruik #RRGGBB)' });
+      sets.push(`cover_color=$${i++}`); vals.push(cc);
     }
     if (b.labels !== undefined && await contentLabelsAvailable()) {
       const clean = Array.isArray(b.labels) ? b.labels.map((x) => String(x)).filter((x) => CONTENT_LABEL_KEYS.includes(x) || /^c\d+$/.test(x)) : [];
