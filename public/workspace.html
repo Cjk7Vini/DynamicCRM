@@ -544,7 +544,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div><div class="tt" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)">Klant-space</div><h2 id="dName">Klant</h2></div>
         </div>
         <div class="tabs" id="dTabs">
-          <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
+          <button id="tabOverview" class="active" onclick="dTab(this,'overview')">Overzicht</button>
+          <button id="tabInfo" onclick="dTab(this,'info')">Gegevens</button>
           <button onclick="dTab(this,'content')">Content planning</button>
           <button id="tabTodo" onclick="dTab(this,'todo')">To do</button>
           <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
@@ -554,6 +555,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
         <div id="clientReportBar" style="display:none;margin:4px 0 14px"></div>
+        <div id="dOverview"><div id="dOverviewBody"><div class="empty">Laden...</div></div></div>
         <div id="dCampReview" style="display:none">
           <div id="campReviewMsg" class="inline-msg"></div>
           <div id="campReviewBody"><div class="empty">Laden...</div></div>
@@ -1300,7 +1302,7 @@ async function renderClientHome(clientId,clientName){
     '<div style="display:flex;gap:14px;flex-wrap:wrap">'+panel('Wacht op jouw goedkeuring',pHtml)+panel('Eerstvolgende posts',upHtml)+panel('Jouw taken',tHtml)+'</div>';
 }
 function applyClientMode(){
-  ['tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  ['tabOverview','tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   var rb=document.getElementById('clientReportBar'); if(rb)rb.style.display='block';
   var back=document.querySelector('#viewClientDetail .back'); if(back)back.style.display='none';
   var login=document.getElementById('clientLoginCard'); if(login)login.style.display='none';
@@ -1716,7 +1718,7 @@ async function openClient(id){
       dTabShow('content');
     } else {
       document.querySelectorAll('#dTabs button').forEach(function(b,i){b.classList.toggle('active',i===0);});
-      dTabShow('info');
+      dTabShow('overview');
     }
   }catch(e){alert('Netwerkfout.');}
 }
@@ -1738,10 +1740,87 @@ function renderClientDetail(c){
   var tam=document.getElementById('tabAdMachine'); if(tam)tam.style.display=(ME.role!=='client')?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
+// Programmatisch naar een tabblad binnen de geopende klant (vanuit het Overzicht).
+function dGoTab(which){
+  var btn=document.querySelector('#dTabs button[onclick*="\''+which+'\'"]');
+  document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  dTabShow(which);
+}
+async function loadClientOverview(){
+  var box=document.getElementById('dOverviewBody'); if(!box)return;
+  if(!CURRENT_CLIENT){box.innerHTML='';return;}
+  var cid=CURRENT_CLIENT.id;
+  box.innerHTML='<div class="empty">Laden...</div>';
+  var posts=[], items=[];
+  try{var r=await fetch('/api/mkt/clients/'+cid+'/posts',{credentials:'include'});var d=await r.json();if(d&&d.success)posts=d.posts||[];}catch(e){}
+  try{var r2=await fetch('/api/mkt/clients/'+cid+'/items?kind=todo',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)items=(d2.items||[]).filter(function(x){return !x.done;});}catch(e){}
+  var now=new Date(), todayStr=now.toISOString().slice(0,10);
+  var wkEnd=new Date(); wkEnd.setDate(wkEnd.getDate()+7);
+  var upcoming=posts.filter(function(p){var dt=new Date(p.scheduled_at);return p.scheduled_at&&!isNaN(dt)&&dt>=now&&p.status!=='published';}).sort(function(a,b){return new Date(a.scheduled_at)-new Date(b.scheduled_at);});
+  var pending=posts.filter(function(p){return p.approval==='pending';});
+  var changes=posts.filter(function(p){return p.approval==='changes';});
+  var nPlanned=upcoming.length, nPending=pending.length, nTasks=items.length;
+  var weekPosts=upcoming.filter(function(p){return new Date(p.scheduled_at)<=wkEnd;}).slice(0,6);
+
+  function statCard(label,value,btnTxt,which){
+    return '<div class="card" style="flex:1;min-width:170px;display:flex;flex-direction:column;gap:6px">'+
+      '<div style="font-size:13px;color:var(--muted);font-weight:600">'+esc(label)+'</div>'+
+      '<div style="font-size:32px;font-weight:800;line-height:1">'+value+'</div>'+
+      '<a onclick="dGoTab(\''+which+'\')" style="margin-top:auto;font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600">'+esc(btnTxt)+' &rarr;</a></div>';
+  }
+  function cardHead(title,rightHtml){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px"><div style="font-weight:700;font-size:15px">'+title+'</div>'+(rightHtml||'')+'</div>';}
+  function cardLink(txt,which){return '<a onclick="dGoTab(\''+which+'\')" style="font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600;white-space:nowrap">'+esc(txt)+' &rarr;</a>';}
+
+  var taken=items.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<todayStr);
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)">'+
+      '<span style="width:15px;height:15px;border:2px solid var(--muted);border-radius:50%;flex:none"></span>'+
+      '<span style="flex:1;font-size:13.5px">'+esc(t.title)+'</span>'+
+      (t.due_date?'<span style="font-size:11.5px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+esc(t.due_date)+'</span>':'')+'</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen openstaande taken.</div>';
+
+  function postLines(list,badgeTxt,badgeCls){return list.slice(0,5).map(function(p){
+    return '<div onclick="dGoTab(\'content\')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer">'+
+      '<span style="width:7px;height:7px;border-radius:50%;background:var(--accent-2);flex:none"></span>'+
+      '<span style="flex:1;font-size:13.5px">'+esc(p.title||'(zonder titel)')+'</span>'+
+      (badgeTxt?'<span class="status '+badgeCls+'" style="white-space:nowrap">'+esc(badgeTxt)+'</span>':'')+'</div>';
+  }).join('');}
+  var waitHtml=pending.length?postLines(pending,'Wacht op klant','scheduled'):'<div style="color:var(--muted);font-size:13px;padding-top:6px">Niets wacht op goedkeuring.</div>';
+  var changeHtml=changes.length?postLines(changes,'Wijziging gevraagd','draft'):'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen wijzigingen gevraagd.</div>';
+
+  var weekHtml=weekPosts.map(function(p){var st=POST_STATUS_LABEL[p.status]||p.status||'';
+    return '<div onclick="dGoTab(\'content\')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer">'+
+      '<span style="flex:1;font-size:13.5px">'+esc(p.title||'(zonder titel)')+'</span>'+
+      '<span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span>'+
+      (st?'<span class="status scheduled" style="white-space:nowrap">'+esc(st)+'</span>':'')+'</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen posts gepland voor deze week.</div>';
+
+  box.innerHTML=
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
+      '<div style="flex:2;min-width:320px;display:flex;flex-direction:column;gap:16px">'+
+        '<div style="display:flex;gap:14px;flex-wrap:wrap">'+
+          statCard('Geplande posts',nPlanned,'Ga naar planning','content')+
+          statCard('Wachten op goedkeuring',nPending,'Ga naar planning','content')+
+          statCard('Openstaande taken',nTasks,'Ga naar to do','todo')+
+        '</div>'+
+        '<div class="card">'+cardHead('Content voor deze week',cardLink('Bekijk hele planning','content'))+weekHtml+'</div>'+
+        '<div class="card">'+cardHead('Jouw best presterende posts',cardLink('Open rapportage','report'))+
+          '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De best presterende posts (op engagement rate) en de Meta-cijfers staan in de Rapportage-tab van deze klant.</div></div>'+
+        '<div class="card">'+cardHead('Actieve campagnes',cardLink('Open campagnes','campreview'))+
+          '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De lopende advertentiecampagnes en hun resultaten (besteed, leads, CPL, budget) staan onder Campagnes.</div></div>'+
+      '</div>'+
+      '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">'+
+        '<div class="card">'+cardHead('Mijn taken voor deze klant',cardLink('Alle taken','todo'))+taken+'</div>'+
+        '<div class="card">'+cardHead('In afwachting van klant',cardLink('Naar planning','content'))+waitHtml+'</div>'+
+        '<div class="card">'+cardHead('Aandacht nodig',cardLink('Naar planning','content'))+changeHtml+'</div>'+
+      '</div>'+
+    '</div>';
+}
 // De Content-knop in de Content planning opent de upload-bak (het oude Content-tabblad).
 function showContentUploads(){ dTabShow('assets'); }
 function backToPlanning(){ dTabShow('content'); }
 function dTabShow(which){
+  var dov=document.getElementById('dOverview'); if(dov)dov.style.display=which==='overview'?'':'none';
   document.getElementById('dInfo').style.display=which==='info'?'':'none';
   document.getElementById('dContent').style.display=which==='content'?'':'none';
   document.getElementById('dAssets').style.display=which==='assets'?'':'none';
@@ -1757,6 +1836,7 @@ function dTabShow(which){
   if(which==='admachine'){loadAdMachine();}
   if(which==='campaigns'){loadCampaigns();}
   if(which==='report'){loadReport();}
+  if(which==='overview'){loadClientOverview();}
   if(which==='todo'){loadClientItems('todo');}
   if(which==='docs'){loadClientItems('document');}
   if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';loadPosts();}
