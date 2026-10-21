@@ -549,10 +549,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
         <div class="tabs" id="dTabs">
           <button id="tabInfo" class="active" onclick="dTab(this,'info')">Gegevens</button>
-          <button onclick="dTab(this,'assets')">Content</button>
           <button onclick="dTab(this,'content')">Content planning</button>
           <button id="tabTodo" onclick="dTab(this,'todo')">To do</button>
-          <button id="tabDocs" onclick="dTab(this,'docs')">Documenten</button>
           <button id="tabCampReview" onclick="dTab(this,'campreview')">Campagnes</button>
           <button id="tabAdMachine" onclick="dTab(this,'admachine')">Ad Machine</button>
           <button id="tabCampaigns" onclick="dTab(this,'campaigns')" style="display:none">Campagnebeheer</button>
@@ -620,7 +618,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               </select>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-ghost" id="shareLinkBtn" onclick="shareApprovalLink()">Goedkeuringslink</button>
+              <button class="btn btn-ghost" id="contentUploadsBtn" onclick="showContentUploads()">Content</button>
               <button class="btn btn-primary" id="newPostBtn" onclick="openNewPost()">+ Nieuwe post</button>
             </div>
           </div>
@@ -640,6 +638,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div id="docsBody"><div class="empty">Laden...</div></div>
         </div>
         <div id="dAssets" style="display:none">
+          <span class="back" onclick="backToPlanning()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:10px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Terug naar planning</span>
           <div class="section-h">
             <span class="pill" id="assetInfo">Beeldmateriaal</span>
             <div>
@@ -1665,6 +1664,9 @@ function renderClientDetail(c){
   var tam=document.getElementById('tabAdMachine'); if(tam)tam.style.display=(ME.role!=='client')?'':'none';
 }
 function dTab(btn,which){document.querySelectorAll('#dTabs button').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');dTabShow(which);}
+// De Content-knop in de Content planning opent de upload-bak (het oude Content-tabblad).
+function showContentUploads(){ dTabShow('assets'); }
+function backToPlanning(){ dTabShow('content'); }
 function dTabShow(which){
   document.getElementById('dInfo').style.display=which==='info'?'':'none';
   document.getElementById('dContent').style.display=which==='content'?'':'none';
@@ -1683,7 +1685,7 @@ function dTabShow(which){
   if(which==='report'){loadReport();}
   if(which==='todo'){loadClientItems('todo');}
   if(which==='docs'){loadClientItems('document');}
-  if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';document.getElementById('shareLinkBtn').style.display=cm?'':'none';loadPosts();}
+  if(which==='content'){var cm=(ME&&ME.role!=='client');document.getElementById('newPostBtn').style.display=cm?'':'none';loadPosts();}
   if(which==='assets'){var ub=document.getElementById('uploadBtn');if(ub)ub.style.display='';loadAssets();}
 }
 
