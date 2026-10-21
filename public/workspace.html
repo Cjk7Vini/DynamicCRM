@@ -309,29 +309,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="content">
       <!-- OVERZICHT -->
       <section class="view active" id="viewOverzicht">
-        <div class="hero">
-          <div>
-            <h3>Je workspace staat klaar</h3>
-            <p>Beheer je klanten, plan content, laat goedkeuren en rapporteer, allemaal op één plek per klant.</p>
-          </div>
-          <button class="btn btn-primary" onclick="navTo('clients')">Naar klanten</button>
-        </div>
-        <div class="stats">
-          <div class="stat"><div class="k">Actieve klanten</div><div class="v accent" id="stClients">-</div></div>
-          <div class="stat"><div class="k">Licentie</div><div class="v" id="stLicense" style="font-size:20px">-</div></div>
-          <div class="stat"><div class="k">Seats</div><div class="v" id="stSeats">-</div></div>
-        </div>
-        <div id="ovPanels"></div>
-        <div class="section-h"><h4>Modules</h4></div>
-        <div class="grid">
-          <div class="mod live" onclick="navTo('clients')"><h5>Klanten</h5><p>Beheer per klant een eigen space.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="perKlant('content')"><h5>Content planning</h5><p>Posts klaarzetten, plannen en goedkeuren.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="perKlant('assets')"><h5>Content</h5><p>Foto en video uploaden en organiseren.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="perKlant('content')"><h5>Goedkeuringen</h5><p>Klant bekijkt en keurt content goed.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="navTo('koppelingen')"><h5>Koppelingen</h5><p>API's, pixels en tokens per klant.</p><span class="tag on">Actief</span></div>
-          <div class="mod live" onclick="navTo('reporting')"><h5>Rapportage</h5><p>Cijfers per klant uit je workspace.</p><span class="tag on">Actief</span></div>
-          <div class="mod"><h5>Live publiceren</h5><p>Rechtstreeks posten naar Meta en Google.</p><span class="tag">Binnenkort</span></div>
-        </div>
+        <div id="ovRoot"><div class="empty">Laden...</div></div>
       </section>
 
       <!-- CLIENT-HOME (overzicht voor de ingelogde client) -->
@@ -1267,8 +1245,8 @@ async function bootstrap(){
   document.getElementById('userAva').textContent=initials(ME.full_name||ME.email);
   var end=ME.license_end?(' · tot '+new Date(ME.license_end).toLocaleDateString('nl-NL')):'';
   document.getElementById('licPill').innerHTML='<span class="d"></span> '+esc(ME.license_type||'-')+esc(end);
-  document.getElementById('stLicense').textContent=(ME.license_type||'-');
-  document.getElementById('stSeats').textContent=(ME.max_seats||'-');
+  var stLic=document.getElementById('stLicense'); if(stLic)stLic.textContent=(ME.license_type||'-');
+  var stSe=document.getElementById('stSeats'); if(stSe)stSe.textContent=(ME.max_seats||'-');
   var canManage=ME.role!=='client';
   document.getElementById('topNewClient').style.display=canManage?'':'none';
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
@@ -1441,25 +1419,84 @@ async function saveClientUser(){
   }catch(e){showMsg('cuMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent=ot;
 }
+function ovScrollTo(id){var e=document.getElementById(id);if(e)e.scrollIntoView({behavior:'smooth',block:'start'});}
 async function loadOverzicht(){
-  var el=document.getElementById('ovPanels'); if(!el)return;
-  if(ME&&ME.role==='client'){el.innerHTML='';return;}
-  var tasks=[],posts=[],clients=[];
+  var root=document.getElementById('ovRoot'); if(!root)return;
+  if(ME&&ME.role==='client'){root.innerHTML='';return;}
+  var tasks=[],posts=[],clients=[],allClients=[];
   try{var r=await fetch('/api/mkt/my-tasks',{credentials:'include'});var d=await r.json();if(d&&d.success)tasks=d.tasks||[];}catch(e){}
   try{var r2=await fetch('/api/mkt/upcoming-posts',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)posts=d2.posts||[];}catch(e){}
-  try{var r3=await fetch('/api/mkt/clients',{credentials:'include'});var d3=await r3.json();if(d3&&d3.success)clients=(d3.clients||[]).filter(function(c){return (Number(c.open_actions)||0)>0;});}catch(e){}
+  try{var r3=await fetch('/api/mkt/clients',{credentials:'include'});var d3=await r3.json();if(d3&&d3.success)allClients=d3.clients||[];}catch(e){}
+  clients=allClients.filter(function(c){return (Number(c.open_actions)||0)>0;});
   var today=new Date().toISOString().slice(0,10);
-  function panel(title,inner){return '<div class="card" style="flex:1;min-width:250px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">'+esc(title)+'</div>'+inner+'</div>';}
-  var tHtml=tasks.length?tasks.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<today);return '<div onclick="openClient('+t.client_id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(t.title)+'<span style="color:var(--muted)"> &middot; '+esc(t.client_name||'')+'</span></span><span style="font-size:12px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+(t.due_date?esc(t.due_date):'')+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen openstaande taken voor jou.</div>';
-  var pHtml=posts.length?posts.slice(0,6).map(function(p){return '<div onclick="openClient('+p.client_id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted)"> &middot; '+esc(p.client_name||'')+'</span></span><span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen geplande posts.</div>';
-  var cHtml=clients.length?clients.map(function(c){return '<div onclick="openClient('+c.id+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(c.name)+'</span><span style="font-size:11px;font-weight:700;color:#fff;background:#dc2626;padding:1px 8px;border-radius:20px">'+(Number(c.open_actions)||0)+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen openstaande acties.</div>';
-  el.innerHTML='<div class="section-h" style="margin-top:4px"><h4>Overzicht</h4></div>'+
-    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">'+
-      panel('Jouw eerstvolgende taken',tHtml)+
-      panel('Eerstvolgende geplande posts',pHtml)+
-      panel('Klanten met openstaande actie',cHtml)+
-    '</div>'+
-    '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Best presterende posts per klant vind je in Rapportage (op engagement rate).</div>';
+  var nActiveClients=allClients.filter(function(c){return !c.archived && (c.status==null||c.status==='active');}).length || allClients.length;
+  var nTasks=tasks.length, nClientsOpen=clients.length;
+  var firstName=(ME&&ME.full_name?String(ME.full_name).trim().split(/\s+/)[0]:'')||(ME&&ME.workspace_name)||'';
+
+  // Statkaart met doorlink-knop.
+  function statCard(label,value,btnTxt,btnAction){
+    return '<div class="card" style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:6px">'+
+      '<div style="font-size:13px;color:var(--muted);font-weight:600">'+esc(label)+'</div>'+
+      '<div style="font-size:34px;font-weight:800;line-height:1">'+esc(String(value))+'</div>'+
+      '<a onclick="'+btnAction+'" style="margin-top:auto;font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600">'+esc(btnTxt)+' &rarr;</a>'+
+    '</div>';
+  }
+
+  // Prio's voor vandaag: jouw eigen openstaande taken (over alle klanten).
+  var prio=tasks.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<today);
+    return '<div onclick="openClient('+t.client_id+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
+      '<span style="width:16px;height:16px;border:2px solid var(--muted);border-radius:50%;flex:none"></span>'+
+      '<span style="flex:1;font-size:13.5px">'+esc(t.title)+'<span style="color:var(--muted)"> &middot; '+esc(t.client_name||'')+'</span></span>'+
+      (t.due_date?'<span style="font-size:11.5px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+esc(t.due_date)+'</span>':'')+
+    '</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen openstaande taken voor jou. Mooi werk.</div>';
+
+  // Aandachtspunten: klanten met openstaande acties (het belletje).
+  var aandacht=clients.slice(0,6).map(function(c){
+    return '<div onclick="openClient('+c.id+')" style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
+      '<span style="width:8px;height:8px;border-radius:50%;background:var(--accent-2);flex:none;margin-top:5px"></span>'+
+      '<div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+esc(c.name)+'</div>'+
+      '<div style="font-size:12px;color:var(--muted)">'+(Number(c.open_actions)||0)+' openstaande '+((Number(c.open_actions)||0)===1?'actie':'acties')+'</div></div>'+
+    '</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen aandachtspunten. Alles is bij.</div>';
+
+  // Posts voor deze week: geplande posts (komende 7 dagen).
+  var wkEnd=new Date(); wkEnd.setDate(wkEnd.getDate()+7);
+  var weekPosts=posts.filter(function(p){var dt=new Date(p.scheduled_at);return !isNaN(dt)&&dt<=wkEnd;}).slice(0,6);
+  var postsHtml=weekPosts.map(function(p){var st=POST_STATUS_LABEL[p.status]||p.status||'';
+    return '<div onclick="openClient('+p.client_id+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
+      '<span style="flex:1;font-size:13.5px">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted)"> &middot; '+esc(p.client_name||'')+'</span></span>'+
+      '<span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span>'+
+      (st?'<span class="status scheduled" style="white-space:nowrap">'+esc(st)+'</span>':'')+
+    '</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen posts gepland voor deze week.</div>';
+
+  function cardHead(title,rightHtml){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px"><div style="font-weight:700;font-size:15px">'+title+'</div>'+(rightHtml||'')+'</div>';}
+  function cardLink(txt,action){return '<a onclick="'+action+'" style="font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600;white-space:nowrap">'+esc(txt)+' &rarr;</a>';}
+
+  root.innerHTML=
+    '<div class="hero" style="margin-bottom:18px"><div>'+
+      '<h3 style="font-size:30px;margin:0 0 6px">Welkom '+esc(firstName)+'.</h3>'+
+      '<p style="margin:0">Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p>'+
+    '</div></div>'+
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
+      // Linker (brede) kolom
+      '<div style="flex:2;min-width:320px;display:flex;flex-direction:column;gap:16px">'+
+        '<div style="display:flex;gap:14px;flex-wrap:wrap">'+
+          statCard('Actieve klanten',nActiveClients,'Ga naar klanten',"navTo('clients')")+
+          statCard('Openstaande taken',nTasks,'Ga naar taken',"ovScrollTo('ovPrioCard')")+
+          statCard('Klanten met openstaande taken',nClientsOpen,'Bekijk klanten',"navTo('clients')")+
+        '</div>'+
+        '<div class="card">'+cardHead('Jouw posts voor deze week',cardLink('Bekijk hele planning',"navTo('clients')"))+postsHtml+'</div>'+
+        '<div class="card">'+cardHead('Jouw best presterende posts',cardLink('Open rapportage',"navTo('reporting')"))+
+          '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De best presterende posts (op engagement rate) staan per klant in de Rapportage-tab van die klant. Open Rapportage om ze te bekijken.</div></div>'+
+      '</div>'+
+      // Rechter (smalle) kolom
+      '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">'+
+        '<div class="card" id="ovPrioCard">'+cardHead('Jouw prio’s voor vandaag',cardLink('Bekijk alle taken',"navTo('clients')"))+prio+'</div>'+
+        '<div class="card">'+cardHead('Aandachtspunten'+(nClientsOpen?(' <span style=\"color:var(--muted);font-weight:600\">('+nClientsOpen+')</span>'):''),cardLink('Bekijk klanten',"navTo('clients')"))+aandacht+'</div>'+
+      '</div>'+
+    '</div>';
 }
 function wsiTab(p){
   ['meta','google','tiktok','linkedin'].forEach(function(x){
@@ -1637,7 +1674,7 @@ async function loadClients(){
     if(!r.ok||!d.success){body.innerHTML='';showMsg('clientsMsg',false,d.error||'Kon klanten niet laden.');return;}
     var max=ME.max_clients||0;
     document.getElementById('clientLimitPill').textContent='Klanten: '+d.clients.length+(max?(' / '+max):'');
-    document.getElementById('stClients').textContent=d.clients.length;
+    var stCl=document.getElementById('stClients'); if(stCl)stCl.textContent=d.clients.length;
     if(!d.clients.length){
       body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3.2"/></svg><h4>Nog geen klanten</h4><p>Maak je eerste klant-space aan om te beginnen.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewClient()">+ Nieuwe klant</button>':'')+'</div>';
       return;
