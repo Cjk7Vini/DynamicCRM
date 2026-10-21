@@ -2776,133 +2776,28 @@ router.post('/api/mkt/clients/:clientId/campaigns', requireMkt, async (req, res)
     if (!name) return res.status(400).json({ error: 'Campagnenaam is verplicht' });
     const objective = CAMPAIGN_OBJECTIVES[b.objective] ? b.objective : null;
     if (!objective) return res.status(400).json({ error: 'Kies een geldig campagnedoel' });
-    const euros = Number(b.dailyBudget);
-    if (!Number.isFinite(euros) || euros < 1) return res.status(400).json({ error: 'Vul een dagbudget in van minimaal 1 euro' });
-    const budgetCents = Math.round(euros * 100);
-    const country = String(b.country || 'NL').trim().toUpperCase().slice(0, 2);
-    const ageMin = Math.min(65, Math.max(13, parseInt(b.ageMin, 10) || 18));
-    const ageMax = Math.min(65, Math.max(ageMin, parseInt(b.ageMax, 10) || 65));
-    const link = String(b.link || '').trim();
-    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: 'Vul een geldige bestemmings-URL in (https://...)' });
-    const cta = CTA_TYPES.includes(b.cta) ? b.cta : 'LEARN_MORE';
-    const caption = String(b.caption || '').slice(0, 2000);
-    const headline = String(b.headline || '').slice(0, 255);
-
-    // Koppelingen ophalen (client met terugval op workspace).
+    // Koppelingen ophalen (client met terugval op workspace). Voor alleen een
+    // campagne hebben we token + ad-account nodig (geen pagina of beeld).
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
     const adAccount = creds.adAccount;
     if (!token) return res.status(400).json({ error: 'Meta access token ontbreekt (klant en workspace)' });
     if (!adAccount) return res.status(400).json({ error: 'Ad Account ID ontbreekt (klant en workspace)' });
-    if (!creds.pageId) return res.status(400).json({ error: 'Facebook Page ID ontbreekt in de koppelingen van deze klant' });
 
-    // Creatief-beeld ophalen (afbeelding of video)
-    if (!b.assetId) return res.status(400).json({ error: 'Kies een afbeelding of video voor de advertentie' });
-    const asset = await withReadConnection(async (c) => (await c.query(
-      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
-      [b.assetId, okClient, wsId]
-    )).rows[0]);
-    if (!asset || asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Gekozen bestand niet gevonden of niet publiek' });
-
-    // Detailtargeting + bieden (fase 1).
-    const genders = ['all', 'men', 'women'].includes(b.genders) ? b.genders : 'all';
-    const interestIds = Array.isArray(b.interests) ? b.interests.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 25) : [];
-    const audienceIds = Array.isArray(b.audiences) ? b.audiences.map((x) => String((x && x.id) || x)).filter(Boolean).slice(0, 20) : [];
-    const bidStrategy = ['LOWEST_COST_WITHOUT_CAP', 'LOWEST_COST_WITH_BID_CAP'].includes(b.bidStrategy) ? b.bidStrategy : 'LOWEST_COST_WITHOUT_CAP';
-    let bidCapCents = null;
-    if (bidStrategy === 'LOWEST_COST_WITH_BID_CAP') {
-      const cap = Number(b.bidCap);
-      if (!Number.isFinite(cap) || cap < 0.5) return res.status(400).json({ error: 'Vul een biedlimiet in van minimaal 0,50 euro' });
-      bidCapCents = Math.round(cap * 100);
-    }
-    const placement = (b.placement === 'manual') ? 'manual' : 'automatic';
-
-    // Locatie: straal rondom een gekozen plaats, of anders het hele land.
-    const geoKey = String(b.geoKey || '').trim();
-    let geoRadius = parseInt(b.geoRadius, 10);
-    if (!Number.isFinite(geoRadius)) geoRadius = 25;
-    if (geoRadius < 17) geoRadius = 17; // Meta hanteert 17 km als minimale straal
-    if (geoRadius > 80) geoRadius = 80;
-    const targetingObj = { age_min: ageMin, age_max: ageMax };
-    if (geoKey) targetingObj.geo_locations = { cities: [{ key: geoKey, radius: geoRadius, distance_unit: 'kilometer' }] };
-    else targetingObj.geo_locations = { countries: [country] };
-    if (genders === 'men') targetingObj.genders = [1];
-    else if (genders === 'women') targetingObj.genders = [2];
-    if (interestIds.length) targetingObj.flexible_spec = [{ interests: interestIds.map((id) => ({ id })) }];
-    if (audienceIds.length) targetingObj.custom_audiences = audienceIds.map((id) => ({ id }));
-    if (placement === 'manual') {
-      targetingObj.publisher_platforms = ['facebook', 'instagram'];
-      targetingObj.facebook_positions = ['feed'];
-      targetingObj.instagram_positions = ['stream'];
-    }
-    const targeting = JSON.stringify(targetingObj);
-
-    // Standaard gepauzeerd aanmaken (veilig). Wie bewust 'direct live' kiest,
-    // krijgt alles meteen op ACTIVE. launch is strikt begrensd tot deze twee waarden.
-    const launchStatus = (b.launch === 'active') ? 'ACTIVE' : 'PAUSED';
-
-    // Startdatum: leeg = over een uur; anders de gekozen (toekomstige) datum, dit
-    // is hoe Meta plant (ad set start_time). Minstens 5 minuten in de toekomst.
-    let startIso = new Date(Date.now() + 3600 * 1000).toISOString();
-    if (b.startTime) {
-      const t = new Date(b.startTime);
-      if (isNaN(t.getTime())) return res.status(400).json({ error: 'Ongeldige startdatum' });
-      if (t.getTime() < Date.now() + 5 * 60 * 1000) return res.status(400).json({ error: 'Kies een startdatum en tijd minstens 5 minuten in de toekomst' });
-      startIso = t.toISOString();
-    }
-
-    // 1) Campagne. Meta vereist expliciet is_adset_budget_sharing_enabled;
-    // false = elke advertentieset houdt zijn eigen budget (past bij onze opzet).
+    // Alleen de campagne aanmaken (gepauzeerd, net als Meta). De advertentieset en
+    // advertentie voeg je daarna apart toe via het campagne-overzicht.
     const campaign = await graphPost(`${adAccount}/campaigns`, {
-      name, objective, status: launchStatus, special_ad_categories: '[]',
+      name, objective, status: 'PAUSED', special_ad_categories: '[]',
       is_adset_budget_sharing_enabled: 'false', access_token: token,
     });
-    // 2) Advertentieset. Voor EU (DSA) is de begunstigde/betaler verplicht:
-    // wie wordt er gepromoot. We vullen dat met de klantnaam.
-    const beneficiaryRow = await withReadConnection(async (c) => (await c.query(
-      'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [okClient, wsId]
-    )).rows[0]);
-    const beneficiary = String((beneficiaryRow && beneficiaryRow.name) || name).slice(0, 100);
-    // Voor Leads/Verkoop optimaliseren we op echte conversies via de pixel
-    // (LEAD-event) zodra er een pixel is; anders veilig terugvallen op linkklikken.
-    let optimizationGoal = CAMPAIGN_OBJECTIVES[objective];
-    let promotedObject = null;
-    if ((objective === 'OUTCOME_LEADS' || objective === 'OUTCOME_SALES') && creds.pixelId) {
-      optimizationGoal = 'OFFSITE_CONVERSIONS';
-      promotedObject = JSON.stringify({ pixel_id: String(creds.pixelId), custom_event_type: 'LEAD' });
-    }
-    const adsetParams = {
-      name: name + ' - set', campaign_id: campaign.id, daily_budget: String(budgetCents),
-      billing_event: 'IMPRESSIONS', optimization_goal: optimizationGoal,
-      bid_strategy: bidStrategy, targeting, status: launchStatus,
-      dsa_beneficiary: beneficiary, dsa_payor: beneficiary,
-      start_time: startIso, access_token: token,
-    };
-    if (promotedObject) adsetParams.promoted_object = promotedObject;
-    if (bidCapCents != null) adsetParams.bid_amount = String(bidCapCents);
-    const adset = await createAdSetWithAttribution(adAccount, token, adsetParams);
-    // 3) Creatief (afbeelding of video), met Kop en AI-verbeteringen uit
-    const captionsArr = (Array.isArray(b.captions) && b.captions.length) ? b.captions : [caption];
-    const creativeFields = await buildCreative(adAccount, token, creds.pageId, asset, captionsArr, link, cta, headline);
-    const creative = await createAdCreativeNoAI(adAccount, token, name + ' - creatief', creativeFields);
-    // 4) Advertentie
-    const ad = await graphPost(`${adAccount}/ads`, {
-      name: name + ' - ad', adset_id: adset.id, creative: JSON.stringify({ creative_id: creative.id }),
-      status: launchStatus, access_token: token,
-    });
-
     const row = await withWriteConnection(async (c) => (await c.query(
       `INSERT INTO marketing.campaigns
          (workspace_id, client_id, name, objective, daily_budget_cents, status, meta_campaign_id, meta_adset_id, meta_creative_id, meta_ad_id, asset_id, link, created_by)
-       VALUES ($1,$2,$3,$4,$5,'${launchStatus}',$6,$7,$8,$9,$10,$11,$12)
+       VALUES ($1,$2,$3,$4,$5,'PAUSED',$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, name, objective, daily_budget_cents, status, meta_campaign_id, link, created_at`,
-      [wsId, okClient, name, objective, budgetCents, campaign.id, adset.id, creative.id, ad.id, b.assetId, link, req.session.mkt.accountId || null]
+      [wsId, okClient, name, objective, null, campaign.id, null, null, null, null, null, null, req.session.mkt.accountId || null]
     )).rows[0]);
-    const wantedMulti = captionsArr.map((x) => String(x || '').trim()).filter(Boolean).length >= 2;
-    // Leads/Verkoop zonder pixel: dan optimaliseert Meta op linkklikken i.p.v. echte
-    // conversies. We melden dat terug zodat de gebruiker de pixel kan instellen.
-    const pixelWarning = (objective === 'OUTCOME_LEADS' || objective === 'OUTCOME_SALES') && !creds.pixelId;
-    res.json({ success: true, campaign: row, pixelWarning, multiTextApplied: wantedMulti ? !creative._usedFallback : null, flexError: creative._usedFallback ? creative._flexError : null });
+    res.json({ success: true, campaign: row });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
