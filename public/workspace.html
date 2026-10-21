@@ -240,9 +240,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <div class="shell hidden" id="appView">
   <aside class="side">
     <div class="logo"><div class="logo-mark">MS</div><div><b>Marketing Studio</b><span>Workspace</span></div></div>
-    <div class="ws-chip">
+    <div class="ws-chip" id="wsChip" onclick="toggleProfileMenu()">
       <div class="ws-ava" id="wsAva">W</div>
-      <div style="min-width:0"><div class="nm" id="wsName">Workspace</div><div class="sub" id="wsPlan">-</div></div>
+      <div style="min-width:0;flex:1"><div class="nm" id="wsName">Workspace</div><div class="sub" id="wsPlan">-</div></div>
+      <svg id="wsChipCaret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted);flex:none;display:none"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div id="profileMenu" style="display:none;margin:-8px 4px 10px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:hidden">
+      <a onclick="navTo('wssettings');toggleProfileMenu(true)" style="display:block;padding:9px 12px;font-size:13px;cursor:pointer">Instellingen</a>
+      <a onclick="navTo('beheer');toggleProfileMenu(true)" style="display:block;padding:9px 12px;font-size:13px;cursor:pointer;border-top:1px solid var(--line)">Beheer</a>
     </div>
     <div id="platformBar" style="display:none;margin:-6px 4px 12px"><a onclick="switchWorkspace()" style="font-size:12px;color:var(--accent-2);cursor:pointer;font-weight:600">&#8592; Alle workspaces</a></div>
     <div class="nav-label">Werkplek</div>
@@ -384,6 +389,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Overzicht van de eigen werkplek-data per klant. Meta-cijfers per klant staan in de Rapportage-tab van die klant.</div>
         <div id="repOverviewMsg" class="inline-msg"></div>
         <div id="repOverviewBody"><div class="empty">Laden...</div></div>
+      </section>
+
+      <!-- BEHEER (clienten per klant) -->
+      <section class="view" id="viewBeheer">
+        <div class="section-h"><span class="pill">Beheer: clienten per klant</span></div>
+        <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Welke client-logins zijn aan welke klant gekoppeld. Binnenkort kun je hier ook clienten uitnodigen.</div>
+        <div id="beheerMsg" class="inline-msg"></div>
+        <div id="beheerBody"><div class="empty">Laden...</div></div>
       </section>
 
       <!-- KOPPELINGEN (werkplek-breed live-overzicht, alleen seats) -->
@@ -1243,7 +1256,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <script>
 var loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
 var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false;
-var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Werkplek-koppeling',reporting:'Rapportage',koppelingen:'Koppelingen',handleiding:'Handleiding'};
+var TITLES={overzicht:'Overzicht',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Instellingen',reporting:'Rapportage',koppelingen:'Koppelingen',handleiding:'Handleiding',beheer:'Beheer'};
 
 function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
@@ -1319,7 +1332,10 @@ async function bootstrap(){
   var canManage=ME.role!=='client';
   document.getElementById('topNewClient').style.display=canManage?'':'none';
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
-  document.getElementById('navWsSettings').style.display=isOwnerMgr?'':'none';
+  CAN_MANAGE_WS=isOwnerMgr;
+  document.getElementById('navWsSettings').style.display='none'; // Instellingen zit nu in het profiel-menu linksboven
+  document.getElementById('wsChipCaret').style.display=isOwnerMgr?'':'none';
+  document.getElementById('wsChip').style.cursor=isOwnerMgr?'pointer':'default';
   CLIENT_MODE = (ME.role==='client');
   if(CLIENT_MODE){ enterClientMode(); return; }
   navTo('overzicht');
@@ -1402,7 +1418,35 @@ function navTo(view){
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
+  else if(view==='beheer'){document.getElementById('viewBeheer').classList.add('active');loadBeheer();}
   else {document.getElementById('viewOverzicht').classList.add('active');loadOverzicht();}
+}
+// Profiel-menu (linksboven): Instellingen + Beheer. Alleen voor eigenaar/manager/platform.
+var CAN_MANAGE_WS=false;
+function toggleProfileMenu(forceClose){
+  if(!CAN_MANAGE_WS)return;
+  var m=document.getElementById('profileMenu'); if(!m)return;
+  if(forceClose===true){m.style.display='none';return;}
+  m.style.display=(m.style.display==='none'||!m.style.display)?'block':'none';
+}
+async function loadBeheer(){
+  var box=document.getElementById('beheerBody'); if(!box)return; hideMsg('beheerMsg');
+  box.innerHTML='<div class="empty">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/client-users',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='';showMsg('beheerMsg',false,(d&&d.error)||'Kon beheer niet laden.');return;}
+    var clients=d.clients||[];
+    if(!clients.length){box.innerHTML='<div class="empty"><h4>Nog geen klanten</h4><p>Maak eerst een klant-space aan.</p></div>';return;}
+    box.innerHTML=clients.map(function(cl){
+      var users=cl.users||[];
+      var rows=users.length?users.map(function(u){
+        var last=u.last_login?('laatst ingelogd '+esc(u.last_login)):'nog niet ingelogd';
+        var st=(u.active===false)?'<span class="status scheduled" style="font-size:10px">Inactief</span>':'';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><div><div style="font-size:13.5px;font-weight:600">'+esc(u.name||u.email)+' '+st+'</div><div style="font-size:12px;color:var(--muted)">'+esc(u.email)+' &middot; '+last+'</div></div></div>';
+      }).join(''):'<div style="font-size:13px;color:var(--muted);padding:8px 0;border-top:1px solid var(--line)">Nog geen client-login voor deze klant.</div>';
+      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="font-weight:700;font-size:15px">'+esc(cl.name)+'</div><span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);padding:2px 10px;border-radius:20px">'+users.length+' client'+(users.length===1?'':'en')+'</span></div>'+rows+'</div>';
+    }).join('')+'<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Clienten uitnodigen komt binnenkort op deze pagina.</div>';
+  }catch(e){box.innerHTML='';showMsg('beheerMsg',false,'Netwerkfout.');}
 }
 async function loadOverzicht(){
   var el=document.getElementById('ovPanels'); if(!el)return;
