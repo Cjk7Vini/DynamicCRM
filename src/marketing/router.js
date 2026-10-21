@@ -1480,6 +1480,33 @@ router.get('/api/mkt/client-users', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Beheer: een client-login toevoegen voor een klant (eigenaar/manager).
+router.post('/api/mkt/client-users', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const { client_id, email, full_name, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord zijn verplicht' });
+    if (!validPassword(password)) return res.status(400).json({ error: 'Wachtwoord: minimaal 8 tekens, met een hoofdletter, een kleine letter en een cijfer' });
+    if (!client_id) return res.status(400).json({ error: 'Kies een klant om deze client-login aan te koppelen' });
+    const em = String(email).toLowerCase().trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return res.status(400).json({ error: 'Vul een geldig e-mailadres in' });
+    const okc = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [client_id, wsId]
+    )).rows[0]);
+    if (!okc) return res.status(400).json({ error: 'Gekozen klant hoort niet bij deze workspace' });
+    const dup = await withReadConnection(async (c) => (await c.query('SELECT 1 FROM marketing.accounts WHERE email=$1', [em])).rows[0]);
+    if (dup) return res.status(400).json({ error: 'Dit e-mailadres bestaat al' });
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.accounts (workspace_id, email, password_hash, full_name, role, client_id)
+       VALUES ($1,$2,$3,$4,'client',$5) RETURNING id, email, full_name, client_id`,
+      [wsId, em, hash, full_name ? String(full_name).slice(0, 120) : null, okc.id]
+    )).rows[0]);
+    res.json({ success: true, account: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Mijn openstaande to-do's (aan mij toegewezen, nog niet afgevinkt) over alle
 // klanten in deze workspace. Voedt het meldingen-badge en de overzichtspagina.
 router.get('/api/mkt/my-tasks', requireMkt, async (req, res) => {
