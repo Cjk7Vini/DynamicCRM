@@ -6,11 +6,11 @@
 <title>Marketing Studio - Workspace</title>
 <style>
 :root{
-  --bg:#0a0c12; --bg-2:#0e111a;
-  --panel:#121622; --panel-2:#171c2a; --panel-3:#1d2434;
-  --line:#232a3a; --line-2:#2c3448;
-  --ink:#eef1f8; --ink-2:#c3cad9; --muted:#828da5; --faint:#5b647c;
-  --accent:#6366f1; --accent-2:#22d3ee; --accent-soft:rgba(99,102,241,.14);
+  --bg:#09222a; --bg-2:#0c2a33;
+  --panel:#0f323b; --panel-2:#143c46; --panel-3:#1a4753;
+  --line:#245863; --line-2:#2f6b78;
+  --ink:#eef6f7; --ink-2:#c6dadd; --muted:#8ba8ae; --faint:#5f7e84;
+  --accent:#17b2c6; --accent-2:#5bd3de; --accent-soft:rgba(32,170,190,.16);
   --ok:#34d399; --ok-soft:rgba(52,211,153,.12);
   --warn:#f59e0b; --warn-soft:rgba(245,158,11,.14);
   --err:#f87171; --err-soft:rgba(248,113,113,.12);
@@ -37,7 +37,7 @@ input[type="date"]{color-scheme:light;background:#fff;color:#111;border:1px soli
 
 /* ---------- BUTTONS ---------- */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:none;border-radius:10px;font-weight:650;font-size:13.5px;cursor:pointer;transition:transform .12s,box-shadow .12s,background .12s;white-space:nowrap}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#7c74ff);color:#fff;box-shadow:0 6px 18px rgba(99,102,241,.35)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#2bc6d8);color:#fff;box-shadow:0 6px 18px rgba(23,178,198,.35)}
 .btn-primary:hover{transform:translateY(-1px)}
 .btn-ghost{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-2)}
 .btn-ghost:hover{border-color:var(--line-2);color:var(--ink)}
@@ -46,11 +46,11 @@ input[type="date"]{color-scheme:light;background:#fff;color:#111;border:1px soli
 
 /* ---------- LOGIN ---------- */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
-.login::before{content:"";position:absolute;width:900px;height:900px;top:-360px;left:-200px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.18),transparent 60%)}
-.login::after{content:"";position:absolute;width:800px;height:800px;bottom:-380px;right:-220px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.12),transparent 60%)}
+.login::before{content:"";position:absolute;width:900px;height:900px;top:-360px;left:-200px;border-radius:50%;background:radial-gradient(circle,rgba(32,170,190,.20),transparent 60%)}
+.login::after{content:"";position:absolute;width:800px;height:800px;bottom:-380px;right:-220px;border-radius:50%;background:radial-gradient(circle,rgba(91,211,222,.12),transparent 60%)}
 .login-card{position:relative;width:100%;max-width:400px;background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line);border-radius:20px;padding:38px 34px;box-shadow:var(--shadow)}
 .logo{display:flex;align-items:center;gap:11px}
-.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;box-shadow:0 6px 16px rgba(99,102,241,.4)}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;box-shadow:0 6px 16px rgba(23,178,198,.4)}
 .logo b{font-size:16px;letter-spacing:-.01em}
 .logo span{display:block;font-size:10px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
 .login h1{font-size:22px;margin:26px 0 4px;letter-spacing:-.02em}
@@ -88,8 +88,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .logout:hover{background:var(--err-soft);color:var(--err)}
 .logout svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.9;fill:none}
 
-.main{min-width:0;background:radial-gradient(1200px 500px at 100% -5%,rgba(99,102,241,.06),transparent)}
-.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 34px;border-bottom:1px solid var(--line);background:rgba(10,12,18,.72);backdrop-filter:blur(10px)}
+.main{min-width:0;background:radial-gradient(1100px 620px at 100% -5%,rgba(60,190,210,.16),transparent 60%),linear-gradient(135deg,#09222a 0%,#0d2c35 55%,#15434d 100%)}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 34px;border-bottom:1px solid var(--line);background:rgba(9,34,42,.72);backdrop-filter:blur(10px)}
 .topbar .tt{font-size:12px;color:var(--muted);letter-spacing:.02em}
 .topbar h2{font-size:20px;letter-spacing:-.02em;margin-top:2px}
 .topbar-right{display:flex;align-items:center;gap:12px}
@@ -100,7 +100,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* welcome / stat cards */
-.hero{background:linear-gradient(120deg,rgba(99,102,241,.14),rgba(34,211,238,.06));border:1px solid var(--line);border-radius:18px;padding:26px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.hero{background:linear-gradient(120deg,rgba(32,170,190,.16),rgba(91,211,222,.06));border:1px solid var(--line);border-radius:18px;padding:26px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
 .hero h3{font-size:19px;letter-spacing:-.01em}
 .hero p{color:var(--ink-2);margin-top:6px;font-size:14px;max-width:56ch}
 .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:26px}
@@ -1437,9 +1437,9 @@ async function loadOverzicht(){
 
   // Statkaart met doorlink-knop.
   function statCard(label,value,btnTxt,btnAction){
-    return '<div class="card" style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:6px">'+
-      '<div style="font-size:13px;color:var(--muted);font-weight:600">'+esc(label)+'</div>'+
-      '<div style="font-size:34px;font-weight:800;line-height:1">'+esc(String(value))+'</div>'+
+    return '<div class="card" style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center">'+
+      '<div style="font-size:14px;color:var(--ink-2);font-weight:700">'+esc(label)+'</div>'+
+      '<div style="font-size:40px;font-weight:800;line-height:1">'+esc(String(value))+'</div>'+
       '<a onclick="'+btnAction+'" style="margin-top:auto;font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600">'+esc(btnTxt)+' &rarr;</a>'+
     '</div>';
   }
@@ -1477,10 +1477,10 @@ async function loadOverzicht(){
   function cardLink(txt,action){return '<a onclick="'+action+'" style="font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600;white-space:nowrap">'+esc(txt)+' &rarr;</a>';}
 
   root.innerHTML=
-    '<div class="hero" style="margin-bottom:18px"><div>'+
-      '<h3 style="font-size:30px;margin:0 0 6px">Welkom '+esc(firstName)+'.</h3>'+
-      '<p style="margin:0">Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p>'+
-    '</div></div>'+
+    '<div style="margin-bottom:26px">'+
+      '<h2 style="font-size:clamp(34px,5vw,56px);font-weight:800;line-height:1.05;letter-spacing:-.01em;margin:0 0 10px">Welkom '+esc(firstName)+'.</h2>'+
+      '<p style="margin:0;color:var(--ink-2);font-size:15px;max-width:640px">Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p>'+
+    '</div>'+
     '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
       // Linker (brede) kolom
       '<div style="flex:2;min-width:320px;display:flex;flex-direction:column;gap:16px">'+
