@@ -334,6 +334,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         </div>
       </section>
 
+      <!-- CLIENT-HOME (overzicht voor de ingelogde client) -->
+      <section class="view" id="viewClientHome">
+        <div id="clientHomeBody"><div class="empty">Laden...</div></div>
+      </section>
+
       <!-- WERKPLEK-KOPPELING (workspace-niveau) -->
       <section class="view" id="viewWsSettings">
         <div id="wsiMsg" class="inline-msg"></div>
@@ -555,7 +560,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
       <!-- KLANT DETAIL -->
       <section class="view" id="viewClientDetail">
-        <span class="back" onclick="navTo('clients')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Terug naar klanten</span>
+        <span class="back" id="detailBackLink" onclick="detailBack()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> <span id="detailBackLabel">Terug naar klanten</span></span>
         <div class="detail-head">
           <div class="cl-ava" id="dBadge">?</div>
           <div><div class="tt" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)">Klant-space</div><h2 id="dName">Klant</h2></div>
@@ -1367,12 +1372,38 @@ async function enterClientMode(){
   document.getElementById('wsName').textContent=ME.client_name||ME.workspace_name||'Workspace';
   document.getElementById('wsAva').textContent=initials(ME.client_name||'K');
   document.getElementById('wsPlan').textContent='Klantportaal';
+  var dbl=document.getElementById('detailBackLabel'); if(dbl)dbl.textContent='Terug naar overzicht';
   try{
     var r=await fetch('/api/mkt/clients',{credentials:'include'}); var d=await r.json();
     var c=(d.clients||[])[0];
-    if(c){ openClient(c.id); }
+    if(c){ CLIENT_HOME_ID=c.id; CLIENT_HOME_NAME=c.name||ME.client_name||''; showClientHome(); }
     else { document.getElementById('viewClientDetail').innerHTML='<div class="empty"><h4>Geen content</h4><p>Er is nog geen content voor je klaargezet.</p></div>'; navTo('clientDetail'); }
   }catch(e){}
+}
+// ---- Client-home: overzicht voor de ingelogde client ----
+var CLIENT_HOME_ID=null, CLIENT_HOME_NAME='';
+function showClientHome(){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.getElementById('viewClientHome').classList.add('active');
+  document.getElementById('pageTitle').textContent='Overzicht';
+  if(CLIENT_HOME_ID!=null) renderClientHome(CLIENT_HOME_ID,CLIENT_HOME_NAME);
+}
+function detailBack(){ if(CLIENT_MODE){ showClientHome(); } else { navTo('clients'); } }
+async function renderClientHome(clientId,clientName){
+  var box=document.getElementById('clientHomeBody'); if(!box)return;
+  box.innerHTML='<div class="empty">Laden...</div>';
+  var posts=[], items=[];
+  try{var r=await fetch('/api/mkt/clients/'+clientId+'/posts',{credentials:'include'});var d=await r.json();if(d&&d.success)posts=d.posts||[];}catch(e){}
+  try{var r2=await fetch('/api/mkt/clients/'+clientId+'/items?kind=todo',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)items=(d2.items||[]).filter(function(x){return !x.done;});}catch(e){}
+  var now=new Date(), todayStr=now.toISOString().slice(0,10);
+  var pending=posts.filter(function(p){return p.approval==='pending';});
+  var upcoming=posts.filter(function(p){return p.scheduled_at && new Date(p.scheduled_at)>=now && p.status!=='published';}).sort(function(a,b){return new Date(a.scheduled_at)-new Date(b.scheduled_at);});
+  function panel(title,inner){return '<div class="card" style="flex:1;min-width:250px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">'+esc(title)+'</div>'+inner+'</div>';}
+  var pHtml=pending.length?pending.slice(0,6).map(function(p){return '<div onclick="openClient('+clientId+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(p.title||'(zonder titel)')+'</span><span style="font-size:11px;font-weight:700;color:#fff;background:#dc2626;padding:1px 8px;border-radius:20px">Beoordeel</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Niks wacht op je goedkeuring.</div>';
+  var upHtml=upcoming.length?upcoming.slice(0,6).map(function(p){return '<div onclick="openClient('+clientId+')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer"><span style="font-size:13px">'+esc(p.title||'(zonder titel)')+'</span><span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen geplande posts.</div>';
+  var tHtml=items.length?items.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<todayStr);return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line)"><span style="font-size:13px">'+esc(t.title)+'</span><span style="font-size:12px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+(t.due_date?esc(t.due_date):'')+'</span></div>';}).join(''):'<div style="color:var(--muted);font-size:13px">Geen openstaande taken.</div>';
+  box.innerHTML='<div class="hero" style="margin-bottom:20px"><div><h2 style="margin:0 0 4px;font-size:20px">Welkom'+(clientName?(', '+esc(clientName)):'')+'</h2><div style="font-size:13.5px;color:var(--muted)">Hier zie je wat er op je wacht, je volgende posts en je taken.</div></div><button class="btn btn-primary" onclick="openClient('+clientId+')">Naar mijn content</button></div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap">'+panel('Wacht op jouw goedkeuring',pHtml)+panel('Eerstvolgende posts',upHtml)+panel('Jouw taken',tHtml)+'</div>';
 }
 function applyClientMode(){
   ['tabInfo','tabReport','tabCampaigns','tabIntegrations'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
