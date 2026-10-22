@@ -196,6 +196,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .ovpill{font-size:13px;color:var(--ink);background:rgba(90,185,200,.16);border:1px solid rgba(90,185,200,.28);padding:7px 14px;border-radius:30px;display:inline-flex;align-items:center;gap:8px}
 .prio-item{display:flex;align-items:center;gap:13px;padding:12px 0;font-size:15px;cursor:pointer}
 .prio-item .circ{width:18px;height:18px;border:2px solid var(--muted);border-radius:50%;flex:none}
+.bp-body{display:flex;gap:18px;align-items:flex-start}
+.bp-img{width:92px;height:92px;border-radius:12px;object-fit:cover;flex:none;background:#0b2026;border:1px solid rgba(90,185,200,.22)}
 .bp-metrics{display:flex;gap:26px;margin-top:14px;flex-wrap:wrap}
 .bp-metric .ml{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:4px}
 .bp-metric .mv{font-size:24px;font-weight:800;line-height:1}
@@ -1520,7 +1522,8 @@ async function loadOverzicht(){
         '</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">Jouw best presterende post</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
-          '<div style="color:var(--muted);font-size:14px;line-height:1.6">De best presterende posts (op engagement rate) en de cijfers per klant staan in de Rapportage-tab. Open Rapportage om ze te bekijken.</div></div>'+
+          '<div id="ovBestPost"><button class="btn btn-ghost" onclick="ovLoadBestPost()" style="font-size:13px;padding:8px 14px">Cijfers laden</button>'+
+            '<div style="color:var(--muted);font-size:12.5px;margin-top:8px">Haalt de best presterende post van je eigen Instagram (werkplek-koppeling) op bij Meta.</div></div></div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+calIcon+' Jouw posts voor deze week</div><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk hele planning &rarr;</a></div>'+postsHtml+'</div>'+
       '</div>'+
@@ -1532,9 +1535,58 @@ async function loadOverzicht(){
           '<div class="ovch"><div class="t">'+bellIcon+' Aandachtspunten</div>'+(nClientsOpen?'<a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle ('+nClientsOpen+') &rarr;</a>':'')+'</div>'+aandacht+'</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">Actieve campagnes</div><a class="ovlnk" onclick="perKlant(\'campreview\')">Bekijk campagnes &rarr;</a></div>'+
-          '<div style="font-size:14px;color:var(--ink-2)">De lopende campagnes en resultaten staan per klant onder Campagnes.</div></div>'+
+          '<div id="ovCampaigns"><button class="btn btn-ghost" onclick="ovLoadCampaigns()" style="font-size:13px;padding:8px 14px">Cijfers laden</button>'+
+            '<div style="color:var(--muted);font-size:12.5px;margin-top:8px">Haalt de actieve campagnes van deze workspace op bij Meta.</div></div></div>'+
       '</div>'+
     '</div>';
+}
+// Best presterende post van het eigen (werkplek-)Instagram, op aanvraag.
+function ovLoadBestPost(){
+  var box=document.getElementById('ovBestPost'); if(!box)return;
+  box.innerHTML='<div style="color:var(--muted);font-size:13px">Laden... dit kan even duren, we halen de cijfers bij Meta op.</div>';
+  fetch('/api/mkt/overview/own-account?part=post',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.success){box.innerHTML='<div style="color:#f87171;font-size:13px">'+esc((d&&d.error)||'Kon niet laden.')+'</div>';return;}
+    if(!d.postConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen eigen Instagram gekoppeld op werkplek-niveau. Stel dat in bij Werkplek-koppeling.</div>';return;}
+    var p=d.bestPost;
+    if(!p){box.innerHTML='<div style="color:var(--muted);font-size:13px">Geen posts gevonden op het werkplek-Instagram'+(d.postError?(' ('+esc(d.postError)+')'):'')+'.</div>';return;}
+    function metric(l,v){return '<div class="bp-metric"><div class="ml">'+l+'</div><div class="mv">'+(v!=null?v:'-')+'</div></div>';}
+    var eng=(p.engagement!=null)?('<div class="bp-metric"><div class="ml">Engagement Rate</div><div class="mv" style="color:#4ade80">'+String(p.engagement).replace('.',',')+'%</div></div>'):'';
+    var when=p.timestamp?('Geplaatst op '+fmtWhen(p.timestamp)):'';
+    box.innerHTML='<div class="bp-body">'+
+      (p.thumb?'<img class="bp-img" src="'+esc(p.thumb)+'" alt="">':'<div class="bp-img"></div>')+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:15.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
+        (when?'<div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+esc(when)+'</div>':'')+
+        '<div class="bp-metrics">'+
+          metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+
+          metric('Gedeeld',p.shares)+metric('Opgeslagen',p.saved)+eng+
+        '</div>'+
+      '</div></div>';
+  }).catch(function(){box.innerHTML='<div style="color:#f87171;font-size:13px">Netwerkfout.</div>';});
+}
+// Actieve campagnes van deze workspace, op aanvraag.
+function ovLoadCampaigns(){
+  var box=document.getElementById('ovCampaigns'); if(!box)return;
+  box.innerHTML='<div style="color:var(--muted);font-size:13px">Laden... we halen de campagnes bij Meta op.</div>';
+  fetch('/api/mkt/overview/own-account?part=campaigns',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.success){box.innerHTML='<div style="color:#f87171;font-size:13px">'+esc((d&&d.error)||'Kon niet laden.')+'</div>';return;}
+    if(!d.campaignsConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen Meta ad-account gekoppeld (werkplek of klant).</div>';return;}
+    var cs=d.campaigns||[];
+    if(!cs.length){box.innerHTML='<div style="font-size:14px;color:var(--ink-2)">Er draaien momenteel geen actieve campagnes.</div>';return;}
+    box.innerHTML=cs.slice(0,8).map(function(c){
+      var bits=[];
+      if(c.spend!=null)bits.push('&euro;'+Number(c.spend).toFixed(0)+' besteed');
+      if(c.leads!=null)bits.push(c.leads+' leads');
+      if(c.cpl!=null)bits.push('CPL &euro;'+String(Number(c.cpl).toFixed(2)).replace('.',','));
+      if(c.budget!=null)bits.push('&euro;'+Number(c.budget).toFixed(0)+'/'+(c.budget_type==='dag'?'dag':'totaal'));
+      return '<div style="padding:10px 0;border-top:1px solid rgba(90,185,200,.14)">'+
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">'+
+          '<span style="font-size:14px;font-weight:600">'+esc(c.name)+(c.clientName?('<span style="color:var(--muted);font-weight:400"> &middot; '+esc(c.clientName)+'</span>'):'')+'</span>'+
+          '<span class="ov-badge ovb-green">Live</span></div>'+
+        (bits.length?'<div style="font-size:12.5px;color:var(--muted);margin-top:3px">'+bits.join(' &middot; ')+'</div>':'')+
+      '</div>';
+    }).join('');
+  }).catch(function(){box.innerHTML='<div style="color:#f87171;font-size:13px">Netwerkfout.</div>';});
 }
 function wsiTab(p){
   ['meta','google','tiktok','linkedin'].forEach(function(x){
