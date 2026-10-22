@@ -3982,7 +3982,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       try {
         const m = await graphGet(`${creds.igUserId}/media`, {
           fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
-          limit: '18', access_token: token,
+          limit: '50', access_token: token,
         });
         allPosts = (m.data || []).map((p) => ({
           id: p.id,
