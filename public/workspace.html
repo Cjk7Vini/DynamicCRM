@@ -2698,14 +2698,6 @@ async function loadMetaInsights(){
       html+='<div class="section-h"><h4>Accountoverzicht</h4></div>';
       html+='<div class="stats" style="margin-bottom:6px">'+bigtile('Weergaven',iv(ins.views),true)+bigtile('Totaal volgers',iv(d.account.followers))+bigtile('Gepubliceerde content',iv(d.account.media))+'</div>';
     }
-    // Tijdelijke diagnostiek (alleen eigenaar/manager): wat geeft Meta precies terug
-    // voor de cijfers die afwijken? Zo kan het exact worden bijgesteld.
-    if(d.insights_debug&&ME&&(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin')){
-      var dbg=d.insights_debug;var dline=function(k){var o=dbg[k];return o?(k+': dag='+(o.daily!=null?o.daily:'-')+', totaal='+(o.total!=null?o.total:'-')):'';};
-      var parts=[dline('views'),dline('profile_views'),dline('total_interactions')].filter(Boolean);
-      if(dbg.views_from_posts!=null)parts.push('weergaven-uit-posts='+dbg.views_from_posts+' (account='+(dbg.views_account!=null?dbg.views_account:'-')+', posts in periode='+(dbg.posts_in_period!=null?dbg.posts_in_period:'-')+')');
-      if(parts.length)html+='<div class="card no-print" style="font-size:11.5px;color:var(--muted);background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25)"><strong>Diagnostiek (tijdelijk):</strong> '+esc(parts.join(' &nbsp;|&nbsp; '))+'</div>';
-    }
     // Prestaties (vergeleken met de vorige, even lange periode)
     if(d.insights){
       var pr=[];
