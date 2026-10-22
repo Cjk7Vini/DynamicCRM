@@ -2747,6 +2747,9 @@ async function loadMetaInsights(){
       // Balkenlijst met percentage (zoals het ontwerp): label + balk + percentage.
       var barList=function(title,arr,n){if(!arr||!arr.length)return '';var tot=arr.reduce(function(s,x){return s+(x.value||0);},0)||1;return '<div style="flex:1;min-width:230px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">'+esc(title)+'</div>'+arr.slice(0,n||8).map(function(x){var p=(x.value/tot*100);return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+p.toFixed(1)+'%</span></div><div style="height:7px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.round(p)+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';};
       var glabel={F:'Vrouwen',M:'Mannen',U:'Onbekend'};
+      // Meta geeft landen als ISO-landcode (NL, BE, ...). We tonen de volledige naam.
+      var COUNTRY_NL={NL:'Nederland',BE:'België',DE:'Duitsland',FR:'Frankrijk',GB:'Verenigd Koninkrijk',UK:'Verenigd Koninkrijk',IE:'Ierland',ES:'Spanje',PT:'Portugal',IT:'Italië',LU:'Luxemburg',AT:'Oostenrijk',CH:'Zwitserland',DK:'Denemarken',SE:'Zweden',NO:'Noorwegen',FI:'Finland',PL:'Polen',CZ:'Tsjechië',SK:'Slowakije',HU:'Hongarije',RO:'Roemenië',BG:'Bulgarije',GR:'Griekenland',TR:'Turkije',RU:'Rusland',UA:'Oekraïne',US:'Verenigde Staten',CA:'Canada',MX:'Mexico',BR:'Brazilië',AR:'Argentinië',CL:'Chili',CO:'Colombia',PE:'Peru',PA:'Panama',PY:'Paraguay',UY:'Uruguay',VE:'Venezuela',EC:'Ecuador',SR:'Suriname',AW:'Aruba',CW:'Curaçao',MA:'Marokko',EG:'Egypte',ZA:'Zuid-Afrika',NG:'Nigeria',KE:'Kenia',GH:'Ghana',MW:'Malawi',TZ:'Tanzania',UG:'Oeganda',ET:'Ethiopië',DZ:'Algerije',TN:'Tunesië',CN:'China',JP:'Japan',KR:'Zuid-Korea',IN:'India',ID:'Indonesië',TH:'Thailand',VN:'Vietnam',PH:'Filipijnen',MY:'Maleisië',SG:'Singapore',AE:'Verenigde Arabische Emiraten',SA:'Saoedi-Arabië',IL:'Israël',AU:'Australië',NZ:'Nieuw-Zeeland'};
+      var cname=function(code){var k=String(code||'').toUpperCase();return COUNTRY_NL[k]||code;};
       // Doelgroep: leeftijd + geslacht (nieuwe follower_demographics).
       var dBlocks='';
       if(dm.age&&dm.age.length)dBlocks+=barList('Leeftijd',dm.age,8);
@@ -2761,7 +2764,7 @@ async function loadMetaInsights(){
       // Locaties: steden + landen.
       var locBlocks='';
       if(dm.city&&dm.city.length)locBlocks+=barList('Steden',dm.city,6);
-      if(dm.country&&dm.country.length)locBlocks+=barList('Landen',dm.country,6);
+      if(dm.country&&dm.country.length)locBlocks+=barList('Landen',dm.country.map(function(x){return {label:cname(x.label),value:x.value};}),6);
       if(locBlocks)html+='<div class="section-h" style="margin-top:16px"><h4>Locaties</h4></div><div class="card" style="display:flex;gap:30px;flex-wrap:wrap">'+locBlocks+'</div>';
     }
     // Actieve tijden van volgers (per uur), zoals het ontwerp.
