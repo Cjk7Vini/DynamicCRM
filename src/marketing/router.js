@@ -3862,35 +3862,55 @@ router.get('/api/mkt/overview/own-account', requireMkt, async (req, res) => {
         if (tok && ad) { const k = tok + '|' + ad; if (!pairs.has(k)) pairs.set(k, { token: tok, adAccount: ad, clientName: cl.name }); }
       }
       if (pairs.size) out.campaignsConfigured = true;
-      const seen = new Set();
-      for (const { token, adAccount, clientName } of pairs.values()) {
-        try {
-          const list = await graphGet(`${adAccount}/campaigns`, {
-            fields: 'name,objective,status,effective_status,daily_budget,lifetime_budget', limit: '50', access_token: token,
-          });
-          const active = (list.data || []).filter((c) => String(c.effective_status || c.status).toUpperCase() === 'ACTIVE');
-          if (!active.length) continue;
-          const stats = {};
+      // WORKSPACE-ISOLATIE: alleen campagnes tonen die DEZE workspace echt kent
+      // (zelf aangemaakt of gekoppeld). Ad-accounts kunnen tussen workspaces
+      // gedeeld zijn; zonder deze filter zou je andermans campagnes zien.
+      const knownMap = new Map();
+      try {
+        const knownRows = await withReadConnection(async (c) => (await c.query(
+          `SELECT k.meta_campaign_id AS id, cl.name AS client_name
+             FROM marketing.campaigns k JOIN marketing.clients cl ON cl.id=k.client_id
+            WHERE k.workspace_id=$1 AND k.meta_campaign_id IS NOT NULL
+           UNION
+           SELECT l.meta_campaign_id AS id, cl.name AS client_name
+             FROM marketing.campaign_links l JOIN marketing.clients cl ON cl.id=l.client_id
+            WHERE l.workspace_id=$1 AND l.meta_campaign_id IS NOT NULL`,
+          [wsId]
+        )).rows);
+        knownRows.forEach((r) => { if (r.id) knownMap.set(String(r.id), r.client_name || null); });
+      } catch (_) { /* zonder bekende campagnes tonen we niets */ }
+      if (!knownMap.size) { out.campaigns = []; }
+      else {
+        const seen = new Set();
+        for (const { token, adAccount } of pairs.values()) {
           try {
-            const ins = await graphGet(`${adAccount}/insights`, {
-              level: 'campaign', fields: 'campaign_id,spend,impressions,actions', date_preset: 'last_30d', limit: '200', access_token: token,
+            const list = await graphGet(`${adAccount}/campaigns`, {
+              fields: 'name,objective,status,effective_status,daily_budget,lifetime_budget', limit: '50', access_token: token,
             });
-            (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
-          } catch (_) { /* cijfers optioneel */ }
-          for (const c of active) {
-            if (seen.has(c.id)) continue; seen.add(c.id);
-            const s = stats[c.id] || {};
-            const budget = c.daily_budget ? (Number(c.daily_budget) / 100) : (c.lifetime_budget ? (Number(c.lifetime_budget) / 100) : null);
-            const leads = pickLeadCount(s.actions);
-            const spend = s.spend != null ? Number(s.spend) : null;
-            out.campaigns.push({
-              id: c.id, name: c.name, clientName: clientName || null,
-              budget, budget_type: c.daily_budget ? 'dag' : (c.lifetime_budget ? 'totaal' : null),
-              spend, leads: (leads != null ? leads : null),
-              cpl: (leads && spend != null && leads > 0) ? Math.round((spend / leads) * 100) / 100 : null,
-            });
-          }
-        } catch (_) { /* dit account overslaan, rapport blijft heel */ }
+            const active = (list.data || []).filter((c) => String(c.effective_status || c.status).toUpperCase() === 'ACTIVE' && knownMap.has(String(c.id)));
+            if (!active.length) continue;
+            const stats = {};
+            try {
+              const ins = await graphGet(`${adAccount}/insights`, {
+                level: 'campaign', fields: 'campaign_id,spend,impressions,actions', date_preset: 'last_30d', limit: '200', access_token: token,
+              });
+              (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
+            } catch (_) { /* cijfers optioneel */ }
+            for (const c of active) {
+              if (seen.has(c.id)) continue; seen.add(c.id);
+              const s = stats[c.id] || {};
+              const budget = c.daily_budget ? (Number(c.daily_budget) / 100) : (c.lifetime_budget ? (Number(c.lifetime_budget) / 100) : null);
+              const leads = pickLeadCount(s.actions);
+              const spend = s.spend != null ? Number(s.spend) : null;
+              out.campaigns.push({
+                id: c.id, name: c.name, clientName: knownMap.get(String(c.id)) || null,
+                budget, budget_type: c.daily_budget ? 'dag' : (c.lifetime_budget ? 'totaal' : null),
+                spend, leads: (leads != null ? leads : null),
+                cpl: (leads && spend != null && leads > 0) ? Math.round((spend / leads) * 100) / 100 : null,
+              });
+            }
+          } catch (_) { /* dit account overslaan, rapport blijft heel */ }
+        }
       }
     }
 
