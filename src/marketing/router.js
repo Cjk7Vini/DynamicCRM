@@ -4070,9 +4070,27 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       // Robuust: probeer eerst met tijdvenster (30 dagen / gekozen periode); geeft
       // Meta daar niets op terug, dan vallen we terug op de aanroep zonder venster,
       // zodat de cijfers NOOIT wegvallen. period:'day' moet altijd meegestuurd worden.
+      // Robuust over de HELE periode: we halen zowel de dagelijkse waarden (opgeteld)
+      // als de totaalwaarde op, en nemen de hoogste. Zo telt een metric die als
+      // total_value maar een deel teruggeeft (de bug: 370 i.p.v. 16.458 weergaven)
+      // toch de volle periode mee via de dagelijkse som. Debug per metric meegegeven.
       const igMetric = async (key, metric) => {
-        await oneMetric(key, { metric, period: 'day', metric_type: 'total_value', ...igWin });
-        if (out.insights[key] == null) await oneMetric(key, { metric, period: 'day', metric_type: 'total_value' });
+        let daily = null; let total = null;
+        try {
+          const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', ...igWin, access_token: token });
+          const row = (r.data && r.data[0]) || null;
+          if (row && Array.isArray(row.values) && row.values.length) daily = row.values.reduce((s, v) => s + (Number(v.value) || 0), 0);
+        } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
+        try {
+          const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', metric_type: 'total_value', ...igWin, access_token: token });
+          const row = (r.data && r.data[0]) || null;
+          if (row && row.total_value && row.total_value.value != null) total = Number(row.total_value.value);
+        } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
+        const cand = [daily, total].filter((v) => v != null);
+        if (cand.length) out.insights[key] = Math.max.apply(null, cand);
+        else await oneMetric(key, { metric, period: 'day', metric_type: 'total_value' });
+        if (!out.insights_debug) out.insights_debug = {};
+        out.insights_debug[key] = { daily, total };
       };
       await oneMetric('reach', { metric: 'reach', period: 'days_28' });
       await igMetric('views', 'views');
