@@ -4097,6 +4097,16 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       await igMetric('profile_views', 'profile_views');
       await igMetric('accounts_engaged', 'accounts_engaged');
       await igMetric('total_interactions', 'total_interactions');
+      // Weergaven: de account-metric 'views' geeft bij sommige accounts maar een
+      // fractie van de echte weergaven terug. De som van de per-post weergaven
+      // benadert Instagram's "Weergaven" beter. We nemen de hoogste (gratis: de
+      // posts zijn hierboven al verrijkt met hun per-post weergaven).
+      const viewsFromPosts = (allPosts || []).reduce((s, p) => s + (Number(p.views) || 0), 0);
+      out.insights_debug = out.insights_debug || {};
+      out.insights_debug.views_from_posts = viewsFromPosts;
+      out.insights_debug.views_account = (out.insights.views != null ? out.insights.views : null);
+      out.insights_debug.posts_in_period = (allPosts || []).length;
+      if (viewsFromPosts > (out.insights.views || 0)) out.insights.views = viewsFromPosts;
       // website_clicks (klikken op de link in bio) is een DAGELIJKSE metric die je
       // optelt; niet total_value. Eerst dagelijks over het venster, dan terugval.
       await oneMetric('website_clicks', { metric: 'website_clicks', period: 'day', ...igWin });
