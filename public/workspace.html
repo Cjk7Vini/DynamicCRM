@@ -176,6 +176,45 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
 /* forms */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+/* Agency-overzicht (1:1 met ontwerp) */
+.ovcard{background:rgba(16,52,61,.62);border:1px solid rgba(90,185,200,.22);border-radius:16px;padding:22px 24px}
+.ovgrid{display:flex;gap:18px;align-items:flex-start}
+.ovmain{flex:2.1;min-width:0;display:flex;flex-direction:column;gap:18px}
+.ovside{flex:1;min-width:300px;display:flex;flex-direction:column;gap:18px}
+.ovhero h1{font-size:clamp(34px,4.6vw,58px);font-weight:800;line-height:1.03;letter-spacing:-.015em;margin:0 0 12px}
+.ovhero p{color:var(--ink-2);font-size:16px;max-width:560px}
+.statrow{display:flex;gap:16px;flex-wrap:wrap}
+.statc{flex:1;min-width:150px;background:rgba(16,52,61,.62);border:1px solid rgba(90,185,200,.22);border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;min-height:158px}
+.statc .lbl{font-size:14.5px;color:var(--ink-2);font-weight:700;line-height:1.3}
+.statc .num{font-size:46px;font-weight:800;line-height:1}
+.statc .go{align-self:flex-start;margin-top:auto;font-size:13px;color:var(--ink-2);font-weight:600;cursor:pointer}
+.statc .go:hover{color:var(--accent-2)}
+.ovch{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.ovch .t{font-weight:700;font-size:18px;display:flex;align-items:center;gap:8px}
+.ovlnk{font-size:13px;color:var(--ink-2);font-weight:600;cursor:pointer;white-space:nowrap}
+.ovlnk:hover{color:var(--accent-2)}
+.ovpill{font-size:13px;color:var(--ink);background:rgba(90,185,200,.16);border:1px solid rgba(90,185,200,.28);padding:7px 14px;border-radius:30px;display:inline-flex;align-items:center;gap:8px}
+.prio-item{display:flex;align-items:center;gap:13px;padding:12px 0;font-size:15px;cursor:pointer}
+.prio-item .circ{width:18px;height:18px;border:2px solid var(--muted);border-radius:50%;flex:none}
+.bp-metrics{display:flex;gap:26px;margin-top:14px;flex-wrap:wrap}
+.bp-metric .ml{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.bp-metric .mv{font-size:24px;font-weight:800;line-height:1}
+.bp-metric .mu{font-size:12px;color:var(--ok);font-weight:700;margin-top:3px}
+.pw-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid rgba(90,185,200,.14);cursor:pointer}
+.pw-row:first-of-type{border-top:none}
+.pw-title{flex:1;font-size:14.5px;font-weight:600}
+.pw-date{font-size:13px;color:var(--ink-2);white-space:nowrap}
+.ov-badge{font-size:12px;font-weight:700;padding:4px 12px;border-radius:30px;white-space:nowrap}
+.ovb-green{background:rgba(52,211,153,.18);color:#4ade80}
+.ovb-teal{background:rgba(91,211,222,.18);color:#5bd3de}
+.ovb-orange{background:rgba(245,158,11,.18);color:#fbbf24}
+.ovb-grey{background:rgba(139,168,174,.18);color:var(--ink-2)}
+.aa-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid rgba(90,185,200,.14);cursor:pointer}
+.aa-item:first-of-type{border-top:none}
+.aa-dot{width:9px;height:9px;border-radius:50%;background:var(--warn);flex:none;margin-top:6px}
+.aa-item .at{font-size:14.5px;font-weight:700}
+.aa-item .as{font-size:12.5px;color:var(--muted);margin-top:2px}
+.ovic{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;flex:none}
 .field{margin-bottom:15px}
 .field label{margin:0 0 6px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -1435,68 +1474,65 @@ async function loadOverzicht(){
   var nTasks=tasks.length, nClientsOpen=clients.length;
   var firstName=(ME&&ME.full_name?String(ME.full_name).trim().split(/\s+/)[0]:'')||(ME&&ME.workspace_name)||'';
 
-  // Statkaart met doorlink-knop.
-  function statCard(label,value,btnTxt,btnAction){
-    return '<div class="card" style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center">'+
-      '<div style="font-size:14px;color:var(--ink-2);font-weight:700">'+esc(label)+'</div>'+
-      '<div style="font-size:40px;font-weight:800;line-height:1">'+esc(String(value))+'</div>'+
-      '<a onclick="'+btnAction+'" style="margin-top:auto;font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600">'+esc(btnTxt)+' &rarr;</a>'+
-    '</div>';
+  function ovBadge(status){
+    var label=POST_STATUS_LABEL[status]||status||'';
+    var cls=(status==='published'||status==='approved')?'ovb-green':(status==='scheduled')?'ovb-teal':(status==='draft')?'ovb-orange':'ovb-grey';
+    return label?'<span class="ov-badge '+cls+'">'+esc(label)+'</span>':'';
   }
 
   // Prio's voor vandaag: jouw eigen openstaande taken (over alle klanten).
-  var prio=tasks.slice(0,6).map(function(t){var od=(t.due_date&&t.due_date<today);
-    return '<div onclick="openClient('+t.client_id+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
-      '<span style="width:16px;height:16px;border:2px solid var(--muted);border-radius:50%;flex:none"></span>'+
-      '<span style="flex:1;font-size:13.5px">'+esc(t.title)+'<span style="color:var(--muted)"> &middot; '+esc(t.client_name||'')+'</span></span>'+
-      (t.due_date?'<span style="font-size:11.5px;white-space:nowrap;'+(od?'color:#dc2626;font-weight:700':'color:var(--muted)')+'">'+esc(t.due_date)+'</span>':'')+
+  var prio=tasks.slice(0,6).map(function(t){
+    return '<div class="prio-item" onclick="openClient('+t.client_id+')"><span class="circ"></span>'+
+      '<span style="flex:1">'+esc(t.title)+'</span>'+
+      (t.due_date&&t.due_date<today?'<span style="font-size:11.5px;color:#f87171;font-weight:700;white-space:nowrap">'+esc(t.due_date)+'</span>':'')+
     '</div>';
-  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen openstaande taken voor jou. Mooi werk.</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:14px;padding:8px 0">Geen openstaande taken voor jou. Mooi werk.</div>';
 
-  // Aandachtspunten: klanten met openstaande acties (het belletje).
-  var aandacht=clients.slice(0,6).map(function(c){
-    return '<div onclick="openClient('+c.id+')" style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
-      '<span style="width:8px;height:8px;border-radius:50%;background:var(--accent-2);flex:none;margin-top:5px"></span>'+
-      '<div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+esc(c.name)+'</div>'+
-      '<div style="font-size:12px;color:var(--muted)">'+(Number(c.open_actions)||0)+' openstaande '+((Number(c.open_actions)||0)===1?'actie':'acties')+'</div></div>'+
-    '</div>';
-  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen aandachtspunten. Alles is bij.</div>';
+  // Aandachtspunten: klanten met openstaande acties (feedback / wijzigingen).
+  var aandacht=clients.slice(0,6).map(function(c){var n=Number(c.open_actions)||0;
+    return '<div class="aa-item" onclick="openClient('+c.id+')"><span class="aa-dot"></span>'+
+      '<div style="flex:1"><div class="at">'+esc(c.name)+'</div>'+
+      '<div class="as">'+n+' '+(n===1?'post wacht op verwerking':'posts wachten op verwerking')+' (feedback of wijziging)</div></div></div>';
+  }).join('')||'<div style="color:var(--muted);font-size:14px;padding:8px 0">Geen aandachtspunten. Alles is bij.</div>';
 
   // Posts voor deze week: geplande posts (komende 7 dagen).
   var wkEnd=new Date(); wkEnd.setDate(wkEnd.getDate()+7);
   var weekPosts=posts.filter(function(p){var dt=new Date(p.scheduled_at);return !isNaN(dt)&&dt<=wkEnd;}).slice(0,6);
-  var postsHtml=weekPosts.map(function(p){var st=POST_STATUS_LABEL[p.status]||p.status||'';
-    return '<div onclick="openClient('+p.client_id+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer">'+
-      '<span style="flex:1;font-size:13.5px">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted)"> &middot; '+esc(p.client_name||'')+'</span></span>'+
-      '<span style="font-size:12px;color:var(--muted);white-space:nowrap">'+esc(fmtWhen(p.scheduled_at))+'</span>'+
-      (st?'<span class="status scheduled" style="white-space:nowrap">'+esc(st)+'</span>':'')+
+  var postsHtml=weekPosts.map(function(p){
+    return '<div class="pw-row" onclick="openClient('+p.client_id+')">'+
+      '<span class="pw-title">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted);font-weight:400"> &middot; '+esc(p.client_name||'')+'</span></span>'+
+      '<span class="pw-date">'+esc(fmtWhen(p.scheduled_at))+'</span>'+ovBadge(p.status)+
     '</div>';
-  }).join('')||'<div style="color:var(--muted);font-size:13px;padding-top:6px">Geen posts gepland voor deze week.</div>';
+  }).join('')||'<div style="color:var(--muted);font-size:14px;padding:8px 0">Geen posts gepland voor deze week.</div>';
 
-  function cardHead(title,rightHtml){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px"><div style="font-weight:700;font-size:15px">'+title+'</div>'+(rightHtml||'')+'</div>';}
-  function cardLink(txt,action){return '<a onclick="'+action+'" style="font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600;white-space:nowrap">'+esc(txt)+' &rarr;</a>';}
+  var calIcon='<svg class="ovic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  var bellIcon='<svg class="ovic" viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>';
 
   root.innerHTML=
-    '<div style="margin-bottom:26px">'+
-      '<h2 style="font-size:clamp(34px,5vw,56px);font-weight:800;line-height:1.05;letter-spacing:-.01em;margin:0 0 10px">Welkom '+esc(firstName)+'.</h2>'+
-      '<p style="margin:0;color:var(--ink-2);font-size:15px;max-width:640px">Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p>'+
-    '</div>'+
-    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
-      // Linker (brede) kolom
-      '<div style="flex:2;min-width:320px;display:flex;flex-direction:column;gap:16px">'+
-        '<div style="display:flex;gap:14px;flex-wrap:wrap">'+
-          statCard('Actieve klanten',nActiveClients,'Ga naar klanten',"navTo('clients')")+
-          statCard('Openstaande taken',nTasks,'Ga naar taken',"ovScrollTo('ovPrioCard')")+
-          statCard('Klanten met openstaande taken',nClientsOpen,'Bekijk klanten',"navTo('clients')")+
+    '<div class="ovgrid">'+
+      '<div class="ovmain">'+
+        '<div class="ovhero"><h1>Welkom '+esc(firstName)+'.</h1>'+
+          '<p>Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p></div>'+
+        '<div class="statrow">'+
+          '<div class="statc"><div class="lbl">Actieve klanten</div><div class="num">'+nActiveClients+'</div><a class="go" onclick="navTo(\'clients\')">Ga naar klanten &rarr;</a></div>'+
+          '<div class="statc"><div class="lbl">Openstaande taken</div><div class="num">'+nTasks+'</div><a class="go" onclick="ovScrollTo(\'ovPrioCard\')">Ga naar taken &rarr;</a></div>'+
+          '<div class="statc"><div class="lbl">Klanten met<br>openstaande taken</div><div class="num">'+nClientsOpen+'</div><a class="go" onclick="navTo(\'clients\')">Bekijk klanten &rarr;</a></div>'+
         '</div>'+
-        '<div class="card">'+cardHead('Jouw posts voor deze week',cardLink('Bekijk hele planning',"navTo('clients')"))+postsHtml+'</div>'+
-        '<div class="card">'+cardHead('Jouw best presterende posts',cardLink('Open rapportage',"navTo('reporting')"))+
-          '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De best presterende posts (op engagement rate) staan per klant in de Rapportage-tab van die klant. Open Rapportage om ze te bekijken.</div></div>'+
+        '<div class="ovcard">'+
+          '<div class="ovch"><div class="t">Jouw best presterende post</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
+          '<div style="color:var(--muted);font-size:14px;line-height:1.6">De best presterende posts (op engagement rate) en de cijfers per klant staan in de Rapportage-tab. Open Rapportage om ze te bekijken.</div></div>'+
+        '<div class="ovcard">'+
+          '<div class="ovch"><div class="t">'+calIcon+' Jouw posts voor deze week</div><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk hele planning &rarr;</a></div>'+postsHtml+'</div>'+
       '</div>'+
-      // Rechter (smalle) kolom
-      '<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px">'+
-        '<div class="card" id="ovPrioCard">'+cardHead('Jouw prio’s voor vandaag',cardLink('Bekijk alle taken',"navTo('clients')"))+prio+'</div>'+
-        '<div class="card">'+cardHead('Aandachtspunten'+(nClientsOpen?(' <span style=\"color:var(--muted);font-weight:600\">('+nClientsOpen+')</span>'):''),cardLink('Bekijk klanten',"navTo('clients')"))+aandacht+'</div>'+
+      '<div class="ovside">'+
+        '<div class="ovcard" id="ovPrioCard" style="display:flex;flex-direction:column;min-height:300px">'+
+          '<div class="ovch"><div class="t">Jouw prio’s voor vandaag</div></div>'+prio+
+          '<div style="margin-top:auto;text-align:right;padding-top:12px"><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle taken &rarr;</a></div></div>'+
+        '<div class="ovcard">'+
+          '<div class="ovch"><div class="t">'+bellIcon+' Aandachtspunten</div>'+(nClientsOpen?'<a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle ('+nClientsOpen+') &rarr;</a>':'')+'</div>'+aandacht+'</div>'+
+        '<div class="ovcard">'+
+          '<div class="ovch"><div class="t">Actieve campagnes</div><a class="ovlnk" onclick="perKlant(\'campreview\')">Bekijk campagnes &rarr;</a></div>'+
+          '<div style="font-size:14px;color:var(--ink-2)">De lopende campagnes en resultaten staan per klant onder Campagnes.</div></div>'+
       '</div>'+
     '</div>';
 }
