@@ -3780,6 +3780,124 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Agency-overzicht: "eigen account"-cijfers, ALLEEN op aanvraag (zwaar: veel
+// Meta-calls). 'part=post' = best presterende post van het werkplek-IG.
+// 'part=campaigns' = actieve campagnes over de hele workspace (werkplek-ad-account
+// plus eventuele eigen ad-accounts van klanten). Zo blijft het overzicht snel en
+// betaal je alleen Meta-calls als je de cijfers echt opvraagt.
+router.get('/api/mkt/overview/own-account', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const part = String(req.query.part || 'all');
+    const wi = await withReadConnection(async (c) => (await c.query(
+      'SELECT * FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]) || {};
+    const wsToken = decryptSecret(wi.meta_access_token) || null;
+    const out = { success: true };
+
+    // ---- Best presterende post (werkplek-Instagram) ----
+    if (part === 'post' || part === 'all') {
+      out.bestPost = null; out.postConfigured = false;
+      const igUser = wi.meta_ig_user_id || null;
+      if (wsToken && igUser) {
+        out.postConfigured = true;
+        try {
+          const m = await graphGet(`${igUser}/media`, {
+            fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
+            limit: '12', access_token: wsToken,
+          });
+          let posts = (m.data || []).map((p) => ({
+            id: p.id, caption: (p.caption || '').slice(0, 140), media_type: p.media_type,
+            timestamp: p.timestamp, permalink: p.permalink,
+            likes: p.like_count ?? 0, comments: p.comments_count ?? 0,
+            thumb: p.thumbnail_url || p.media_url || null,
+          }));
+          const enrich = async (p) => {
+            const trySet = async (metric) => {
+              const pin = await graphGet(`${p.id}/insights`, { metric, access_token: wsToken });
+              (pin.data || []).forEach((row) => {
+                const val = (row.total_value && row.total_value.value != null) ? Number(row.total_value.value)
+                  : (Array.isArray(row.values) && row.values.length ? Number(row.values[0].value) : null);
+                if (val != null) p[row.name] = val;
+              });
+            };
+            try { await trySet('reach,views,saved,shares,total_interactions'); }
+            catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
+            if (p.reach != null && p.reach > 0) {
+              const inter = (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
+              p.engagement = Math.round((inter / p.reach) * 10000) / 100;
+            }
+          };
+          try { await Promise.all(posts.map(enrich)); } catch (_) { /* rapport blijft heel */ }
+          const interCount = (p) => (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
+          posts.sort((x, y) => {
+            const ex = x.engagement != null ? x.engagement : -1;
+            const ey = y.engagement != null ? y.engagement : -1;
+            if (ey !== ex) return ey - ex;
+            return interCount(y) - interCount(x);
+          });
+          out.bestPost = posts[0] || null;
+        } catch (e) { out.postError = e.message; }
+      }
+    }
+
+    // ---- Actieve campagnes (hele workspace) ----
+    if (part === 'campaigns' || part === 'all') {
+      out.campaigns = []; out.campaignsConfigured = false;
+      // Unieke (token, ad-account)-paren: werkplek-account + eventuele eigen
+      // klant-accounts. Zo vragen we een gedeeld account niet dubbel op.
+      const pairs = new Map();
+      const wsAd = normalizeAdAccount(wi.meta_ad_account_id);
+      if (wsToken && wsAd) pairs.set(wsToken + '|' + wsAd, { token: wsToken, adAccount: wsAd, clientName: null });
+      const clients = await withReadConnection(async (c) => (await c.query(
+        `SELECT cl.id, cl.name, ci.meta_ad_account_id, ci.meta_access_token
+           FROM marketing.clients cl
+           LEFT JOIN marketing.client_integrations ci ON ci.client_id=cl.id AND ci.workspace_id=cl.workspace_id
+          WHERE cl.workspace_id=$1 AND cl.archived=false`, [wsId]
+      )).rows);
+      for (const cl of clients) {
+        const tok = decryptSecret(cl.meta_access_token) || wsToken;
+        const ad = normalizeAdAccount(cl.meta_ad_account_id);
+        if (tok && ad) { const k = tok + '|' + ad; if (!pairs.has(k)) pairs.set(k, { token: tok, adAccount: ad, clientName: cl.name }); }
+      }
+      if (pairs.size) out.campaignsConfigured = true;
+      const seen = new Set();
+      for (const { token, adAccount, clientName } of pairs.values()) {
+        try {
+          const list = await graphGet(`${adAccount}/campaigns`, {
+            fields: 'name,objective,status,effective_status,daily_budget,lifetime_budget', limit: '50', access_token: token,
+          });
+          const active = (list.data || []).filter((c) => String(c.effective_status || c.status).toUpperCase() === 'ACTIVE');
+          if (!active.length) continue;
+          const stats = {};
+          try {
+            const ins = await graphGet(`${adAccount}/insights`, {
+              level: 'campaign', fields: 'campaign_id,spend,impressions,actions', date_preset: 'last_30d', limit: '200', access_token: token,
+            });
+            (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
+          } catch (_) { /* cijfers optioneel */ }
+          for (const c of active) {
+            if (seen.has(c.id)) continue; seen.add(c.id);
+            const s = stats[c.id] || {};
+            const budget = c.daily_budget ? (Number(c.daily_budget) / 100) : (c.lifetime_budget ? (Number(c.lifetime_budget) / 100) : null);
+            const leads = pickLeadCount(s.actions);
+            const spend = s.spend != null ? Number(s.spend) : null;
+            out.campaigns.push({
+              id: c.id, name: c.name, clientName: clientName || null,
+              budget, budget_type: c.daily_budget ? 'dag' : (c.lifetime_budget ? 'totaal' : null),
+              spend, leads: (leads != null ? leads : null),
+              cpl: (leads && spend != null && leads > 0) ? Math.round((spend / leads) * 100) / 100 : null,
+            });
+          }
+        } catch (_) { /* dit account overslaan, rapport blijft heel */ }
+      }
+    }
+
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // =======================================================================
 // STAP 9 - META INSIGHTS in de rapportage (organic + ads)
 // Defensief: elk onderdeel apart afgeschermd. Faalt een deel, dan blijft
