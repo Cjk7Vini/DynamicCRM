@@ -4150,27 +4150,67 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 
       if (!Object.keys(out.insights).length) out.insights = null;
 
-      // Demografie van de volgers (land, stad, leeftijd/gender). Lifetime-cijfers,
-      // vereist instagram_manage_insights en 100+ volgers. Elk stuk afgeschermd.
+      // Demografie van de volgers (leeftijd, geslacht, stad, land). Meta heeft de
+      // oude audience_* metrics uitgefaseerd; we gebruiken nu follower_demographics
+      // met breakdowns. Lifetime, vereist instagram_manage_insights en 100+ volgers.
       out.demographics = null;
       try {
         const dg = {};
-        const parseTop = async (metric, key, topN) => {
+        const fd = async (breakdown, key, topN) => {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'lifetime', access_token: token });
-            const row = (r.data && r.data[0]) || null;
-            const val = row && row.values && row.values[0] && row.values[0].value;
-            if (val && typeof val === 'object') {
-              const arr = Object.keys(val).map((k) => ({ label: k, value: Number(val[k]) || 0 })).sort((a, b) => b.value - a.value);
-              dg[key] = topN ? arr.slice(0, topN) : arr;
+            const r = await graphGet(`${creds.igUserId}/insights`, {
+              metric: 'follower_demographics', period: 'lifetime', timeframe: 'last_30_days',
+              breakdown, metric_type: 'total_value', access_token: token,
+            });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) {
+              let arr = bd.results.map((x) => ({ label: (x.dimension_values || [])[0] || '?', value: Number(x.value) || 0 })).filter((x) => x.value > 0);
+              if (key === 'age') arr.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+              else arr.sort((a, b) => b.value - a.value);
+              if (arr.length) dg[key] = topN ? arr.slice(0, topN) : arr;
             }
           } catch (e) { /* deze breakdown overslaan */ }
         };
-        await parseTop('audience_gender_age', 'gender_age', 0);
-        await parseTop('audience_country', 'country', 10);
-        await parseTop('audience_city', 'city', 10);
+        await fd('age', 'age', 0);
+        await fd('gender', 'gender', 0);
+        await fd('city', 'city', 6);
+        await fd('country', 'country', 6);
+        // Terugval op de oude (uitgefaseerde) metrics als follower_demographics niets geeft.
+        if (!Object.keys(dg).length) {
+          const parseTop = async (metric, key, topN) => {
+            try {
+              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'lifetime', access_token: token });
+              const row = (r.data && r.data[0]) || null;
+              const val = row && row.values && row.values[0] && row.values[0].value;
+              if (val && typeof val === 'object') {
+                const arr = Object.keys(val).map((k) => ({ label: k, value: Number(val[k]) || 0 })).sort((a, b) => b.value - a.value);
+                dg[key] = topN ? arr.slice(0, topN) : arr;
+              }
+            } catch (e) { /* deze breakdown overslaan */ }
+          };
+          await parseTop('audience_gender_age', 'gender_age', 0);
+          await parseTop('audience_country', 'country', 10);
+          await parseTop('audience_city', 'city', 10);
+        }
         if (Object.keys(dg).length) out.demographics = dg;
       } catch (_) { /* geen demografie beschikbaar */ }
+
+      // Actieve tijden van de volgers (per uur). online_followers geeft per dag een
+      // object uur->aantal; we middelen per uur over de periode. Afgeschermd.
+      out.activeTimes = null;
+      try {
+        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'online_followers', period: 'lifetime', ...igWin, access_token: token });
+        const vals = ((r.data || [])[0] || {}).values || [];
+        if (vals.length) {
+          const sum = {}; const cnt = {};
+          vals.forEach((v) => {
+            const o = v.value || {};
+            Object.keys(o).forEach((h) => { sum[h] = (sum[h] || 0) + (Number(o[h]) || 0); cnt[h] = (cnt[h] || 0) + 1; });
+          });
+          const hours = Object.keys(sum).map((h) => ({ hour: Number(h), value: Math.round(sum[h] / (cnt[h] || 1)) }));
+          if (hours.length) { hours.sort((a, b) => a.hour - b.hour); out.activeTimes = hours; }
+        }
+      } catch (_) { /* actieve tijden niet beschikbaar */ }
     } else {
       out.errors.account = 'Geen Instagram user ID ingesteld';
     }
