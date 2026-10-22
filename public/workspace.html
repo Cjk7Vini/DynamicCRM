@@ -2732,14 +2732,16 @@ async function loadMetaInsights(){
       html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per contenttype</h4></div><div class="card">';
       html+=d.views_by_type.map(function(x){var w=Math.round((x.value/mvt)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+' weergaven</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
     }
-    // Interacties per contenttype (likes + reacties), uit de opgehaalde posts.
-    if(d.contentTypes&&d.contentTypes.length){
-      var ctI=d.contentTypes.filter(function(x){return (x.interactions||0)>0;}).sort(function(a,b){return b.interactions-a.interactions;});
-      if(ctI.length){
-        var mci=Math.max.apply(null,ctI.map(function(x){return x.interactions;}))||1;
-        html+='<div class="section-h" style="margin-top:16px"><h4>Interacties per contenttype</h4></div><div class="card">';
-        html+=ctI.map(function(x){var w=Math.round((x.interactions/mci)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(RTL[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.interactions)+' interacties</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent-2)"></div></div></div>';}).join('')+'</div>';
-      }
+    // Interacties per contenttype (Reels, Berichten, Verhalen...). Bij voorkeur uit
+    // de Meta-breakdown (klopt met Instagram); anders terugval op de opgehaalde posts.
+    var ibt=(d.interactions_by_type&&d.interactions_by_type.length)
+      ? d.interactions_by_type.map(function(x){return {label:(MPT[x.type]||x.type),value:x.value};})
+      : ((d.contentTypes||[]).filter(function(x){return (x.interactions||0)>0;}).map(function(x){return {label:(RTL[x.type]||x.type),value:x.interactions};}));
+    ibt=ibt.filter(function(x){return (x.value||0)>0;}).sort(function(a,b){return b.value-a.value;});
+    if(ibt.length){
+      var mci=Math.max.apply(null,ibt.map(function(x){return x.value;}))||1;
+      html+='<div class="section-h" style="margin-top:16px"><h4>Interacties per contenttype</h4></div><div class="card">';
+      html+=ibt.map(function(x){var w=Math.round((x.value/mci)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+iv(x.value)+' interacties</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent-2)"></div></div></div>';}).join('')+'</div>';
     }
     // Demografie van de volgers
     if(d.demographics){

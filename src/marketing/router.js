@@ -4170,6 +4170,17 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           if (arr.length) out.views_by_type = arr;
         }
       } catch (e) { /* breakdown niet beschikbaar */ }
+      // Interacties per contenttype (Reels, Berichten, Verhalen...) via dezelfde
+      // media_product_type-breakdown, zodat het klopt met Instagram zelf.
+      out.interactions_by_type = null;
+      try {
+        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', ...igWin, access_token: token });
+        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+        if (bd && Array.isArray(bd.results)) {
+          const arr = bd.results.map((x) => ({ type: (x.dimension_values || [])[0] || '?', value: Number(x.value) || 0 })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+          if (arr.length) out.interactions_by_type = arr;
+        }
+      } catch (e) { /* breakdown niet beschikbaar */ }
 
       // Dagelijkse reeks over de periode voor de grafiek (weergaven en nieuwe
       // volgers per dag). Afgeschermd; ontbreekt hij, dan gewoon geen grafiek.
