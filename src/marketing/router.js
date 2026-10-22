@@ -4067,30 +4067,38 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const igS = winS;
       const igWin = { since: String(igS), until: String(igU) };
       out.insights_period = { since: igS, until: igU };
-      // Robuust: probeer eerst met tijdvenster (30 dagen / gekozen periode); geeft
-      // Meta daar niets op terug, dan vallen we terug op de aanroep zonder venster,
-      // zodat de cijfers NOOIT wegvallen. period:'day' moet altijd meegestuurd worden.
-      // Robuust over de HELE periode: we halen zowel de dagelijkse waarden (opgeteld)
-      // als de totaalwaarde op, en nemen de hoogste. Zo telt een metric die als
-      // total_value maar een deel teruggeeft (de bug: 370 i.p.v. 16.458 weergaven)
-      // toch de volle periode mee via de dagelijkse som. Debug per metric meegegeven.
+      // Meta staat deze total_value-metrics maar tot 30 dagen per verzoek toe.
+      // Een langere periode (bijv. 22 sept t/m 22 okt = 31 dagen) wordt in zijn
+      // geheel afgewezen -> dan kwamen de cijfers veel te laag binnen. We knippen
+      // het venster daarom op in stukken van max 30 dagen en tellen die op.
+      const CHUNK_SECS = 30 * 24 * 3600;
+      const igChunks = [];
+      for (let s = igS; s <= igU; s += CHUNK_SECS) igChunks.push([s, Math.min(s + CHUNK_SECS - 1, igU)]);
       const igMetric = async (key, metric) => {
-        let daily = null; let total = null;
-        try {
-          const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', ...igWin, access_token: token });
-          const row = (r.data && r.data[0]) || null;
-          if (row && Array.isArray(row.values) && row.values.length) daily = row.values.reduce((s, v) => s + (Number(v.value) || 0), 0);
-        } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
-        try {
-          const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', metric_type: 'total_value', ...igWin, access_token: token });
-          const row = (r.data && r.data[0]) || null;
-          if (row && row.total_value && row.total_value.value != null) total = Number(row.total_value.value);
-        } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
-        const cand = [daily, total].filter((v) => v != null);
-        if (cand.length) out.insights[key] = Math.max.apply(null, cand);
+        let total = null;
+        for (const [s, u] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', metric_type: 'total_value', since: String(s), until: String(u), access_token: token });
+            const row = (r.data && r.data[0]) || null;
+            if (row && row.total_value && row.total_value.value != null) total = (total || 0) + Number(row.total_value.value);
+          } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
+        }
+        // Alleen als total_value helemaal niets gaf: dagelijkse som over de stukken.
+        let daily = null;
+        if (total == null) {
+          for (const [s, u] of igChunks) {
+            try {
+              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: token });
+              const row = (r.data && r.data[0]) || null;
+              if (row && Array.isArray(row.values) && row.values.length) daily = (daily || 0) + row.values.reduce((a, v) => a + (Number(v.value) || 0), 0);
+            } catch (e) { /* daily is secundair */ }
+          }
+        }
+        if (total != null) out.insights[key] = total;
+        else if (daily != null) out.insights[key] = daily;
         else await oneMetric(key, { metric, period: 'day', metric_type: 'total_value' });
         if (!out.insights_debug) out.insights_debug = {};
-        out.insights_debug[key] = { daily, total };
+        out.insights_debug[key] = { total, daily, chunks: igChunks.length };
       };
       await oneMetric('reach', { metric: 'reach', period: 'days_28' });
       await igMetric('views', 'views');
@@ -4107,12 +4115,22 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.insights_debug.views_account = (out.insights.views != null ? out.insights.views : null);
       out.insights_debug.posts_in_period = (allPosts || []).length;
       if (viewsFromPosts > (out.insights.views || 0)) out.insights.views = viewsFromPosts;
-      // website_clicks (klikken op de link in bio) is een DAGELIJKSE metric die je
-      // optelt; niet total_value. Eerst dagelijks over het venster, dan terugval.
-      await oneMetric('website_clicks', { metric: 'website_clicks', period: 'day', ...igWin });
-      if (out.insights.website_clicks == null) await oneMetric('website_clicks', { metric: 'website_clicks', period: 'day', metric_type: 'total_value', ...igWin });
+      // website_clicks en follower_count zijn DAGELIJKSE metrics die je optelt;
+      // ook hier het venster in stukken van max 30 dagen (anders afgewezen).
+      const igDailySumChunked = async (key, metric) => {
+        let sum = null;
+        for (const [s, u] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: token });
+            const row = (r.data && r.data[0]) || null;
+            if (row && Array.isArray(row.values) && row.values.length) sum = (sum || 0) + row.values.reduce((a, v) => a + (Number(v.value) || 0), 0);
+          } catch (e) { /* dit stuk overslaan */ }
+        }
+        if (sum != null) out.insights[key] = sum;
+      };
+      await igDailySumChunked('website_clicks', 'website_clicks');
       const _now = Math.floor(Date.now() / 1000);
-      await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', ...igWin });
+      await igDailySumChunked('follower_delta', 'follower_count');
       if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
 
       // NETTO nieuwe volgers via dagelijkse snapshots (eind - begin van de periode).
