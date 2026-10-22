@@ -3796,50 +3796,72 @@ router.get('/api/mkt/overview/own-account', requireMkt, async (req, res) => {
     const wsToken = decryptSecret(wi.meta_access_token) || null;
     const out = { success: true };
 
-    // ---- Best presterende post (werkplek-Instagram) ----
+    // ---- Best presterende post van de hele workspace ----
+    // De beste post over ALLE klanten van deze workspace (plus het werkplek-IG als
+    // dat apart is ingesteld). Kosten begrensd: per IG 1 media-call en per IG de
+    // beste 2 kandidaten; daarna verrijken we alleen de ~5 beste kandidaten totaal.
     if (part === 'post' || part === 'all') {
       out.bestPost = null; out.postConfigured = false;
-      const igUser = wi.meta_ig_user_id || null;
-      if (wsToken && igUser) {
-        out.postConfigured = true;
+      // IG-bronnen verzamelen (uniek per IG-user).
+      const sources = new Map();
+      if (wsToken && wi.meta_ig_user_id) sources.set(String(wi.meta_ig_user_id), { igUser: wi.meta_ig_user_id, token: wsToken, clientName: null });
+      const clientsIg = await withReadConnection(async (c) => (await c.query(
+        `SELECT cl.id, cl.name, ci.meta_ig_user_id, ci.meta_access_token
+           FROM marketing.clients cl
+           LEFT JOIN marketing.client_integrations ci ON ci.client_id=cl.id AND ci.workspace_id=cl.workspace_id
+          WHERE cl.workspace_id=$1 AND cl.archived=false`, [wsId]
+      )).rows);
+      for (const cl of clientsIg) {
+        const ig = cl.meta_ig_user_id || null; // alleen de eigen IG van de klant
+        const tok = decryptSecret(cl.meta_access_token) || wsToken;
+        if (ig && tok && !sources.has(String(ig))) sources.set(String(ig), { igUser: ig, token: tok, clientName: cl.name });
+      }
+      if (sources.size) out.postConfigured = true;
+
+      const interCount = (p) => (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
+      let candidates = [];
+      for (const { igUser, token, clientName } of sources.values()) {
         try {
           const m = await graphGet(`${igUser}/media`, {
             fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
-            limit: '12', access_token: wsToken,
+            limit: '8', access_token: token,
           });
           let posts = (m.data || []).map((p) => ({
             id: p.id, caption: (p.caption || '').slice(0, 140), media_type: p.media_type,
             timestamp: p.timestamp, permalink: p.permalink,
             likes: p.like_count ?? 0, comments: p.comments_count ?? 0,
             thumb: p.thumbnail_url || p.media_url || null,
+            _token: token, clientName: clientName || null,
           }));
-          const enrich = async (p) => {
-            const trySet = async (metric) => {
-              const pin = await graphGet(`${p.id}/insights`, { metric, access_token: wsToken });
-              (pin.data || []).forEach((row) => {
-                const val = (row.total_value && row.total_value.value != null) ? Number(row.total_value.value)
-                  : (Array.isArray(row.values) && row.values.length ? Number(row.values[0].value) : null);
-                if (val != null) p[row.name] = val;
-              });
-            };
-            try { await trySet('reach,views,saved,shares,total_interactions'); }
-            catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
-            if (p.reach != null && p.reach > 0) {
-              const inter = (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
-              p.engagement = Math.round((inter / p.reach) * 10000) / 100;
-            }
-          };
-          try { await Promise.all(posts.map(enrich)); } catch (_) { /* rapport blijft heel */ }
-          const interCount = (p) => (p.likes || 0) + (p.comments || 0) + (p.saved || 0) + (p.shares || 0);
-          posts.sort((x, y) => {
-            const ex = x.engagement != null ? x.engagement : -1;
-            const ey = y.engagement != null ? y.engagement : -1;
-            if (ey !== ex) return ey - ex;
-            return interCount(y) - interCount(x);
-          });
-          out.bestPost = posts[0] || null;
-        } catch (e) { out.postError = e.message; }
+          posts.sort((a, b) => interCount(b) - interCount(a));
+          candidates.push(...posts.slice(0, 2));
+        } catch (e) { if (!out.postError) out.postError = e.message; }
       }
+      // Alleen de beste kandidaten verrijken met per-post insights (bereik -> engagement).
+      candidates.sort((a, b) => interCount(b) - interCount(a));
+      const top = candidates.slice(0, 5);
+      const enrich = async (p) => {
+        const trySet = async (metric) => {
+          const pin = await graphGet(`${p.id}/insights`, { metric, access_token: p._token });
+          (pin.data || []).forEach((row) => {
+            const val = (row.total_value && row.total_value.value != null) ? Number(row.total_value.value)
+              : (Array.isArray(row.values) && row.values.length ? Number(row.values[0].value) : null);
+            if (val != null) p[row.name] = val;
+          });
+        };
+        try { await trySet('reach,views,saved,shares,total_interactions'); }
+        catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
+        if (p.reach != null && p.reach > 0) p.engagement = Math.round((interCount(p) / p.reach) * 10000) / 100;
+      };
+      try { await Promise.all(top.map(enrich)); } catch (_) { /* rapport blijft heel */ }
+      top.sort((x, y) => {
+        const ex = x.engagement != null ? x.engagement : -1;
+        const ey = y.engagement != null ? y.engagement : -1;
+        if (ey !== ex) return ey - ex;
+        return interCount(y) - interCount(x);
+      });
+      const best = top[0] || candidates[0] || null;
+      if (best) { delete best._token; out.bestPost = best; }
     }
 
     // ---- Actieve campagnes (hele workspace) ----

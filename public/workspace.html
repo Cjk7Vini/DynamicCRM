@@ -1546,17 +1546,18 @@ function ovLoadBestPost(){
   box.innerHTML='<div style="color:var(--muted);font-size:13px">Laden... dit kan even duren, we halen de cijfers bij Meta op.</div>';
   fetch('/api/mkt/overview/own-account?part=post',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d||!d.success){box.innerHTML='<div style="color:#f87171;font-size:13px">'+esc((d&&d.error)||'Kon niet laden.')+'</div>';return;}
-    if(!d.postConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen eigen Instagram gekoppeld op werkplek-niveau. Stel dat in bij Werkplek-koppeling.</div>';return;}
+    if(!d.postConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen Instagram gekoppeld bij de klanten of op werkplek-niveau.</div>';return;}
     var p=d.bestPost;
-    if(!p){box.innerHTML='<div style="color:var(--muted);font-size:13px">Geen posts gevonden op het werkplek-Instagram'+(d.postError?(' ('+esc(d.postError)+')'):'')+'.</div>';return;}
+    if(!p){box.innerHTML='<div style="color:var(--muted);font-size:13px">Geen posts gevonden'+(d.postError?(' ('+esc(d.postError)+')'):'')+'.</div>';return;}
     function metric(l,v){return '<div class="bp-metric"><div class="ml">'+l+'</div><div class="mv">'+(v!=null?v:'-')+'</div></div>';}
     var eng=(p.engagement!=null)?('<div class="bp-metric"><div class="ml">Engagement Rate</div><div class="mv" style="color:#4ade80">'+String(p.engagement).replace('.',',')+'%</div></div>'):'';
     var when=p.timestamp?('Geplaatst op '+fmtWhen(p.timestamp)):'';
+    var sub=[(p.clientName?esc(p.clientName):''),(when?esc(when):'')].filter(Boolean).join(' &middot; ');
     box.innerHTML='<div class="bp-body">'+
       (p.thumb?'<img class="bp-img" src="'+esc(p.thumb)+'" alt="">':'<div class="bp-img"></div>')+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:15.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
-        (when?'<div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+esc(when)+'</div>':'')+
+        (sub?'<div style="font-size:12.5px;color:var(--muted);margin-top:2px">'+sub+'</div>':'')+
         '<div class="bp-metrics">'+
           metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+
           metric('Gedeeld',p.shares)+metric('Opgeslagen',p.saved)+eng+
