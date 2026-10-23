@@ -280,7 +280,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 <!-- ===================== APP ===================== -->
 <div class="shell hidden" id="appView">
   <aside class="side">
-    <div class="logo"><div class="logo-mark">MS</div><div><b>Marketing Studio</b><span>Workspace</span></div></div>
+    <div class="logo"><div class="logo-mark" id="sideLogoMark">MS</div><div><b id="sideBrandName">Marketing Studio</b><span>Workspace</span></div></div>
     <div class="ws-chip" id="wsChip" onclick="toggleProfileMenu()">
       <div class="ws-ava" id="wsAva">W</div>
       <div style="min-width:0;flex:1"><div class="nm" id="wsName">Workspace</div><div class="sub" id="wsPlan">-</div></div>
@@ -340,7 +340,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
   <main class="main">
     <div class="topbar">
-      <div><div class="tt">Marketing Studio</div><h2 id="pageTitle">Overzicht</h2></div>
+      <div><div class="tt" id="topBrandTt">Marketing Studio</div><h2 id="pageTitle">Overzicht</h2></div>
       <div class="topbar-right">
         <span class="pill" id="licPill"><span class="d"></span> Licentie</span>
         <button class="btn btn-primary" id="topNewClient" onclick="openNewClient()" style="display:none">+ Nieuwe klant</button>
@@ -361,6 +361,24 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <!-- WERKPLEK-KOPPELING (workspace-niveau) -->
       <section class="view" id="viewWsSettings">
         <div id="wsiMsg" class="inline-msg"></div>
+        <div class="card" id="brandingCard" style="max-width:640px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Huisstijl (white-label)</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Geef de workspace je eigen merk: naam, logo en kleuren. Je klanten zien dan jouw huisstijl in plaats van Marketing Studio.</p>
+          <div id="brMsg" class="inline-msg"></div>
+          <div class="field"><label>Merknaam</label><input id="brName" maxlength="60" placeholder="Bijv. Fleur's Marketing Agency"></div>
+          <div class="field"><label>Logo-URL (optioneel)</label><input id="brLogo" placeholder="https://... (laat leeg voor initialen)">
+            <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Plak een link naar je logo (vierkant werkt het best). Uploaden vanaf je computer komt binnenkort.</div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Hoofdkleur</label><input id="brColor1" type="color" class="color-in" value="#17b2c6"></div>
+            <div class="field"><label>Accentkleur</label><input id="brColor2" type="color" class="color-in" value="#5bd3de"></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
+            <button class="btn btn-primary" onclick="saveBranding()">Huisstijl opslaan</button>
+            <button class="btn btn-ghost" onclick="previewBranding()">Voorbeeld tonen</button>
+            <button class="btn btn-ghost" onclick="resetBranding()">Terug naar standaard</button>
+          </div>
+        </div>
         <div class="card" style="max-width:640px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">Werkplek-koppeling</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:14px">De gedeelde accounts van de werkplek, per platform. Klanten vallen hierop terug als ze zelf geen koppeling hebben. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
@@ -1279,6 +1297,7 @@ async function bootstrap(){
   } else { ME=d.account; }
   loginView.classList.add('hidden'); document.getElementById('pickerView').classList.add('hidden'); appView.classList.remove('hidden');
   document.getElementById('platformBar').style.display = IS_PLATFORM ? 'block' : 'none';
+  loadBranding();
   var wsName=ME.workspace_name||'Workspace';
   document.getElementById('wsName').textContent=wsName;
   document.getElementById('wsAva').textContent=initials(wsName);
@@ -1300,6 +1319,65 @@ async function bootstrap(){
   CLIENT_MODE = (ME.role==='client');
   if(CLIENT_MODE){ enterClientMode(); return; }
   navTo('overzicht');
+}
+function hexToSoft(hex,a){try{var h=String(hex).replace('#','');var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);if([r,g,b].some(isNaN))return null;return 'rgba('+r+','+g+','+b+','+(a||0.14)+')';}catch(e){return null;}}
+function applyBranding(b){
+  b=b||{};
+  var name=b.brand_name;
+  var nm=document.getElementById('sideBrandName'); if(nm)nm.textContent=name||'Marketing Studio';
+  var tt=document.getElementById('topBrandTt'); if(tt)tt.textContent=name||'Marketing Studio';
+  var mark=document.getElementById('sideLogoMark');
+  if(mark){
+    if(b.logo_url){ mark.innerHTML='<img src="'+esc(b.logo_url)+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'; mark.style.background='transparent'; mark.style.boxShadow='none'; }
+    else { mark.innerHTML=''; mark.textContent=(name?initials(name).slice(0,2):'MS'); mark.style.background=''; mark.style.boxShadow=''; }
+  }
+  var root=document.documentElement;
+  if(b.accent_color){ root.style.setProperty('--accent',b.accent_color); var s=hexToSoft(b.accent_color); if(s)root.style.setProperty('--accent-soft',s); }
+  else { root.style.removeProperty('--accent'); root.style.removeProperty('--accent-soft'); }
+  if(b.accent_color_2){ root.style.setProperty('--accent-2',b.accent_color_2); } else { root.style.removeProperty('--accent-2'); }
+}
+async function loadBranding(){
+  try{ var r=await fetch('/api/mkt/workspace/branding',{credentials:'include'}); var d=await r.json(); if(d&&d.success)applyBranding(d.branding||{}); }catch(e){}
+}
+// ---- Huisstijl-instellingen (white-label) ----
+async function loadBrandingForm(){
+  try{
+    var r=await fetch('/api/mkt/workspace/branding',{credentials:'include'}); var d=await r.json(); var b=(d&&d.branding)||{};
+    var n=document.getElementById('brName'); if(n)n.value=b.brand_name||'';
+    var l=document.getElementById('brLogo'); if(l)l.value=b.logo_url||'';
+    var c1=document.getElementById('brColor1'); if(c1)c1.value=b.accent_color||'#17b2c6';
+    var c2=document.getElementById('brColor2'); if(c2)c2.value=b.accent_color_2||'#5bd3de';
+  }catch(e){}
+}
+function brandingFormPayload(){
+  return {
+    brand_name:document.getElementById('brName').value.trim(),
+    logo_url:document.getElementById('brLogo').value.trim(),
+    accent_color:document.getElementById('brColor1').value,
+    accent_color_2:document.getElementById('brColor2').value
+  };
+}
+function previewBranding(){ applyBranding(brandingFormPayload()); showMsg('brMsg',true,'Voorbeeld toegepast (nog niet opgeslagen).'); }
+async function saveBranding(){
+  hideMsg('brMsg'); var p=brandingFormPayload();
+  if(p.logo_url && !/^https?:\/\//i.test(p.logo_url)){ showMsg('brMsg',false,'Logo-URL moet met https:// beginnen.'); return; }
+  try{
+    var r=await fetch('/api/mkt/workspace/branding',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(p)});
+    var d=await r.json();
+    if(r.ok&&d.success){ applyBranding(p); showMsg('brMsg',true,'Huisstijl opgeslagen.'); }
+    else showMsg('brMsg',false,d.error||'Opslaan mislukt.');
+  }catch(e){ showMsg('brMsg',false,'Netwerkfout.'); }
+}
+async function resetBranding(){
+  if(!confirm('Terug naar de standaard huisstijl van Marketing Studio?'))return;
+  document.getElementById('brName').value=''; document.getElementById('brLogo').value='';
+  document.getElementById('brColor1').value='#17b2c6'; document.getElementById('brColor2').value='#5bd3de';
+  try{
+    var r=await fetch('/api/mkt/workspace/branding',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({brand_name:'',logo_url:'',accent_color:'',accent_color_2:''})});
+    var d=await r.json();
+    if(r.ok&&d.success){ applyBranding({}); showMsg('brMsg',true,'Teruggezet naar standaard.'); }
+    else showMsg('brMsg',false,d.error||'Terugzetten mislukt.');
+  }catch(e){ showMsg('brMsg',false,'Netwerkfout.'); }
 }
 var CLIENT_MODE=false;
 async function enterClientMode(){
@@ -1401,7 +1479,7 @@ function navTo(view){
   document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
-  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();}
+  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();}
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
