@@ -2600,7 +2600,7 @@ async function openPostDetail(id){
 var RPT_MODE='preset', RPT_PRESET='last_30d', RPT_SINCE=null, RPT_UNTIL=null;
 (function(){var t=new Date();RPT_UNTIL=t.toISOString().slice(0,10);RPT_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
 function rptDateQS(){var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
-function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)return RPT_SINCE+' t/m '+RPT_UNTIL;var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
+function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL){var ds=Math.round((new Date(RPT_UNTIL)-new Date(RPT_SINCE))/86400000)+1;return RPT_SINCE+' t/m '+RPT_UNTIL+' ('+ds+' dagen)';}var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function rptSetPreset(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();}
 function rptApplyDates(){var s=document.getElementById('rptDtSince').value,u=document.getElementById('rptDtUntil').value;if(!s||!u)return;RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}
 function rptOpenPicker(){openDatePicker({since:RPT_SINCE,until:RPT_UNTIL,active:(RPT_MODE==='preset'?RPT_PRESET:null),onPreset:function(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();},onRange:function(s,u){RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}});}
