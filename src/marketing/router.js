@@ -2139,6 +2139,58 @@ function workspaceIntegrationsView(row) {
   };
 }
 
+// ---- Huisstijl / white-label van de werkplek ----
+let _hasWsBranding = null;
+async function workspaceBrandingAvailable() {
+  if (_hasWsBranding === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='workspaces' AND column_name='brand_name'"
+    )).rows);
+    if (r.length > 0) _hasWsBranding = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+function validBrandHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()); }
+
+// Elke ingelogde gebruiker (ook een klant) mag de branding OPHALEN om hem toe te
+// passen; alleen eigenaar/manager mag hem WIJZIGEN.
+router.get('/api/mkt/workspace/branding', requireMkt, async (req, res) => {
+  try {
+    if (!(await workspaceBrandingAvailable())) return res.json({ success: true, branding: {} });
+    const wsId = req.session.mkt.workspaceId;
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT brand_name, logo_url, accent_color, accent_color_2 FROM marketing.workspaces WHERE id=$1', [wsId]
+    )).rows[0]) || {};
+    res.json({ success: true, branding: {
+      brand_name: row.brand_name || null,
+      logo_url: row.logo_url || null,
+      accent_color: row.accent_color || null,
+      accent_color_2: row.accent_color_2 || null,
+    } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.put('/api/mkt/workspace/branding', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!(await workspaceBrandingAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld (migratie 022 nog niet gedraaid).' });
+    const b = req.body || {};
+    const brandName = (typeof b.brand_name === 'string') ? b.brand_name.trim().slice(0, 60) : null;
+    const logoUrl = (typeof b.logo_url === 'string') ? b.logo_url.trim().slice(0, 500) : null;
+    if (logoUrl && !/^https?:\/\//i.test(logoUrl)) return res.status(400).json({ error: 'Logo-URL moet met https:// beginnen' });
+    const ac = (b.accent_color && validBrandHex(b.accent_color)) ? b.accent_color.trim() : null;
+    const ac2 = (b.accent_color_2 && validBrandHex(b.accent_color_2)) ? b.accent_color_2.trim() : null;
+    if (b.accent_color && !ac) return res.status(400).json({ error: 'Ongeldige hoofdkleur (gebruik #rrggbb)' });
+    if (b.accent_color_2 && !ac2) return res.status(400).json({ error: 'Ongeldige accentkleur (gebruik #rrggbb)' });
+    const wsId = req.session.mkt.workspaceId;
+    await withWriteConnection(async (c) => c.query(
+      'UPDATE marketing.workspaces SET brand_name=$1, logo_url=$2, accent_color=$3, accent_color_2=$4 WHERE id=$5',
+      [brandName || null, logoUrl || null, ac, ac2, wsId]
+    ));
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 router.get('/api/mkt/workspace/integrations', requireMkt, async (req, res) => {
   try {
     if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
