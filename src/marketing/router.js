@@ -2265,6 +2265,82 @@ router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res)
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// ===== Login met Facebook (OAuth) =====
+// Start- en callback-endpoint voor de "Login met Facebook"-koppeling. Additief:
+// de handmatige token-weg blijft gewoon bestaan. De app-gegevens komen uit de
+// serveromgeving (META_APP_ID/META_APP_SECRET) = de platform-app.
+const META_OAUTH_SCOPES = [
+  'email', 'public_profile', 'pages_show_list', 'pages_read_engagement', 'pages_manage_posts',
+  'instagram_basic', 'instagram_manage_insights', 'instagram_content_publish',
+  'business_management', 'ads_management', 'ads_read', 'read_insights',
+].join(',');
+function metaRedirectUri(req) { return 'https://' + req.get('host') + '/api/mkt/meta/callback'; }
+
+router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).send('Alleen eigenaar of manager mag koppelen.');
+    const appId = process.env.META_APP_ID || null;
+    if (!appId) return res.status(400).send('Meta App ID is niet ingesteld in de serveromgeving (META_APP_ID).');
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.metaOAuthState = state;
+    const url = 'https://www.facebook.com/v21.0/dialog/oauth'
+      + '?client_id=' + encodeURIComponent(appId)
+      + '&redirect_uri=' + encodeURIComponent(metaRedirectUri(req))
+      + '&state=' + encodeURIComponent(state)
+      + '&response_type=code'
+      + '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
+    res.redirect(url);
+  } catch (e) { res.status(500).send('Fout bij starten koppeling: ' + e.message); }
+});
+
+router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
+  const page = (ok, msg) => {
+    const color = ok ? '#15976b' : '#dc2626';
+    res.set('Content-Type', 'text/html; charset=utf-8').send(
+      '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<body style="font-family:-apple-system,system-ui,sans-serif;background:#09222a;color:#eef6f7;padding:48px 20px;text-align:center">'
+      + '<div style="max-width:440px;margin:0 auto;background:#0f323b;border:1px solid #245863;border-radius:16px;padding:28px 24px">'
+      + '<h2 style="color:' + color + ';margin:0 0 10px">' + (ok ? 'Gekoppeld' : 'Koppelen mislukt') + '</h2>'
+      + '<p style="color:#c6dadd;font-size:14px;line-height:1.6">' + msg + '</p>'
+      + '<p style="margin-top:18px"><a href="/workspace.html" style="color:#5bd3de">Terug naar de workspace</a></p>'
+      + '</div>'
+      + '<script>try{setTimeout(function(){location.href="/workspace.html";},3000);}catch(e){}</script></body>'
+    );
+  };
+  try {
+    if (!mktIsOwnerOrManager(req)) return page(false, 'Alleen eigenaar of manager mag koppelen.');
+    if (req.query.error) return page(false, 'De toegang is geweigerd of geannuleerd.');
+    const code = String(req.query.code || '');
+    const state = String(req.query.state || '');
+    if (!code) return page(false, 'Geen code ontvangen van Facebook.');
+    if (!state || state !== req.session.metaOAuthState) return page(false, 'Beveiligingscontrole mislukt (state). Probeer de koppeling opnieuw te starten.');
+    req.session.metaOAuthState = null;
+    const appId = process.env.META_APP_ID || null;
+    const appSecret = process.env.META_APP_SECRET || null;
+    if (!appId || !appSecret) return page(false, 'Meta App ID/Secret niet ingesteld in de serveromgeving.');
+    const redirectUri = metaRedirectUri(req);
+    // 1. code -> kortlevend token
+    const short = await graphGet('oauth/access_token', { client_id: appId, redirect_uri: redirectUri, client_secret: appSecret, code });
+    if (!short || !short.access_token) return page(false, 'Geen token ontvangen van Facebook.');
+    // 2. kortlevend -> langlevend (60 dagen)
+    let longTok = short.access_token;
+    let expSecs = short.expires_in ? Number(short.expires_in) : 3600;
+    try {
+      const long = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: short.access_token });
+      if (long && long.access_token) { longTok = long.access_token; expSecs = long.expires_in ? Number(long.expires_in) : 60 * 24 * 3600; }
+    } catch (_) { /* dan houden we het kortlevende token */ }
+    // 3. opslaan op de werkplek-koppeling
+    const wsId = req.session.mkt.workspaceId;
+    await withWriteConnection(async (c) => {
+      const exists = (await c.query('SELECT 1 FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId])).rows[0];
+      if (!exists) await c.query('INSERT INTO marketing.workspace_integrations (workspace_id) VALUES ($1)', [wsId]).catch(() => {});
+      try { await c.query("UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_token_expires_at=now()+($2||' seconds')::interval, updated_at=now() WHERE workspace_id=$3", [encryptSecret(longTok), String(expSecs), wsId]); }
+      catch (_) { await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1 WHERE workspace_id=$2', [encryptSecret(longTok), wsId]); }
+    });
+    return page(true, 'Je Facebook- en Instagram-koppeling is opgeslagen. Open de Koppelingen-tab om je pagina, Instagram-account en advertentie-account te kiezen.');
+  } catch (e) { return page(false, 'Er ging iets mis: ' + (e && e.message ? e.message : 'onbekende fout')); }
+});
+
 // Automatische token-verversing (EasyCron). Roep periodiek aan, bijv. wekelijks:
 //   https://<domein>/api/mkt/cron/refresh-meta-tokens?cron_secret=XXX
 // Ververst de langlevende Meta-tokens (werkplek + klant) ruim vóór de 60-dagen-
