@@ -2281,13 +2281,13 @@ router.get('/api/mkt/cron/refresh-meta-tokens', async (req, res) => {
     const envSecret = process.env.META_APP_SECRET || null;
 
     const wsRows = await withReadConnection(async (c) => (await c.query(
-      'SELECT workspace_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.workspace_integrations WHERE meta_access_token IS NOT NULL'
+      "SELECT workspace_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.workspace_integrations WHERE meta_access_token IS NOT NULL AND meta_access_token <> ''"
     )).rows).catch(() => []);
     const clRows = await withReadConnection(async (c) => (await c.query(
-      'SELECT workspace_id, client_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE meta_access_token IS NOT NULL'
+      "SELECT workspace_id, client_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE meta_access_token IS NOT NULL AND meta_access_token <> ''"
     )).rows).catch(() => []);
 
-    const out = { success: true, checked: 0, refreshed: 0, failed: 0, errors: [] };
+    const out = { success: true, checked: 0, refreshed: 0, skipped: 0, failed: 0, errors: [] };
 
     const refreshOne = async (kind, row) => {
       out.checked += 1;
@@ -2295,7 +2295,10 @@ router.get('/api/mkt/cron/refresh-meta-tokens', async (req, res) => {
       const appSecret = decryptSecret(row.meta_app_secret) || envSecret;
       const token = decryptSecret(row.meta_access_token);
       const label = kind === 'ws' ? ('werkplek ' + row.workspace_id) : ('klant ' + row.client_id);
-      if (!appId || !appSecret || !token) { out.failed += 1; out.errors.push(label + ': app-gegevens of token ontbreken'); return; }
+      // Geen bruikbaar eigen token: deze koppeling gebruikt de werkplek-token
+      // (die apart wordt ververst). Overslaan, geen fout.
+      if (!token) { out.skipped += 1; return; }
+      if (!appId || !appSecret) { out.failed += 1; out.errors.push(label + ': App ID of App Secret ontbreekt'); return; }
       try {
         const r = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: token });
         if (!r || !r.access_token) { out.failed += 1; out.errors.push(label + ': geen nieuw token ontvangen'); return; }
