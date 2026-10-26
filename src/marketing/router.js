@@ -2269,10 +2269,12 @@ router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res)
 // Start- en callback-endpoint voor de "Login met Facebook"-koppeling. Additief:
 // de handmatige token-weg blijft gewoon bestaan. De app-gegevens komen uit de
 // serveromgeving (META_APP_ID/META_APP_SECRET) = de platform-app.
+// Tijdelijk minimaal om de flow te bewijzen. De volledige set (pages_*,
+// instagram_*, ads_*, business_management, read_insights) zetten we aan zodra
+// die permissies in de Meta-app zijn toegevoegd; anders weigert Meta ze als
+// "invalid scopes".
 const META_OAUTH_SCOPES = [
-  'email', 'public_profile', 'pages_show_list', 'pages_read_engagement', 'pages_manage_posts',
-  'instagram_basic', 'instagram_manage_insights', 'instagram_content_publish',
-  'business_management', 'ads_management', 'ads_read', 'read_insights',
+  'public_profile',
 ].join(',');
 function metaRedirectUri(req) { return 'https://' + req.get('host') + '/api/mkt/meta/callback'; }
 
