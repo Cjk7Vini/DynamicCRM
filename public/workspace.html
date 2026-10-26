@@ -2443,13 +2443,22 @@ function admOpen(key){
   var body=document.getElementById('admBody'); if(!body)return;
   var s=(ADM_CONFIG||[]).filter(function(x){return x.key===key;})[0]; if(!s)return;
   ADM_LAST_OUTPUT='';
-  var note=s.note?'<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;padding:10px 12px;background:rgba(99,102,241,.06);border-radius:8px">'+esc(s.note)+'</div>':'';
+  var note=s.note?'<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;padding:10px 12px;background:var(--accent-soft);border-radius:8px">'+esc(s.note)+'</div>':'';
   var fields=(s.fields||[]).map(admField).join('');
+  var adLib='';
+  if(key==='concurrentie-analyse'){
+    adLib='<div class="field" style="background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+      +'<label>Automatisch zoeken in de Meta Ad Library</label>'
+      +'<div style="font-size:12px;color:var(--muted);margin:2px 0 8px">Typ een concurrent of markt en haal de lopende advertenties automatisch op. Lukt dat niet (bijv. verificatie nodig), gebruik dan de handmatige velden eronder.</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="admLibQ" placeholder="bv. fysiotherapie Zeeland" style="flex:1;min-width:200px"><input id="admLibCountry" value="NL" maxlength="2" style="width:62px;text-transform:uppercase" title="Landcode"><button type="button" class="btn btn-primary" onclick="admLibSearch()" style="padding:8px 14px;font-size:13px">Zoeken</button></div>'
+      +'<div id="admLibResults" style="margin-top:10px"></div>'
+      +'</div>';
+  }
   body.innerHTML='<div style="margin-bottom:12px"><a href="#" onclick="admRenderList();return false;" style="font-size:13px;color:var(--muted)">&larr; Terug naar de Ad Machine</a></div>'
     +'<div class="card" style="max-width:640px">'
     +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">'+esc(s.title)+'</div>'
     +'<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px">'+esc(s.desc)+'</div>'
-    +note+fields
+    +note+adLib+fields
     +'<div id="admMsg" style="font-size:12.5px;color:#dc2626;margin-bottom:8px"></div>'
     +'<button class="btn btn-primary" id="admRunBtn" onclick="admRun(\''+esc(key)+'\',\'\')">Genereren</button>'
     +'</div>'
@@ -2486,6 +2495,44 @@ async function admRun(key,fase){
   }finally{
     if(btn){btn.disabled=false;btn.textContent='Genereren';}
   }
+}
+// ---- Ad Machine: automatisch zoeken in de Meta Ad Library ----
+var ADM_LIB_ADS=[];
+async function admLibSearch(){
+  var q=((document.getElementById('admLibQ')||{}).value||'').trim();
+  var country=(((document.getElementById('admLibCountry')||{}).value||'NL').trim().toUpperCase())||'NL';
+  var box=document.getElementById('admLibResults'); if(!box)return;
+  if(q.length<2){box.innerHTML='<div style="color:#dc2626;font-size:12.5px">Typ eerst een zoekterm.</div>';return;}
+  box.innerHTML='<div style="color:var(--muted);font-size:12.5px">Zoeken in de Ad Library...</div>';
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ad-library?q='+encodeURIComponent(q)+'&country='+encodeURIComponent(country),{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div style="color:#dc2626;font-size:12.5px">'+esc((d&&d.error)||'Zoeken mislukt.')+'</div>';return;}
+    if(d.configured===false){box.innerHTML='<div style="color:var(--muted);font-size:12.5px;line-height:1.5">De Ad Library gaf geen resultaten terug'+(d.error?(' ('+esc(d.error)+')'):'')+'. Dit vereist vaak identiteitsverificatie op het Meta-account, en buiten de EU werkt het beperkt. Gebruik zolang de handmatige velden hieronder.</div>';return;}
+    var ads=d.ads||[];
+    if(!ads.length){box.innerHTML='<div style="color:var(--muted);font-size:12.5px">Geen lopende advertenties gevonden voor "'+esc(q)+'". Probeer een andere term of de handmatige manier.</div>';return;}
+    ADM_LIB_ADS=ads;
+    var html=ads.slice(0,15).map(function(a){
+      var dur=a.days!=null?(a.days+' dagen'+(a.running?', loopt nog':'')):'';
+      return '<div style="border-top:1px solid var(--line);padding:8px 0;font-size:12.5px">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px"><strong>'+esc(a.page||'(onbekend)')+'</strong>'+(dur?'<span style="color:var(--muted);white-space:nowrap">'+esc(dur)+'</span>':'')+'</div>'
+        +(a.body?'<div style="color:var(--muted);margin-top:2px">'+esc(a.body.slice(0,180))+(a.body.length>180?'...':'')+'</div>':'')
+        +(a.link?'<a href="'+esc(a.link)+'" target="_blank" style="color:var(--accent-2);font-size:11.5px">bekijk in Ad Library</a>':'')
+        +'</div>';
+    }).join('');
+    html+='<div style="margin-top:10px"><button type="button" class="btn btn-ghost" style="padding:7px 12px;font-size:12.5px" onclick="admLibUse()">Gebruik deze '+Math.min(ads.length,15)+' voor de analyse</button></div>';
+    box.innerHTML=html;
+  }catch(e){box.innerHTML='<div style="color:#dc2626;font-size:12.5px">Netwerkfout.</div>';}
+}
+function admLibUse(){
+  var lines=(ADM_LIB_ADS||[]).slice(0,15).map(function(a){
+    return '- '+(a.page||'(onbekend)')+': "'+String(a.body||a.title||'').slice(0,160).replace(/\s+/g,' ').trim()+'"'+(a.days!=null?(' | loopt '+a.days+' dagen'+(a.running?' en nog actief':'')):'');
+  });
+  var txt='Advertenties uit de Meta Ad Library (automatisch opgehaald):\n'+lines.join('\n');
+  var ta=document.getElementById('adm_observaties'); if(ta){ ta.value=(ta.value?ta.value+'\n\n':'')+txt; }
+  var cc=document.getElementById('adm_concurrent'); var qel=document.getElementById('admLibQ');
+  if(cc&&!cc.value&&qel)cc.value=qel.value;
+  var box=document.getElementById('admLibResults'); if(box)box.innerHTML='<div style="color:var(--accent-2);font-size:12.5px">Toegevoegd aan de observaties hieronder. Klik op Genereren.</div>';
 }
 // ---- Geplande (concept) campagnes: klaarzetten + goedkeuren ----
 var DRAFTS_CACHE={}, DRAFTS_CANMANAGE=false, EDIT_DRAFT_ID=null;
