@@ -3482,7 +3482,7 @@ const ADSKILLS = {
   'concurrentie-analyse': {
     title: 'Concurrentie-analyse',
     desc: 'Zie welke invalshoeken in de markt al bezet zijn en waar het gat zit, op basis van wat jij in de Meta Ad Library ziet.',
-    note: 'Open de Meta Ad Library, zoek de concurrent of markt en plak hieronder wat je ziet: welke advertenties lopen er, hoe lang al, welke invalshoeken en teksten. De analyse werkt op wat jij aanlevert.',
+    note: 'Twee manieren: zoek hieronder automatisch in de Meta Ad Library (vult de observaties voor je in), of open de Ad Library zelf en plak handmatig wat je ziet (welke advertenties lopen, hoe lang al, welke invalshoeken en teksten). De analyse werkt op wat er in het observaties-veld staat.',
     maxTokens: 2200,
     fields: [
       { name: 'concurrent', label: 'Concurrent of markt', type: 'text', required: true, ph: 'bv. fysiotherapie Zeeland, of een concurrentnaam' },
@@ -3491,7 +3491,7 @@ const ADSKILLS = {
     system: [
       'Je bent een ervaren Nederlandse ads-strateeg die concurrentie in kaart brengt.',
       'Het kernidee: een advertentie die al weken of maanden draait kost elke dag geld, dus looptijd is het beste publieke signaal voor wat werkt.',
-      'Je krijgt geen live Ad Library; je werkt met wat de gebruiker aanlevert. Vraag om meer observaties als het te dun is, maar lever met wat er ligt een zo scherp mogelijke analyse.',
+      'Je werkt met de aangeleverde observaties (automatisch uit de Ad Library opgehaald of handmatig geplakt). Vraag om meer observaties als het te dun is, maar lever met wat er ligt een zo scherp mogelijke analyse.',
       'Structuur van je antwoord:',
       '1. Wie er adverteert en wat opvalt.',
       '2. Welke creatives het langst lijken te lopen en waarom dat een signaal is.',
@@ -3665,6 +3665,58 @@ router.get('/api/mkt/admachine/skills', requireMkt, (req, res) => {
 });
 
 // Draait een skill via Claude en geeft Markdown terug.
+// Concurrentie-analyse: automatisch zoeken in de Meta Ad Library (ads_archive).
+// Voor EU/NL commerciele ads werkt ad_type=ALL (DSA). Volledige toegang vereist
+// vaak identiteitsverificatie op het Meta-account; lukt het niet, dan geeft dit
+// netjes configured:false terug en valt de gebruiker terug op handmatig plakken.
+router.get('/api/mkt/clients/:clientId/ad-library', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.status(400).json({ error: 'Geef een zoekterm (bijv. een concurrentnaam of markt)' });
+    const country = (String(req.query.country || 'NL').trim().toUpperCase().slice(0, 2)) || 'NL';
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    if (!token) return res.status(400).json({ error: 'Geen Meta access token gekoppeld (werkplek of klant)' });
+    const params = {
+      ad_reached_countries: JSON.stringify([country]),
+      search_terms: q,
+      ad_active_status: ['ACTIVE', 'INACTIVE', 'ALL'].includes(String(req.query.active || '')) ? String(req.query.active) : 'ACTIVE',
+      ad_type: 'ALL',
+      fields: 'id,page_name,ad_creative_bodies,ad_creative_link_titles,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms',
+      limit: '25',
+      access_token: token,
+    };
+    let data;
+    try { data = await graphGet('ads_archive', params); }
+    catch (e) { return res.json({ success: true, configured: false, error: e.message, ads: [] }); }
+    const now = Date.now();
+    const ads = (data.data || []).map((a) => {
+      const start = a.ad_delivery_start_time ? new Date(a.ad_delivery_start_time) : null;
+      const stop = a.ad_delivery_stop_time ? new Date(a.ad_delivery_stop_time) : null;
+      const end = stop || new Date(now);
+      const days = start ? Math.max(0, Math.round((end - start) / 86400000)) : null;
+      return {
+        id: a.id,
+        page: a.page_name || '',
+        body: (Array.isArray(a.ad_creative_bodies) ? a.ad_creative_bodies[0] : '') || '',
+        title: (Array.isArray(a.ad_creative_link_titles) ? a.ad_creative_link_titles[0] : '') || '',
+        start: a.ad_delivery_start_time || null,
+        running: !stop,
+        days,
+        platforms: a.publisher_platforms || [],
+        // Publieke Ad Library-link (zonder token), zodat niets lekt.
+        link: 'https://www.facebook.com/ads/library/?id=' + encodeURIComponent(a.id),
+      };
+    });
+    ads.sort((x, y) => (y.days || 0) - (x.days || 0)); // langst lopende eerst
+    res.json({ success: true, configured: true, country, ads });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 router.post('/api/mkt/clients/:clientId/ai/admachine', requireMkt, async (req, res) => {
   try {
     if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
