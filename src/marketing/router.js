@@ -2265,6 +2265,62 @@ router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res)
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// Automatische token-verversing (EasyCron). Roep periodiek aan, bijv. wekelijks:
+//   https://<domein>/api/mkt/cron/refresh-meta-tokens?cron_secret=XXX
+// Ververst de langlevende Meta-tokens (werkplek + klant) ruim vóór de 60-dagen-
+// grens, zodat niemand handmatig hoeft te verlengen. Hergebruikt dezelfde
+// fb_exchange_token-omwisseling als de handmatige knop. Volledig defensief: een
+// mislukte verversing van 1 koppeling raakt de rest niet.
+router.get('/api/mkt/cron/refresh-meta-tokens', async (req, res) => {
+  try {
+    const secret = process.env.CRON_SECRET;
+    const provided = req.headers['x-cron-secret'] || req.query.cron_secret;
+    if (!secret || !provided || provided !== secret) return res.status(401).json({ error: 'Ongeautoriseerde cron aanroep' });
+
+    const envAppId = process.env.META_APP_ID || null;
+    const envSecret = process.env.META_APP_SECRET || null;
+
+    const wsRows = await withReadConnection(async (c) => (await c.query(
+      'SELECT workspace_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.workspace_integrations WHERE meta_access_token IS NOT NULL'
+    )).rows).catch(() => []);
+    const clRows = await withReadConnection(async (c) => (await c.query(
+      'SELECT workspace_id, client_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE meta_access_token IS NOT NULL'
+    )).rows).catch(() => []);
+
+    const out = { success: true, checked: 0, refreshed: 0, failed: 0, errors: [] };
+
+    const refreshOne = async (kind, row) => {
+      out.checked += 1;
+      const appId = row.meta_app_id || envAppId;
+      const appSecret = decryptSecret(row.meta_app_secret) || envSecret;
+      const token = decryptSecret(row.meta_access_token);
+      const label = kind === 'ws' ? ('werkplek ' + row.workspace_id) : ('klant ' + row.client_id);
+      if (!appId || !appSecret || !token) { out.failed += 1; out.errors.push(label + ': app-gegevens of token ontbreken'); return; }
+      try {
+        const r = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: token });
+        if (!r || !r.access_token) { out.failed += 1; out.errors.push(label + ': geen nieuw token ontvangen'); return; }
+        const expSecs = r.expires_in ? Number(r.expires_in) : 60 * 24 * 3600;
+        await withWriteConnection(async (c) => {
+          if (kind === 'ws') {
+            try { await c.query("UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_token_expires_at=now()+($2||' seconds')::interval, updated_at=now() WHERE workspace_id=$3", [encryptSecret(r.access_token), String(expSecs), row.workspace_id]); }
+            catch (_) { await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1 WHERE workspace_id=$2', [encryptSecret(r.access_token), row.workspace_id]); }
+          } else {
+            try { await c.query("UPDATE marketing.client_integrations SET meta_access_token=$1, meta_token_expires_at=now()+($2||' seconds')::interval WHERE client_id=$3 AND workspace_id=$4", [encryptSecret(r.access_token), String(expSecs), row.client_id, row.workspace_id]); }
+            catch (_) { await c.query('UPDATE marketing.client_integrations SET meta_access_token=$1 WHERE client_id=$2 AND workspace_id=$3', [encryptSecret(r.access_token), row.client_id, row.workspace_id]); }
+          }
+        });
+        out.refreshed += 1;
+      } catch (e) { out.failed += 1; out.errors.push(label + ': ' + (e && e.message ? e.message : 'fout')); }
+    };
+
+    for (const row of wsRows) await refreshOne('ws', row);
+    for (const row of clRows) await refreshOne('client', row);
+    out.errors = out.errors.slice(0, 20);
+    console.log('[meta-token-refresh]', JSON.stringify({ checked: out.checked, refreshed: out.refreshed, failed: out.failed }));
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Meta-gegevens voor een klant: client-waarde wint, anders terugval op de workspace-koppeling.
 async function resolveClientMeta(wsId, clientId) {
   const ci = await withReadConnection(async (c) => (await c.query(
