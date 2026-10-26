@@ -392,12 +392,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
 
           <div class="wsi-panel" id="wsiPanel_meta">
-            <div style="background:var(--accent-soft);border:1px solid rgba(90,185,200,.28);border-radius:10px;padding:14px 16px;margin-bottom:16px">
-              <div style="font-weight:700;font-size:14px;margin-bottom:4px">Koppel met Facebook (aanrader)</div>
-              <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">Log in met Facebook; je hoeft dan geen token meer handmatig te plakken of te verlengen. Daarna kies je je pagina, Instagram en advertentie-account.</div>
-              <button class="btn btn-primary" onclick="metaLoginStart()" style="display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 10-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0022 12z"/></svg> Login met Facebook</button>
-            </div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Of vul handmatig een token in (valt automatisch terug op de Facebook-login hierboven):</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">Koppel je Meta-account</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">Vul hieronder je Meta access token en gegevens in. De koppeling blijft daarna automatisch geldig; je hoeft het token niet handmatig te verlengen.</div>
             <div id="wsiMetaStatus" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
             <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account/pagina, dan vul je dat bij die klant in (dat wint).</p>
             <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
