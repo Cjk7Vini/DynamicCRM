@@ -2287,12 +2287,22 @@ router.get('/api/mkt/cron/refresh-meta-tokens', async (req, res) => {
       "SELECT workspace_id, client_id, meta_app_id, meta_app_secret, meta_access_token FROM marketing.client_integrations WHERE meta_access_token IS NOT NULL AND meta_access_token <> ''"
     )).rows).catch(() => []);
 
+    // App ID/Secret per werkplek, zodat een klant zonder eigen app-gegevens
+    // terugvalt op die van de werkplek (net als resolveClientMeta), voordat env.
+    const wsCreds = {};
+    try {
+      (await withReadConnection(async (c) => (await c.query(
+        'SELECT workspace_id, meta_app_id, meta_app_secret FROM marketing.workspace_integrations'
+      )).rows)).forEach((w) => { wsCreds[w.workspace_id] = { appId: w.meta_app_id || null, appSecret: decryptSecret(w.meta_app_secret) || null }; });
+    } catch (_) { /* geen werkplek-app-gegevens: valt terug op env */ }
+
     const out = { success: true, checked: 0, refreshed: 0, skipped: 0, failed: 0, errors: [] };
 
     const refreshOne = async (kind, row) => {
       out.checked += 1;
-      const appId = row.meta_app_id || envAppId;
-      const appSecret = decryptSecret(row.meta_app_secret) || envSecret;
+      const wc = wsCreds[row.workspace_id] || {};
+      const appId = row.meta_app_id || (kind === 'client' ? wc.appId : null) || envAppId;
+      const appSecret = decryptSecret(row.meta_app_secret) || (kind === 'client' ? wc.appSecret : null) || envSecret;
       const token = decryptSecret(row.meta_access_token);
       const label = kind === 'ws' ? ('werkplek ' + row.workspace_id) : ('klant ' + row.client_id);
       // Geen bruikbaar eigen token: deze koppeling gebruikt de werkplek-token
