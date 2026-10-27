@@ -1973,13 +1973,10 @@ router.get('/api/mkt/clients/:clientId/integrations', requireMkt, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Snel koppelen: met de meegegeven token de beschikbare pagina's + Instagram-accounts
-// en advertentieaccounts ophalen, zodat de gebruiker het juiste kan kiezen.
-router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, res) => {
-  try {
-    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
-    const token = String((req.body && req.body.token) || '').trim();
-    if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
+// Beschikbare pagina's + Instagram-accounts + advertentieaccounts ophalen met een
+// token, zodat de gebruiker het juiste kan kiezen. Herbruikbaar: zowel de handmatige
+// "snel koppelen" (geplakt token) als de automatische werkplek-login gebruiken dit.
+async function discoverMetaAssets(token) {
     const pageMap = {};
     const igMap = {}; // alle gevonden Instagram-accounts: id -> { id, username }
     // Een Instagram-account kan op twee manieren aan een pagina hangen: als
@@ -2005,7 +2002,7 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
     try {
       const r = await graphGet('me/accounts', { fields: PF, limit: '200', access_token: token });
       (r.data || []).forEach(addPage);
-    } catch (e) { return res.status(400).json({ error: 'Kon accounts niet ophalen: ' + e.message }); }
+    } catch (e) { throw new Error('Kon accounts niet ophalen: ' + e.message); }
     const addIg = (x) => { if (x && x.id && !igMap[x.id]) igMap[x.id] = { id: x.id, username: x.username || null }; };
     // 2. Pagina's die via haar account/business zijn toegewezen (owned + client pages),
     //    EN de Instagram-accounts die direct onder de Business vallen. Zo vinden we
@@ -2063,8 +2060,34 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
       const a = await graphGet('me/adaccounts', { fields: 'name,account_id', limit: '200', access_token: token });
       adaccounts = (a.data || []).map((x) => ({ id: 'act_' + (x.account_id || ''), name: x.name || ('act_' + x.account_id) }));
     } catch (_) { /* ad accounts optioneel */ }
-    res.json({ success: true, pages, igaccounts, adaccounts, ig_hint });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    return { pages, igaccounts, adaccounts, ig_hint };
+}
+
+// Snel koppelen (handmatig): met een geplakt token de accounts ophalen.
+router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const token = String((req.body && req.body.token) || '').trim();
+    if (token.length < 20) return res.status(400).json({ error: 'Plak eerst een geldig access token.' });
+    const out = await discoverMetaAssets(token);
+    res.json({ success: true, ...out });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Automatisch: de accounts van de werkplek-koppeling (de Facebook-login) ophalen,
+// zodat je per klant uit een lijst kunt kiezen zonder een token te plakken.
+router.get('/api/mkt/meta/assets', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const wi = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_access_token FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]) || {};
+    const token = decryptSecret(wi.meta_access_token) || process.env.META_ACCESS_TOKEN || null;
+    if (!token) return res.status(400).json({ error: 'Nog geen Meta-koppeling op de werkplek. Log eerst in met Facebook of vul een token in.' });
+    const out = await discoverMetaAssets(token);
+    res.json({ success: true, ...out });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // Koppelingen opslaan. Lege tokenvelden laten het bestaande token ongemoeid.
