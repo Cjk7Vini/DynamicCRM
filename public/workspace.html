@@ -2856,26 +2856,10 @@ async function deleteCampFeedback(campId,id){
 }
 async function loadReport(){
   if(!CURRENT_CLIENT)return; var body=document.getElementById('reportBody'); hideMsg('reportMsg');
-  body.innerHTML='<div class="empty">Laden...</div>';
-  try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/stats',{credentials:'include'}); var d=await r.json();
-    if(!r.ok||!d.success){body.innerHTML='';showMsg('reportMsg',false,d.error||'Kon rapportage niet laden.');return;}
-    var p=d.stats.posts, a=d.stats.assets, nx=d.stats.next;
-    function tile(k,v,acc){return '<div class="stat"><div class="k">'+k+'</div><div class="v'+(acc?' accent':'')+'">'+v+'</div></div>';}
-    var mb=(Number(a.bytes)||0)/1048576;
-    var next=nx?('<div class="card" style="margin-top:20px"><div class="k" style="font-size:12px;color:var(--muted);font-weight:600">Eerstvolgende geplande post</div><div style="font-size:16px;font-weight:700;margin-top:6px">'+esc(nx.title)+'</div><div class="mut" style="color:var(--muted);font-size:13px;margin-top:2px">'+esc(fmtWhen(nx.scheduled_at))+'</div></div>')
-      :'<div class="card" style="margin-top:20px;color:var(--muted);font-size:14px">Geen toekomstige posts ingepland.</div>';
-    body.innerHTML=
-      '<div class="section-h"><h4>Content</h4></div>'+
-      '<div class="stats">'+tile('Posts totaal',p.total,true)+tile('Ingepland',p.scheduled)+tile('Gepubliceerd',p.published)+tile('Nog te komen',p.upcoming)+'</div>'+
-      '<div class="section-h"><h4>Goedkeuringen</h4></div>'+
-      '<div class="stats">'+tile('Wacht op klant',p.pending)+tile('Goedgekeurd',p.approved,true)+tile('Wijzigingen gevraagd',p.changes)+'</div>'+
-      '<div class="section-h"><h4>Assets</h4></div>'+
-      '<div class="stats">'+tile('Bestanden',a.total,true)+tile('Video\'s',a.videos)+tile('Opslag',mb.toFixed(1)+' MB')+'</div>'+
-      next+
-      '<div id="metaReport" style="margin-top:26px"><div class="section-h"><h4>Meta (Instagram)</h4></div><div class="card" style="color:var(--muted);font-size:14px">Meta-cijfers laden...</div></div>';
-    loadMetaInsights();
-  }catch(e){body.innerHTML='';showMsg('reportMsg',false,'Netwerkfout.');}
+  // De rapportage toont de Instagram-cijfers (tab Organisch) en de Meta Ads
+  // (tab Campagnes). De content/assets-tellers staan in het klant-overzicht.
+  body.innerHTML='<div id="metaReport"><div class="card" style="color:var(--muted);font-size:14px">Rapportage laden...</div></div>';
+  loadMetaInsights();
 }
 var _METAPOSTS=[];
 function closePostDetail(){document.getElementById('postDetailModal').classList.remove('open');}
@@ -3001,8 +2985,8 @@ async function loadMetaInsights(){
         '<div style="font-size:12px;color:var(--muted)">Rapportage'+((CURRENT_CLIENT&&CURRENT_CLIENT.name)?(' &middot; '+esc(CURRENT_CLIENT.name)):'')+'</div></div>'+
       '</div>';
     }
-    var html=brandHead+rptDateBar();
-    html+='<div class="section-h"><h4>Instagram</h4><span style="display:flex;align-items:center;gap:10px"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="toggleMetricsLegend()">&#9432; Uitleg van de cijfers</button><span style="font-size:12px;color:var(--muted)">'+esc(rptPeriodLabel())+'</span></span></div>';
+    var html='';
+    html+='<div class="section-h"><h4>Instagram rapportage</h4><span style="display:flex;align-items:center;gap:10px"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="toggleMetricsLegend()">&#9432; Uitleg van de cijfers</button><span style="font-size:12px;color:var(--muted)">'+esc(rptPeriodLabel())+'</span></span></div>';
     html+='<div id="metricsLegend" style="display:none">'+metricsLegendHTML()+'</div>';
     // Hero: account + volgers
     if(d.account){
@@ -3115,25 +3099,27 @@ async function loadMetaInsights(){
           '<td style="padding:8px 6px;font-weight:700">'+(p.engagement!=null?(p.engagement+'%'):'-')+'</td></tr>';
       }).join('')+'</table></div>';
     }
+    // ===== Campagnes-tab (Meta Ads) in een aparte html-string =====
+    var adsHtml='';
     // Campagne data algemeen (met normen) + per adset + campagnes op Meta
     if(d.ads&&!d.ads.empty){
-      html+='<div style="margin-top:8px">'+campPerfBlock(d.ads,rptPeriodLabel())+'</div>';
+      adsHtml+='<div style="margin-top:8px">'+campPerfBlock(d.ads,rptPeriodLabel())+'</div>';
       var allAdsets=[]; (d.adTree||[]).forEach(function(c){(c.adsets||[]).forEach(function(s){allAdsets.push(s);});});
       if(allAdsets.length){
-        html+='<div class="section-h"><h4>Resultaten per adset</h4></div><div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Doelgroep</th><th style="padding:8px 6px">CTR</th><th style="padding:8px 6px">Leads</th><th style="padding:8px 6px">Kosten per lead</th></tr>'+
+        adsHtml+='<div class="section-h"><h4>Resultaten per adset</h4></div><div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Doelgroep</th><th style="padding:8px 6px">CTR</th><th style="padding:8px 6px">Leads</th><th style="padding:8px 6px">Kosten per lead</th></tr>'+
           allAdsets.map(function(s){return '<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:8px 6px">'+esc(s.name||'Ad set')+'</td><td style="padding:8px 6px">'+(s.ctr!=null?(s.ctr+'%'):'-')+'</td><td style="padding:8px 6px">'+(s.results!=null?iv(s.results):'-')+'</td><td style="padding:8px 6px">'+(s.cost_per_result!=null?('€ '+num(s.cost_per_result)):'-')+'</td></tr>';}).join('')+'</table></div>';
       }
     } else if(d.ads&&d.ads.empty){
-      html+='<div class="section-h" style="margin-top:8px"><h4>Advertenties</h4></div><div class="card" style="color:var(--muted);font-size:13px">Geen advertentiedata in deze periode.</div>';
+      adsHtml+='<div class="section-h" style="margin-top:8px"><h4>Advertenties</h4></div><div class="card" style="color:var(--muted);font-size:13px">Geen advertentiedata in deze periode.</div>';
     }
-    if(d.errors&&d.errors.ads)html+='<div style="margin-top:10px;font-size:12px;color:var(--faint)">Advertentiecijfers niet beschikbaar: '+esc(d.errors.ads)+'</div>';
+    if(d.errors&&d.errors.ads)adsHtml+='<div style="margin-top:10px;font-size:12px;color:var(--faint)">Advertentiecijfers niet beschikbaar: '+esc(d.errors.ads)+'</div>';
     // Campagnes op Meta (per campagne, ad set en advertentie) - alleen gekoppeld aan deze klant
     var shownCamps=(camps&&camps.success&&camps.configured&&camps.campaigns)?camps.campaigns.filter(function(x){return linkedIds.indexOf(String(x.id))>=0;}):[];
     var campMeta={}; shownCamps.forEach(function(c2){campMeta[String(c2.id)]={name:c2.name,objective:c2.objective,status:c2.status,budget:c2.budget,budget_type:c2.budget_type};});
     var tree=(d&&d.adTree)?d.adTree:[];
     if(tree.length){
-      html+='<div class="section-h" style="margin-top:8px"><h4>Campagnes op Meta</h4><span style="font-size:12px;color:var(--muted)">per campagne, ad set en advertentie</span></div>';
-      html+=tree.map(function(c){
+      adsHtml+='<div class="section-h" style="margin-top:8px"><h4>Campagnes op Meta</h4><span style="font-size:12px;color:var(--muted)">per campagne, ad set en advertentie</span></div>';
+      adsHtml+=tree.map(function(c){
         var cm=campMeta[String(c.id)]||{};
         var nSets=(c.adsets||[]).length, nLive=c.live_adsets||0;
         var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div><h4 style="font-size:15px">'+esc(cm.name||'Campagne')+'</h4><div style="font-size:12px;color:var(--muted)">'+esc(cm.objective||'')+(cm.status?(' &middot; '+esc(cm.status)):'')+(cm.budget!=null?(' &middot; € '+Number(cm.budget).toFixed(2)+'/'+esc(cm.budget_type||'')):'')+'</div><div style="font-size:12px;color:var(--muted);margin-top:3px;font-weight:600">'+nSets+' ad sets &middot; '+nLive+' live</div></div>'+
@@ -3146,8 +3132,24 @@ async function loadMetaInsights(){
         return '<div class="card" style="margin-bottom:10px">'+head+table+'</div>';
       }).join('');
     }
-    box.innerHTML=html;
+    // Tabs: Organisch (Instagram) + Campagnes (Meta Ads).
+    var hasAds=!!(adsHtml&&adsHtml.trim());
+    var tabBar='<div class="no-print" style="display:flex;gap:8px;margin:4px 0 16px">'+
+      '<button id="rptTabOrg" class="btn btn-primary" style="padding:8px 16px" onclick="rptTab(\'org\')">Organisch</button>'+
+      '<button id="rptTabCamp" class="btn btn-ghost" style="padding:8px 16px" onclick="rptTab(\'camp\')">Campagnes</button></div>';
+    box.innerHTML=brandHead+tabBar+rptDateBar()+
+      '<div id="rptPaneOrg">'+html+'</div>'+
+      '<div id="rptPaneCamp" style="display:none">'+(hasAds?adsHtml:'<div class="card" style="color:var(--muted);font-size:14px">Geen advertentiedata voor deze klant in deze periode.</div>')+'</div>';
   }catch(e){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
+}
+function rptTab(which){
+  var o=document.getElementById('rptPaneOrg'), c=document.getElementById('rptPaneCamp');
+  var bo=document.getElementById('rptTabOrg'), bc=document.getElementById('rptTabCamp');
+  if(!o||!c)return;
+  var org=(which!=='camp');
+  o.style.display=org?'':'none'; c.style.display=org?'none':'';
+  if(bo){bo.className='btn '+(org?'btn-primary':'btn-ghost');bo.style.padding='8px 16px';}
+  if(bc){bc.className='btn '+(org?'btn-ghost':'btn-primary');bc.style.padding='8px 16px';}
 }
 
 async function runAiAnalysis(){

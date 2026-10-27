@@ -4810,6 +4810,26 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           if (arr.length) out.interactions_by_type = arr;
         }
       } catch (e) { /* breakdown niet beschikbaar */ }
+      // Tweekleurige splitsing (volgers/niet-volgers) per contenttype voor de
+      // "Contentprestaties"-grafieken. Meta geeft deze gecombineerde breakdown niet
+      // altijd terug; lukt het niet, dan valt de frontend terug op enkelkleurige balken.
+      out.views_by_type_split = null;
+      out.interactions_by_type_split = null;
+      const splitByType = async (metric) => {
+        try {
+          const r = await graphGet(`${creds.igUserId}/insights`, { metric, metric_type: 'total_value', breakdown: 'media_product_type,follow_type', period: 'day', ...igWin, access_token: token });
+          const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+          if (bd && Array.isArray(bd.results)) {
+            const map = {};
+            bd.results.forEach((x) => { const dims = x.dimension_values || []; const t = dims[0] || '?'; const ft = dims[1] || '?'; const v = Number(x.value) || 0; map[t] = map[t] || { follower: 0, non_follower: 0 }; if (ft === 'FOLLOWER') map[t].follower += v; else if (ft === 'NON_FOLLOWER') map[t].non_follower += v; });
+            const arr = Object.keys(map).map((t) => ({ type: t, follower: map[t].follower, non_follower: map[t].non_follower })).filter((x) => (x.follower + x.non_follower) > 0).sort((a, b) => (b.follower + b.non_follower) - (a.follower + a.non_follower));
+            return arr.length ? arr : null;
+          }
+        } catch (_) { /* gecombineerde breakdown niet beschikbaar */ }
+        return null;
+      };
+      out.views_by_type_split = await splitByType('views');
+      out.interactions_by_type_split = await splitByType('total_interactions');
 
       // Dagelijkse reeks over de periode voor de grafiek (weergaven en nieuwe
       // volgers per dag). Afgeschermd; ontbreekt hij, dan gewoon geen grafiek.
@@ -4878,17 +4898,27 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       // Actieve tijden van de volgers (per uur). online_followers geeft per dag een
       // object uur->aantal; we middelen per uur over de periode. Afgeschermd.
       out.activeTimes = null;
+      out.activeTimesByDay = null; // per weekdag (0=zondag) voor de dagkiezer
       try {
         const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'online_followers', period: 'lifetime', ...igWin, access_token: token });
         const vals = ((r.data || [])[0] || {}).values || [];
         if (vals.length) {
           const sum = {}; const cnt = {};
+          const dsum = {}; const dcnt = {}; // per weekdag
           vals.forEach((v) => {
             const o = v.value || {};
-            Object.keys(o).forEach((h) => { sum[h] = (sum[h] || 0) + (Number(o[h]) || 0); cnt[h] = (cnt[h] || 0) + 1; });
+            const wd = v.end_time ? new Date(v.end_time).getUTCDay() : null;
+            Object.keys(o).forEach((h) => {
+              const val = Number(o[h]) || 0;
+              sum[h] = (sum[h] || 0) + val; cnt[h] = (cnt[h] || 0) + 1;
+              if (wd != null) { dsum[wd] = dsum[wd] || {}; dcnt[wd] = dcnt[wd] || {}; dsum[wd][h] = (dsum[wd][h] || 0) + val; dcnt[wd][h] = (dcnt[wd][h] || 0) + 1; }
+            });
           });
           const hours = Object.keys(sum).map((h) => ({ hour: Number(h), value: Math.round(sum[h] / (cnt[h] || 1)) }));
           if (hours.length) { hours.sort((a, b) => a.hour - b.hour); out.activeTimes = hours; }
+          const byDay = {};
+          Object.keys(dsum).forEach((wd) => { byDay[wd] = Object.keys(dsum[wd]).map((h) => ({ hour: Number(h), value: Math.round(dsum[wd][h] / (dcnt[wd][h] || 1)) })).sort((a, b) => a.hour - b.hour); });
+          if (Object.keys(byDay).length) out.activeTimesByDay = byDay;
         }
       } catch (_) { /* actieve tijden niet beschikbaar */ }
     } else {
