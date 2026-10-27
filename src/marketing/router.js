@@ -2383,18 +2383,31 @@ function metaRedirectUri(req) { return 'https://' + req.get('host') + '/api/mkt/
 router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
   try {
     if (!mktIsOwnerOrManager(req)) return res.status(403).send('Alleen eigenaar of manager mag koppelen.');
-    const appId = process.env.META_APP_ID || null;
-    if (!appId) return res.status(400).send('Meta App ID is niet ingesteld in de serveromgeving (META_APP_ID).');
+    // De login-app: bij voorkeur de nieuwe, zakelijke app (META_LOGIN_APP_ID).
+    // Terugval op de bestaande META_APP_ID zolang die niet is ingesteld.
+    const appId = process.env.META_LOGIN_APP_ID || process.env.META_APP_ID || null;
+    const configId = process.env.META_LOGIN_CONFIG_ID || null;
+    if (!appId) return res.status(400).send('Meta App ID is niet ingesteld in de serveromgeving (META_LOGIN_APP_ID of META_APP_ID).');
     const state = crypto.randomBytes(16).toString('hex');
     req.session.metaOAuthState = state;
-    const url = 'https://www.facebook.com/v21.0/dialog/oauth'
+    let url = 'https://www.facebook.com/v21.0/dialog/oauth'
       + '?client_id=' + encodeURIComponent(appId)
       + '&redirect_uri=' + encodeURIComponent(metaRedirectUri(req))
       + '&state=' + encodeURIComponent(state)
-      + '&response_type=code'
-      + '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
+      + '&response_type=code';
+    // Facebook Login for Business gebruikt een config_id; de permissies zitten in
+    // die configuratie. Zonder config_id valt hij terug op losse scopes.
+    if (configId) url += '&config_id=' + encodeURIComponent(configId);
+    else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
     res.redirect(url);
   } catch (e) { res.status(500).send('Fout bij starten koppeling: ' + e.message); }
+});
+
+// Laat de frontend weten of de "Login met Facebook"-flow is ingesteld. Pas als de
+// nieuwe, zakelijke app is geconfigureerd (config_id of eigen app-id) tonen we de knop.
+router.get('/api/mkt/meta/login-config', requireMkt, (req, res) => {
+  const configured = !!process.env.META_LOGIN_CONFIG_ID;
+  res.json({ success: true, configured });
 });
 
 router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
@@ -2419,8 +2432,8 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
     if (!code) return page(false, 'Geen code ontvangen van Facebook.');
     if (!state || state !== req.session.metaOAuthState) return page(false, 'Beveiligingscontrole mislukt (state). Probeer de koppeling opnieuw te starten.');
     req.session.metaOAuthState = null;
-    const appId = process.env.META_APP_ID || null;
-    const appSecret = process.env.META_APP_SECRET || null;
+    const appId = process.env.META_LOGIN_APP_ID || process.env.META_APP_ID || null;
+    const appSecret = process.env.META_LOGIN_APP_SECRET || process.env.META_APP_SECRET || null;
     if (!appId || !appSecret) return page(false, 'Meta App ID/Secret niet ingesteld in de serveromgeving.');
     const redirectUri = metaRedirectUri(req);
     // 1. code -> kortlevend token
@@ -2438,8 +2451,10 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
     await withWriteConnection(async (c) => {
       const exists = (await c.query('SELECT 1 FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId])).rows[0];
       if (!exists) await c.query('INSERT INTO marketing.workspace_integrations (workspace_id) VALUES ($1)', [wsId]).catch(() => {});
-      try { await c.query("UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_token_expires_at=now()+($2||' seconds')::interval, updated_at=now() WHERE workspace_id=$3", [encryptSecret(longTok), String(expSecs), wsId]); }
-      catch (_) { await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1 WHERE workspace_id=$2', [encryptSecret(longTok), wsId]); }
+      // Sla ook de app-gegevens van de login-app op, zodat de automatische
+      // token-verversing deze tokens met de juiste app kan verlengen.
+      try { await c.query("UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_app_id=$2, meta_app_secret=$3, meta_token_expires_at=now()+($4||' seconds')::interval, updated_at=now() WHERE workspace_id=$5", [encryptSecret(longTok), appId, encryptSecret(appSecret), String(expSecs), wsId]); }
+      catch (_) { await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_app_id=$2, meta_app_secret=$3 WHERE workspace_id=$4', [encryptSecret(longTok), appId, encryptSecret(appSecret), wsId]); }
     });
     return page(true, 'Je Facebook- en Instagram-koppeling is opgeslagen. Open de Koppelingen-tab om je pagina, Instagram-account en advertentie-account te kiezen.');
   } catch (e) { return page(false, 'Er ging iets mis: ' + (e && e.message ? e.message : 'onbekende fout')); }
