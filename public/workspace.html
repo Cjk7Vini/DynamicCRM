@@ -2988,104 +2988,120 @@ async function loadMetaInsights(){
     var html='';
     html+='<div class="section-h"><h4>Instagram rapportage</h4><span style="display:flex;align-items:center;gap:10px"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="toggleMetricsLegend()">&#9432; Uitleg van de cijfers</button><span style="font-size:12px;color:var(--muted)">'+esc(rptPeriodLabel())+'</span></span></div>';
     html+='<div id="metricsLegend" style="display:none">'+metricsLegendHTML()+'</div>';
-    // Hero: account + volgers
-    if(d.account){
-      html+='<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">'+
-        '<div><div style="font-size:13px;color:var(--muted);word-break:break-all">'+(d.account.username?('@'+esc(d.account.username)):'Instagram')+'</div>'+
-        '<div style="font-size:30px;font-weight:800;line-height:1.1;margin-top:2px">'+iv(d.account.followers)+'</div>'+
-        '<div style="font-size:12px;color:var(--muted)">volgers</div></div>'+
-        '<div style="text-align:right"><div style="font-size:22px;font-weight:700">'+iv(d.account.media)+'</div><div style="font-size:12px;color:var(--muted)">berichten</div></div>'+
-      '</div>';
-    } else {
-      html+='<div class="card" style="color:var(--muted);font-size:13px;margin-bottom:14px">Accountcijfers niet beschikbaar'+(d.errors&&d.errors.account?(': '+esc(d.errors.account)):'')+'</div>';
+    // ===== 1. Samenvatting: 4 kerncijfers met %-verschil t.o.v. de vorige periode =====
+    var _rng=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);
+    var _pdays=Math.max(1,Math.round((new Date(_rng.until)-new Date(_rng.since))/86400000)+1);
+    var _prevStart=new Date(new Date(_rng.since).getTime()-_pdays*86400000);
+    var _mnd=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+    var _cmpTxt='in vergelijking met '+_prevStart.getDate()+' '+_mnd[_prevStart.getMonth()];
+    var deltaLine=function(cur,prev){var pp=pctChange(cur,prev);if(pp==null)return '<div style="height:15px;margin-top:10px"></div>';var pos=pp>=0;return '<div style="font-size:11.5px;font-weight:700;color:'+(pos?'#16a34a':'#dc2626')+';margin-top:10px">'+(pos?'+':'')+String(pp).replace('.',',')+'% '+_cmpTxt+'</div>';};
+    var sumTile=function(label,val,cur,prev){return '<div class="card" style="text-align:center;padding:22px 16px"><div style="font-size:15px;font-weight:700">'+esc(label)+'</div><div style="font-size:36px;font-weight:800;margin-top:10px;line-height:1">'+val+'</div>'+deltaLine(cur,prev)+'</div>';};
+    var _fNow=d.account?d.account.followers:null;
+    var _fPrev=(_fNow!=null&&ins.follower_net!=null)?(_fNow-ins.follower_net):null;
+    html+='<div class="section-h" style="margin-top:4px"><h4>Samenvatting</h4><span style="font-size:12px;color:var(--muted)">Belangrijkste resultaten van de afgelopen '+_pdays+' dagen vergeleken met de vorige periode.</span></div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:6px">'+
+      sumTile('Weergaven',iv(ins.views),ins.views,pmeta.views)+
+      sumTile('Volgers',iv(_fNow),_fNow,_fPrev)+
+      sumTile('Profielbezoeken',iv(ins.profile_views),ins.profile_views,pmeta.profile_views)+
+      sumTile('Klikken op links',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks)+
+    '</div>';
+    if(!d.insights&&d.account){
+      html+='<div class="card" style="margin-bottom:6px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
     }
-    // Accountoverzicht (grote tegels)
-    if(d.account){
-      var vP=pctChange(ins.views,pmeta.views);
-      html+='<div class="section-h"><h4>Accountoverzicht</h4></div>';
-      html+='<div class="stats" style="margin-bottom:6px">'+bigtile('Weergaven',iv(ins.views),true)+bigtile('Totaal volgers',iv(d.account.followers))+bigtile('Gepubliceerde content',iv(d.account.media))+'</div>';
-    }
-    // Prestaties (vergeleken met de vorige, even lange periode)
+    // Detailcijfers (behouden zodat geen data verloren gaat): bereik, interacties, nieuwe volgers.
     if(d.insights){
       var pr=[];
       if(ins.reach!=null)pr.push(kpiD('Bereik',iv(ins.reach),null,null));
-      if(ins.views!=null)pr.push(kpiD('Weergaven',iv(ins.views),ins.views,pmeta.views));
       if(ins.total_interactions!=null)pr.push(kpiD('Interacties',iv(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
       if(ins.follower_net!=null)pr.push(kpiD('Nieuwe volgers (netto)',(ins.follower_net>0?'+':'')+iv(ins.follower_net),null,null));
       else if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers (bruto)',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
-      if(ins.profile_views!=null)pr.push(kpiD('Profielbezoeken',iv(ins.profile_views),ins.profile_views,pmeta.profile_views));
-      if(ins.website_clicks!=null)pr.push(kpiD('Klikken op links in bio',iv(ins.website_clicks),ins.website_clicks,pmeta.website_clicks));
-      if(pr.length)html+='<div class="section-h" style="margin-top:16px"><h4>Prestaties</h4><span style="font-size:12px;color:var(--muted)">vergeleken met de vorige periode</span></div><div class="stats" style="margin-bottom:6px">'+pr.join('')+'</div>';
-    } else if(d.account){
-      html+='<div class="card" style="margin-bottom:14px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig. Zodra die is goedgekeurd, vullen deze cijfers zich automatisch.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
+      if(d.account&&d.account.media!=null)pr.push(kpiD('Gepubliceerde content',iv(d.account.media),null,null));
+      if(pr.length)html+='<div class="stats" style="margin:4px 0 6px">'+pr.join('')+'</div>';
     }
-    // Professionele grafieken: weergaven en nieuwe volgers per dag
-    if(d.series){
-      if(d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
-      if(d.series.follower_count&&d.series.follower_count.length>1){var fc=d.series.follower_count;var tot=fc.reduce(function(s,x){return s+(Number(x.v)||0);},0);var avg=(tot/fc.length);html+='<div class="section-h" style="margin-top:16px"><h4>Nieuwe volgers per dag</h4><span style="font-size:12px;color:var(--muted)">gemiddeld '+avg.toFixed(1)+' per dag &middot; '+iv(tot)+' totaal</span></div><div class="card">'+reportChart(fc,'#16a34a','gFollow')+'</div>';}
-    }
-    // Weergaven: volgers vs niet-volgers
-    if(d.views_split){
-      var vf=d.views_split.follower||0, vn=d.views_split.non_follower||0, vt=vf+vn;
-      if(vt>0){
-        html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven: volgers vs niet-volgers</h4></div><div class="card">';
-        html+='<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin-bottom:6px"><div style="width:'+(vf/vt*100).toFixed(1)+'%;background:var(--accent)"></div><div style="width:'+(vn/vt*100).toFixed(1)+'%;background:#c7cbe0"></div></div>';
-        html+='<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted)"><span>Volgers '+(vf/vt*100).toFixed(1)+'% ('+iv(vf)+')</span><span>Niet-volgers '+(vn/vt*100).toFixed(1)+'% ('+iv(vn)+')</span></div></div>';
+    // ===== 2. Volgersgroei: grafiek + nieuwe volgers + weergaven volgers/niet-volgers =====
+    var _fc=(d.series&&d.series.follower_count)?d.series.follower_count:null;
+    var _fnew=_fc?_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0):null;
+    var _vs=d.views_split||{};
+    html+='<div class="section-h" style="margin-top:18px"><h4>Volgersgroei</h4></div>';
+    html+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">';
+    html+='<div class="card" style="flex:2;min-width:300px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div style="font-weight:700;font-size:15px">Nieuwe volgers per dag</div>'+(_fc?('<div style="font-size:12px;color:var(--muted)">gemiddeld '+(_fnew/_fc.length).toFixed(1).replace('.',',')+' per dag</div>'):'')+'</div>'+(_fnew!=null?('<div style="text-align:right"><div style="font-size:26px;font-weight:800;color:#16a34a">'+(_fnew>0?'+':'')+iv(_fnew)+'</div><div style="font-size:11px;color:var(--muted)">Nieuwe volgers</div></div>'):'')+'</div>'+
+      (_fc&&_fc.length>1?('<div style="margin-top:12px">'+reportChart(_fc,'#16a34a','gFollow')+'</div>'):'<div style="color:var(--muted);font-size:13px;margin-top:10px">Nog te weinig dagdata voor een grafiek.</div>')+
+    '</div>';
+    var _side='';
+    if(_vs.follower!=null)_side+='<div class="card" style="text-align:center;padding:18px"><div style="font-weight:700;font-size:13px">Weergaven van volgers</div><div style="font-size:28px;font-weight:800;margin-top:8px">'+iv(_vs.follower)+'</div></div>';
+    if(_vs.non_follower!=null)_side+='<div class="card" style="text-align:center;padding:18px'+(_vs.follower!=null?';margin-top:14px':'')+'"><div style="font-weight:700;font-size:13px">Weergaven van niet-volgers</div><div style="font-size:28px;font-weight:800;margin-top:8px">'+iv(_vs.non_follower)+'</div></div>';
+    if(_side)html+='<div style="flex:1;min-width:200px;display:flex;flex-direction:column">'+_side+'</div>';
+    html+='</div>';
+    if(d.series&&d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
+    // ===== 3. Contentprestaties: weergaven + interacties per contenttype =====
+    var twoTone=function(title,split,single){
+      var rows='';
+      if(split&&split.length){
+        var mx=Math.max.apply(null,split.map(function(x){return x.follower+x.non_follower;}))||1;
+        rows=split.map(function(x){var tot=x.follower+x.non_follower;var wTot=Math.round(tot/mx*100);var wF=tot>0?Math.round(x.follower/tot*100):0;return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(tot)+'</span></div><div style="height:9px;border-radius:6px;overflow:hidden;background:var(--line)"><div style="height:100%;width:'+wTot+'%;display:flex"><div style="width:'+wF+'%;background:var(--accent)"></div><div style="flex:1;background:#d98fd4"></div></div></div></div>';}).join('');
+      } else if(single&&single.length){
+        var mx2=Math.max.apply(null,single.map(function(x){return x.value;}))||1;
+        rows=single.map(function(x){var w=Math.round(x.value/mx2*100);return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label||MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+'</span></div><div style="height:9px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('');
       }
+      if(!rows)return '';
+      var legend=(split&&split.length)?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px"><span style="color:var(--accent)">&#9679;</span> Volgers &nbsp; <span style="color:#d98fd4">&#9679;</span> Niet-volgers</div>':'';
+      return '<div style="flex:1;min-width:280px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">'+esc(title)+'</div>'+legend+rows+'</div>';
+    };
+    var _ibtSingle=(d.interactions_by_type&&d.interactions_by_type.length)
+      ? d.interactions_by_type.map(function(x){return {type:x.type,value:x.value};})
+      : ((d.contentTypes||[]).filter(function(x){return (x.interactions||0)>0;}).map(function(x){return {label:(RTL[x.type]||x.type),value:x.interactions};})).sort(function(a,b){return b.value-a.value;});
+    var _cpL=twoTone('Weergaven per contenttype',d.views_by_type_split,(d.views_by_type||[]).map(function(x){return {type:x.type,value:x.value};}));
+    var _cpR=twoTone('Interacties per contenttype',d.interactions_by_type_split,_ibtSingle);
+    if(_cpL||_cpR){
+      html+='<div class="section-h" style="margin-top:18px"><h4>Contentprestaties</h4><span style="font-size:12px;color:var(--muted)">Hoe je content heeft gepresteerd</span></div>';
+      html+='<div class="card" style="display:flex;gap:40px;flex-wrap:wrap">'+_cpL+_cpR+'</div>';
     }
-    // Weergaven per contenttype
-    if(d.views_by_type&&d.views_by_type.length){
-      var mvt=Math.max.apply(null,d.views_by_type.map(function(x){return x.value;}))||1;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per contenttype</h4></div><div class="card">';
-      html+=d.views_by_type.map(function(x){var w=Math.round((x.value/mvt)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+' weergaven</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';
-    }
-    // Interacties per contenttype (Reels, Berichten, Verhalen...). Bij voorkeur uit
-    // de Meta-breakdown (klopt met Instagram); anders terugval op de opgehaalde posts.
-    var ibt=(d.interactions_by_type&&d.interactions_by_type.length)
-      ? d.interactions_by_type.map(function(x){return {label:(MPT[x.type]||x.type),value:x.value};})
-      : ((d.contentTypes||[]).filter(function(x){return (x.interactions||0)>0;}).map(function(x){return {label:(RTL[x.type]||x.type),value:x.interactions};}));
-    ibt=ibt.filter(function(x){return (x.value||0)>0;}).sort(function(a,b){return b.value-a.value;});
-    if(ibt.length){
-      var mci=Math.max.apply(null,ibt.map(function(x){return x.value;}))||1;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Interacties per contenttype</h4></div><div class="card">';
-      html+=ibt.map(function(x){var w=Math.round((x.value/mci)*100);return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+iv(x.value)+' interacties</span></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent-2)"></div></div></div>';}).join('')+'</div>';
-    }
-    // Demografie van de volgers
+    // ===== 4. Doelgroep: leeftijd (balken) + geslachtsverdeling (donut) =====
     if(d.demographics){
       var dm=d.demographics;
-      // Balkenlijst met percentage (zoals het ontwerp): label + balk + percentage.
-      var barList=function(title,arr,n){if(!arr||!arr.length)return '';var tot=arr.reduce(function(s,x){return s+(x.value||0);},0)||1;return '<div style="flex:1;min-width:230px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">'+esc(title)+'</div>'+arr.slice(0,n||8).map(function(x){var p=(x.value/tot*100);return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+p.toFixed(1)+'%</span></div><div style="height:7px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.round(p)+'%;background:var(--accent)"></div></div></div>';}).join('')+'</div>';};
-      var glabel={F:'Vrouwen',M:'Mannen',U:'Onbekend'};
-      // Meta geeft landen als ISO-landcode (NL, BE, ...). We tonen de volledige naam.
       var COUNTRY_NL={NL:'Nederland',BE:'België',DE:'Duitsland',FR:'Frankrijk',GB:'Verenigd Koninkrijk',UK:'Verenigd Koninkrijk',IE:'Ierland',ES:'Spanje',PT:'Portugal',IT:'Italië',LU:'Luxemburg',AT:'Oostenrijk',CH:'Zwitserland',DK:'Denemarken',SE:'Zweden',NO:'Noorwegen',FI:'Finland',PL:'Polen',CZ:'Tsjechië',SK:'Slowakije',HU:'Hongarije',RO:'Roemenië',BG:'Bulgarije',GR:'Griekenland',TR:'Turkije',RU:'Rusland',UA:'Oekraïne',US:'Verenigde Staten',CA:'Canada',MX:'Mexico',BR:'Brazilië',AR:'Argentinië',CL:'Chili',CO:'Colombia',PE:'Peru',PA:'Panama',PY:'Paraguay',UY:'Uruguay',VE:'Venezuela',EC:'Ecuador',SR:'Suriname',AW:'Aruba',CW:'Curaçao',MA:'Marokko',EG:'Egypte',ZA:'Zuid-Afrika',NG:'Nigeria',KE:'Kenia',GH:'Ghana',MW:'Malawi',TZ:'Tanzania',UG:'Oeganda',ET:'Ethiopië',DZ:'Algerije',TN:'Tunesië',CN:'China',JP:'Japan',KR:'Zuid-Korea',IN:'India',ID:'Indonesië',TH:'Thailand',VN:'Vietnam',PH:'Filipijnen',MY:'Maleisië',SG:'Singapore',AE:'Verenigde Arabische Emiraten',SA:'Saoedi-Arabië',IL:'Israël',AU:'Australië',NZ:'Nieuw-Zeeland'};
       var cname=function(code){var k=String(code||'').toUpperCase();return COUNTRY_NL[k]||code;};
-      // Doelgroep: leeftijd + geslacht (nieuwe follower_demographics).
-      var dBlocks='';
-      if(dm.age&&dm.age.length)dBlocks+=barList('Leeftijd',dm.age,8);
-      if(dm.gender&&dm.gender.length)dBlocks+=barList('Geslacht',dm.gender.map(function(x){return {label:(glabel[x.label]||x.label),value:x.value};}),4);
-      // Terugval op de oude gecombineerde gender_age als de nieuwe niets gaf.
-      if(!dBlocks&&dm.gender_age&&dm.gender_age.length){
-        var gg={},aa={};dm.gender_age.forEach(function(x){var pp=String(x.label).split('.');gg[pp[0]]=(gg[pp[0]]||0)+(x.value||0);aa[pp[1]||'?']=(aa[pp[1]||'?']||0)+(x.value||0);});
-        dBlocks+=barList('Leeftijd',Object.keys(aa).sort().map(function(k){return {label:k,value:aa[k]};}),8);
-        dBlocks+=barList('Geslacht',Object.keys(gg).map(function(k){return {label:(glabel[k]||k),value:gg[k]};}),4);
+      var ageBars=function(arr){var t=arr.reduce(function(s,x){return s+(x.value||0);},0)||1;return arr.slice(0,8).map(function(x){var p=x.value/t*100;return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+p.toFixed(1).replace('.',',')+'%</span></div><div style="height:7px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.round(p)+'%;background:var(--accent)"></div></div></div>';}).join('');};
+      var ageHtml='', genHtml='';
+      if(dm.age&&dm.age.length)ageHtml=ageBars(dm.age);
+      if(dm.gender&&dm.gender.length){
+        var gt=dm.gender.reduce(function(s,x){return s+(x.value||0);},0)||1;
+        var gf=dm.gender.filter(function(x){return x.label==='F';}).reduce(function(s,x){return s+x.value;},0);
+        var gm=dm.gender.filter(function(x){return x.label==='M';}).reduce(function(s,x){return s+x.value;},0);
+        var fP=gf/gt*100,mP=gm/gt*100,deg=Math.round(fP/100*360);
+        genHtml='<div style="text-align:center"><div style="width:170px;height:170px;border-radius:50%;margin:6px auto 0;background:conic-gradient(#e9a8e4 0deg '+deg+'deg,var(--accent) '+deg+'deg 360deg);position:relative"><div style="position:absolute;top:34px;left:34px;right:34px;bottom:34px;border-radius:50%;background:var(--panel)"></div></div><div style="display:flex;justify-content:center;gap:18px;margin-top:14px;font-size:13px"><span><span style="color:#e9a8e4">&#9679;</span> Vrouwen '+fP.toFixed(1).replace('.',',')+'%</span><span><span style="color:var(--accent)">&#9679;</span> Mannen '+mP.toFixed(1).replace('.',',')+'%</span></div></div>';
       }
-      if(dBlocks)html+='<div class="section-h" style="margin-top:16px"><h4>Doelgroep</h4><span style="font-size:12px;color:var(--muted)">Inzicht in wie je account volgt en bereikt</span></div><div class="card" style="display:flex;gap:30px;flex-wrap:wrap">'+dBlocks+'</div>';
-      // Locaties: steden + landen.
-      var locBlocks='';
-      if(dm.city&&dm.city.length)locBlocks+=barList('Steden',dm.city,6);
-      if(dm.country&&dm.country.length)locBlocks+=barList('Landen',dm.country.map(function(x){return {label:cname(x.label),value:x.value};}),6);
-      if(locBlocks)html+='<div class="section-h" style="margin-top:16px"><h4>Locaties</h4></div><div class="card" style="display:flex;gap:30px;flex-wrap:wrap">'+locBlocks+'</div>';
+      if(!ageHtml&&!genHtml&&dm.gender_age&&dm.gender_age.length){
+        var aa={};dm.gender_age.forEach(function(x){var pp=String(x.label).split('.');aa[pp[1]||'?']=(aa[pp[1]||'?']||0)+(x.value||0);});
+        ageHtml=ageBars(Object.keys(aa).sort().map(function(k){return {label:k,value:aa[k]};}));
+      }
+      if(ageHtml||genHtml){
+        html+='<div class="section-h" style="margin-top:18px"><h4>Doelgroep</h4><span style="font-size:12px;color:var(--muted)">Inzicht in wie je account volgt en bereikt</span></div>';
+        html+='<div style="display:flex;gap:14px;flex-wrap:wrap">'+
+          (ageHtml?('<div class="card" style="flex:1;min-width:280px"><div style="font-weight:700;text-align:center;margin-bottom:12px">Leeftijd</div>'+ageHtml+'</div>'):'')+
+          (genHtml?('<div class="card" style="flex:1;min-width:280px"><div style="font-weight:700;text-align:center;margin-bottom:6px">Geslachtsverdeling</div>'+genHtml+'</div>'):'')+
+        '</div>';
+      }
+      // ===== 5. Locaties =====
+      var _locBars=function(arr,fmt){var mx=Math.max.apply(null,arr.map(function(x){return x.value;}))||1;return arr.slice(0,8).map(function(x){var w=Math.round(x.value/mx*100);return '<div style="margin-bottom:11px;display:flex;align-items:center;gap:12px"><span style="font-size:13px;min-width:120px">'+esc(fmt?fmt(x.label):x.label)+'</span><div style="flex:1;height:10px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('');};
+      var locHtml='';
+      if(dm.city&&dm.city.length)locHtml+='<div style="flex:1;min-width:260px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Steden</div>'+_locBars(dm.city)+'</div>';
+      if(dm.country&&dm.country.length)locHtml+='<div style="flex:1;min-width:260px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Landen</div>'+_locBars(dm.country,cname)+'</div>';
+      if(locHtml)html+='<div class="section-h" style="margin-top:18px"><h4>Locaties</h4></div><div class="card" style="display:flex;gap:40px;flex-wrap:wrap">'+locHtml+'</div>';
     }
-    // Actieve tijden van volgers (per uur), zoals het ontwerp.
-    if(d.activeTimes&&d.activeTimes.length){
-      var at=d.activeTimes; var atmx=Math.max.apply(null,at.map(function(x){return x.value;}))||1;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Actieve tijden van volgers</h4><span style="font-size:12px;color:var(--muted)">Wanneer je volgers online zijn</span></div>';
-      html+='<div class="card"><div style="display:flex;align-items:flex-end;gap:3px;height:150px">'+at.map(function(x){var hh=Math.round((x.value/atmx)*130);return '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center" title="'+x.hour+':00 uur"><div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;height:'+hh+'px"></div></div>';}).join('')+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px"><span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div></div>';
+    // ===== 6. Actieve tijden: dagkiezer + staafjes per uur =====
+    if((d.activeTimes&&d.activeTimes.length)||d.activeTimesByDay){
+      window.RPT_ACTIVE=d.activeTimesByDay||null; window.RPT_ACTIVE_ALL=d.activeTimes||null;
+      var _dnames=['Zo','Ma','Di','Woe','Do','Vrij','Za'];
+      var _dayBtns=_dnames.map(function(dn,i){var has=window.RPT_ACTIVE&&window.RPT_ACTIVE[i]&&window.RPT_ACTIVE[i].length;return '<button class="btn btn-ghost" id="rptDay'+i+'" style="padding:5px 12px;font-size:12px" onclick="rptActiveDay('+i+')"'+((has||!window.RPT_ACTIVE)?'':' disabled')+'>'+dn+'</button>';}).join('');
+      html+='<div class="section-h" style="margin-top:18px"><h4>Actieve tijden van volgers</h4><span style="font-size:12px;color:var(--muted)">Wanneer je volgers online zijn</span></div>';
+      html+='<div class="card">'+(window.RPT_ACTIVE?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+_dayBtns+'</div>'):'')+'<div id="rptActiveChart"></div></div>';
     }
     // Ranking of posts (tabel met per-post cijfers)
     if(d.topPosts&&d.topPosts.length){
       _METAPOSTS=d.topPosts;
-      html+='<div class="section-h" style="margin-top:16px"><h4>Ranking of posts</h4><span style="font-size:12px;color:var(--muted)">'+d.topPosts.length+' best presterende posts (op engagement rate: likes + reacties + opgeslagen + gedeeld / bereik)</span></div>';
+      html+='<div class="section-h" style="margin-top:18px"><h4>De 10 best presterende posts</h4><span style="font-size:12px;color:var(--muted)">Jouw best presterende posts gebaseerd op engagement rate</span></div>';
       html+='<div class="card" style="overflow-x:auto;padding:6px 10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:var(--muted);text-align:right"><th style="text-align:left;padding:8px 6px">Datum</th><th style="text-align:left;padding:8px 6px">Type</th><th style="text-align:left;padding:8px 6px">Tekst</th><th style="padding:8px 6px">Weergaven</th><th style="padding:8px 6px">Kijkers</th><th style="padding:8px 6px">Nieuwe volgers</th><th style="padding:8px 6px">Likes</th><th style="padding:8px 6px">Reacties</th><th style="padding:8px 6px">Opgeslagen</th><th style="padding:8px 6px">Gedeeld</th><th style="padding:8px 6px">Engagement</th></tr>';
       html+=d.topPosts.map(function(p){
         var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:cover;display:block">'):'<div style="width:40px;height:40px;border-radius:7px;background:var(--line)"></div>';
@@ -3098,6 +3114,21 @@ async function loadMetaInsights(){
           '<td style="padding:8px 6px">'+iv(p.likes)+'</td><td style="padding:8px 6px">'+iv(p.comments)+'</td><td style="padding:8px 6px">'+iv(p.saved)+'</td><td style="padding:8px 6px">'+iv(p.shares)+'</td>'+
           '<td style="padding:8px 6px;font-weight:700">'+(p.engagement!=null?(p.engagement+'%'):'-')+'</td></tr>';
       }).join('')+'</table></div>';
+    }
+    // ===== 7. AI Doelgroep analyse (knop opent de bestaande AI-analyse) =====
+    html+='<div class="section-h" style="margin-top:18px"><h4>AI Doelgroep analyse</h4></div>';
+    html+='<div class="card"><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px">Hier verschijnt een analyse van de werkelijke doelgroepgegevens, inclusief mogelijke verschillen met de gewenste doelgroep en concrete aandachtspunten voor de contentstrategie.</div><button class="btn btn-ghost" onclick="runAiAnalysis()">&#10024; Bekijk doelgroep analyse</button></div>';
+    // ===== 8. Analyse & inzichten: verbeterkans-kaarten, automatisch uit de cijfers =====
+    var _cards=[];
+    var _intP=pctChange(ins.total_interactions,pmeta.total_interactions);
+    var _viewP=pctChange(ins.views,pmeta.views);
+    if(_intP!=null&&_intP<0){_cards.push({ic:'&#128201;',col:'#dc2626',t:'Interactie is gedaald',d:'Het aantal interacties is '+((_viewP!=null&&_intP<_viewP)?'sterker ':'')+'gedaald ('+String(_intP).replace('.',',')+'%).',a:'Onderzoek welke content minder reacties, saves of shares opleverde en test meer formats die uitnodigen tot interactie.'});}
+    if(_vs&&_vs.follower!=null&&_vs.non_follower!=null){var _tt=_vs.follower+_vs.non_follower;if(_tt>0&&(_vs.non_follower/_tt)>=0.6){_cards.push({ic:'&#128100;',col:'#17b2c6',t:'Veel niet-volgers bereikt',d:'Ruim '+Math.round(_vs.non_follower/_tt*100)+'% van de weergaven komt van mensen die het account niet volgen.',a:'Test duidelijke redenen om het account te volgen in relevante Reels en captions.'});}}
+    var _vbt=(d.views_by_type&&d.views_by_type.length)?d.views_by_type.slice().sort(function(a,b){return b.value-a.value;}):[];
+    if(_vbt.length&&/REEL/i.test(_vbt[0].type)){var _totV=_vbt.reduce(function(s,x){return s+x.value;},0)||1;_cards.push({ic:'&#127909;',col:'#d14fc4',t:'Reels domineren weergaven',d:'Reels zijn goed voor '+Math.round(_vbt[0].value/_totV*100)+'% van je weergaven.',a:'Blijf investeren in Reels en wissel af met berichten en verhalen voor binding met je volgers.'});}
+    if(_cards.length){
+      html+='<div class="section-h" style="margin-top:18px"><h4>Analyse &amp; inzichten</h4><span style="font-size:12px;color:var(--muted)">Verbeterkansen op basis van de afgelopen '+_pdays+' dagen</span></div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">'+_cards.map(function(c){return '<div class="card"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px;color:'+c.col+'">'+c.ic+'</span><div style="font-weight:800;font-size:16px">'+esc(c.t)+'</div></div><div style="font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6">'+esc(c.d)+'</div><div style="font-weight:700;font-size:13px;margin-top:10px">Verbeterkans</div><div style="font-size:13px;color:var(--muted);margin-top:4px;line-height:1.6">'+esc(c.a)+'</div></div>';}).join('')+'</div>';
     }
     // ===== Campagnes-tab (Meta Ads) in een aparte html-string =====
     var adsHtml='';
@@ -3140,6 +3171,7 @@ async function loadMetaInsights(){
     box.innerHTML=brandHead+tabBar+rptDateBar()+
       '<div id="rptPaneOrg">'+html+'</div>'+
       '<div id="rptPaneCamp" style="display:none">'+(hasAds?adsHtml:'<div class="card" style="color:var(--muted);font-size:14px">Geen advertentiedata voor deze klant in deze periode.</div>')+'</div>';
+    try{ if(document.getElementById('rptActiveChart')){ var _def=-1; if(window.RPT_ACTIVE){ _def=(window.RPT_ACTIVE[2]&&window.RPT_ACTIVE[2].length)?2:Number(Object.keys(window.RPT_ACTIVE)[0]); } rptActiveDay(_def); } }catch(_){}
   }catch(e){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Netwerkfout bij het laden van Meta-cijfers.</div>';}
 }
 function rptTab(which){
@@ -3150,6 +3182,20 @@ function rptTab(which){
   o.style.display=org?'':'none'; c.style.display=org?'none':'';
   if(bo){bo.className='btn '+(org?'btn-primary':'btn-ghost');bo.style.padding='8px 16px';}
   if(bc){bc.className='btn '+(org?'btn-ghost':'btn-primary');bc.style.padding='8px 16px';}
+}
+// Actieve tijden: staafjes per uur voor een gekozen weekdag.
+function rptActiveChartHtml(arr){
+  if(!arr||!arr.length)return '<div style="color:var(--muted);font-size:13px">Geen data voor deze dag.</div>';
+  var byH={}; arr.forEach(function(x){byH[x.hour]=x.value;});
+  var mx=Math.max.apply(null,arr.map(function(x){return x.value;}))||1;
+  var bars='';for(var h=0;h<24;h++){var v=byH[h]||0;var hh=Math.round(v/mx*150);bars+='<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center" title="'+h+':00 - '+v+'"><div style="width:100%;background:#d14fc4;border-radius:3px 3px 0 0;height:'+hh+'px;min-height:2px"></div></div>';}
+  return '<div style="display:flex;align-items:flex-end;gap:2px;height:170px">'+bars+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px"><span>00:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>';
+}
+function rptActiveDay(wd){
+  var box=document.getElementById('rptActiveChart'); if(!box)return;
+  var arr=(wd>=0&&window.RPT_ACTIVE&&window.RPT_ACTIVE[wd])?window.RPT_ACTIVE[wd]:window.RPT_ACTIVE_ALL;
+  box.innerHTML=rptActiveChartHtml(arr);
+  for(var i=0;i<7;i++){var b=document.getElementById('rptDay'+i);if(b)b.className='btn '+(i===wd?'btn-primary':'btn-ghost');}
 }
 
 async function runAiAnalysis(){
