@@ -3116,7 +3116,7 @@ async function loadMetaInsights(){
     }
     // ===== 7. AI Doelgroep analyse (knop opent de bestaande AI-analyse) =====
     html+='<div class="section-h" style="margin-top:18px"><h4>AI Doelgroep analyse</h4></div>';
-    html+='<div class="card"><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px">Hier verschijnt een analyse van de werkelijke doelgroepgegevens, inclusief mogelijke verschillen met de gewenste doelgroep en concrete aandachtspunten voor de contentstrategie.</div><button class="btn btn-ghost" onclick="runAiAnalysis()">&#10024; Bekijk doelgroep analyse</button></div>';
+    html+='<div class="card"><div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px">Hier verschijnt een analyse van de werkelijke doelgroepgegevens, inclusief mogelijke verschillen met de gewenste doelgroep en concrete aandachtspunten voor de contentstrategie.</div><button class="btn btn-ghost" id="aiDoelgroepBtn" onclick="runDoelgroepAnalyse(this)">&#10024; Bekijk doelgroep analyse</button><div id="aiDoelgroepResult" style="margin-top:12px"></div></div>';
     // ===== 8. Analyse & inzichten: verbeterkans-kaarten, automatisch uit de cijfers =====
     var _cards=[];
     var _intP=pctChange(ins.total_interactions,pmeta.total_interactions);
@@ -3197,9 +3197,24 @@ function rptActiveDay(wd){
   for(var i=0;i<7;i++){var b=document.getElementById('rptDay'+i);if(b)b.className='btn '+(i===wd?'btn-primary':'btn-ghost');}
 }
 
+// Doelgroep-analyse die het resultaat direct in de kaart toont (waar de knop staat).
+async function runDoelgroepAnalyse(btn){
+  if(!CURRENT_CLIENT)return;
+  var box=document.getElementById('aiDoelgroepResult'); if(!box)return;
+  box.innerHTML='<div style="color:var(--muted);font-size:14px">AI leest de cijfers en schrijft een verslag...</div>';
+  var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Bezig...';}
+  try{
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div style="color:#b91c1c;font-size:14px">'+esc((d&&d.error)||'AI-analyse mislukt.')+'</div>';}
+    else{var safe=esc(d.report).replace(/\n/g,'<br>');box.innerHTML='<div style="border-top:1px solid var(--line);margin-top:4px;padding-top:12px"><div style="font-weight:700;margin-bottom:8px">AI-analyse <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></div><div style="font-size:14px;line-height:1.7">'+safe+'</div><div style="font-size:11.5px;color:var(--faint);margin-top:12px">Gebaseerd op de Meta-cijfers van de gekozen periode. Controleer altijd zelf voor je dit met de klant deelt.</div></div>';}
+  }catch(e){box.innerHTML='<div style="color:#b91c1c;font-size:14px">Netwerkfout.</div>';}
+  if(btn){btn.disabled=false;btn.textContent=orig;}
+}
 async function runAiAnalysis(){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('aiAnalyseBox'); var btn=document.getElementById('aiAnalyseBtn');
+  if(!box||!btn)return;
   box.style.display='block';
   box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">AI leest de cijfers en schrijft een verslag...</div>';
   btn.disabled=true; var orig=btn.textContent; btn.textContent='Bezig...';
