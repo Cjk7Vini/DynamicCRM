@@ -774,6 +774,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
                     <button class="btn btn-ghost" style="padding:8px 14px" onclick="metaDiscover(this)">Accounts ophalen</button>
                   </div>
                 </details>
+                <div id="igLoginOption" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+                  <div style="font-weight:700;font-size:13px;margin-bottom:3px">Geen Facebook? Koppel via Instagram</div>
+                  <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Voor een klant met wel Instagram maar geen Facebook-pagina. Geeft inzichten en posts klaarzetten (geen advertenties).</div>
+                  <div id="igLoginStatus" style="font-size:12px;margin-bottom:8px"></div>
+                  <button class="btn btn-ghost" onclick="igLoginStart()" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.17.05 1.8.25 2.23.42.56.22.96.48 1.38.9.42.42.68.82.9 1.38.17.42.37 1.06.42 2.23.06 1.27.07 1.65.07 4.86s0 3.6-.07 4.86c-.05 1.17-.25 1.8-.42 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.17-1.06.37-2.23.42-1.27.06-1.65.07-4.86.07s-3.6 0-4.86-.07c-1.17-.05-1.8-.25-2.23-.42a3.7 3.7 0 01-1.38-.9 3.7 3.7 0 01-.9-1.38c-.17-.42-.37-1.06-.42-2.23-.07-1.26-.07-1.66-.07-4.86s0-3.6.07-4.86c.05-1.17.25-1.8.42-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.17 1.06-.37 2.23-.42 1.26-.07 1.66-.07 4.86-.07zm0 3.1a6.7 6.7 0 100 13.4 6.7 6.7 0 000-13.4zm0 11a4.3 4.3 0 110-8.6 4.3 4.3 0 010 8.6zm6.95-11.3a1.57 1.57 0 11-3.14 0 1.57 1.57 0 013.14 0z"/></svg> Koppel via Instagram</button>
+                </div>
               </div>
               <details style="margin-bottom:12px">
                 <summary style="font-size:12px;color:var(--muted);cursor:pointer">Geavanceerd (velden handmatig invullen)</summary>
@@ -3292,12 +3298,24 @@ function metaFillFromDiscover(){
   if(!igId){showMsg('intMsg',false,'Let op: er is geen Instagram-account gekozen. '+(_MQ_IG_HINT||'Kies een Instagram-account uit de lijst.'));}
   else{showMsg('intMsg',true,'Velden ingevuld: '+naam+(igUser?(' + @'+igUser):(' + Instagram '+igId))+'. Klik op Koppelingen opslaan om te bewaren.');}
 }
+// Instagram-login per klant (voor accounts zonder Facebook).
+function igLoginStart(){
+  if(!CURRENT_CLIENT){alert('Open eerst een klant.');return;}
+  window.location.href='/api/mkt/meta/ig-oauth/start?clientId='+encodeURIComponent(CURRENT_CLIENT.id);
+}
+async function igCheckConfig(){
+  var box=document.getElementById('igLoginOption'); if(!box)return;
+  try{ var r=await fetch('/api/mkt/meta/ig-login-config',{credentials:'include'}); var d=await r.json(); box.style.display=(d&&d.configured)?'':'none'; }
+  catch(e){ box.style.display='none'; }
+}
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
+  igCheckConfig();
   // Snel-koppelen leegmaken, zodat token en opgehaalde accounts van de vorige klant
   // niet blijven staan als je naar een andere klant wisselt.
   var _mqT=document.getElementById('mqToken'); if(_mqT)_mqT.value='';
   var _mqR=document.getElementById('mqResult'); if(_mqR)_mqR.innerHTML='';
+  var _igs=document.getElementById('igLoginStatus'); if(_igs)_igs.innerHTML='';
   _MQ_PAGES=[]; _MQ_ADS=[]; _MQ_IGS=[]; _MQ_IG_HINT=null;
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{credentials:'include'}); var d=await r.json();
