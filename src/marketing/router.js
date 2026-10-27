@@ -1095,11 +1095,27 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
         ? [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null, assignees, JSON.stringify(checklist)]
         : [wsId, okClient, String(title).trim(), body || null, ch, st, when, assetId, autoPub, pubCh, req.session.mkt.accountId || null]
     )).rows[0]);
+    // Type (bericht/reel/story/carrousel) direct serverzijdig opslaan, los van de
+    // vervolg-PATCH vanuit de browser. Anders kan een carrousel terugkomen als gewoon
+    // bericht als die tweede call niet aankomt, en blijft de carrousel verborgen.
+    if (req.body && req.body.post_type !== undefined && POST_TYPES.includes(req.body.post_type) && await postTypeAvailable()) {
+      try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET post_type=$1 WHERE id=$2 AND workspace_id=$3', [req.body.post_type, row.id, wsId])); row.post_type = req.body.post_type; } catch (_) { /* niet blokkerend */ }
+    }
     // Carousel-bestanden opslaan (als meegegeven en de kolom beschikbaar is).
-    if (Array.isArray(req.body && req.body.carousel_asset_ids) && await postCarouselAvailable()) {
-      const items = await resolveCarouselAssets(wsId, okClient, req.body.carousel_asset_ids);
-      const cids = items.map((x) => x.id);
-      try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET carousel_asset_ids=$1 WHERE id=$2 AND workspace_id=$3', [cids, row.id, wsId])); row.carousel_asset_ids = cids; } catch (_) { /* niet blokkerend */ }
+    let carouselWarn = null;
+    if (Array.isArray(req.body && req.body.carousel_asset_ids) && req.body.carousel_asset_ids.length) {
+      if (await postCarouselAvailable()) {
+        const requested = req.body.carousel_asset_ids.length;
+        const items = await resolveCarouselAssets(wsId, okClient, req.body.carousel_asset_ids);
+        const cids = items.map((x) => x.id);
+        try {
+          await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET carousel_asset_ids=$1 WHERE id=$2 AND workspace_id=$3', [cids, row.id, wsId]));
+          row.carousel_asset_ids = cids;
+          if (cids.length < requested) carouselWarn = 'Niet alle carrousel-bestanden konden worden gekoppeld (' + cids.length + ' van ' + requested + ' bewaard). Controleer of de bestanden bij deze klant horen en opnieuw geupload zijn.';
+        } catch (e) { carouselWarn = 'De carrousel-bestanden konden niet worden opgeslagen: ' + (e.message || 'onbekende fout'); }
+      } else {
+        carouselWarn = 'Carrousel kan nog niet worden opgeslagen: de database-kolom carousel_asset_ids ontbreekt (migratie 018).';
+      }
     }
     // Week (los van de status) opslaan.
     if (req.body && req.body.board_week !== undefined && await postBoardWeekAvailable()) {
@@ -1107,7 +1123,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
       try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET board_week=$1 WHERE id=$2 AND workspace_id=$3', [wk, row.id, wsId])); row.board_week = wk; } catch (_) { /* niet blokkerend */ }
     }
     await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'created', null);
-    res.json({ success: true, post: row });
+    res.json({ success: true, post: row, warning: carouselWarn || undefined });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1132,9 +1148,19 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && await isValidPostStatus(wsId, b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
     if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
-    if (b.carousel_asset_ids !== undefined && await postCarouselAvailable()) {
-      const prow = await withReadConnection(async (c) => (await c.query('SELECT client_id FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId])).rows[0]);
-      if (prow) { const items = await resolveCarouselAssets(wsId, prow.client_id, b.carousel_asset_ids); sets.push(`carousel_asset_ids=$${i++}`); vals.push(items.map((x) => x.id)); }
+    let carouselWarn = null;
+    if (b.carousel_asset_ids !== undefined) {
+      if (await postCarouselAvailable()) {
+        const prow = await withReadConnection(async (c) => (await c.query('SELECT client_id FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId])).rows[0]);
+        if (prow) {
+          const requested = Array.isArray(b.carousel_asset_ids) ? b.carousel_asset_ids.length : 0;
+          const items = await resolveCarouselAssets(wsId, prow.client_id, b.carousel_asset_ids);
+          sets.push(`carousel_asset_ids=$${i++}`); vals.push(items.map((x) => x.id));
+          if (requested && items.length < requested) carouselWarn = 'Niet alle carrousel-bestanden konden worden gekoppeld (' + items.length + ' van ' + requested + ' bewaard). Controleer of de bestanden bij deze klant horen en opnieuw geupload zijn.';
+        }
+      } else if (Array.isArray(b.carousel_asset_ids) && b.carousel_asset_ids.length) {
+        carouselWarn = 'Carrousel kan nog niet worden opgeslagen: de database-kolom carousel_asset_ids ontbreekt (migratie 018).';
+      }
     }
     if (b.board_week !== undefined && await postBoardWeekAvailable()) {
       let wk = null; const n = parseInt(b.board_week, 10); if (Number.isInteger(n) && n >= 1 && n <= 5) wk = n;
@@ -1207,7 +1233,7 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.status !== undefined && oldStatus !== null && row.status !== oldStatus) {
       await logPostActivity(wsId, row.id, req.session.mkt.accountId, req.session.mkt.email, 'moved', row.status);
     }
-    res.json({ success: true, post: row });
+    res.json({ success: true, post: row, warning: carouselWarn || undefined });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
