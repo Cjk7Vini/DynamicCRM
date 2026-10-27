@@ -624,6 +624,32 @@ router.get('/api/mkt/clients', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Uitgebreid klantprofiel (migratie 023): doelen en kanalen zijn vaste keuzes.
+const CLIENT_GOALS = ['bereik', 'interactie', 'aanvragen', 'websitebezoekers'];
+const CLIENT_CHANNELS = ['instagram', 'facebook', 'linkedin', 'tiktok'];
+let _hasClientProfile = null;
+async function clientProfileAvailable() {
+  if (_hasClientProfile === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='clients' AND column_name='logo_url'"
+    )).rows);
+    if (r.length > 0) _hasClientProfile = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Haal alleen de geldige, aanwezige profielvelden uit de body (voor create en patch).
+function sanitizeClientProfile(b) {
+  const out = {};
+  b = b || {};
+  if (typeof b.logo_url === 'string') { const u = b.logo_url.trim().slice(0, 500); if (!u || /^https?:\/\//i.test(u)) out.logo_url = u || null; }
+  if (typeof b.branche === 'string') out.branche = b.branche.trim().slice(0, 120) || null;
+  if (typeof b.audience === 'string') out.audience = b.audience.trim().slice(0, 500) || null;
+  if (b.goals !== undefined) out.goals = Array.isArray(b.goals) ? b.goals.map((x) => String(x)).filter((x) => CLIENT_GOALS.includes(x)) : [];
+  if (b.channels !== undefined) out.channels = Array.isArray(b.channels) ? b.channels.map((x) => String(x)).filter((x) => CLIENT_CHANNELS.includes(x)) : [];
+  return out;
+}
+
 // Nieuwe klant aanmaken (owner/manager/member). Respecteert max_clients van de licentie.
 router.post('/api/mkt/clients', requireMkt, async (req, res) => {
   try {
@@ -647,6 +673,22 @@ router.post('/api/mkt/clients', requireMkt, async (req, res) => {
        RETURNING id, name, contact_name, contact_email, website, brand_color, status, archived, created_at`,
       [wsId, String(name).trim(), contact_name || null, contact_email || null, website || null, brand_color || null, notes || null, req.session.mkt.accountId || null]
     )).rows[0]);
+    // Uitgebreid profiel (logo, branche, doelen, doelgroep, kanalen) opslaan als de
+    // kolommen bestaan (migratie 023). Niet-blokkerend.
+    if (await clientProfileAvailable()) {
+      const prof = sanitizeClientProfile(req.body || {});
+      const keys = Object.keys(prof);
+      if (keys.length) {
+        try {
+          const setsP = keys.map((k, idx) => `${k}=$${idx + 1}`);
+          await withWriteConnection(async (c) => c.query(
+            `UPDATE marketing.clients SET ${setsP.join(', ')} WHERE id=$${keys.length + 1} AND workspace_id=$${keys.length + 2}`,
+            [...keys.map((k) => prof[k]), row.id, wsId]
+          ));
+          keys.forEach((k) => { row[k] = prof[k]; });
+        } catch (_) { /* niet blokkerend */ }
+      }
+    }
     res.json({ success: true, client: row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -676,6 +718,11 @@ router.patch('/api/mkt/clients/:id', requireMkt, async (req, res) => {
     }
     if (b.status !== undefined && CLIENT_STATUS.includes(b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
     if (typeof b.archived === 'boolean') { sets.push(`archived=$${i++}`); vals.push(b.archived); }
+    // Uitgebreid profiel (migratie 023), alleen de meegestuurde velden.
+    if (await clientProfileAvailable()) {
+      const prof = sanitizeClientProfile(b);
+      for (const k of Object.keys(prof)) { sets.push(`${k}=$${i++}`); vals.push(prof[k]); }
+    }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     vals.push(req.params.id, req.session.mkt.workspaceId);
     const row = await withWriteConnection(async (c) => (await c.query(
@@ -2227,6 +2274,20 @@ router.post('/api/mkt/workspace/logo/sign', requireMkt, async (req, res) => {
     const wsId = req.session.mkt.workspaceId;
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = `mkt/ws${wsId}/brand`;
+    const signature = cloudinarySign({ folder, timestamp }, cfg.apiSecret);
+    res.json({ success: true, cloudName: cfg.cloudName, apiKey: cfg.apiKey, timestamp, folder, signature });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Upload-handtekening voor een klant-logo bij het aanmaken (er is dan nog geen
+// klant-id). Alleen gebruikers die klanten mogen beheren.
+router.post('/api/mkt/clients/logo/sign', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om klanten te beheren' });
+    const cfg = cloudinaryConfig();
+    if (!cfg) return res.status(500).json({ error: 'Cloudinary is niet geconfigureerd op de server' });
+    const wsId = req.session.mkt.workspaceId;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `mkt/ws${wsId}/clientlogos`;
     const signature = cloudinarySign({ folder, timestamp }, cfg.apiSecret);
     res.json({ success: true, cloudName: cfg.cloudName, apiKey: cfg.apiKey, timestamp, folder, signature });
   } catch (e) { res.status(500).json({ error: e.message }); }

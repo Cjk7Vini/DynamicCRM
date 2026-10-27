@@ -848,23 +848,46 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 
 <!-- MODAL: nieuwe klant -->
 <div class="modal-ov" id="newClientModal">
-  <div class="modal">
-    <h3>Nieuwe klant</h3>
-    <div class="sub">Maak een eigen space aan voor deze klant.</div>
+  <div class="modal" style="max-width:880px">
+    <h3>Nieuwe klant toevoegen</h3>
+    <div class="sub">Maak een eigen werkruimte voor je klant aan. Je kunt alle gegevens later aanvullen of wijzigen.</div>
     <div id="newClientMsg" class="inline-msg"></div>
-    <div class="field"><label>Klantnaam *</label><input id="ncName" placeholder="Bijv. Bakkerij Jansen"></div>
-    <div class="row2">
-      <div class="field"><label>Contactpersoon</label><input id="ncContact"></div>
-      <div class="field"><label>Contact e-mail</label><input id="ncEmail" type="email"></div>
+    <div style="display:flex;gap:30px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <div style="font-weight:700;font-size:13px;margin:4px 0 10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Klantgegevens</div>
+        <div class="field"><label>Klantnaam *</label><input id="ncName" placeholder="Bv. Fysiotherapie Rek & Strek"></div>
+        <div class="field"><label>Profielfoto of bedrijfslogo</label>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div id="ncLogoPreview" style="width:60px;height:60px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-size:11px;text-align:center">Geen</div>
+            <div>
+              <input type="file" id="ncLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadClientLogo(this)">
+              <button class="btn btn-ghost" type="button" id="ncLogoBtn" onclick="document.getElementById('ncLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Afbeelding uploaden</button>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Zonder afbeelding tonen we de initialen van de klant.</div>
+            </div>
+          </div>
+          <input type="hidden" id="ncLogo">
+        </div>
+        <div class="row2">
+          <div class="field"><label>Contactpersoon</label><input id="ncContact"></div>
+          <div class="field"><label>Contact e-mail</label><input id="ncEmail" type="email"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Website</label><input id="ncWebsite" placeholder="https://"></div>
+          <div class="field"><label>Branche</label><input id="ncBranche" placeholder="Bv. fysiotherapie"></div>
+        </div>
+        <div class="field"><label>Merkkleur</label><input id="ncColor" type="color" value="#6366f1" class="color-in"></div>
+      </div>
+      <div style="flex:1;min-width:280px">
+        <div style="font-weight:700;font-size:13px;margin:4px 0 10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Social media strategie</div>
+        <div class="field"><label>Belangrijkste doel(en)</label><div id="ncGoals"></div></div>
+        <div class="field"><label>Doelgroep</label><input id="ncAudience" placeholder="Wie wil de klant bereiken?"></div>
+        <div class="field"><label>Social media kanalen</label><div id="ncChannels"></div></div>
+        <div class="field"><label>Belangrijke afspraken & notities</label><textarea id="ncNotes" rows="3" placeholder="Bv. tone of voice, wensen of bijzonderheden"></textarea></div>
+      </div>
     </div>
-    <div class="row2">
-      <div class="field"><label>Website</label><input id="ncWebsite" placeholder="https://"></div>
-      <div class="field"><label>Merkkleur</label><input id="ncColor" type="color" value="#6366f1" class="color-in"></div>
-    </div>
-    <div class="field"><label>Notities</label><textarea id="ncNotes" rows="2"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeNewClient()">Annuleren</button>
-      <button class="btn btn-primary" id="ncCreateBtn" onclick="createClient()">Klant aanmaken</button>
+      <button class="btn btn-primary" id="ncCreateBtn" onclick="createClient()">Klant opslaan</button>
     </div>
   </div>
 </div>
@@ -1927,11 +1950,43 @@ async function loadClients(){
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('clientsMsg',false,'Netwerkfout.');}
 }
-function openNewClient(){hideMsg('newClientMsg');['ncName','ncContact','ncEmail','ncWebsite','ncNotes'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('ncColor').value='#6366f1';document.getElementById('newClientModal').classList.add('open');document.getElementById('ncName').focus();}
+var NC_GOALS=[], NC_CHANNELS=[];
+var NC_GOAL_OPTS=[['bereik','Meer bereik en naamsbekendheid'],['interactie','Meer interactie en betrokkenheid'],['aanvragen','Meer aanvragen en klanten'],['websitebezoekers','Meer websitebezoekers']];
+var NC_CHANNEL_OPTS=[['instagram','Instagram'],['facebook','Facebook'],['linkedin','LinkedIn'],['tiktok','Tiktok']];
+function ncPickRow(onclick,on,label){
+  return '<div onclick="'+onclick+'" style="display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;font-size:14px">'+
+    '<span style="width:18px;height:18px;border-radius:50%;border:2px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent)':'transparent')+';flex:0 0 auto;display:flex;align-items:center;justify-content:center">'+(on?'<span style="width:7px;height:7px;border-radius:50%;background:#fff"></span>':'')+'</span>'+
+    '<span>'+esc(label)+'</span></div>';
+}
+function ncRenderGoals(){var box=document.getElementById('ncGoals'); if(!box)return; box.innerHTML=NC_GOAL_OPTS.map(function(o){return ncPickRow("ncToggleGoal('"+o[0]+"')",NC_GOALS.indexOf(o[0])>=0,o[1]);}).join('');}
+function ncToggleGoal(k){var i=NC_GOALS.indexOf(k);if(i>=0)NC_GOALS.splice(i,1);else NC_GOALS.push(k);ncRenderGoals();}
+function ncRenderChannels(){var box=document.getElementById('ncChannels'); if(!box)return; box.innerHTML=NC_CHANNEL_OPTS.map(function(o){return ncPickRow("ncToggleChannel('"+o[0]+"')",NC_CHANNELS.indexOf(o[0])>=0,o[1]);}).join('');}
+function ncToggleChannel(k){var i=NC_CHANNELS.indexOf(k);if(i>=0)NC_CHANNELS.splice(i,1);else NC_CHANNELS.push(k);ncRenderChannels();}
+async function uploadClientLogo(input){
+  var file=input.files&&input.files[0]; input.value='';
+  if(!file)return;
+  var ok=['image/png','image/jpeg','image/webp'];
+  if(ok.indexOf(file.type)<0){ showMsg('newClientMsg',false,'Alleen PNG, JPG of WebP.'); return; }
+  if(file.size>5*1024*1024){ showMsg('newClientMsg',false,'Afbeelding is te groot (max 5 MB).'); return; }
+  var btn=document.getElementById('ncLogoBtn'); if(btn){btn.disabled=true;btn.textContent='Uploaden...';}
+  try{
+    var sr=await fetch('/api/mkt/clients/logo/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var sd=await sr.json();
+    if(!sr.ok||!sd.success){ showMsg('newClientMsg',false,sd.error||'Kon upload niet voorbereiden.'); if(btn){btn.disabled=false;btn.textContent='Afbeelding uploaden';} return; }
+    var fd=new FormData(); fd.append('file',file); fd.append('api_key',sd.apiKey); fd.append('timestamp',sd.timestamp); fd.append('signature',sd.signature); fd.append('folder',sd.folder);
+    var cr=await fetch('https://api.cloudinary.com/v1_1/'+sd.cloudName+'/auto/upload',{method:'POST',body:fd});
+    var cd=await cr.json();
+    if(!cr.ok||!cd.secure_url){ showMsg('newClientMsg',false,(cd.error&&cd.error.message)||'Upload naar Cloudinary mislukt.'); if(btn){btn.disabled=false;btn.textContent='Afbeelding uploaden';} return; }
+    document.getElementById('ncLogo').value=cd.secure_url;
+    var lp=document.getElementById('ncLogoPreview'); if(lp)lp.innerHTML='<img src="'+esc(cd.secure_url)+'" alt="" style="width:100%;height:100%;object-fit:cover">';
+  }catch(e){ showMsg('newClientMsg',false,'Netwerkfout bij uploaden.'); }
+  if(btn){btn.disabled=false;btn.textContent='Afbeelding uploaden';}
+}
+function openNewClient(){hideMsg('newClientMsg');['ncName','ncContact','ncEmail','ncWebsite','ncNotes','ncBranche','ncAudience','ncLogo'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});document.getElementById('ncColor').value='#6366f1';NC_GOALS=[];NC_CHANNELS=[];ncRenderGoals();ncRenderChannels();var lp=document.getElementById('ncLogoPreview');if(lp){lp.innerHTML='';lp.textContent='Geen';}document.getElementById('newClientModal').classList.add('open');document.getElementById('ncName').focus();}
 function closeNewClient(){document.getElementById('newClientModal').classList.remove('open');}
 async function createClient(){
   var btn=document.getElementById('ncCreateBtn'); hideMsg('newClientMsg');
-  var body={name:document.getElementById('ncName').value.trim(),contact_name:document.getElementById('ncContact').value.trim(),contact_email:document.getElementById('ncEmail').value.trim(),website:document.getElementById('ncWebsite').value.trim(),brand_color:document.getElementById('ncColor').value,notes:document.getElementById('ncNotes').value.trim()};
+  var body={name:document.getElementById('ncName').value.trim(),contact_name:document.getElementById('ncContact').value.trim(),contact_email:document.getElementById('ncEmail').value.trim(),website:document.getElementById('ncWebsite').value.trim(),brand_color:document.getElementById('ncColor').value,notes:document.getElementById('ncNotes').value.trim(),logo_url:(document.getElementById('ncLogo').value||'').trim(),branche:document.getElementById('ncBranche').value.trim(),audience:document.getElementById('ncAudience').value.trim(),goals:NC_GOALS.slice(),channels:NC_CHANNELS.slice()};
   if(!body.name){showMsg('newClientMsg',false,'Klantnaam is verplicht.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
@@ -1939,7 +1994,7 @@ async function createClient(){
     var d=await r.json();
     if(r.ok&&d.success){closeNewClient();loadClients();} else {showMsg('newClientMsg',false,d.error||'Aanmaken mislukt.');}
   }catch(e){showMsg('newClientMsg',false,'Netwerkfout: '+e.message);}
-  btn.disabled=false; btn.textContent='Klant aanmaken';
+  btn.disabled=false; btn.textContent='Klant opslaan';
 }
 async function openClient(id){
   try{
