@@ -2092,7 +2092,13 @@ router.get('/api/mkt/meta/assets', requireMkt, async (req, res) => {
     const token = decryptSecret(wi.meta_access_token) || process.env.META_ACCESS_TOKEN || null;
     if (!token) return res.status(400).json({ error: 'Nog geen Meta-koppeling op de werkplek. Log eerst in met Facebook of vul een token in.' });
     const out = await discoverMetaAssets(token);
-    _wsAssetsCache.set(wsId, { ts: Date.now(), data: out });
+    // Alleen cachen als er echt iets gevonden is; een lege/mislukte ophaal (bijv.
+    // door een tijdelijk tokenprobleem) mag niet 15 minuten blijven hangen.
+    if ((out.pages && out.pages.length) || (out.igaccounts && out.igaccounts.length)) {
+      _wsAssetsCache.set(wsId, { ts: Date.now(), data: out });
+    } else {
+      _wsAssetsCache.delete(wsId);
+    }
     res.json({ success: true, ...out });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
