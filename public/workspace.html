@@ -4424,8 +4424,10 @@ async function savePost(){
     var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
     var d=await r.json();
     if(r.ok&&d.success){
+      var warn=d.warning||'';
       // Nieuwe post: blokken opslaan via een vervolg-PATCH (create bewaart de blokken nog niet).
-      if(!EDIT_POST&&d.post&&d.post.id){ try{ await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText,post_type:document.getElementById('pfType').value,cover_color:PF_COVER})}); }catch(_){} }
+      if(!EDIT_POST&&d.post&&d.post.id){ try{ var pr=await fetch('/api/mkt/posts/'+d.post.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({blocks:PF_BLOCKS,body:bodyText,post_type:document.getElementById('pfType').value,cover_color:PF_COVER})}); var pd=await pr.json(); if(pd&&pd.warning&&!warn)warn=pd.warning; }catch(_){} }
+      if(warn){ alert('Let op: '+warn); }
       closePost();loadPosts();
     } else {showMsg('postMsg',false,d.error||'Opslaan mislukt.');}
   }catch(e){showMsg('postMsg',false,'Netwerkfout.');}
