@@ -2010,32 +2010,29 @@ async function discoverMetaAssets(token) {
     //    client-pagina waar we geen pagina-token voor krijgen).
     try {
       const b = await graphGet('me/businesses', { fields: 'id,name', limit: '100', access_token: token });
+      // Alle business-edges parallel ophalen (scheelt veel wachttijd bij meerdere
+      // businesses/pagina's) in plaats van een voor een.
+      const tasks = [];
       for (const biz of (b.data || [])) {
         for (const edge of ['owned_pages', 'client_pages']) {
-          try {
-            const pr = await graphGet(`${biz.id}/${edge}`, { fields: PF, limit: '200', access_token: token });
-            (pr.data || []).forEach(addPage);
-          } catch (_) { /* deze edge overslaan */ }
+          tasks.push(graphGet(`${biz.id}/${edge}`, { fields: PF, limit: '200', access_token: token })
+            .then((pr) => (pr.data || []).forEach(addPage)).catch(() => {}));
         }
         for (const edge of ['owned_instagram_accounts', 'client_instagram_accounts']) {
-          try {
-            const ir = await graphGet(`${biz.id}/${edge}`, { fields: 'id,username', limit: '200', access_token: token });
-            (ir.data || []).forEach(addIg);
-          } catch (_) { /* deze edge overslaan */ }
+          tasks.push(graphGet(`${biz.id}/${edge}`, { fields: 'id,username', limit: '200', access_token: token })
+            .then((ir) => (ir.data || []).forEach(addIg)).catch(() => {}));
         }
       }
+      await Promise.all(tasks);
     } catch (_) { /* geen business-toegang: alleen directe pagina's */ }
     // Terugval: voor pagina's zonder gevonden Instagram de pagina direct bevragen,
-    // bij voorkeur met het pagina-token (geeft het gekoppelde IG-account vaker terug).
-    for (const pg of Object.values(pageMap)) {
-      if (pg.ig_id) continue;
+    // bij voorkeur met het pagina-token. Ook dit parallel.
+    await Promise.all(Object.values(pageMap).filter((pg) => !pg.ig_id).map((pg) => {
       const pgToken = pg._token || token;
-      try {
-        const d = await graphGet(`${pg.id}`, { fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', access_token: pgToken });
-        const ig = igFrom(d);
-        if (ig.id) { pg.ig_id = ig.id; pg.ig_username = ig.username; }
-      } catch (_) { /* terugval mislukt: laat leeg */ }
-    }
+      return graphGet(`${pg.id}`, { fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', access_token: pgToken })
+        .then((d) => { const ig = igFrom(d); if (ig.id) { pg.ig_id = ig.id; pg.ig_username = ig.username; } })
+        .catch(() => {});
+    }));
     // Instagram-accounts die via een pagina gevonden zijn ook in de lijst opnemen.
     Object.values(pageMap).forEach((p) => { if (p.ig_id) addIg({ id: p.ig_id, username: p.ig_username }); });
     // Diagnose alleen als er helemaal geen Instagram-account gevonden is: ligt het
@@ -2076,16 +2073,26 @@ router.post('/api/mkt/clients/:clientId/meta-discover', requireMkt, async (req, 
 
 // Automatisch: de accounts van de werkplek-koppeling (de Facebook-login) ophalen,
 // zodat je per klant uit een lijst kunt kiezen zonder een token te plakken.
+// Het resultaat wordt kort gecachet per werkplek, zodat je niet elke keer hoeft te
+// wachten. Met ?refresh=1 forceer je een verse ophaal.
+const _wsAssetsCache = new Map(); // wsId -> { ts, data }
+const WS_ASSETS_TTL = 15 * 60 * 1000; // 15 minuten
 router.get('/api/mkt/meta/assets', requireMkt, async (req, res) => {
   try {
     if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
     const wsId = req.session.mkt.workspaceId;
+    const force = req.query.refresh === '1';
+    if (!force) {
+      const c = _wsAssetsCache.get(wsId);
+      if (c && (Date.now() - c.ts) < WS_ASSETS_TTL) return res.json({ success: true, cached: true, ...c.data });
+    }
     const wi = await withReadConnection(async (c) => (await c.query(
       'SELECT meta_access_token FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
     )).rows[0]) || {};
     const token = decryptSecret(wi.meta_access_token) || process.env.META_ACCESS_TOKEN || null;
     if (!token) return res.status(400).json({ error: 'Nog geen Meta-koppeling op de werkplek. Log eerst in met Facebook of vul een token in.' });
     const out = await discoverMetaAssets(token);
+    _wsAssetsCache.set(wsId, { ts: Date.now(), data: out });
     res.json({ success: true, ...out });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });

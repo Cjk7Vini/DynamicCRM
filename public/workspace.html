@@ -3207,12 +3207,12 @@ async function metaDiscover(btn){
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
 // Accounts ophalen uit de werkplek-login (de Facebook-login), zonder token plakken.
-async function metaDiscoverFromWorkspace(btn){
+async function metaDiscoverFromWorkspace(btn,force){
   var box=document.getElementById('mqResult');
   var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Ophalen...';}
   box.innerHTML='<div style="font-size:12.5px;color:var(--muted)">Accounts ophalen uit werkplek-login...</div>';
   try{
-    var r=await fetch('/api/mkt/meta/assets',{credentials:'include'});
+    var r=await fetch('/api/mkt/meta/assets'+(force?'?refresh=1':''),{credentials:'include'});
     var d=await r.json();
     if(!r.ok||!d.success){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">'+esc(d.error||'Ophalen mislukt.')+'</div>';return;}
     renderMqDropdowns(d);
@@ -3233,7 +3233,8 @@ function renderMqDropdowns(d){
     '<label style="font-size:12.5px;color:var(--muted)">Instagram-account<select id="mqIg" style="margin-top:3px">'+igOpts+'</select></label>'+
     hintHtml+
     '<label style="font-size:12.5px;color:var(--muted)">Advertentieaccount (optioneel)<select id="mqAd" style="margin-top:3px">'+adOpts+'</select></label>'+
-    '<button class="btn btn-primary" style="padding:8px 14px;align-self:flex-start" onclick="metaFillFromDiscover()">Velden invullen</button>'+
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-primary" style="padding:8px 14px" onclick="metaFillFromDiscover()">Velden invullen</button>'+
+    '<a href="#" onclick="metaDiscoverFromWorkspace(null,true);return false;" style="font-size:12px;color:var(--accent-2)">Lijst verversen</a></div>'+
   '</div>';
   mqPageChanged();
 }
