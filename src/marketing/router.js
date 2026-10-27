@@ -2560,6 +2560,105 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
   } catch (e) { return page(false, 'Er ging iets mis: ' + (e && e.message ? e.message : 'onbekende fout')); }
 });
 
+// ===== Instagram-login (Instagram API with Instagram Login) =====
+// Voor klanten met wel Instagram maar geen Facebook-pagina. Aparte app-gegevens
+// (Instagram App ID/Secret) en een eigen token-endpoint (graph.instagram.com).
+// Volledig additief en uit-standaard: werkt alleen als META_IG_LOGIN_APP_ID staat.
+const IG_GRAPH = 'https://graph.instagram.com';
+const META_IG_LOGIN_SCOPES = (process.env.META_IG_LOGIN_SCOPES || [
+  'instagram_business_basic',
+  'instagram_business_manage_insights',
+  'instagram_business_content_publish',
+].join(',')).replace(/\s+/g, '');
+function igRedirectUri(req) { return 'https://' + req.get('host') + '/api/mkt/meta/ig/callback'; }
+async function igGraphGet(pathAndId, params) {
+  const qs = new URLSearchParams(params).toString();
+  const r = await fetch(`${IG_GRAPH}/${pathAndId}?${qs}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+  return j;
+}
+// Laat de frontend weten of de Instagram-login is ingesteld.
+router.get('/api/mkt/meta/ig-login-config', requireMkt, (req, res) => {
+  res.json({ success: true, configured: !!process.env.META_IG_LOGIN_APP_ID });
+});
+// Start de Instagram-login voor een specifieke klant.
+router.get('/api/mkt/meta/ig-oauth/start', requireMkt, (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).send('Alleen eigenaar of manager mag koppelen.');
+    const appId = process.env.META_IG_LOGIN_APP_ID || null;
+    if (!appId) return res.status(400).send('Instagram App ID is niet ingesteld (META_IG_LOGIN_APP_ID).');
+    const clientId = String(req.query.clientId || '').trim();
+    if (!clientId) return res.status(400).send('Geen klant opgegeven.');
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.igOAuthState = state;
+    req.session.igOAuthClient = clientId;
+    const url = 'https://www.instagram.com/oauth/authorize'
+      + '?client_id=' + encodeURIComponent(appId)
+      + '&redirect_uri=' + encodeURIComponent(igRedirectUri(req))
+      + '&response_type=code'
+      + '&state=' + encodeURIComponent(state)
+      + '&scope=' + encodeURIComponent(META_IG_LOGIN_SCOPES);
+    res.redirect(url);
+  } catch (e) { res.status(500).send('Fout bij starten Instagram-koppeling: ' + e.message); }
+});
+router.get('/api/mkt/meta/ig/callback', requireMkt, async (req, res) => {
+  const page = (ok, msg) => {
+    const color = ok ? '#15976b' : '#dc2626';
+    res.set('Content-Type', 'text/html; charset=utf-8').send(
+      '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<body style="font-family:-apple-system,system-ui,sans-serif;background:#09222a;color:#eef6f7;padding:48px 20px;text-align:center">'
+      + '<div style="max-width:440px;margin:0 auto;background:#0f323b;border:1px solid #245863;border-radius:16px;padding:28px 24px">'
+      + '<h2 style="color:' + color + ';margin:0 0 10px">' + (ok ? 'Instagram gekoppeld' : 'Koppelen mislukt') + '</h2>'
+      + '<p style="color:#c6dadd;font-size:14px;line-height:1.6">' + msg + '</p>'
+      + '<p style="margin-top:18px"><a href="/workspace.html" style="color:#5bd3de">Terug naar de workspace</a></p>'
+      + '</div>'
+      + '<script>try{setTimeout(function(){location.href="/workspace.html";},3500);}catch(e){}</script></body>'
+    );
+  };
+  try {
+    if (!mktIsOwnerOrManager(req)) return page(false, 'Alleen eigenaar of manager mag koppelen.');
+    if (req.query.error) return page(false, 'De toegang is geweigerd of geannuleerd.');
+    const code = String(req.query.code || '').replace(/#_$/, '');
+    const state = String(req.query.state || '');
+    const clientId = req.session.igOAuthClient || null;
+    if (!code) return page(false, 'Geen code ontvangen van Instagram.');
+    if (!state || state !== req.session.igOAuthState) return page(false, 'Beveiligingscontrole mislukt (state). Start de koppeling opnieuw.');
+    req.session.igOAuthState = null; req.session.igOAuthClient = null;
+    const appId = process.env.META_IG_LOGIN_APP_ID || null;
+    const appSecret = process.env.META_IG_LOGIN_APP_SECRET || null;
+    if (!appId || !appSecret) return page(false, 'Instagram App ID/Secret niet ingesteld in de serveromgeving.');
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = clientId ? await clientInWorkspace(clientId, wsId) : null;
+    if (!okClient) return page(false, 'Klant niet gevonden.');
+    const redirectUri = igRedirectUri(req);
+    // 1. code -> kortlevend token (api.instagram.com, form-encoded POST)
+    const form = new URLSearchParams({ client_id: appId, client_secret: appSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code });
+    const sr = await fetch('https://api.instagram.com/oauth/access_token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() });
+    const sj = await sr.json().catch(() => ({}));
+    if (!sr.ok || !sj.access_token) return page(false, 'Geen token van Instagram ontvangen' + (sj.error_message ? (': ' + sj.error_message) : '') + '.');
+    const shortTok = sj.access_token;
+    let uId = sj.user_id ? String(sj.user_id) : '';
+    // 2. kortlevend -> langlevend (graph.instagram.com, ig_exchange_token, ~60 dagen)
+    let longTok = shortTok; let expSecs = 3600;
+    try {
+      const lj = await igGraphGet('access_token', { grant_type: 'ig_exchange_token', client_secret: appSecret, access_token: shortTok });
+      if (lj && lj.access_token) { longTok = lj.access_token; expSecs = lj.expires_in ? Number(lj.expires_in) : 60 * 24 * 3600; }
+    } catch (_) { /* dan houden we het kortlevende token */ }
+    // 3. profiel ophalen (user_id + username)
+    let uName = null;
+    try { const me = await igGraphGet('me', { fields: 'user_id,username', access_token: longTok }); if (me) { uId = String(me.user_id || me.id || uId); uName = me.username || null; } } catch (_) { /* optioneel */ }
+    // 4. opslaan op de klant
+    await withWriteConnection(async (c) => {
+      const exists = (await c.query('SELECT 1 FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId])).rows[0];
+      if (!exists) await c.query('INSERT INTO marketing.client_integrations (workspace_id, client_id) VALUES ($1,$2)', [wsId, okClient]).catch(() => {});
+      try { await c.query("UPDATE marketing.client_integrations SET ig_login_token=$1, ig_login_user_id=$2, ig_login_username=$3, ig_login_expires_at=now()+($4||' seconds')::interval, updated_at=now() WHERE client_id=$5 AND workspace_id=$6", [encryptSecret(longTok), uId || null, uName, String(expSecs), okClient, wsId]); }
+      catch (_) { await c.query('UPDATE marketing.client_integrations SET ig_login_token=$1, ig_login_user_id=$2, ig_login_username=$3 WHERE client_id=$4 AND workspace_id=$5', [encryptSecret(longTok), uId || null, uName, okClient, wsId]); }
+    });
+    return page(true, 'Je Instagram-account' + (uName ? ' @' + uName : '') + ' is gekoppeld aan deze klant. Open de Rapportage-tab om de cijfers te zien.');
+  } catch (e) { return page(false, 'Er ging iets mis: ' + (e && e.message ? e.message : 'onbekende fout')); }
+});
+
 // Automatische token-verversing (EasyCron). Roep periodiek aan, bijv. wekelijks:
 //   https://<domein>/api/mkt/cron/refresh-meta-tokens?cron_secret=XXX
 // Ververst de langlevende Meta-tokens (werkplek + klant) ruim vóór de 60-dagen-
@@ -2623,6 +2722,28 @@ router.get('/api/mkt/cron/refresh-meta-tokens', async (req, res) => {
 
     for (const row of wsRows) await refreshOne('ws', row);
     for (const row of clRows) await refreshOne('client', row);
+    // Instagram-login-tokens verlengen (graph.instagram.com, ig_refresh_token).
+    // Defensief: ontbreekt de kolom (migratie 024 nog niet gedraaid), dan overslaan.
+    try {
+      const igRows = await withReadConnection(async (c) => (await c.query(
+        "SELECT client_id, workspace_id, ig_login_token FROM marketing.client_integrations WHERE ig_login_token IS NOT NULL AND ig_login_token <> ''"
+      )).rows);
+      for (const row of igRows) {
+        out.checked += 1;
+        const tok = decryptSecret(row.ig_login_token);
+        if (!tok) { out.skipped += 1; continue; }
+        try {
+          const r = await igGraphGet('refresh_access_token', { grant_type: 'ig_refresh_token', access_token: tok });
+          if (!r || !r.access_token) { out.failed += 1; out.errors.push('ig klant ' + row.client_id + ': geen nieuw token'); continue; }
+          const expSecs = r.expires_in ? Number(r.expires_in) : 60 * 24 * 3600;
+          await withWriteConnection(async (c) => c.query(
+            "UPDATE marketing.client_integrations SET ig_login_token=$1, ig_login_expires_at=now()+($2||' seconds')::interval WHERE client_id=$3 AND workspace_id=$4",
+            [encryptSecret(r.access_token), String(expSecs), row.client_id, row.workspace_id]
+          ));
+          out.refreshed += 1;
+        } catch (e) { out.failed += 1; out.errors.push('ig klant ' + row.client_id + ': ' + (e && e.message ? e.message : 'fout')); }
+      }
+    } catch (_) { /* kolom ontbreekt of geen IG-koppelingen: overslaan */ }
     out.errors = out.errors.slice(0, 20);
     console.log('[meta-token-refresh]', JSON.stringify({ checked: out.checked, refreshed: out.refreshed, failed: out.failed }));
     res.json(out);
@@ -2645,6 +2766,10 @@ async function resolveClientMeta(wsId, clientId) {
     pageId: ci.meta_page_id || wi.meta_page_id || null,
     igUserId: ci.meta_ig_user_id || wi.meta_ig_user_id || null,
     pixelId: ci.meta_pixel_id || wi.meta_pixel_id || null,
+    // Instagram-login (graph.instagram.com) is per klant; apart van het Facebook-token.
+    igLoginToken: decryptSecret(ci.ig_login_token) || null,
+    igLoginUserId: ci.ig_login_user_id || null,
+    igLoginUsername: ci.ig_login_username || null,
   };
 }
 
@@ -4423,21 +4548,29 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
-    if (!token) {
+    // Instagram-login (graph.instagram.com) is per klant en apart van het FB-token.
+    // Is die aanwezig, dan lezen we de Instagram-cijfers via de Instagram-eigen Graph
+    // met dat token; anders via de Facebook-graph met het FB-token. Voor bestaande
+    // klanten (geen ig_login_token) verandert er niets: igGet=graphGet enz.
+    const isIgLogin = !!creds.igLoginToken;
+    const igGet = isIgLogin ? igGraphGet : graphGet;
+    const igTok = isIgLogin ? creds.igLoginToken : token;
+    const igUid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    if (!token && !isIgLogin) {
       return res.json({ success: true, configured: false });
     }
 
     const out = { configured: true, account: null, topPosts: null, ads: null, errors: {} };
 
     // --- Instagram account: volgers + aantal media ---
-    if (creds.igUserId) {
+    if (igUid) {
       // Meetvenster (Unix) uit de gekozen periode; de frontend stuurt altijd van/tot mee.
       const _okd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
       const winU = _okd(req.query.until) ? Math.floor(new Date(req.query.until + 'T23:59:59Z').getTime() / 1000) : Math.floor(Date.now() / 1000);
       const winS = _okd(req.query.since) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (winU - 30 * 24 * 3600);
       try {
-        const a = await graphGet(`${creds.igUserId}`, {
-          fields: 'username,followers_count,follows_count,media_count', access_token: token,
+        const a = await igGet(`${igUid}`, {
+          fields: 'username,followers_count,follows_count,media_count', access_token: igTok,
         });
         out.account = { username: a.username || null, followers: a.followers_count ?? null, following: a.follows_count ?? null, media: a.media_count ?? null };
       } catch (e) { out.errors.account = e.message; }
@@ -4448,9 +4581,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       // die met toevallig de meeste likes). ---
       let allPosts = [];
       try {
-        const m = await graphGet(`${creds.igUserId}/media`, {
+        const m = await igGet(`${igUid}/media`, {
           fields: 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url',
-          limit: '50', access_token: token,
+          limit: '50', access_token: igTok,
         });
         allPosts = (m.data || []).map((p) => ({
           id: p.id,
