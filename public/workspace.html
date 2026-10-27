@@ -424,6 +424,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">Vul hieronder je Meta access token en gegevens in. De koppeling blijft daarna automatisch geldig; je hoeft het token niet handmatig te verlengen.</div>
             <div id="wsiMetaStatus" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
             <div id="wsMetaAssets" style="font-size:12.5px;margin-bottom:10px"></div>
+            <div style="margin-bottom:10px"><button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="wsMetaDiagnose(this)">Diagnose koppeling</button></div>
+            <div id="wsMetaDiag" style="font-size:12.5px;margin-bottom:10px"></div>
             <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account/pagina, dan vul je dat bij die klant in (dat wint).</p>
             <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
             <div class="row2">
@@ -1797,6 +1799,29 @@ async function wsLoadMetaAssets(){
       box.innerHTML='<div style="background:rgba(22,151,107,.1);border:1px solid rgba(22,151,107,.3);border-radius:9px;padding:9px 12px;color:#15976b;font-weight:600">Gekoppeld: '+np+' pagina\'s, '+ng+' Instagram-accounts, '+na+' advertentieaccounts. Kies per klant het juiste account in de Koppelingen-tab.</div>';
     }
   }catch(e){}
+}
+// Diagnose: toon of er een werkplek-token is en welke permissies het heeft.
+async function wsMetaDiagnose(btn){
+  var box=document.getElementById('wsMetaDiag'); if(!box)return;
+  var o=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Bezig...';}
+  box.innerHTML='Diagnose...';
+  try{
+    var r=await fetch('/api/mkt/meta/assets-debug',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||d.success===false){box.innerHTML='<span style="color:#dc2626">'+esc((d&&d.error)||'Fout')+'</span>';}
+    else{
+      var need=['instagram_basic','instagram_manage_insights','pages_show_list','pages_read_engagement','business_management','ads_read','ads_management'];
+      var g=d.granted||[];
+      var rows=need.map(function(p){var ok=g.indexOf(p)>=0;return '<div>'+(ok?'&#9989;':'&#10060;')+' '+p+'</div>';}).join('');
+      box.innerHTML='<div style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">'+
+        '<div><strong>Token aanwezig:</strong> '+(d.hasWorkspaceToken?'ja':'nee')+(d.me?(' ('+esc(d.me)+')'):'')+'</div>'+
+        (d.expiresAt?('<div><strong>Verloopt:</strong> '+esc(String(d.expiresAt))+'</div>'):'')+
+        '<div style="margin-top:6px"><strong>Permissies op het token:</strong></div>'+rows+
+        (d.error?('<div style="color:#dc2626;margin-top:6px">'+esc(d.error)+'</div>'):'')+
+      '</div>';
+    }
+  }catch(e){box.innerHTML='<span style="color:#dc2626">Netwerkfout.</span>';}
+  if(btn){btn.disabled=false;btn.textContent=o;}
 }
 async function testWsMeta(btn){
   var el=document.getElementById('wsiMetaStatus');
