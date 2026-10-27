@@ -3008,16 +3008,6 @@ async function loadMetaInsights(){
     if(!d.insights&&d.account){
       html+='<div class="card" style="margin-bottom:6px;color:var(--muted);font-size:13px">Voor weergaven, bereik, interacties en profielbezoeken is de permissie <strong>instagram_manage_insights</strong> nodig.'+((d.errors&&d.errors.insights)?('<div style="margin-top:8px;color:#b45309;word-break:break-word"><strong>Meta-melding:</strong> '+esc(d.errors.insights)+'</div>'):'')+'</div>';
     }
-    // Detailcijfers (behouden zodat geen data verloren gaat): bereik, interacties, nieuwe volgers.
-    if(d.insights){
-      var pr=[];
-      if(ins.reach!=null)pr.push(kpiD('Bereik',iv(ins.reach),null,null));
-      if(ins.total_interactions!=null)pr.push(kpiD('Interacties',iv(ins.total_interactions),ins.total_interactions,pmeta.total_interactions));
-      if(ins.follower_net!=null)pr.push(kpiD('Nieuwe volgers (netto)',(ins.follower_net>0?'+':'')+iv(ins.follower_net),null,null));
-      else if(ins.follower_delta!=null)pr.push(kpiD('Nieuwe volgers (bruto)',(ins.follower_delta>0?'+':'')+iv(ins.follower_delta),ins.follower_delta,pmeta.follower_delta));
-      if(d.account&&d.account.media!=null)pr.push(kpiD('Gepubliceerde content',iv(d.account.media),null,null));
-      if(pr.length)html+='<div class="stats" style="margin:4px 0 6px">'+pr.join('')+'</div>';
-    }
     // ===== 2. Volgersgroei: grafiek + nieuwe volgers + weergaven volgers/niet-volgers =====
     var _fc=(d.series&&d.series.follower_count)?d.series.follower_count:null;
     var _fnew=_fc?_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0):null;
@@ -3034,25 +3024,27 @@ async function loadMetaInsights(){
     if(_side)html+='<div style="flex:1;min-width:200px;display:flex;flex-direction:column">'+_side+'</div>';
     html+='</div>';
     if(d.series&&d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
-    // ===== 3. Contentprestaties: weergaven + interacties per contenttype =====
+    // ===== 3. Contentprestaties: vaste contenttypes Verhalen/Reels/Berichten/Livevideo's =====
+    var _ctype=function(mt){mt=String(mt||'').toUpperCase();if(mt.indexOf('REEL')>=0)return 'Reels';if(mt.indexOf('STORY')>=0)return 'Verhalen';if(mt.indexOf('LIVE')>=0||mt.indexOf('BROADCAST')>=0)return "Livevideo's";return 'Berichten';};
+    var _corder=['Verhalen','Reels','Berichten',"Livevideo's"];
+    var _cfmt=function(v){return rptShort(v).replace('.',',').replace('k','K');};
+    var _canonSingle=function(arr){var m={Verhalen:0,Reels:0,Berichten:0};m["Livevideo's"]=0;(arr||[]).forEach(function(x){m[_ctype(x.type)]+=(x.value||0);});var o=_corder.map(function(k){return {label:k,value:m[k]};}).sort(function(a,b){return b.value-a.value;});return (o.reduce(function(s,x){return s+x.value;},0)>0)?o:null;};
+    var _canonSplit=function(arr){if(!arr||!arr.length)return null;var m={};_corder.forEach(function(k){m[k]={f:0,n:0};});arr.forEach(function(x){var k=_ctype(x.type);m[k].f+=(x.follower||0);m[k].n+=(x.non_follower||0);});var o=_corder.map(function(k){return {label:k,follower:m[k].f,non_follower:m[k].n};}).sort(function(a,b){return (b.follower+b.non_follower)-(a.follower+a.non_follower);});return (o.reduce(function(s,x){return s+x.follower+x.non_follower;},0)>0)?o:null;};
     var twoTone=function(title,split,single){
       var rows='';
       if(split&&split.length){
         var mx=Math.max.apply(null,split.map(function(x){return x.follower+x.non_follower;}))||1;
-        rows=split.map(function(x){var tot=x.follower+x.non_follower;var wTot=Math.round(tot/mx*100);var wF=tot>0?Math.round(x.follower/tot*100):0;return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(tot)+'</span></div><div style="height:9px;border-radius:6px;overflow:hidden;background:var(--line)"><div style="height:100%;width:'+wTot+'%;display:flex"><div style="width:'+wF+'%;background:var(--accent)"></div><div style="flex:1;background:#d98fd4"></div></div></div></div>';}).join('');
+        rows=split.map(function(x){var tot=x.follower+x.non_follower;var wTot=Math.round(tot/mx*100);var wF=tot>0?Math.round(x.follower/tot*100):0;return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+_cfmt(tot)+'</span></div><div style="height:9px;border-radius:6px;overflow:hidden;background:var(--line)"><div style="height:100%;width:'+Math.max(wTot,2)+'%;display:flex"><div style="width:'+wF+'%;background:var(--accent)"></div><div style="flex:1;background:#d98fd4"></div></div></div></div>';}).join('');
       } else if(single&&single.length){
         var mx2=Math.max.apply(null,single.map(function(x){return x.value;}))||1;
-        rows=single.map(function(x){var w=Math.round(x.value/mx2*100);return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label||MPT[x.type]||x.type)+'</span><span style="color:var(--muted)">'+iv(x.value)+'</span></div><div style="height:9px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:var(--accent)"></div></div></div>';}).join('');
+        rows=single.map(function(x){var w=Math.round(x.value/mx2*100);return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(x.label)+'</span><span style="color:var(--muted)">'+_cfmt(x.value)+'</span></div><div style="height:9px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+(x.value>0?Math.max(w,2):0)+'%;background:var(--accent)"></div></div></div>';}).join('');
       }
       if(!rows)return '';
       var legend=(split&&split.length)?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px"><span style="color:var(--accent)">&#9679;</span> Volgers &nbsp; <span style="color:#d98fd4">&#9679;</span> Niet-volgers</div>':'';
       return '<div style="flex:1;min-width:280px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">'+esc(title)+'</div>'+legend+rows+'</div>';
     };
-    var _ibtSingle=(d.interactions_by_type&&d.interactions_by_type.length)
-      ? d.interactions_by_type.map(function(x){return {type:x.type,value:x.value};})
-      : ((d.contentTypes||[]).filter(function(x){return (x.interactions||0)>0;}).map(function(x){return {label:(RTL[x.type]||x.type),value:x.interactions};})).sort(function(a,b){return b.value-a.value;});
-    var _cpL=twoTone('Weergaven per contenttype',d.views_by_type_split,(d.views_by_type||[]).map(function(x){return {type:x.type,value:x.value};}));
-    var _cpR=twoTone('Interacties per contenttype',d.interactions_by_type_split,_ibtSingle);
+    var _cpL=twoTone('Weergaven per contenttype',_canonSplit(d.views_by_type_split),_canonSingle(d.views_by_type));
+    var _cpR=twoTone('Interacties per contenttype',_canonSplit(d.interactions_by_type_split),_canonSingle(d.interactions_by_type));
     if(_cpL||_cpR){
       html+='<div class="section-h" style="margin-top:18px"><h4>Contentprestaties</h4><span style="font-size:12px;color:var(--muted)">Hoe je content heeft gepresteerd</span></div>';
       html+='<div class="card" style="display:flex;gap:40px;flex-wrap:wrap">'+_cpL+_cpR+'</div>';
@@ -3066,9 +3058,9 @@ async function loadMetaInsights(){
       var ageHtml='', genHtml='';
       if(dm.age&&dm.age.length)ageHtml=ageBars(dm.age);
       if(dm.gender&&dm.gender.length){
-        var gt=dm.gender.reduce(function(s,x){return s+(x.value||0);},0)||1;
         var gf=dm.gender.filter(function(x){return x.label==='F';}).reduce(function(s,x){return s+x.value;},0);
         var gm=dm.gender.filter(function(x){return x.label==='M';}).reduce(function(s,x){return s+x.value;},0);
+        var gt=(gf+gm)||1; // normaliseren op man/vrouw, net als Instagram (onbekend eruit)
         var fP=gf/gt*100,mP=gm/gt*100,deg=Math.round(fP/100*360);
         genHtml='<div style="text-align:center"><div style="width:170px;height:170px;border-radius:50%;margin:6px auto 0;background:conic-gradient(#e9a8e4 0deg '+deg+'deg,var(--accent) '+deg+'deg 360deg);position:relative"><div style="position:absolute;top:34px;left:34px;right:34px;bottom:34px;border-radius:50%;background:var(--panel)"></div></div><div style="display:flex;justify-content:center;gap:18px;margin-top:14px;font-size:13px"><span><span style="color:#e9a8e4">&#9679;</span> Vrouwen '+fP.toFixed(1).replace('.',',')+'%</span><span><span style="color:var(--accent)">&#9679;</span> Mannen '+mP.toFixed(1).replace('.',',')+'%</span></div></div>';
       }
@@ -3090,13 +3082,20 @@ async function loadMetaInsights(){
       if(dm.country&&dm.country.length)locHtml+='<div style="flex:1;min-width:260px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Landen</div>'+_locBars(dm.country,cname)+'</div>';
       if(locHtml)html+='<div class="section-h" style="margin-top:18px"><h4>Locaties</h4></div><div class="card" style="display:flex;gap:40px;flex-wrap:wrap">'+locHtml+'</div>';
     }
-    // ===== 6. Actieve tijden: dagkiezer + staafjes per uur =====
+    // ===== 6. Actieve tijden: dagkiezer + staafjes per uur + "wanneer actiefst" =====
     if((d.activeTimes&&d.activeTimes.length)||d.activeTimesByDay){
       window.RPT_ACTIVE=d.activeTimesByDay||null; window.RPT_ACTIVE_ALL=d.activeTimes||null;
       var _dnames=['Zo','Ma','Di','Woe','Do','Vrij','Za'];
+      var _dnamesF=['Zondagen','Maandagen','Dinsdagen','Woensdagen','Donderdagen','Vrijdagen','Zaterdagen'];
       var _dayBtns=_dnames.map(function(dn,i){var has=window.RPT_ACTIVE&&window.RPT_ACTIVE[i]&&window.RPT_ACTIVE[i].length;return '<button class="btn btn-ghost" id="rptDay'+i+'" style="padding:5px 12px;font-size:12px" onclick="rptActiveDay('+i+')"'+((has||!window.RPT_ACTIVE)?'':' disabled')+'>'+dn+'</button>';}).join('');
+      var _peak='';
+      if(window.RPT_ACTIVE){
+        var _ds=[];Object.keys(window.RPT_ACTIVE).forEach(function(wd){var arr=window.RPT_ACTIVE[wd];var tot=arr.reduce(function(s,x){return s+x.value;},0);_ds.push({wd:Number(wd),tot:tot,arr:arr});});
+        _ds.sort(function(a,b){return b.tot-a.tot;});
+        _peak=_ds.slice(0,2).filter(function(x){return x.tot>0;}).map(function(x){var mx=Math.max.apply(null,x.arr.map(function(y){return y.value;}))||1;var hrs=x.arr.filter(function(y){return y.value>=mx*0.7;}).map(function(y){return y.hour;});if(!hrs.length)return '';var lo=Math.min.apply(null,hrs),hi=Math.max.apply(null,hrs);return '<div style="margin-top:16px"><div style="font-weight:700;font-size:14px">'+_dnamesF[x.wd]+'</div><div style="font-size:20px;font-weight:800;margin-top:2px">'+lo+' - '+hi+'</div></div>';}).join('');
+      }
       html+='<div class="section-h" style="margin-top:18px"><h4>Actieve tijden van volgers</h4><span style="font-size:12px;color:var(--muted)">Wanneer je volgers online zijn</span></div>';
-      html+='<div class="card">'+(window.RPT_ACTIVE?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+_dayBtns+'</div>'):'')+'<div id="rptActiveChart"></div></div>';
+      html+='<div class="card"><div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:2;min-width:300px">'+(window.RPT_ACTIVE?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+_dayBtns+'</div>'):'')+'<div id="rptActiveChart"></div></div>'+(_peak?('<div style="flex:1;min-width:170px;text-align:center;align-self:center"><div style="font-weight:700;font-size:14px">Wanneer je volgers<br>het actiefst zijn</div>'+_peak+'</div>'):'')+'</div></div>';
     }
     // Ranking of posts (tabel met per-post cijfers)
     if(d.topPosts&&d.topPosts.length){
