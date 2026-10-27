@@ -2089,8 +2089,10 @@ router.get('/api/mkt/meta/assets', requireMkt, async (req, res) => {
     const wi = await withReadConnection(async (c) => (await c.query(
       'SELECT meta_access_token FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
     )).rows[0]) || {};
-    const token = decryptSecret(wi.meta_access_token) || process.env.META_ACCESS_TOKEN || null;
-    if (!token) return res.status(400).json({ error: 'Nog geen Meta-koppeling op de werkplek. Log eerst in met Facebook of vul een token in.' });
+    // Uitsluitend het token van DEZE werkplek gebruiken. Geen env-terugval, anders
+    // zou een werkplek zonder koppeling de accounts van het centrale token zien.
+    const token = decryptSecret(wi.meta_access_token) || null;
+    if (!token) return res.status(400).json({ error: 'Nog geen Meta-koppeling op de werkplek. Log eerst in met Facebook (werkplek-koppeling).' });
     const out = await discoverMetaAssets(token);
     // Alleen cachen als er echt iets gevonden is; een lege/mislukte ophaal (bijv.
     // door een tijdelijk tokenprobleem) mag niet 15 minuten blijven hangen.
@@ -2100,6 +2102,28 @@ router.get('/api/mkt/meta/assets', requireMkt, async (req, res) => {
       _wsAssetsCache.delete(wsId);
     }
     res.json({ success: true, ...out });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Diagnose: staat er een werkplek-token, en welke permissies heeft het echt?
+// Geeft in een oogopslag waarom de accounts wel/niet gevonden worden.
+router.get('/api/mkt/meta/assets-debug', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const wi = await withReadConnection(async (c) => (await c.query(
+      'SELECT meta_access_token, meta_token_expires_at FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+    )).rows[0]) || {};
+    const token = decryptSecret(wi.meta_access_token) || null;
+    const out = { success: true, hasWorkspaceToken: !!token, expiresAt: wi.meta_token_expires_at || null, granted: [], declined: [], me: null, error: null };
+    if (!token) { out.error = 'Geen werkplek-token opgeslagen. Log in met Facebook op de werkplek-koppeling.'; return res.json(out); }
+    try { const m = await graphGet('me', { fields: 'id,name', access_token: token }); out.me = m && m.name ? m.name : (m && m.id ? m.id : null); } catch (e) { out.error = 'me: ' + e.message; }
+    try {
+      const p = await graphGet('me/permissions', { access_token: token });
+      out.granted = (p.data || []).filter((x) => x.status === 'granted').map((x) => x.permission);
+      out.declined = (p.data || []).filter((x) => x.status !== 'granted').map((x) => x.permission);
+    } catch (e) { out.error = (out.error ? out.error + ' | ' : '') + 'permissions: ' + e.message; }
+    res.json(out);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
