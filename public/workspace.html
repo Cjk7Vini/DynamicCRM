@@ -423,6 +423,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div style="font-weight:700;font-size:14px;margin-bottom:4px">Koppel je Meta-account</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">Vul hieronder je Meta access token en gegevens in. De koppeling blijft daarna automatisch geldig; je hoeft het token niet handmatig te verlengen.</div>
             <div id="wsiMetaStatus" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
+            <div id="wsMetaAssets" style="font-size:12.5px;margin-bottom:10px"></div>
             <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Adverteer je alles vanuit je eigen business-account, vul dan ook de Facebook-pagina en Instagram hier in; alle klanten gebruiken die dan automatisch. Heeft een klant een eigen account/pagina, dan vul je dat bij die klant in (dat wint).</p>
             <div class="field"><label>Meta access token</label><input id="wsi_meta_access_token" type="password"></div>
             <div class="row2">
@@ -760,13 +761,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div class="int-panel" id="intPanel_meta">
               <div id="stat_meta" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Niet getest</div>
               <div style="background:rgba(99,102,241,.06);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-                <div style="font-weight:700;font-size:14px;margin-bottom:3px">Snel koppelen</div>
-                <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Plak je Meta access token en klik Ophalen. Kies daarna het juiste account; de velden hieronder worden automatisch ingevuld. (De klant verschijnt alleen als je token toegang heeft tot zijn pagina.)</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                  <input id="mqToken" type="password" placeholder="Plak hier je Meta access token" style="flex:1;min-width:220px">
-                  <button class="btn btn-primary" style="padding:8px 14px" onclick="metaDiscover(this)">Accounts ophalen</button>
-                </div>
+                <div style="font-weight:700;font-size:14px;margin-bottom:3px">Account kiezen</div>
+                <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Haal de accounts op uit je werkplek-koppeling (de Facebook-login) en kies welk account bij deze klant hoort. De velden hieronder worden automatisch ingevuld.</div>
+                <button class="btn btn-primary" style="padding:8px 14px" onclick="metaDiscoverFromWorkspace(this)">Accounts ophalen uit werkplek-login</button>
                 <div id="mqResult" style="margin-top:10px"></div>
+                <details style="margin-top:10px">
+                  <summary style="font-size:12px;color:var(--muted);cursor:pointer">Of handmatig een token gebruiken</summary>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+                    <input id="mqToken" type="password" placeholder="Plak hier je Meta access token" style="flex:1;min-width:220px">
+                    <button class="btn btn-ghost" style="padding:8px 14px" onclick="metaDiscover(this)">Accounts ophalen</button>
+                  </div>
+                </details>
               </div>
               <div class="row2">
                 <div class="field"><label>Facebook Page ID</label><input id="int_meta_page_id"></div>
@@ -1571,7 +1576,7 @@ function navTo(view){
   document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
-  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();metaCheckLoginConfig();}
+  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();metaCheckLoginConfig();wsLoadMetaAssets();}
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
@@ -1774,6 +1779,19 @@ async function metaCheckLoginConfig(){
   var box=document.getElementById('metaLoginBox'); if(!box)return;
   try{ var r=await fetch('/api/mkt/meta/login-config',{credentials:'include'}); var d=await r.json(); box.style.display=(d&&d.configured)?'':'none'; }
   catch(e){ box.style.display='none'; }
+}
+// Toon welke accounts de werkplek-koppeling (Facebook-login) heeft binnengehaald.
+async function wsLoadMetaAssets(){
+  var box=document.getElementById('wsMetaAssets'); if(!box)return; box.innerHTML='';
+  try{
+    var r=await fetch('/api/mkt/meta/assets',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success)return; // geen koppeling of geen rechten: niets tonen
+    var np=(d.pages||[]).length, ng=(d.igaccounts||[]).length, na=(d.adaccounts||[]).length;
+    if(np||ng||na){
+      box.innerHTML='<div style="background:rgba(22,151,107,.1);border:1px solid rgba(22,151,107,.3);border-radius:9px;padding:9px 12px;color:#15976b;font-weight:600">Gekoppeld: '+np+' pagina\'s, '+ng+' Instagram-accounts, '+na+' advertentieaccounts. Kies per klant het juiste account in de Koppelingen-tab.</div>';
+    }
+  }catch(e){}
 }
 async function testWsMeta(btn){
   var el=document.getElementById('wsiMetaStatus');
@@ -3184,23 +3202,40 @@ async function metaDiscover(btn){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-discover',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({token:token})});
     var d=await r.json();
     if(!r.ok||!d.success){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">'+esc(d.error||'Ophalen mislukt.')+'</div>';return;}
-    _MQ_PAGES=d.pages||[]; _MQ_ADS=d.adaccounts||[]; _MQ_IGS=d.igaccounts||[]; _MQ_IG_HINT=d.ig_hint||null;
-    if(!_MQ_PAGES.length){box.innerHTML='<div style="font-size:12.5px;color:#b45309">Geen pagina\'s gevonden voor dit token. Zorg dat je token toegang heeft tot de pagina van de klant (zie handleiding: paginatoegang).</div>';return;}
-    var pageOpts=_MQ_PAGES.map(function(p,i){var lbl=p.name+(p.ig_username?(' (@'+p.ig_username+')'):'');return '<option value="'+i+'">'+esc(lbl)+'</option>';}).join('');
-    // Instagram-keuzelijst: alle gevonden accounts (via pagina EN rechtstreeks uit de Business).
-    var igOpts='<option value="">Geen Instagram</option>'+_MQ_IGS.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.username?('@'+g.username):g.id)+'</option>';}).join('');
-    var adOpts='<option value="">Geen / later</option>'+_MQ_ADS.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name+' - '+a.id)+'</option>';}).join('');
-    var hintHtml=(!_MQ_IGS.length&&_MQ_IG_HINT)?('<div style="font-size:12px;color:#b45309;background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.3);border-radius:8px;padding:8px 10px">'+esc(_MQ_IG_HINT)+'</div>'):'';
-    box.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+
-      '<label style="font-size:12.5px;color:var(--muted)">Facebook-pagina<select id="mqPage" style="margin-top:3px" onchange="mqPageChanged()">'+pageOpts+'</select></label>'+
-      '<label style="font-size:12.5px;color:var(--muted)">Instagram-account<select id="mqIg" style="margin-top:3px">'+igOpts+'</select></label>'+
-      hintHtml+
-      '<label style="font-size:12.5px;color:var(--muted)">Advertentieaccount (optioneel)<select id="mqAd" style="margin-top:3px">'+adOpts+'</select></label>'+
-      '<button class="btn btn-primary" style="padding:8px 14px;align-self:flex-start" onclick="metaFillFromDiscover()">Velden invullen</button>'+
-    '</div>';
-    mqPageChanged();
+    renderMqDropdowns(d);
   }catch(e){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">Netwerkfout.</div>';}
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
+}
+// Accounts ophalen uit de werkplek-login (de Facebook-login), zonder token plakken.
+async function metaDiscoverFromWorkspace(btn){
+  var box=document.getElementById('mqResult');
+  var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Ophalen...';}
+  box.innerHTML='<div style="font-size:12.5px;color:var(--muted)">Accounts ophalen uit werkplek-login...</div>';
+  try{
+    var r=await fetch('/api/mkt/meta/assets',{credentials:'include'});
+    var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">'+esc(d.error||'Ophalen mislukt.')+'</div>';return;}
+    renderMqDropdowns(d);
+  }catch(e){box.innerHTML='<div style="font-size:12.5px;color:#dc2626">Netwerkfout.</div>';}
+  finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
+}
+// Gedeelde weergave van de keuzelijsten (pagina / Instagram / advertentieaccount).
+function renderMqDropdowns(d){
+  var box=document.getElementById('mqResult');
+  _MQ_PAGES=d.pages||[]; _MQ_ADS=d.adaccounts||[]; _MQ_IGS=d.igaccounts||[]; _MQ_IG_HINT=d.ig_hint||null;
+  if(!_MQ_PAGES.length&&!_MQ_IGS.length){box.innerHTML='<div style="font-size:12.5px;color:#b45309">Geen pagina\'s of Instagram-accounts gevonden. '+(_MQ_IG_HINT?esc(_MQ_IG_HINT):'Controleer of de werkplek-koppeling toegang heeft tot de accounts.')+'</div>';return;}
+  var pageOpts='<option value="">Geen pagina</option>'+_MQ_PAGES.map(function(p,i){var lbl=p.name+(p.ig_username?(' (@'+p.ig_username+')'):'');return '<option value="'+i+'">'+esc(lbl)+'</option>';}).join('');
+  var igOpts='<option value="">Geen Instagram</option>'+_MQ_IGS.map(function(g){return '<option value="'+esc(g.id)+'">'+esc(g.username?('@'+g.username):g.id)+'</option>';}).join('');
+  var adOpts='<option value="">Geen / later</option>'+_MQ_ADS.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.name+' - '+a.id)+'</option>';}).join('');
+  var hintHtml=(!_MQ_IGS.length&&_MQ_IG_HINT)?('<div style="font-size:12px;color:#b45309;background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.3);border-radius:8px;padding:8px 10px">'+esc(_MQ_IG_HINT)+'</div>'):'';
+  box.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<label style="font-size:12.5px;color:var(--muted)">Facebook-pagina<select id="mqPage" style="margin-top:3px" onchange="mqPageChanged()">'+pageOpts+'</select></label>'+
+    '<label style="font-size:12.5px;color:var(--muted)">Instagram-account<select id="mqIg" style="margin-top:3px">'+igOpts+'</select></label>'+
+    hintHtml+
+    '<label style="font-size:12.5px;color:var(--muted)">Advertentieaccount (optioneel)<select id="mqAd" style="margin-top:3px">'+adOpts+'</select></label>'+
+    '<button class="btn btn-primary" style="padding:8px 14px;align-self:flex-start" onclick="metaFillFromDiscover()">Velden invullen</button>'+
+  '</div>';
+  mqPageChanged();
 }
 // Bij het kiezen van een pagina het bijbehorende Instagram-account voorselecteren.
 // Heeft de pagina geen eigen IG, maar is er maar 1 account gevonden, kies die dan.
@@ -3212,15 +3247,19 @@ function mqPageChanged(){
   if(want){for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===want){sel.value=want;return;}}}
 }
 function metaFillFromDiscover(){
-  var pi=document.getElementById('mqPage').value; var p=_MQ_PAGES[pi]; if(!p)return;
+  var pi=document.getElementById('mqPage').value; var p=(pi!=='')?_MQ_PAGES[pi]:null;
   var igId=(document.getElementById('mqIg')||{}).value||'';
+  if(!p&&!igId){showMsg('intMsg',false,'Kies een pagina of een Instagram-account uit de lijst.');return;}
   var igUser=''; for(var i=0;i<_MQ_IGS.length;i++){if(String(_MQ_IGS[i].id)===String(igId)){igUser=_MQ_IGS[i].username||'';break;}}
-  document.getElementById('int_meta_page_id').value=p.id||'';
+  document.getElementById('int_meta_page_id').value=p?(p.id||''):'';
   document.getElementById('int_meta_ig_user_id').value=igId||'';
-  document.getElementById('int_meta_access_token').value=(document.getElementById('mqToken').value||'').trim();
+  // Alleen een los token invullen als je de handmatige weg gebruikt; bij de
+  // werkplek-login erft de klant automatisch het werkplek-token.
+  var tk=(document.getElementById('mqToken').value||'').trim(); if(tk)document.getElementById('int_meta_access_token').value=tk;
   var ad=document.getElementById('mqAd').value; if(ad)document.getElementById('int_meta_ad_account_id').value=ad;
-  if(!igId){showMsg('intMsg',false,'Let op: er is geen Instagram-account gekozen. '+(_MQ_IG_HINT||'Kies een Instagram-account uit de lijst, of plak het Instagram user ID (begint met 1784...) handmatig in het veld hieronder.'));}
-  else{showMsg('intMsg',true,'Velden ingevuld: pagina '+p.name+(igUser?(' + @'+igUser):(' + Instagram '+igId))+'. Klik op Koppelingen opslaan om te bewaren.');}
+  var naam=p?p.name:(igUser?('@'+igUser):('Instagram '+igId));
+  if(!igId){showMsg('intMsg',false,'Let op: er is geen Instagram-account gekozen. '+(_MQ_IG_HINT||'Kies een Instagram-account uit de lijst.'));}
+  else{showMsg('intMsg',true,'Velden ingevuld: '+naam+(igUser?(' + @'+igUser):(' + Instagram '+igId))+'. Klik op Koppelingen opslaan om te bewaren.');}
 }
 async function loadIntegrations(){
   if(!CURRENT_CLIENT)return; hideMsg('intMsg');
