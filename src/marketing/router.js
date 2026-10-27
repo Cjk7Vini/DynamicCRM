@@ -2462,11 +2462,11 @@ router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
       + '&redirect_uri=' + encodeURIComponent(metaRedirectUri(req))
       + '&state=' + encodeURIComponent(state)
       + '&response_type=code';
-    // Standaard de zakelijke login (config_id): dat is de weg die voor deze app de
-    // Instagram-/pagina-permissies daadwerkelijk verleent. De klassieke scope-login
-    // ziet er schoner uit maar geeft die permissies (nog) niet zolang de app niet
-    // gepubliceerd/Advanced is. Wie toch de klassieke weg wil: META_LOGIN_MODE=classic.
-    const useClassic = process.env.META_LOGIN_MODE === 'classic' || !configId;
+    // Standaard de klassieke login met scopes (de schone flow die je wilt). De
+    // callback controleert daarna of de permissies (o.a. instagram_basic) echt
+    // verleend zijn en of het token langlevend is, en meldt het als dat niet zo is.
+    // Alleen met META_LOGIN_MODE=business gebruiken we de zakelijke config_id-login.
+    const useClassic = process.env.META_LOGIN_MODE !== 'business';
     if (!useClassic && configId) url += '&config_id=' + encodeURIComponent(configId);
     else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
     res.redirect(url);
@@ -2512,10 +2512,26 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
     // 2. kortlevend -> langlevend (60 dagen)
     let longTok = short.access_token;
     let expSecs = short.expires_in ? Number(short.expires_in) : 3600;
+    let exchanged = false;
     try {
       const long = await graphGet('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: short.access_token });
-      if (long && long.access_token) { longTok = long.access_token; expSecs = long.expires_in ? Number(long.expires_in) : 60 * 24 * 3600; }
+      if (long && long.access_token) { longTok = long.access_token; expSecs = long.expires_in ? Number(long.expires_in) : 60 * 24 * 3600; exchanged = true; }
     } catch (_) { /* dan houden we het kortlevende token */ }
+    // 2b. Verifieer het token met debug_token: welke permissies zijn verleend en
+    //     wat is de echte vervaldatum? Zo weten we meteen of Instagram erbij zit en
+    //     slaan we geen kortlevend/half token stilletjes op.
+    let grantedScopes = [];
+    try {
+      const dbg = await graphGet('debug_token', { input_token: longTok, access_token: appId + '|' + appSecret });
+      const dd = dbg && dbg.data;
+      if (dd) {
+        if (Array.isArray(dd.scopes)) grantedScopes = dd.scopes;
+        if (dd.expires_at && Number(dd.expires_at) > 0) {
+          const secs = Number(dd.expires_at) - Math.floor(Date.now() / 1000);
+          if (secs > 0) expSecs = secs;
+        }
+      }
+    } catch (_) { /* debug optioneel */ }
     // 3. opslaan op de werkplek-koppeling
     const wsId = req.session.mkt.workspaceId;
     await withWriteConnection(async (c) => {
@@ -2526,7 +2542,21 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
       try { await c.query("UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_app_id=$2, meta_app_secret=$3, meta_token_expires_at=now()+($4||' seconds')::interval, updated_at=now() WHERE workspace_id=$5", [encryptSecret(longTok), appId, encryptSecret(appSecret), String(expSecs), wsId]); }
       catch (_) { await c.query('UPDATE marketing.workspace_integrations SET meta_access_token=$1, meta_app_id=$2, meta_app_secret=$3 WHERE workspace_id=$4', [encryptSecret(longTok), appId, encryptSecret(appSecret), wsId]); }
     });
-    return page(true, 'Je Facebook- en Instagram-koppeling is opgeslagen. Open de Koppelingen-tab om je pagina, Instagram-account en advertentie-account te kiezen.');
+    // Reset de accounts-cache zodat de nieuwe login meteen verse accounts geeft.
+    try { _wsAssetsCache.delete(wsId); } catch (_) {}
+    // Bouw een duidelijke statusmelding met de verleende permissies.
+    const need = ['instagram_basic', 'instagram_manage_insights', 'pages_show_list', 'pages_read_engagement', 'ads_read', 'ads_management'];
+    let msg = 'Je Facebook- en Instagram-koppeling is opgeslagen.';
+    if (grantedScopes.length) {
+      const lines = need.map((p) => (grantedScopes.includes(p) ? '&#9989; ' : '&#10060; ') + p).join('<br>');
+      const days = Math.round(expSecs / 86400);
+      msg += '<br><br><strong>Verleende permissies:</strong><br>' + lines + '<br><br>Token geldig: ~' + days + ' dagen' + (exchanged ? '' : ' (kortlevend: omwisseling naar langlevend mislukte)');
+      if (!grantedScopes.includes('instagram_basic')) {
+        msg += '<br><br><strong style="color:#f59e0b">Let op:</strong> instagram_basic is niet verleend, dus Instagram-accounts verschijnen niet. Log opnieuw in en vink bij het inloggen Instagram aan (Alle Instagram, Alles selecteren).';
+      }
+    }
+    msg += '<br><br>Open de Koppelingen-tab om per klant je account te kiezen.';
+    return page(true, msg);
   } catch (e) { return page(false, 'Er ging iets mis: ' + (e && e.message ? e.message : 'onbekende fout')); }
 });
 
