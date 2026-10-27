@@ -361,22 +361,45 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <!-- WERKPLEK-KOPPELING (workspace-niveau) -->
       <section class="view" id="viewWsSettings">
         <div id="wsiMsg" class="inline-msg"></div>
-        <div class="card" id="brandingCard" style="max-width:640px;margin-bottom:16px">
+        <div class="card" id="brandingCard" style="max-width:880px;margin-bottom:16px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">Huisstijl (white-label)</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Geef de workspace je eigen merk: naam, logo en kleuren. Je klanten zien dan jouw huisstijl in plaats van Marketing Studio.</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Geef de workspace je eigen merk: naam, logo en kleuren. Je klanten en de rapportages tonen dan jouw huisstijl in plaats van Marketing Studio.</p>
           <div id="brMsg" class="inline-msg"></div>
-          <div class="field"><label>Merknaam</label><input id="brName" maxlength="60" placeholder="Bijv. Fleur's Marketing Agency"></div>
-          <div class="field"><label>Logo-URL (optioneel)</label><input id="brLogo" placeholder="https://... (laat leeg voor initialen)">
-            <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Plak een link naar je logo (vierkant werkt het best). Uploaden vanaf je computer komt binnenkort.</div>
-          </div>
-          <div class="row2">
-            <div class="field"><label>Hoofdkleur</label><input id="brColor1" type="color" class="color-in" value="#17b2c6"></div>
-            <div class="field"><label>Accentkleur</label><input id="brColor2" type="color" class="color-in" value="#5bd3de"></div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
-            <button class="btn btn-primary" onclick="saveBranding()">Huisstijl opslaan</button>
-            <button class="btn btn-ghost" onclick="previewBranding()">Voorbeeld tonen</button>
-            <button class="btn btn-ghost" onclick="resetBranding()">Terug naar standaard</button>
+          <div style="display:flex;gap:30px;flex-wrap:wrap">
+            <div style="flex:1;min-width:280px">
+              <div class="field"><label>Merknaam</label><input id="brName" maxlength="60" placeholder="Bijv. Fleur's Marketing Agency" oninput="previewBrandingLive()"></div>
+              <div class="field"><label>Logo</label>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                  <div id="brLogoPreview" style="width:60px;height:60px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-size:11px;text-align:center">Geen</div>
+                  <div>
+                    <input type="file" id="brLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadBrandLogo(this)">
+                    <button class="btn btn-ghost" type="button" id="brLogoBtn" onclick="document.getElementById('brLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Logo uploaden</button>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Vierkant werkt het best.</div>
+                  </div>
+                </div>
+                <input id="brLogo" placeholder="of plak een logo-URL: https://..." oninput="previewBrandingLive()">
+              </div>
+              <div class="row2">
+                <div class="field"><label>Hoofdkleur</label><input id="brColor1" type="color" class="color-in" value="#17b2c6" oninput="previewBrandingLive()"></div>
+                <div class="field"><label>Accentkleur</label><input id="brColor2" type="color" class="color-in" value="#5bd3de" oninput="previewBrandingLive()"></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
+                <button class="btn btn-primary" onclick="saveBranding()">Huisstijl opslaan</button>
+                <button class="btn btn-ghost" onclick="resetBranding()">Terug naar standaard</button>
+              </div>
+            </div>
+            <div style="flex:1;min-width:240px">
+              <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Voorbeeld</div>
+              <div style="border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel-2)">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div id="brPvMark" style="width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;overflow:hidden;background:#17b2c6">MS</div>
+                  <div><div id="brPvName" style="font-weight:800;font-size:15px">Marketing Studio</div><div style="font-size:11px;color:var(--muted);letter-spacing:1px">WORKSPACE</div></div>
+                </div>
+                <div style="margin-top:14px"><span id="brPvBtn" style="display:inline-block;padding:8px 16px;border-radius:9px;color:#fff;font-size:13px;font-weight:600;background:#17b2c6">Voorbeeldknop</span></div>
+                <div style="margin-top:12px;height:8px;border-radius:6px;background:var(--line);overflow:hidden"><div id="brPvBar" style="height:100%;width:65%;background:#5bd3de"></div></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:10px">Zo zien je klanten de werkplek en staat het logo op de rapportage.</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="card" style="max-width:640px">
@@ -1325,6 +1348,7 @@ async function bootstrap(){
 function hexToSoft(hex,a){try{var h=String(hex).replace('#','');var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);if([r,g,b].some(isNaN))return null;return 'rgba('+r+','+g+','+b+','+(a||0.14)+')';}catch(e){return null;}}
 function applyBranding(b){
   b=b||{};
+  window.WS_BRANDING=b; // bewaar huisstijl zodat o.a. de rapportage het logo kan tonen
   var name=b.brand_name;
   var nm=document.getElementById('sideBrandName'); if(nm)nm.textContent=name||'Marketing Studio';
   var tt=document.getElementById('topBrandTt'); if(tt)tt.textContent=name||'Marketing Studio';
@@ -1349,7 +1373,45 @@ async function loadBrandingForm(){
     var l=document.getElementById('brLogo'); if(l)l.value=b.logo_url||'';
     var c1=document.getElementById('brColor1'); if(c1)c1.value=b.accent_color||'#17b2c6';
     var c2=document.getElementById('brColor2'); if(c2)c2.value=b.accent_color_2||'#5bd3de';
+    previewBrandingLive();
   }catch(e){}
+}
+// Live voorbeeld van de huisstijl (zonder op te slaan) en de logo-thumbnail.
+function previewBrandingLive(){
+  var nameEl=document.getElementById('brName'), logoEl=document.getElementById('brLogo');
+  if(!nameEl||!logoEl)return;
+  var name=nameEl.value.trim(), logo=logoEl.value.trim();
+  var c1=(document.getElementById('brColor1')||{}).value||'#17b2c6';
+  var c2=(document.getElementById('brColor2')||{}).value||'#5bd3de';
+  var pvName=document.getElementById('brPvName'); if(pvName)pvName.textContent=name||'Marketing Studio';
+  var mark=document.getElementById('brPvMark');
+  if(mark){ if(logo){mark.innerHTML='<img src="'+esc(logo)+'" alt="" style="width:100%;height:100%;object-fit:cover">';mark.style.background='transparent';} else {mark.innerHTML='';mark.textContent=name?initials(name).slice(0,2):'MS';mark.style.background=c1;} }
+  var btn=document.getElementById('brPvBtn'); if(btn)btn.style.background=c1;
+  var bar=document.getElementById('brPvBar'); if(bar)bar.style.background=c2;
+  var lp=document.getElementById('brLogoPreview');
+  if(lp){ if(logo){lp.innerHTML='<img src="'+esc(logo)+'" alt="" style="width:100%;height:100%;object-fit:cover">';} else {lp.innerHTML='';lp.textContent='Geen';} }
+}
+// Logo uploaden naar Cloudinary (werkplek-niveau) en de URL in het formulier zetten.
+async function uploadBrandLogo(input){
+  var file=input.files&&input.files[0]; input.value='';
+  if(!file)return;
+  var ok=['image/png','image/jpeg','image/webp'];
+  if(ok.indexOf(file.type)<0){ showMsg('brMsg',false,'Alleen PNG, JPG of WebP.'); return; }
+  if(file.size>5*1024*1024){ showMsg('brMsg',false,'Logo is te groot (max 5 MB).'); return; }
+  var btn=document.getElementById('brLogoBtn'); if(btn){btn.disabled=true;btn.textContent='Uploaden...';}
+  try{
+    var sr=await fetch('/api/mkt/workspace/logo/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var sd=await sr.json();
+    if(!sr.ok||!sd.success){ showMsg('brMsg',false,sd.error||'Kon upload niet voorbereiden.'); if(btn){btn.disabled=false;btn.textContent='Logo uploaden';} return; }
+    var fd=new FormData(); fd.append('file',file); fd.append('api_key',sd.apiKey); fd.append('timestamp',sd.timestamp); fd.append('signature',sd.signature); fd.append('folder',sd.folder);
+    var cr=await fetch('https://api.cloudinary.com/v1_1/'+sd.cloudName+'/auto/upload',{method:'POST',body:fd});
+    var cd=await cr.json();
+    if(!cr.ok||!cd.secure_url){ showMsg('brMsg',false,(cd.error&&cd.error.message)||'Upload naar Cloudinary mislukt.'); if(btn){btn.disabled=false;btn.textContent='Logo uploaden';} return; }
+    document.getElementById('brLogo').value=cd.secure_url;
+    previewBrandingLive();
+    showMsg('brMsg',true,'Logo geupload. Klik op Huisstijl opslaan om te bewaren.');
+  }catch(e){ showMsg('brMsg',false,'Netwerkfout bij uploaden.'); }
+  if(btn){btn.disabled=false;btn.textContent='Logo uploaden';}
 }
 function brandingFormPayload(){
   return {
@@ -2809,7 +2871,17 @@ async function loadMetaInsights(){
     var deltaSpan=function(cur,prev){var p=pctChange(cur,prev);if(p==null)return '';return '<span style="font-size:12px;font-weight:700;color:'+(p>=0?'#16a34a':'#dc2626')+';margin-left:6px">'+deltaTxt(p)+'</span>';};
     var kpiD=function(label,val,cur,prev){return '<div class="stat"><div class="k">'+esc(label)+'</div><div class="v">'+val+deltaSpan(cur,prev)+'</div></div>';};
     var bigtile=function(label,val,accent){return '<div class="stat"><div class="k">'+esc(label)+'</div><div class="v'+(accent?' accent':'')+'">'+esc(val)+'</div></div>';};
-    var html=rptDateBar();
+    // White-label: logo en merknaam van het bureau bovenaan de rapportage.
+    var _wb=window.WS_BRANDING||{};
+    var brandHead='';
+    if(_wb.logo_url||_wb.brand_name){
+      brandHead='<div class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:14px">'+
+        (_wb.logo_url?('<img src="'+esc(_wb.logo_url)+'" alt="" style="height:46px;max-width:170px;object-fit:contain;border-radius:8px">'):'')+
+        '<div><div style="font-weight:800;font-size:16px">'+esc(_wb.brand_name||'')+'</div>'+
+        '<div style="font-size:12px;color:var(--muted)">Rapportage'+((CURRENT_CLIENT&&CURRENT_CLIENT.name)?(' &middot; '+esc(CURRENT_CLIENT.name)):'')+'</div></div>'+
+      '</div>';
+    }
+    var html=brandHead+rptDateBar();
     html+='<div class="section-h"><h4>Instagram</h4><span style="display:flex;align-items:center;gap:10px"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="toggleMetricsLegend()">&#9432; Uitleg van de cijfers</button><span style="font-size:12px;color:var(--muted)">'+esc(rptPeriodLabel())+'</span></span></div>';
     html+='<div id="metricsLegend" style="display:none">'+metricsLegendHTML()+'</div>';
     // Hero: account + volgers
