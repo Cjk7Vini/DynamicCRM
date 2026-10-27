@@ -2462,11 +2462,12 @@ router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
       + '&redirect_uri=' + encodeURIComponent(metaRedirectUri(req))
       + '&state=' + encodeURIComponent(state)
       + '&response_type=code';
-    // Standaard de klassieke login met scopes (Metricool-stijl): soepele lijst met
-    // "Alles selecteren". Alleen als je bewust de zakelijke login wilt (portfolio-
-    // deelscherm, system-user) zet je META_LOGIN_MODE=business met een config_id.
-    const useBusiness = process.env.META_LOGIN_MODE === 'business';
-    if (useBusiness && configId) url += '&config_id=' + encodeURIComponent(configId);
+    // Standaard de zakelijke login (config_id): dat is de weg die voor deze app de
+    // Instagram-/pagina-permissies daadwerkelijk verleent. De klassieke scope-login
+    // ziet er schoner uit maar geeft die permissies (nog) niet zolang de app niet
+    // gepubliceerd/Advanced is. Wie toch de klassieke weg wil: META_LOGIN_MODE=classic.
+    const useClassic = process.env.META_LOGIN_MODE === 'classic' || !configId;
+    if (!useClassic && configId) url += '&config_id=' + encodeURIComponent(configId);
     else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
     res.redirect(url);
   } catch (e) { res.status(500).send('Fout bij starten koppeling: ' + e.message); }
