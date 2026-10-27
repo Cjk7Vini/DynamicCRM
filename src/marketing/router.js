@@ -4783,32 +4783,42 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.views_split = null;    // volgers vs niet-volgers
       out.views_by_type = null;  // per contenttype (incl. verhalen)
       try {
-        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', ...igWin, access_token: token });
-        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
-        if (bd && Array.isArray(bd.results)) {
-          let f = 0; let n = 0;
-          bd.results.forEach((x) => { const dv = (x.dimension_values || [])[0]; const v = Number(x.value) || 0; if (dv === 'FOLLOWER') f += v; else if (dv === 'NON_FOLLOWER') n += v; });
-          if (f + n > 0) out.views_split = { follower: f, non_follower: n };
+        let f = 0; let n = 0;
+        for (const [cs, cu] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const dv = (x.dimension_values || [])[0]; const v = Number(x.value) || 0; if (dv === 'FOLLOWER') f += v; else if (dv === 'NON_FOLLOWER') n += v; });
+          } catch (e) { /* dit stuk overslaan */ }
         }
+        if (f + n > 0) out.views_split = { follower: f, non_follower: n };
       } catch (e) { /* breakdown niet beschikbaar */ }
       try {
-        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', ...igWin, access_token: token });
-        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
-        if (bd && Array.isArray(bd.results)) {
-          const arr = bd.results.map((x) => ({ type: (x.dimension_values || [])[0] || '?', value: Number(x.value) || 0 })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
-          if (arr.length) out.views_by_type = arr;
+        const map = {};
+        for (const [cs, cu] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const t = (x.dimension_values || [])[0] || '?'; map[t] = (map[t] || 0) + (Number(x.value) || 0); });
+          } catch (e) { /* dit stuk overslaan */ }
         }
+        const arr = Object.keys(map).map((t) => ({ type: t, value: map[t] })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+        if (arr.length) out.views_by_type = arr;
       } catch (e) { /* breakdown niet beschikbaar */ }
       // Interacties per contenttype (Reels, Berichten, Verhalen...) via dezelfde
       // media_product_type-breakdown, zodat het klopt met Instagram zelf.
       out.interactions_by_type = null;
       try {
-        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', ...igWin, access_token: token });
-        const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
-        if (bd && Array.isArray(bd.results)) {
-          const arr = bd.results.map((x) => ({ type: (x.dimension_values || [])[0] || '?', value: Number(x.value) || 0 })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
-          if (arr.length) out.interactions_by_type = arr;
+        const map = {};
+        for (const [cs, cu] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const t = (x.dimension_values || [])[0] || '?'; map[t] = (map[t] || 0) + (Number(x.value) || 0); });
+          } catch (e) { /* dit stuk overslaan */ }
         }
+        const arr = Object.keys(map).map((t) => ({ type: t, value: map[t] })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+        if (arr.length) out.interactions_by_type = arr;
       } catch (e) { /* breakdown niet beschikbaar */ }
       // Tweekleurige splitsing (volgers/niet-volgers) per contenttype voor de
       // "Contentprestaties"-grafieken. Meta geeft deze gecombineerde breakdown niet
@@ -4816,17 +4826,16 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.views_by_type_split = null;
       out.interactions_by_type_split = null;
       const splitByType = async (metric) => {
-        try {
-          const r = await graphGet(`${creds.igUserId}/insights`, { metric, metric_type: 'total_value', breakdown: 'media_product_type,follow_type', period: 'day', ...igWin, access_token: token });
-          const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
-          if (bd && Array.isArray(bd.results)) {
-            const map = {};
-            bd.results.forEach((x) => { const dims = x.dimension_values || []; const t = dims[0] || '?'; const ft = dims[1] || '?'; const v = Number(x.value) || 0; map[t] = map[t] || { follower: 0, non_follower: 0 }; if (ft === 'FOLLOWER') map[t].follower += v; else if (ft === 'NON_FOLLOWER') map[t].non_follower += v; });
-            const arr = Object.keys(map).map((t) => ({ type: t, follower: map[t].follower, non_follower: map[t].non_follower })).filter((x) => (x.follower + x.non_follower) > 0).sort((a, b) => (b.follower + b.non_follower) - (a.follower + a.non_follower));
-            return arr.length ? arr : null;
-          }
-        } catch (_) { /* gecombineerde breakdown niet beschikbaar */ }
-        return null;
+        const map = {};
+        for (const [cs, cu] of igChunks) {
+          try {
+            const r = await graphGet(`${creds.igUserId}/insights`, { metric, metric_type: 'total_value', breakdown: 'media_product_type,follow_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const dims = x.dimension_values || []; const t = dims[0] || '?'; const ft = dims[1] || '?'; const v = Number(x.value) || 0; map[t] = map[t] || { follower: 0, non_follower: 0 }; if (ft === 'FOLLOWER') map[t].follower += v; else if (ft === 'NON_FOLLOWER') map[t].non_follower += v; });
+          } catch (_) { /* dit stuk overslaan */ }
+        }
+        const arr = Object.keys(map).map((t) => ({ type: t, follower: map[t].follower, non_follower: map[t].non_follower })).filter((x) => (x.follower + x.non_follower) > 0).sort((a, b) => (b.follower + b.non_follower) - (a.follower + a.non_follower));
+        return arr.length ? arr : null;
       };
       out.views_by_type_split = await splitByType('views');
       out.interactions_by_type_split = await splitByType('total_interactions');
@@ -4836,12 +4845,18 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.series = null;
       try {
         const s = {};
+        // Per reeks het venster in stukken van max 30 dagen ophalen en samenvoegen,
+        // anders weigert Meta een langere periode en valt de grafiek weg.
         const daily = async (key, metric) => {
-          try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', ...igWin, access_token: token });
-            const row = (r.data && r.data[0]) || null;
-            if (row && Array.isArray(row.values) && row.values.length) s[key] = row.values.map((v) => ({ t: v.end_time || null, v: Number(v.value) || 0 }));
-          } catch (e) { /* deze reeks overslaan */ }
+          const all = [];
+          for (const [cs, cu] of igChunks) {
+            try {
+              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(cs), until: String(cu), access_token: token });
+              const row = (r.data && r.data[0]) || null;
+              if (row && Array.isArray(row.values)) row.values.forEach((v) => all.push({ t: v.end_time || null, v: Number(v.value) || 0 }));
+            } catch (e) { /* dit stuk overslaan */ }
+          }
+          if (all.length) s[key] = all;
         };
         await daily('views', 'views');
         await daily('follower_count', 'follower_count');
