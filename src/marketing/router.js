@@ -2394,13 +2394,20 @@ router.post('/api/mkt/workspace/meta/extend-token', requireMkt, async (req, res)
 // Start- en callback-endpoint voor de "Login met Facebook"-koppeling. Additief:
 // de handmatige token-weg blijft gewoon bestaan. De app-gegevens komen uit de
 // serveromgeving (META_APP_ID/META_APP_SECRET) = de platform-app.
-// Tijdelijk minimaal om de flow te bewijzen. De volledige set (pages_*,
-// instagram_*, ads_*, business_management, read_insights) zetten we aan zodra
-// die permissies in de Meta-app zijn toegevoegd; anders weigert Meta ze als
-// "invalid scopes".
-const META_OAUTH_SCOPES = [
+// Standaard de klassieke Facebook-login (zoals Metricool): de gebruiker logt in,
+// kiest "Alles selecteren" voor pagina's/Instagram, en krijgt een gebruikerstoken
+// dat toegang geeft tot alles waar hij bij kan. Via META_LOGIN_SCOPES aan te passen
+// zonder code te wijzigen, mocht een scope nog niet op de app staan.
+const META_OAUTH_SCOPES = (process.env.META_LOGIN_SCOPES || [
   'public_profile',
-].join(',');
+  'pages_show_list',
+  'pages_read_engagement',
+  'business_management',
+  'instagram_basic',
+  'instagram_manage_insights',
+  'ads_read',
+  'ads_management',
+].join(',')).replace(/\s+/g, '');
 function metaRedirectUri(req) { return 'https://' + req.get('host') + '/api/mkt/meta/callback'; }
 
 router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
@@ -2418,18 +2425,20 @@ router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
       + '&redirect_uri=' + encodeURIComponent(metaRedirectUri(req))
       + '&state=' + encodeURIComponent(state)
       + '&response_type=code';
-    // Facebook Login for Business gebruikt een config_id; de permissies zitten in
-    // die configuratie. Zonder config_id valt hij terug op losse scopes.
-    if (configId) url += '&config_id=' + encodeURIComponent(configId);
+    // Standaard de klassieke login met scopes (Metricool-stijl): soepele lijst met
+    // "Alles selecteren". Alleen als je bewust de zakelijke login wilt (portfolio-
+    // deelscherm, system-user) zet je META_LOGIN_MODE=business met een config_id.
+    const useBusiness = process.env.META_LOGIN_MODE === 'business';
+    if (useBusiness && configId) url += '&config_id=' + encodeURIComponent(configId);
     else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
     res.redirect(url);
   } catch (e) { res.status(500).send('Fout bij starten koppeling: ' + e.message); }
 });
 
-// Laat de frontend weten of de "Login met Facebook"-flow is ingesteld. Pas als de
-// nieuwe, zakelijke app is geconfigureerd (config_id of eigen app-id) tonen we de knop.
+// Laat de frontend weten of de "Login met Facebook"-flow is ingesteld. Zodra de
+// login-app (eigen app-id) is ingesteld, tonen we de knop.
 router.get('/api/mkt/meta/login-config', requireMkt, (req, res) => {
-  const configured = !!process.env.META_LOGIN_CONFIG_ID;
+  const configured = !!(process.env.META_LOGIN_APP_ID || process.env.META_LOGIN_CONFIG_ID);
   res.json({ success: true, configured });
 });
 
