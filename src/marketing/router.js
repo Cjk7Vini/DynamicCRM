@@ -2216,6 +2216,21 @@ router.put('/api/mkt/workspace/branding', requireMkt, async (req, res) => {
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+// Upload-handtekening voor het werkplek-logo (white-label). Alleen eigenaar/manager.
+// De browser uploadt rechtstreeks naar Cloudinary en bewaart daarna de URL via de
+// branding-PUT hierboven.
+router.post('/api/mkt/workspace/logo/sign', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const cfg = cloudinaryConfig();
+    if (!cfg) return res.status(500).json({ error: 'Cloudinary is niet geconfigureerd op de server' });
+    const wsId = req.session.mkt.workspaceId;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `mkt/ws${wsId}/brand`;
+    const signature = cloudinarySign({ folder, timestamp }, cfg.apiSecret);
+    res.json({ success: true, cloudName: cfg.cloudName, apiKey: cfg.apiKey, timestamp, folder, signature });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 router.get('/api/mkt/workspace/integrations', requireMkt, async (req, res) => {
   try {
