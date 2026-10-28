@@ -4628,6 +4628,14 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           try { await trySet('reach,views,saved,shares,total_interactions'); }
           catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
           try { await trySet('follows'); } catch (_) { /* follows niet beschikbaar */ }
+          // Kliks op de bio-link. Meta heeft het account-totaal uitgefaseerd; het bestaat
+          // alleen nog per post via profile_activity (alleen Feed/Verhalen, niet Reels).
+          // We tellen het per post op als terugval voor "Klikken op links".
+          try {
+            const pa = await graphGet(`${p.id}/insights`, { metric: 'profile_activity', breakdown: 'action_type', metric_type: 'total_value', access_token: token });
+            const bd = ((((pa.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { if (((x.dimension_values || [])[0]) === 'BIO_LINK_CLICKED') p._bioLinkClicks = (p._bioLinkClicks || 0) + (Number(x.value) || 0); });
+          } catch (_) { /* profile_activity niet beschikbaar voor dit medium */ }
           // Engagement rate volgens de DHC-formule:
           // (likes + reacties + opgeslagen + gedeeld) / bereik * 100.
           if (p.reach != null && p.reach > 0) {
@@ -4737,6 +4745,12 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         if (sum != null) out.insights[key] = sum;
       };
       await igDailySumChunked('website_clicks', 'website_clicks');
+      // Meta geeft het account-cijfer voor bio-link-kliks niet meer; valt die weg,
+      // dan nemen we de som van de per-post bio-link-kliks (zie enrichPost).
+      if (out.insights.website_clicks == null) {
+        const bioClicks = (allPosts || []).reduce((s, p) => s + (Number(p._bioLinkClicks) || 0), 0);
+        if (bioClicks > 0) out.insights.website_clicks = bioClicks;
+      }
       const _now = Math.floor(Date.now() / 1000);
       await igDailySumChunked('follower_delta', 'follower_count');
       if (out.insights.follower_delta == null) await oneMetric('follower_delta', { metric: 'follower_count', period: 'day', since: String(_now - 28 * 24 * 3600), until: String(_now) });
