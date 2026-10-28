@@ -4629,13 +4629,16 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           catch (_) { try { await trySet('reach,saved,total_interactions'); } catch (__) { /* basiscijfers blijven */ } }
           try { await trySet('follows'); } catch (_) { /* follows niet beschikbaar */ }
           // Kliks op de bio-link. Meta heeft het account-totaal uitgefaseerd; het bestaat
-          // alleen nog per post via profile_activity (alleen Feed/Verhalen, niet Reels).
-          // We tellen het per post op als terugval voor "Klikken op links".
-          try {
-            const pa = await graphGet(`${p.id}/insights`, { metric: 'profile_activity', breakdown: 'action_type', metric_type: 'total_value', access_token: token });
-            const bd = ((((pa.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
-            if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { if (((x.dimension_values || [])[0]) === 'BIO_LINK_CLICKED') p._bioLinkClicks = (p._bioLinkClicks || 0) + (Number(x.value) || 0); });
-          } catch (_) { /* profile_activity niet beschikbaar voor dit medium */ }
+          // alleen nog per post via profile_activity (Feed, niet Reels/Video). We halen het
+          // daarom alleen op voor feed-posts (foto/carrousel) en tellen het op als terugval
+          // voor "Klikken op links". Zo blijven we weg bij nutteloze, trage extra calls.
+          if (p.media_type === 'IMAGE' || p.media_type === 'CAROUSEL_ALBUM') {
+            try {
+              const pa = await graphGet(`${p.id}/insights`, { metric: 'profile_activity', breakdown: 'action_type', metric_type: 'total_value', access_token: token });
+              const bd = ((((pa.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+              if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { if (((x.dimension_values || [])[0]) === 'BIO_LINK_CLICKED') p._bioLinkClicks = (p._bioLinkClicks || 0) + (Number(x.value) || 0); });
+            } catch (_) { /* profile_activity niet beschikbaar voor dit medium */ }
+          }
           // Engagement rate volgens de DHC-formule:
           // (likes + reacties + opgeslagen + gedeeld) / bereik * 100.
           if (p.reach != null && p.reach > 0) {
