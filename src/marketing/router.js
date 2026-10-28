@@ -2570,9 +2570,8 @@ const META_IG_LOGIN_SCOPES = (process.env.META_IG_LOGIN_SCOPES || [
   'instagram_business_manage_insights',
   'instagram_business_content_publish',
 ].join(',')).replace(/\s+/g, '');
-// Altijd dezelfde, vaste callback-URL (met www), zodat die exact matcht met wat je
-// bij Instagram registreert, ongeacht of de workspace via www of zonder www wordt
-// geopend. Via META_IG_REDIRECT_URI te overschrijven als het domein ooit wijzigt.
+// Callback-URL op basis van de host waarmee de workspace is geopend. Zowel de
+// www- als de kale variant staan als aparte redirect-URI's bij Instagram geregistreerd.
 function igRedirectUri(req) {
   return 'https://' + req.get('host') + '/api/mkt/meta/ig/callback';
 }
@@ -2602,6 +2601,7 @@ router.get('/api/mkt/meta/ig-oauth/start', requireMkt, (req, res) => {
       + '?client_id=' + encodeURIComponent(appId)
       + '&redirect_uri=' + encodeURIComponent(igRedirectUri(req))
       + '&response_type=code'
+      + '&force_reauth=true'
       + '&state=' + encodeURIComponent(state)
       + '&scope=' + encodeURIComponent(META_IG_LOGIN_SCOPES);
     res.redirect(url);
