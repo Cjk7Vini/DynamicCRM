@@ -1710,8 +1710,7 @@ async function loadOverzicht(){
         '</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">Jouw best presterende post</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
-          '<div id="ovBestPost"><button class="btn btn-ghost" onclick="ovLoadBestPost()" style="font-size:13px;padding:8px 14px">Cijfers laden</button>'+
-            '<div style="color:var(--muted);font-size:12.5px;margin-top:8px">Haalt de best presterende post van je eigen Instagram (werkplek-koppeling) op bij Meta.</div></div></div>'+
+          '<div id="ovBestPost"><div style="color:var(--muted);font-size:13px">Cijfers laden...</div></div></div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+calIcon+' Jouw posts voor deze week</div><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk hele planning &rarr;</a></div>'+postsHtml+'</div>'+
       '</div>'+
@@ -1723,10 +1722,13 @@ async function loadOverzicht(){
           '<div class="ovch"><div class="t">'+bellIcon+' Aandachtspunten</div>'+(nClientsOpen?'<a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle ('+nClientsOpen+') &rarr;</a>':'')+'</div>'+aandacht+'</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">Actieve campagnes</div><a class="ovlnk" onclick="perKlant(\'campreview\')">Bekijk campagnes &rarr;</a></div>'+
-          '<div id="ovCampaigns"><button class="btn btn-ghost" onclick="ovLoadCampaigns()" style="font-size:13px;padding:8px 14px">Cijfers laden</button>'+
-            '<div style="color:var(--muted);font-size:12.5px;margin-top:8px">Haalt de actieve campagnes van deze workspace op bij Meta.</div></div></div>'+
+          '<div id="ovCampaigns"><div style="color:var(--muted);font-size:13px">Cijfers laden...</div></div></div>'+
       '</div>'+
     '</div>';
+  // Cijfers automatisch laden. Elk endpoint meldt zelf of er iets gekoppeld is en
+  // breekt snel af als dat niet zo is, dus dit belast de pagina alleen waar er data is.
+  ovLoadBestPost();
+  ovLoadCampaigns();
 }
 // Best presterende post van het eigen (werkplek-)Instagram, op aanvraag.
 function ovLoadBestPost(){
