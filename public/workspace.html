@@ -1720,7 +1720,7 @@ async function loadOverzicht(){
           '<div class="statc"><div class="lbl">Klanten met<br>openstaande taken</div><div class="num">'+nClientsOpen+'</div><a class="go" onclick="navTo(\'clients\')">Bekijk klanten &rarr;</a></div>'+
         '</div>'+
         '<div class="ovcard">'+
-          '<div class="ovch"><div class="t">Jouw best presterende post</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
+          '<div class="ovch"><div class="t">'+(pinnedName?('Cijfers van '+esc(pinnedName)):'Jouw best presterende post')+'</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
           '<div id="ovBestPost"><div style="color:var(--muted);font-size:13px">Cijfers laden...</div></div></div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+calIcon+' Jouw posts voor deze week</div><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk hele planning &rarr;</a></div>'+postsHtml+'</div>'+
@@ -1752,16 +1752,29 @@ function ovLoadPinnedCards(cid){
     if(pb){
       if(!d||!d.success||!d.configured){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Nog geen Instagram gekoppeld voor deze klant.</div>'; }
       else {
-        var p=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
-        if(!p){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Geen posts gevonden voor deze klant.</div>'; }
-        else {
+        var ins=d.insights||{}, prev=d.insights_prev||{};
+        var kpi=function(lbl,cur,pv){
+          var val=(cur!=null)?iv(cur):'-'; var dl='<div style="height:13px;margin-top:4px"></div>';
+          if(cur!=null&&pv!=null&&Number(pv)!==0){ var pct=Math.round((cur-pv)/Math.abs(pv)*1000)/10; var pos=pct>=0; dl='<div style="font-size:10.5px;font-weight:700;margin-top:4px;color:'+(pos?'#16a34a':'#dc2626')+'">'+(pos?'+':'')+String(pct).replace('.',',')+'%</div>'; }
+          return '<div style="flex:1;min-width:92px;text-align:center;padding:10px 6px;border:1px solid var(--line);border-radius:10px"><div style="font-size:11px;color:var(--muted);font-weight:600">'+lbl+'</div><div style="font-size:21px;font-weight:800;margin-top:3px">'+val+'</div>'+dl+'</div>';
+        };
+        var tiles='<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+          kpi('Weergaven',ins.views,prev.views)+
+          kpi('Volgers',(d.account?d.account.followers:null),null)+
+          kpi('Profielbezoeken',ins.profile_views,prev.profile_views)+
+          kpi('Interacties',ins.total_interactions,prev.total_interactions)+'</div>';
+        var postBlock=function(p,label,color){
+          if(!p)return '';
           var metric=function(l,v){return '<div class="bp-metric"><div class="ml">'+l+'</div><div class="mv">'+(v!=null?iv(v):'-')+'</div></div>';};
-          var eng=(p.engagement!=null)?('<div class="bp-metric"><div class="ml">Engagement Rate</div><div class="mv" style="color:#4ade80">'+String(p.engagement).replace('.',',')+'%</div></div>'):'';
-          pb.innerHTML='<div class="bp-body">'+
+          var eng=(p.engagement!=null)?('<div class="bp-metric"><div class="ml">Engagement</div><div class="mv" style="color:'+color+'">'+String(p.engagement).replace('.',',')+'%</div></div>'):'';
+          return '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px">'+esc(label)+'</div><div class="bp-body">'+
             (p.thumb?'<img class="bp-img" src="'+esc(p.thumb)+'" alt="">':'<div class="bp-img"></div>')+
-            '<div style="flex:1;min-width:0"><div style="font-size:15.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
-            '<div class="bp-metrics">'+metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+metric('Gedeeld',p.shares)+metric('Opgeslagen',p.saved)+eng+'</div></div></div>';
-        }
+            '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
+            '<div class="bp-metrics">'+metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+eng+'</div></div></div></div>';
+        };
+        var best=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
+        var worst=d.worstPost||null;
+        pb.innerHTML=tiles+(best?postBlock(best,'Best presterende post','#16a34a'):'')+(worst?postBlock(worst,'Minst presterende post','#dc2626'):'')+((!best&&!worst)?'<div style="color:var(--muted);font-size:13px;margin-top:12px">Geen posts gevonden voor deze klant.</div>':'');
       }
     }
     if(cb){
@@ -2254,13 +2267,18 @@ async function loadClientOverviewCijfers(cid){
       box.innerHTML='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px">Nog geen Instagram of Meta gekoppeld voor deze klant. Koppel via het tabblad Koppelingen.</div></div>';
       return;
     }
-    var ins=d.insights||{};
+    var ins=d.insights||{}, prev=d.insights_prev||{};
     var tiles='';
-    function kpi(lbl,val){return '<div class="card" style="flex:1;min-width:120px;text-align:center;padding:14px 10px"><div style="font-size:12px;color:var(--muted);font-weight:600">'+lbl+'</div><div style="font-size:26px;font-weight:800;margin-top:4px">'+val+'</div></div>';}
-    if(ins.views!=null)tiles+=kpi('Weergaven',iv(ins.views));
-    if(d.account&&d.account.followers!=null)tiles+=kpi('Volgers',iv(d.account.followers));
-    if(ins.profile_views!=null)tiles+=kpi('Profielbezoeken',iv(ins.profile_views));
-    if(ins.total_interactions!=null)tiles+=kpi('Interacties',iv(ins.total_interactions));
+    function kpi(lbl,cur,pv){
+      if(cur==null)return '';
+      var dl='';
+      if(pv!=null&&Number(pv)!==0){ var pct=Math.round((cur-pv)/Math.abs(pv)*1000)/10; var pos=pct>=0; dl='<div style="font-size:11px;font-weight:700;margin-top:6px;color:'+(pos?'#16a34a':'#dc2626')+'">'+(pos?'+':'')+String(pct).replace('.',',')+'% vs vorige 30 dagen</div>'; }
+      return '<div class="card" style="flex:1;min-width:140px;text-align:center;padding:14px 10px"><div style="font-size:12px;color:var(--muted);font-weight:600">'+lbl+'</div><div style="font-size:26px;font-weight:800;margin-top:4px">'+iv(cur)+'</div>'+dl+'</div>';
+    }
+    tiles+=kpi('Weergaven',ins.views,prev.views);
+    tiles+=kpi('Volgers',(d.account&&d.account.followers!=null?d.account.followers:null),null);
+    tiles+=kpi('Profielbezoeken',ins.profile_views,prev.profile_views);
+    tiles+=kpi('Interacties',ins.total_interactions,prev.total_interactions);
     function pcard(p,label,color){
       if(!p)return '';
       var eng=(p.engagement!=null)?(String(p.engagement).replace('.',',')+'%'):'-';
