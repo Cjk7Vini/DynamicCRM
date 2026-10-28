@@ -2574,10 +2574,7 @@ const META_IG_LOGIN_SCOPES = (process.env.META_IG_LOGIN_SCOPES || [
 // bij Instagram registreert, ongeacht of de workspace via www of zonder www wordt
 // geopend. Via META_IG_REDIRECT_URI te overschrijven als het domein ooit wijzigt.
 function igRedirectUri(req) {
-  if (process.env.META_IG_REDIRECT_URI) return process.env.META_IG_REDIRECT_URI;
-  let host = (req.get('host') || 'www.dynamic-health-consultancy.nl');
-  if (host.indexOf('www.') !== 0) host = 'www.' + host;
-  return 'https://' + host + '/api/mkt/meta/ig/callback';
+  return 'https://' + req.get('host') + '/api/mkt/meta/ig/callback';
 }
 async function igGraphGet(pathAndId, params) {
   const qs = new URLSearchParams(params).toString();
