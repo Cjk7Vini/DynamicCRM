@@ -1744,6 +1744,7 @@ async function loadOverzicht(){
 }
 // Cijfers van één vastgepinde klant in de overzicht-kaarten (beste post + campagnes).
 function ovLoadPinnedCards(cid){
+  var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
   var pb=document.getElementById('ovBestPost'); var cb=document.getElementById('ovCampaigns');
   if(pb)pb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
   if(cb)cb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
@@ -2245,6 +2246,7 @@ async function loadClientOverview(){
 // Rapportage (standaard laatste 30 dagen).
 async function loadClientOverviewCijfers(cid){
   var box=document.getElementById('ovwCijfers'); if(!box)return;
+  var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
   try{
     var r=await fetch('/api/mkt/clients/'+cid+'/meta-insights',{credentials:'include'});
     var d=await r.json();
