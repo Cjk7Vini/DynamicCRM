@@ -4720,7 +4720,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.insights_debug.views_from_posts = viewsFromPosts;
       out.insights_debug.views_account = (out.insights.views != null ? out.insights.views : null);
       out.insights_debug.posts_in_period = (allPosts || []).length;
-      if (viewsFromPosts > (out.insights.views || 0)) out.insights.views = viewsFromPosts;
+      // Instagram's account-"views" is het getal dat de app toont; dat houden we aan.
+      // Alleen als die metric helemaal niets gaf, vallen we terug op de som van de posts.
+      if ((out.insights.views == null || out.insights.views === 0) && viewsFromPosts > 0) out.insights.views = viewsFromPosts;
       // website_clicks en follower_count zijn DAGELIJKSE metrics die je optelt;
       // ook hier het venster in stukken van max 30 dagen (anders afgewezen).
       const igDailySumChunked = async (key, metric) => {
@@ -4893,8 +4895,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         };
         await fd('age', 'age', 0);
         await fd('gender', 'gender', 0);
-        await fd('city', 'city', 6);
-        await fd('country', 'country', 6);
+        await fd('city', 'city', 5);
+        await fd('country', 'country', 5);
         // Terugval op de oude (uitgefaseerde) metrics als follower_demographics niets geeft.
         if (!Object.keys(dg).length) {
           const parseTop = async (metric, key, topN) => {
@@ -4909,8 +4911,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
             } catch (e) { /* deze breakdown overslaan */ }
           };
           await parseTop('audience_gender_age', 'gender_age', 0);
-          await parseTop('audience_country', 'country', 10);
-          await parseTop('audience_city', 'city', 10);
+          await parseTop('audience_country', 'country', 5);
+          await parseTop('audience_city', 'city', 5);
         }
         if (Object.keys(dg).length) out.demographics = dg;
       } catch (_) { /* geen demografie beschikbaar */ }
