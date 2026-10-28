@@ -4631,7 +4631,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       if (allPosts.length) {
         const enrichPost = async (p) => {
           const trySet = async (metric) => {
-            const pin = await graphGet(`${p.id}/insights`, { metric, access_token: token });
+            const pin = await igGet(`${p.id}/insights`, { metric, access_token: igTok });
             (pin.data || []).forEach((row) => {
               const val = (row.total_value && row.total_value.value != null) ? Number(row.total_value.value)
                 : (Array.isArray(row.values) && row.values.length ? Number(row.values[0].value) : null);
@@ -4647,7 +4647,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           // voor "Klikken op links". Zo blijven we weg bij nutteloze, trage extra calls.
           if (p.media_type === 'IMAGE' || p.media_type === 'CAROUSEL_ALBUM') {
             try {
-              const pa = await graphGet(`${p.id}/insights`, { metric: 'profile_activity', breakdown: 'action_type', metric_type: 'total_value', access_token: token });
+              const pa = await igGet(`${p.id}/insights`, { metric: 'profile_activity', breakdown: 'action_type', metric_type: 'total_value', access_token: igTok });
               const bd = ((((pa.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
               if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { if (((x.dimension_values || [])[0]) === 'BIO_LINK_CLICKED') p._bioLinkClicks = (p._bioLinkClicks || 0) + (Number(x.value) || 0); });
             } catch (_) { /* profile_activity niet beschikbaar voor dit medium */ }
@@ -4680,7 +4680,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.insights = {};
       const oneMetric = async (key, params) => {
         try {
-          const r = await graphGet(`${creds.igUserId}/insights`, { ...params, access_token: token });
+          const r = await igGet(`${igUid}/insights`, { ...params, access_token: igTok });
           const row = (r.data && r.data[0]) || null;
           if (!row) return;
           if (row.total_value && row.total_value.value != null) {
@@ -4708,7 +4708,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         let total = null;
         for (const [s, u] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', metric_type: 'total_value', since: String(s), until: String(u), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric, period: 'day', metric_type: 'total_value', since: String(s), until: String(u), access_token: igTok });
             const row = (r.data && r.data[0]) || null;
             if (row && row.total_value && row.total_value.value != null) total = (total || 0) + Number(row.total_value.value);
           } catch (e) { if (!out.errors.insights) out.errors.insights = e.message; }
@@ -4718,7 +4718,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         if (total == null) {
           for (const [s, u] of igChunks) {
             try {
-              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: token });
+              const r = await igGet(`${igUid}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: igTok });
               const row = (r.data && r.data[0]) || null;
               if (row && Array.isArray(row.values) && row.values.length) daily = (daily || 0) + row.values.reduce((a, v) => a + (Number(v.value) || 0), 0);
             } catch (e) { /* daily is secundair */ }
@@ -4753,7 +4753,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         let sum = null;
         for (const [s, u] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric, period: 'day', since: String(s), until: String(u), access_token: igTok });
             const row = (r.data && r.data[0]) || null;
             if (row && Array.isArray(row.values) && row.values.length) sum = (sum || 0) + row.values.reduce((a, v) => a + (Number(v.value) || 0), 0);
           } catch (e) { /* dit stuk overslaan */ }
@@ -4801,8 +4801,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       const prevWin = { since: String(igS - prevLen), until: String(igS) };
       const igPrev = async (key, metric, isDelta) => {
         try {
-          const params = isDelta ? { metric, period: 'day', ...prevWin, access_token: token } : { metric, period: 'day', metric_type: 'total_value', ...prevWin, access_token: token };
-          const r = await graphGet(`${creds.igUserId}/insights`, params);
+          const params = isDelta ? { metric, period: 'day', ...prevWin, access_token: igTok } : { metric, period: 'day', metric_type: 'total_value', ...prevWin, access_token: igTok };
+          const r = await igGet(`${igUid}/insights`, params);
           const row = (r.data && r.data[0]) || null; if (!row) return;
           if (row.total_value && row.total_value.value != null) out.insights_prev[key] = Number(row.total_value.value);
           else if (Array.isArray(row.values) && row.values.length) out.insights_prev[key] = row.values.reduce((s, v) => s + (Number(v.value) || 0), 0);
@@ -4823,7 +4823,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         let f = 0; let n = 0;
         for (const [cs, cu] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
             const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
             if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const dv = (x.dimension_values || [])[0]; const v = Number(x.value) || 0; if (dv === 'FOLLOWER') f += v; else if (dv === 'NON_FOLLOWER') n += v; });
           } catch (e) { /* dit stuk overslaan */ }
@@ -4834,7 +4834,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         const map = {};
         for (const [cs, cu] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric: 'views', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
             const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
             if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const t = (x.dimension_values || [])[0] || '?'; map[t] = (map[t] || 0) + (Number(x.value) || 0); });
           } catch (e) { /* dit stuk overslaan */ }
@@ -4849,7 +4849,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         const map = {};
         for (const [cs, cu] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
             const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
             if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const t = (x.dimension_values || [])[0] || '?'; map[t] = (map[t] || 0) + (Number(x.value) || 0); });
           } catch (e) { /* dit stuk overslaan */ }
@@ -4866,7 +4866,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         const map = {};
         for (const [cs, cu] of igChunks) {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, { metric, metric_type: 'total_value', breakdown: 'media_product_type,follow_type', period: 'day', since: String(cs), until: String(cu), access_token: token });
+            const r = await igGet(`${igUid}/insights`, { metric, metric_type: 'total_value', breakdown: 'media_product_type,follow_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
             const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
             if (bd && Array.isArray(bd.results)) bd.results.forEach((x) => { const dims = x.dimension_values || []; const t = dims[0] || '?'; const ft = dims[1] || '?'; const v = Number(x.value) || 0; map[t] = map[t] || { follower: 0, non_follower: 0 }; if (ft === 'FOLLOWER') map[t].follower += v; else if (ft === 'NON_FOLLOWER') map[t].non_follower += v; });
           } catch (_) { /* dit stuk overslaan */ }
@@ -4888,7 +4888,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           const all = [];
           for (const [cs, cu] of igChunks) {
             try {
-              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'day', since: String(cs), until: String(cu), access_token: token });
+              const r = await igGet(`${igUid}/insights`, { metric, period: 'day', since: String(cs), until: String(cu), access_token: igTok });
               const row = (r.data && r.data[0]) || null;
               if (row && Array.isArray(row.values)) row.values.forEach((v) => all.push({ t: v.end_time || null, v: Number(v.value) || 0 }));
             } catch (e) { /* dit stuk overslaan */ }
@@ -4910,9 +4910,9 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         const dg = {};
         const fd = async (breakdown, key, topN) => {
           try {
-            const r = await graphGet(`${creds.igUserId}/insights`, {
+            const r = await igGet(`${igUid}/insights`, {
               metric: 'follower_demographics', period: 'lifetime', timeframe: 'last_30_days',
-              breakdown, metric_type: 'total_value', access_token: token,
+              breakdown, metric_type: 'total_value', access_token: igTok,
             });
             const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
             if (bd && Array.isArray(bd.results)) {
@@ -4931,7 +4931,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         if (!Object.keys(dg).length) {
           const parseTop = async (metric, key, topN) => {
             try {
-              const r = await graphGet(`${creds.igUserId}/insights`, { metric, period: 'lifetime', access_token: token });
+              const r = await igGet(`${igUid}/insights`, { metric, period: 'lifetime', access_token: igTok });
               const row = (r.data && r.data[0]) || null;
               const val = row && row.values && row.values[0] && row.values[0].value;
               if (val && typeof val === 'object') {
@@ -4952,7 +4952,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.activeTimes = null;
       out.activeTimesByDay = null; // per weekdag (0=zondag) voor de dagkiezer
       try {
-        const r = await graphGet(`${creds.igUserId}/insights`, { metric: 'online_followers', period: 'lifetime', ...igWin, access_token: token });
+        const r = await igGet(`${igUid}/insights`, { metric: 'online_followers', period: 'lifetime', ...igWin, access_token: igTok });
         const vals = ((r.data || [])[0] || {}).values || [];
         if (vals.length) {
           const sum = {}; const cnt = {};
