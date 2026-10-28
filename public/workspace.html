@@ -3019,7 +3019,7 @@ async function loadMetaInsights(){
     html+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">';
     html+='<div class="card" style="flex:2;min-width:300px">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div style="font-weight:700;font-size:15px">Nieuwe volgers per dag</div>'+(_fc?('<div style="font-size:12px;color:var(--muted)">gemiddeld '+(_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0)/_fc.length).toFixed(1).replace('.',',')+' per dag</div>'):'')+'</div>'+(_fnew!=null?('<div style="text-align:right"><div style="font-size:26px;font-weight:800;color:#16a34a">'+(_fnew>0?'+':'')+iv(_fnew)+'</div><div style="font-size:11px;color:var(--muted)">Nieuwe volgers'+(_fnewNet?' (netto)':' (bruto)')+'</div></div>'):'')+'</div>'+
-      (_fc&&_fc.length>1?('<div style="margin-top:12px">'+reportChart(_fc,'#16a34a','gFollow')+'</div>'):'<div style="color:var(--muted);font-size:13px;margin-top:10px">Nog te weinig dagdata voor een grafiek.</div>')+
+      (_fc&&_fc.length>1?('<div style="margin-top:12px">'+reportChart(_fc,'#16a34a','gFollow')+'</div>'):('<div style="color:var(--muted);font-size:13px;margin-top:10px">'+(((new Date()-new Date(_rng.since))/86400000>31)?'Instagram levert de dagelijkse volgersdata maar 30 dagen terug. Kies een periode binnen de laatste 30 dagen om deze grafiek te zien.':'Nog te weinig dagdata voor een grafiek.')+'</div>'))+
     '</div>';
     var _side='';
     if(_vs.follower!=null)_side+='<div class="card" style="text-align:center;padding:18px"><div style="font-weight:700;font-size:13px">Weergaven van volgers</div><div style="font-size:28px;font-weight:800;margin-top:8px">'+iv(_vs.follower)+'</div></div>';
@@ -3075,7 +3075,7 @@ async function loadMetaInsights(){
         ageHtml=ageBars(Object.keys(aa).sort().map(function(k){return {label:k,value:aa[k]};}));
       }
       if(ageHtml||genHtml){
-        html+='<div class="section-h" style="margin-top:18px"><h4>Doelgroep</h4><span style="font-size:12px;color:var(--muted)">Inzicht in wie je account volgt en bereikt</span></div>';
+        html+='<div class="section-h" style="margin-top:18px"><h4>Doelgroep</h4><span style="font-size:12px;color:var(--muted)">Inzicht in wie je account volgt en bereikt, gebaseerd op de laatste 30 dagen (Instagram biedt hiervoor geen vrije periode)</span></div>';
         html+='<div style="display:flex;gap:14px;flex-wrap:wrap">'+
           (ageHtml?('<div class="card" style="flex:1;min-width:280px"><div style="font-weight:700;text-align:center;margin-bottom:12px">Leeftijd</div>'+ageHtml+'</div>'):'')+
           (genHtml?('<div class="card" style="flex:1;min-width:280px"><div style="font-weight:700;text-align:center;margin-bottom:6px">Geslachtsverdeling</div>'+genHtml+'</div>'):'')+

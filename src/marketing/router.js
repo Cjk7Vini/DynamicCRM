@@ -4570,9 +4570,22 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     // --- Instagram account: volgers + aantal media ---
     if (igUid) {
       // Meetvenster (Unix) uit de gekozen periode; de frontend stuurt altijd van/tot mee.
+      // Daggrenzen in de tijdzone van het account (Instagram meet ook zo), niet in UTC.
+      // Anders lopen de cijfers een paar uur uit de pas met de Instagram-app.
       const _okd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
-      const winU = _okd(req.query.until) ? Math.floor(new Date(req.query.until + 'T23:59:59Z').getTime() / 1000) : Math.floor(Date.now() / 1000);
-      const winS = _okd(req.query.since) ? Math.floor(new Date(req.query.since + 'T00:00:00Z').getTime() / 1000) : (winU - 30 * 24 * 3600);
+      const _RPT_TZ = process.env.MKT_REPORT_TZ || 'Europe/Amsterdam';
+      const _tzOffMs = (ms) => {
+        const d = new Date(ms);
+        const tz = new Date(d.toLocaleString('en-US', { timeZone: _RPT_TZ })).getTime();
+        const utc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' })).getTime();
+        return tz - utc; // offset van de tijdzone t.o.v. UTC (onafhankelijk van servertijd)
+      };
+      const _localUnix = (dateStr, endOfDay) => {
+        const naive = new Date(dateStr + (endOfDay ? 'T23:59:59Z' : 'T00:00:00Z')).getTime();
+        return Math.floor((naive - _tzOffMs(naive)) / 1000);
+      };
+      const winU = _okd(req.query.until) ? _localUnix(req.query.until, true) : Math.floor(Date.now() / 1000);
+      const winS = _okd(req.query.since) ? _localUnix(req.query.since, false) : (winU - 30 * 24 * 3600);
       try {
         const a = await igGet(`${igUid}`, {
           fields: 'username,followers_count,follows_count,media_count', access_token: igTok,
