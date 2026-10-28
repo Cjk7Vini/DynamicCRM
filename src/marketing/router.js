@@ -4670,8 +4670,14 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           return interCount(y) - interCount(x);
         });
         out.topPosts = allPosts.slice(0, 10);
+        // Minst presterende post (laagste engagement rate) van de posts met cijfers,
+        // voor de samenvatting in de klant-Overzicht-tab. Alleen als er meer dan 1 is,
+        // zodat dezelfde post niet tegelijk "beste" en "slechtste" wordt.
+        const _withEng = allPosts.filter((p) => p.engagement != null);
+        out.worstPost = _withEng.length > 1 ? _withEng[_withEng.length - 1] : null;
       } else {
         out.topPosts = [];
+        out.worstPost = null;
       }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
