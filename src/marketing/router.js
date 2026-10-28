@@ -2601,6 +2601,7 @@ router.get('/api/mkt/meta/ig-oauth/start', requireMkt, (req, res) => {
       + '?client_id=' + encodeURIComponent(appId)
       + '&redirect_uri=' + encodeURIComponent(igRedirectUri(req))
       + '&response_type=code'
+      + '&force_reauth=true'
       + '&state=' + encodeURIComponent(state)
       + '&scope=' + encodeURIComponent(META_IG_LOGIN_SCOPES);
     res.redirect(url);
