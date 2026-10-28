@@ -3010,12 +3010,15 @@ async function loadMetaInsights(){
     }
     // ===== 2. Volgersgroei: grafiek + nieuwe volgers + weergaven volgers/niet-volgers =====
     var _fc=(d.series&&d.series.follower_count)?d.series.follower_count:null;
-    var _fnew=_fc?_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0):null;
+    // Netto volgersgroei (eind - begin) matcht met wat Instagram toont; die krijgen we
+    // zodra er genoeg dagelijkse snapshots zijn. Anders bruto (som nieuwe volgers per dag).
+    var _fnew=(ins&&ins.follower_net!=null)?ins.follower_net:(_fc?_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0):null);
+    var _fnewNet=(ins&&ins.follower_net!=null);
     var _vs=d.views_split||{};
     html+='<div class="section-h" style="margin-top:18px"><h4>Volgersgroei</h4></div>';
     html+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">';
     html+='<div class="card" style="flex:2;min-width:300px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div style="font-weight:700;font-size:15px">Nieuwe volgers per dag</div>'+(_fc?('<div style="font-size:12px;color:var(--muted)">gemiddeld '+(_fnew/_fc.length).toFixed(1).replace('.',',')+' per dag</div>'):'')+'</div>'+(_fnew!=null?('<div style="text-align:right"><div style="font-size:26px;font-weight:800;color:#16a34a">'+(_fnew>0?'+':'')+iv(_fnew)+'</div><div style="font-size:11px;color:var(--muted)">Nieuwe volgers</div></div>'):'')+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div style="font-weight:700;font-size:15px">Nieuwe volgers per dag</div>'+(_fc?('<div style="font-size:12px;color:var(--muted)">gemiddeld '+(_fc.reduce(function(s,x){return s+(Number(x.v)||0);},0)/_fc.length).toFixed(1).replace('.',',')+' per dag</div>'):'')+'</div>'+(_fnew!=null?('<div style="text-align:right"><div style="font-size:26px;font-weight:800;color:#16a34a">'+(_fnew>0?'+':'')+iv(_fnew)+'</div><div style="font-size:11px;color:var(--muted)">Nieuwe volgers'+(_fnewNet?' (netto)':' (bruto)')+'</div></div>'):'')+'</div>'+
       (_fc&&_fc.length>1?('<div style="margin-top:12px">'+reportChart(_fc,'#16a34a','gFollow')+'</div>'):'<div style="color:var(--muted);font-size:13px;margin-top:10px">Nog te weinig dagdata voor een grafiek.</div>')+
     '</div>';
     var _side='';
@@ -3026,10 +3029,13 @@ async function loadMetaInsights(){
     if(d.series&&d.series.views&&d.series.views.length>1)html+='<div class="section-h" style="margin-top:16px"><h4>Weergaven per dag</h4></div><div class="card">'+reportChart(d.series.views,'#e1306c','gViews')+'</div>';
     // ===== 3. Contentprestaties: vaste contenttypes Verhalen/Reels/Berichten/Livevideo's =====
     var _ctype=function(mt){mt=String(mt||'').toUpperCase();if(mt.indexOf('REEL')>=0)return 'Reels';if(mt.indexOf('STORY')>=0)return 'Verhalen';if(mt.indexOf('LIVE')>=0||mt.indexOf('BROADCAST')>=0)return "Livevideo's";return 'Berichten';};
+    // Advertentie-/promotie-weergaven horen niet in de organische contenttype-grafieken;
+    // Instagram telt die ook niet mee bij de organische cijfers. Daarom filteren we ze eruit.
+    var _isAd=function(mt){mt=String(mt||'').toUpperCase();return mt==='AD'||mt==='ADS'||mt.indexOf('ADVERT')>=0||mt.indexOf('PROMOT')>=0;};
     var _corder=['Verhalen','Reels','Berichten',"Livevideo's"];
     var _cfmt=function(v){return rptShort(v).replace('.',',').replace('k','K');};
-    var _canonSingle=function(arr){var m={Verhalen:0,Reels:0,Berichten:0};m["Livevideo's"]=0;(arr||[]).forEach(function(x){m[_ctype(x.type)]+=(x.value||0);});var o=_corder.map(function(k){return {label:k,value:m[k]};}).sort(function(a,b){return b.value-a.value;});return (o.reduce(function(s,x){return s+x.value;},0)>0)?o:null;};
-    var _canonSplit=function(arr){if(!arr||!arr.length)return null;var m={};_corder.forEach(function(k){m[k]={f:0,n:0};});arr.forEach(function(x){var k=_ctype(x.type);m[k].f+=(x.follower||0);m[k].n+=(x.non_follower||0);});var o=_corder.map(function(k){return {label:k,follower:m[k].f,non_follower:m[k].n};}).sort(function(a,b){return (b.follower+b.non_follower)-(a.follower+a.non_follower);});return (o.reduce(function(s,x){return s+x.follower+x.non_follower;},0)>0)?o:null;};
+    var _canonSingle=function(arr){var m={Verhalen:0,Reels:0,Berichten:0};m["Livevideo's"]=0;(arr||[]).forEach(function(x){if(_isAd(x.type))return;m[_ctype(x.type)]+=(x.value||0);});var o=_corder.map(function(k){return {label:k,value:m[k]};}).sort(function(a,b){return b.value-a.value;});return (o.reduce(function(s,x){return s+x.value;},0)>0)?o:null;};
+    var _canonSplit=function(arr){if(!arr||!arr.length)return null;var m={};_corder.forEach(function(k){m[k]={f:0,n:0};});arr.forEach(function(x){if(_isAd(x.type))return;var k=_ctype(x.type);m[k].f+=(x.follower||0);m[k].n+=(x.non_follower||0);});var o=_corder.map(function(k){return {label:k,follower:m[k].f,non_follower:m[k].n};}).sort(function(a,b){return (b.follower+b.non_follower)-(a.follower+a.non_follower);});return (o.reduce(function(s,x){return s+x.follower+x.non_follower;},0)>0)?o:null;};
     var twoTone=function(title,split,single){
       var rows='';
       if(split&&split.length){
