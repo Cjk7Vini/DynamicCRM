@@ -1658,6 +1658,8 @@ async function loadOverzicht(){
   try{var r=await fetch('/api/mkt/my-tasks',{credentials:'include'});var d=await r.json();if(d&&d.success)tasks=d.tasks||[];}catch(e){}
   try{var r2=await fetch('/api/mkt/upcoming-posts',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)posts=d2.posts||[];}catch(e){}
   try{var r3=await fetch('/api/mkt/clients',{credentials:'include'});var d3=await r3.json();if(d3&&d3.success)allClients=d3.clients||[];}catch(e){}
+  var pinnedId=null;
+  try{var rp=await fetch('/api/mkt/overview/pinned-client',{credentials:'include'});var dp=await rp.json();if(dp&&dp.success&&dp.clientId!=null)pinnedId=dp.clientId;}catch(e){}
   clients=allClients.filter(function(c){return (Number(c.open_actions)||0)>0;});
   var today=new Date().toISOString().slice(0,10);
   var nActiveClients=allClients.filter(function(c){return !c.archived && (c.status==null||c.status==='active');}).length || allClients.length;
@@ -1697,12 +1699,15 @@ async function loadOverzicht(){
 
   var calIcon='<svg class="ovic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   var bellIcon='<svg class="ovic" viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>';
+  // Keuze welke cijfers op het overzicht komen: algemeen (alle klanten) of één vaste klant.
+  var pinOpts='<option value="">Algemeen (alle klanten)</option>'+allClients.filter(function(c){return !c.archived;}).map(function(c){return '<option value="'+c.id+'"'+(String(c.id)===String(pinnedId)?' selected':'')+'>'+esc(c.name)+'</option>';}).join('');
+  var pinSel='<div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">Cijfers tonen voor:</span><select onchange="ovSetPinned(this.value)" style="background:rgba(255,255,255,.05);color:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px">'+pinOpts+'</select></div>';
 
   root.innerHTML=
     '<div class="ovgrid">'+
       '<div class="ovmain">'+
         '<div class="ovhero"><h1>Welkom '+esc(firstName)+'.</h1>'+
-          '<p>Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p></div>'+
+          '<p>Je workspace staat klaar. Dit is jouw agency overzicht. Hieronder zie je de belangrijkste updates voor vandaag.</p>'+pinSel+'</div>'+
         '<div class="statrow">'+
           '<div class="statc"><div class="lbl">Actieve klanten</div><div class="num">'+nActiveClients+'</div><a class="go" onclick="navTo(\'clients\')">Ga naar klanten &rarr;</a></div>'+
           '<div class="statc"><div class="lbl">Openstaande taken</div><div class="num">'+nTasks+'</div><a class="go" onclick="ovScrollTo(\'ovPrioCard\')">Ga naar taken &rarr;</a></div>'+
@@ -1727,8 +1732,48 @@ async function loadOverzicht(){
     '</div>';
   // Cijfers automatisch laden. Elk endpoint meldt zelf of er iets gekoppeld is en
   // breekt snel af als dat niet zo is, dus dit belast de pagina alleen waar er data is.
-  ovLoadBestPost();
-  ovLoadCampaigns();
+  // Is er een klant vastgepind, dan tonen we de cijfers van die ene klant.
+  if(pinnedId!=null){ ovLoadPinnedCards(pinnedId); }
+  else { ovLoadBestPost(); ovLoadCampaigns(); }
+}
+// Werkplek-eigenaar kiest welke klant op het hoofd-overzicht getoond wordt (of algemeen).
+function ovSetPinned(val){
+  fetch('/api/mkt/overview/pinned-client',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({clientId:val||null})})
+    .then(function(r){return r.json();}).then(function(){ loadOverzicht(); }).catch(function(){});
+}
+// Cijfers van één vastgepinde klant in de overzicht-kaarten (beste post + campagnes).
+function ovLoadPinnedCards(cid){
+  var pb=document.getElementById('ovBestPost'); var cb=document.getElementById('ovCampaigns');
+  if(pb)pb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
+  if(cb)cb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
+  fetch('/api/mkt/clients/'+cid+'/meta-insights',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(pb){
+      if(!d||!d.success||!d.configured){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Nog geen Instagram gekoppeld voor deze klant.</div>'; }
+      else {
+        var p=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
+        if(!p){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Geen posts gevonden voor deze klant.</div>'; }
+        else {
+          var metric=function(l,v){return '<div class="bp-metric"><div class="ml">'+l+'</div><div class="mv">'+(v!=null?iv(v):'-')+'</div></div>';};
+          var eng=(p.engagement!=null)?('<div class="bp-metric"><div class="ml">Engagement Rate</div><div class="mv" style="color:#4ade80">'+String(p.engagement).replace('.',',')+'%</div></div>'):'';
+          pb.innerHTML='<div class="bp-body">'+
+            (p.thumb?'<img class="bp-img" src="'+esc(p.thumb)+'" alt="">':'<div class="bp-img"></div>')+
+            '<div style="flex:1;min-width:0"><div style="font-size:15.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
+            '<div class="bp-metrics">'+metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+metric('Gedeeld',p.shares)+metric('Opgeslagen',p.saved)+eng+'</div></div></div>';
+        }
+      }
+    }
+    if(cb){
+      var ads=(d&&d.success&&d.ads&&!d.ads.empty)?d.ads:null;
+      if(!ads){ cb.innerHTML='<div style="font-size:13px;color:var(--muted)">Geen actieve campagnes voor deze klant.</div>'; }
+      else {
+        var bits=[];
+        if(ads.spend!=null)bits.push('&euro;'+Number(ads.spend).toFixed(0)+' besteed');
+        if(ads.leads!=null)bits.push(ads.leads+' leads');
+        if(ads.cost_per_lead!=null)bits.push('CPL &euro;'+String(Number(ads.cost_per_lead).toFixed(2)).replace('.',','));
+        cb.innerHTML='<div style="font-size:13.5px;line-height:1.7">'+(bits.length?bits.join(' &middot; '):'Campagnegegevens staan onder Campagnes.')+'</div>';
+      }
+    }
+  }).catch(function(){ if(pb)pb.innerHTML='<div style="color:#f87171;font-size:13px">Netwerkfout.</div>'; if(cb)cb.innerHTML=''; });
 }
 // Best presterende post van het eigen (werkplek-)Instagram, op aanvraag.
 function ovLoadBestPost(){
