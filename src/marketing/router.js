@@ -4378,6 +4378,32 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Vastgepinde klant voor de hoofd-overzichtspagina. Leeg = algemeen overzicht.
+router.get('/api/mkt/overview/pinned-client', requireMkt, async (req, res) => {
+  try {
+    const wsId = req.session.mkt.workspaceId;
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT overview_client_id FROM marketing.workspaces WHERE id=$1', [wsId]
+    )).rows[0]);
+    res.json({ success: true, clientId: (row && row.overview_client_id != null) ? row.overview_client_id : null });
+  } catch (e) { res.json({ success: true, clientId: null }); }
+});
+router.put('/api/mkt/overview/pinned-client', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    let cid = req.body ? req.body.clientId : null;
+    cid = (cid === null || cid === '' || cid === undefined) ? null : parseInt(cid, 10);
+    if (cid != null && isNaN(cid)) return res.status(400).json({ error: 'Ongeldige klant' });
+    if (cid != null) {
+      const ok = await clientInWorkspace(cid, wsId);
+      if (!ok) return res.status(404).json({ error: 'Klant niet gevonden' });
+    }
+    await withWriteConnection(async (c) => c.query('UPDATE marketing.workspaces SET overview_client_id=$1 WHERE id=$2', [cid, wsId]));
+    res.json({ success: true, clientId: cid });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Agency-overzicht: "eigen account"-cijfers, ALLEEN op aanvraag (zwaar: veel
 // Meta-calls). 'part=post' = best presterende post van het werkplek-IG.
 // 'part=campaigns' = actieve campagnes over de hele workspace (werkplek-ad-account
