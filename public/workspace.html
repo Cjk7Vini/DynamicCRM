@@ -2159,8 +2159,7 @@ async function loadClientOverview(){
           statCard('Openstaande taken',nTasks,'Ga naar to do','todo')+
         '</div>'+
         '<div class="card">'+cardHead('Content voor deze week',cardLink('Bekijk hele planning','content'))+weekHtml+'</div>'+
-        '<div class="card">'+cardHead('Jouw best presterende posts',cardLink('Open rapportage','report'))+
-          '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De best presterende posts (op engagement rate) en de Meta-cijfers staan in de Rapportage-tab van deze klant.</div></div>'+
+        '<div id="ovwCijfers"><div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px;padding-top:2px">Cijfers laden...</div></div></div>'+
         '<div class="card">'+cardHead('Actieve campagnes',cardLink('Open campagnes','campreview'))+
           '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De lopende advertentiecampagnes en hun resultaten (besteed, leads, CPL, budget) staan onder Campagnes.</div></div>'+
       '</div>'+
@@ -2170,6 +2169,48 @@ async function loadClientOverview(){
         '<div class="card">'+cardHead('Aandacht nodig',cardLink('Naar planning','content'))+changeHtml+'</div>'+
       '</div>'+
     '</div>';
+  loadClientOverviewCijfers(cid);
+}
+// Cijfers (KPI's + beste/slechtste post) voor de klant-Overzicht-tab. Laadt los van
+// de planning, zodat de tab niet blokkeert. Gebruikt hetzelfde endpoint als de
+// Rapportage (standaard laatste 30 dagen).
+async function loadClientOverviewCijfers(cid){
+  var box=document.getElementById('ovwCijfers'); if(!box)return;
+  try{
+    var r=await fetch('/api/mkt/clients/'+cid+'/meta-insights',{credentials:'include'});
+    var d=await r.json();
+    if(!d||!d.success||!d.configured){
+      box.innerHTML='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px">Nog geen Instagram of Meta gekoppeld voor deze klant. Koppel via het tabblad Koppelingen.</div></div>';
+      return;
+    }
+    var ins=d.insights||{};
+    var tiles='';
+    function kpi(lbl,val){return '<div class="card" style="flex:1;min-width:120px;text-align:center;padding:14px 10px"><div style="font-size:12px;color:var(--muted);font-weight:600">'+lbl+'</div><div style="font-size:26px;font-weight:800;margin-top:4px">'+val+'</div></div>';}
+    if(ins.views!=null)tiles+=kpi('Weergaven',iv(ins.views));
+    if(d.account&&d.account.followers!=null)tiles+=kpi('Volgers',iv(d.account.followers));
+    if(ins.profile_views!=null)tiles+=kpi('Profielbezoeken',iv(ins.profile_views));
+    if(ins.total_interactions!=null)tiles+=kpi('Interacties',iv(ins.total_interactions));
+    function pcard(p,label,color){
+      if(!p)return '';
+      var eng=(p.engagement!=null)?(String(p.engagement).replace('.',',')+'%'):'-';
+      var thumb=p.thumb?'<img src="'+esc(p.thumb)+'" style="width:54px;height:54px;border-radius:8px;object-fit:cover;flex:none" onerror="this.style.display=\'none\'">':'';
+      var clk=p.permalink?(' onclick="window.open(\''+esc(p.permalink)+'\',\'_blank\')" style="cursor:pointer;display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"'):(' style="display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"');
+      return '<div'+clk+'>'+thumb+
+        '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.3px">'+esc(label)+'</div>'+
+        '<div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.caption||'(zonder tekst)')+'</div>'+
+        '<div style="font-size:12px;color:var(--muted)">'+iv(p.likes||0)+' likes &middot; '+iv(p.comments||0)+' reacties &middot; '+eng+' engagement</div></div></div>';
+    }
+    var best=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
+    var worst=d.worstPost||null;
+    var html='';
+    if(tiles)html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">'+tiles+'</div>';
+    if(best||worst){
+      html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:2px"><div style="font-weight:700;font-size:15px">Postprestaties</div><a onclick="dGoTab(\'report\')" style="font-size:12.5px;color:var(--accent-2);cursor:pointer;font-weight:600;white-space:nowrap">Open rapportage &rarr;</a></div><div style="font-size:12px;color:var(--muted);margin-bottom:4px">Laatste 30 dagen, op engagement rate</div>'+pcard(best,'Best presterende post','#16a34a')+pcard(worst,'Minst presterende post','#dc2626')+'</div>';
+    }
+    box.innerHTML=html||'<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px">Nog geen cijfers beschikbaar voor deze periode.</div></div>';
+  }catch(e){
+    box.innerHTML='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px">Kon de cijfers niet laden.</div></div>';
+  }
 }
 // De Content-knop in de Content planning opent de upload-bak (het oude Content-tabblad).
 function showContentUploads(){ dTabShow('assets'); }
