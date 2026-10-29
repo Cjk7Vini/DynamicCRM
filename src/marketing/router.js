@@ -4415,13 +4415,22 @@ router.get('/api/mkt/debug-profile-views', requireMkt, async (req, res) => {
     };
     const out = { success: true, client: q, source: isIgLogin ? 'instagram-login' : 'facebook', igUserId: uid, now: new Date(now * 1000).toISOString(), windows: {}, daily: [], errors: [] };
 
-    // Som via total_value over een venster (zoals de rapportage het ophaalt).
+    // Som via total_value over een venster, in stukken van max 30 dagen (Meta weigert
+    // langere vensters; door de wintertijd kan "30 dagen" 1 uur langer zijn). Zelfde
+    // opknip-methode als de rapportage, zodat de uitkomsten vergelijkbaar zijn.
+    const CH = 30 * DAY - 1;
     const tv = async (label, s, u) => {
-      try {
-        const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', metric_type: 'total_value', since: String(s), until: String(u), access_token: tok });
-        const v = (((r.data || [])[0] || {}).total_value || {}).value;
-        out.windows[label] = { van: new Date(s * 1000).toISOString(), tot: new Date(u * 1000).toISOString(), profielbezoeken: v != null ? Number(v) : null };
-      } catch (e) { out.windows[label] = { error: e.message }; }
+      let total = null; const fouten = [];
+      for (let a = s; a < u; a += CH + 1) {
+        const b = Math.min(a + CH, u);
+        try {
+          const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', metric_type: 'total_value', since: String(a), until: String(b), access_token: tok });
+          const v = (((r.data || [])[0] || {}).total_value || {}).value;
+          if (v != null) total = (total || 0) + Number(v);
+        } catch (e) { fouten.push(e.message); }
+      }
+      out.windows[label] = { van: new Date(s * 1000).toISOString(), tot: new Date(u * 1000).toISOString(), profielbezoeken: total };
+      if (fouten.length) out.windows[label].fouten = fouten;
     };
     const A = 'Europe/Amsterdam'; const P = 'America/Los_Angeles';
     await tv('voortschuivend_30d_tot_nu', now - 30 * DAY, now);
@@ -4431,15 +4440,19 @@ router.get('/api/mkt/debug-profile-views', requireMkt, async (req, res) => {
     await tv('volle_30d_tm_gisteren_pacific', tzMidnight(P, 30), tzMidnight(P, 0));
     await tv('voortschuivend_28d_tot_nu', now - 28 * DAY, now);
 
-    // Dagwaarden van de afgelopen ~60 dagen, in twee stukken van max 30 dagen.
-    for (const [s, u] of [[now - 60 * DAY, now - 30 * DAY], [now - 30 * DAY, now]]) {
+    // Dagwaarden van de afgelopen ~60 dagen, in stukken van 29 dagen (ruim binnen
+    // Meta's limiet). Dubbele dagen op de knip-grenzen worden samengevoegd.
+    const byDay = new Map();
+    for (let a = now - 60 * DAY; a < now; a += 29 * DAY) {
+      const b = Math.min(a + 29 * DAY, now);
       try {
-        const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', since: String(s), until: String(u), access_token: tok });
+        const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', since: String(a), until: String(b), access_token: tok });
         const vals = (((r.data || [])[0] || {}).values) || [];
-        vals.forEach((v) => out.daily.push({ end_time: v.end_time, value: Number(v.value) || 0 }));
+        vals.forEach((v) => { if (v.end_time) byDay.set(v.end_time, Number(v.value) || 0); });
       } catch (e) { out.errors.push('dagwaarden: ' + e.message); }
     }
-    out.daily.sort((a, b) => String(a.end_time).localeCompare(String(b.end_time)));
+    out.daily = [...byDay.entries()].map(([end_time, value]) => ({ end_time, value }))
+      .sort((a, b) => String(a.end_time).localeCompare(String(b.end_time)));
     // Sommen van de laatste N dagwaarden, met en zonder de meest recente dag(en).
     const last = (n, skip) => out.daily.slice(Math.max(0, out.daily.length - n - skip), out.daily.length - skip).reduce((s, x) => s + x.value, 0);
     out.dagsommen = {
