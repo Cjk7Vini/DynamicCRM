@@ -4706,11 +4706,12 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           return interCount(y) - interCount(x);
         });
         out.topPosts = allPosts.slice(0, 10);
-        // Minst presterende post (laagste engagement rate) van de posts met cijfers,
-        // voor de samenvatting in de klant-Overzicht-tab. Alleen als er meer dan 1 is,
-        // zodat dezelfde post niet tegelijk "beste" en "slechtste" wordt.
-        const _withEng = allPosts.filter((p) => p.engagement != null);
-        out.worstPost = _withEng.length > 1 ? _withEng[_withEng.length - 1] : null;
+        // Minst presterende post: de laagste op engagement rate BINNEN dezelfde lijst
+        // die de rapportage toont (topPosts), zodat het altijd een post is die je ook
+        // in de rapportage terugziet, met exact dezelfde cijfers. Alleen posts met een
+        // berekende engagement rate tellen mee; alleen tonen als er meer dan 1 is.
+        const _ranked = out.topPosts.filter((p) => p.engagement != null);
+        out.worstPost = _ranked.length > 1 ? _ranked[_ranked.length - 1] : null;
       } else {
         out.topPosts = [];
         out.worstPost = null;
