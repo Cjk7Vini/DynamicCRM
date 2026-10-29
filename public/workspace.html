@@ -1748,7 +1748,7 @@ function ovLoadPinnedCards(cid){
   var pb=document.getElementById('ovBestPost'); var cb=document.getElementById('ovCampaigns');
   if(pb)pb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
   if(cb)cb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
-  fetch('/api/mkt/clients/'+cid+'/meta-insights',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+  fetch('/api/mkt/clients/'+cid+'/meta-insights'+ovDateQS(),{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(pb){
       if(!d||!d.success||!d.configured){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Nog geen Instagram gekoppeld voor deze klant.</div>'; }
       else {
@@ -1770,6 +1770,7 @@ function ovLoadPinnedCards(cid){
           return '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px">'+esc(label)+'</div><div class="bp-body">'+
             (p.thumb?'<img class="bp-img" src="'+esc(p.thumb)+'" alt="">':'<div class="bp-img"></div>')+
             '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:700">'+esc(p.caption||'(zonder tekst)')+'</div>'+
+            (p.timestamp?'<div style="font-size:11.5px;color:var(--muted);margin-top:2px">'+esc(fmtWhen(p.timestamp))+'</div>':'')+
             '<div class="bp-metrics">'+metric('Weergaven',(p.views!=null?p.views:p.reach))+metric('Likes',p.likes)+metric('Reacties',p.comments)+eng+'</div></div></div></div>';
         };
         var best=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
@@ -2261,7 +2262,7 @@ async function loadClientOverviewCijfers(cid){
   var box=document.getElementById('ovwCijfers'); if(!box)return;
   var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
   try{
-    var r=await fetch('/api/mkt/clients/'+cid+'/meta-insights',{credentials:'include'});
+    var r=await fetch('/api/mkt/clients/'+cid+'/meta-insights'+ovDateQS(),{credentials:'include'});
     var d=await r.json();
     if(!d||!d.success||!d.configured){
       box.innerHTML='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px">Nog geen Instagram of Meta gekoppeld voor deze klant. Koppel via het tabblad Koppelingen.</div></div>';
@@ -2287,7 +2288,8 @@ async function loadClientOverviewCijfers(cid){
       return '<div'+clk+'>'+thumb+
         '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.3px">'+esc(label)+'</div>'+
         '<div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.caption||'(zonder tekst)')+'</div>'+
-        '<div style="font-size:12px;color:var(--muted)">'+iv(p.likes||0)+' likes &middot; '+iv(p.comments||0)+' reacties &middot; '+eng+' engagement</div></div></div>';
+        '<div style="font-size:12px;color:var(--muted)">'+iv(p.views!=null?p.views:(p.reach!=null?p.reach:0))+' weergaven &middot; '+iv(p.likes||0)+' likes &middot; '+iv(p.comments||0)+' reacties &middot; '+eng+' engagement</div>'+
+        (p.timestamp?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(fmtWhen(p.timestamp))+'</div>':'')+'</div></div>';
     }
     var best=(d.topPosts&&d.topPosts.length)?d.topPosts[0]:null;
     var worst=d.worstPost||null;
@@ -2508,6 +2510,10 @@ function presetToRange(preset){
   else {since.setDate(today.getDate()-29);} // last_30d / default
   return {since:iso(since),until:iso(until)};
 }
+// Overzicht-cijfers gebruiken dezelfde "Afgelopen 30 dagen" als de Rapportage,
+// zodat de server hetzelfde (dag-gebaseerde, Amsterdamse) venster aanhoudt en de
+// cijfers op het overzicht gelijklopen met de Rapportage-tab.
+function ovDateQS(){var r=presetToRange('last_30d');return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
 function openReportPdf(){
   if(!CURRENT_CLIENT)return;
   var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);
