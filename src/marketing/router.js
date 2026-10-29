@@ -4586,11 +4586,12 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     // Is die aanwezig, dan lezen we de Instagram-cijfers via de Instagram-eigen Graph
     // met dat token; anders via de Facebook-graph met het FB-token. Voor bestaande
     // klanten (geen ig_login_token) verandert er niets: igGet=graphGet enz.
-    // Instagram-login alleen gebruiken als TERUGVAL: wanneer er geen bruikbare
-    // Facebook-route is (Facebook-token + Facebook-gekoppeld Instagram-account).
-    // Een klant die via Facebook is gekoppeld (meta_ig_user_id aanwezig) blijft dus
-    // de Facebook-API gebruiken, ook als er nog een los Instagram-login-token staat.
-    const isIgLogin = !!creds.igLoginToken && !(token && creds.clientIgUserId);
+    // Instagram-login is puur een TERUGVAL. Zodra er een werkende Facebook-route is
+    // (Facebook-token + een Instagram-account, van de klant zelf of de werkplek),
+    // gebruiken we die. Een los/oud Instagram-login-token wordt dan genegeerd, zodat
+    // het nooit een goede Facebook-koppeling verdringt. Alleen klanten zonder enige
+    // Facebook-route (geen Instagram-account) vallen terug op de Instagram-login.
+    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
     const igGet = isIgLogin ? igGraphGet : graphGet;
     const igTok = isIgLogin ? creds.igLoginToken : token;
     const igUid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
@@ -4599,6 +4600,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     }
 
     const out = { configured: true, account: null, topPosts: null, ads: null, errors: {} };
+    // Welke bron de Instagram-cijfers leveren, zodat het in de UI zichtbaar is.
+    out.source = isIgLogin ? 'instagram-login' : 'facebook';
 
     // --- Instagram account: volgers + aantal media ---
     if (igUid) {
