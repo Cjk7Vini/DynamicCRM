@@ -2770,6 +2770,9 @@ async function resolveClientMeta(wsId, clientId) {
     adAccount: normalizeAdAccount(ci.meta_ad_account_id || wi.meta_ad_account_id),
     pageId: ci.meta_page_id || wi.meta_page_id || null,
     igUserId: ci.meta_ig_user_id || wi.meta_ig_user_id || null,
+    // Klant-EIGEN Facebook-Instagram (zonder werkplek-terugval). Bepaalt of een klant
+    // echt via Facebook is gekoppeld, los van een eventueel werkplek-Instagram.
+    clientIgUserId: ci.meta_ig_user_id || null,
     pixelId: ci.meta_pixel_id || wi.meta_pixel_id || null,
     // Instagram-login (graph.instagram.com) is per klant; apart van het Facebook-token.
     igLoginToken: decryptSecret(ci.ig_login_token) || null,
@@ -4587,7 +4590,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     // Facebook-route is (Facebook-token + Facebook-gekoppeld Instagram-account).
     // Een klant die via Facebook is gekoppeld (meta_ig_user_id aanwezig) blijft dus
     // de Facebook-API gebruiken, ook als er nog een los Instagram-login-token staat.
-    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
+    const isIgLogin = !!creds.igLoginToken && !(token && creds.clientIgUserId);
     const igGet = isIgLogin ? igGraphGet : graphGet;
     const igTok = isIgLogin ? creds.igLoginToken : token;
     const igUid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
