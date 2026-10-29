@@ -4704,19 +4704,8 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         const naive = new Date(dateStr + (endOfDay ? 'T23:59:59Z' : 'T00:00:00Z')).getTime();
         return Math.floor((naive - _tzOffMs(naive)) / 1000);
       };
-      let winU = _okd(req.query.until) ? _localUnix(req.query.until, true) : Math.floor(Date.now() / 1000);
-      let winS = _okd(req.query.since) ? _localUnix(req.query.since, false) : (winU - 30 * 24 * 3600);
-      // Loopt de periode t/m vandaag? Dan een VOORTSCHUIVEND venster (eindigend op nu),
-      // net als de Instagram-app. Een kalender-venster t/m 23:59 mist aan de rand net
-      // een dag en wijkt daardoor af (bijv. profielbezoeken ~663 i.p.v. ~771). We
-      // behouden de lengte van de gekozen periode en schuiven 'm tot nu. Periodes in
-      // het verleden (until < vandaag) blijven exact op de gekozen kalenderdagen.
-      const _todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: _RPT_TZ }).format(new Date());
-      if (_okd(req.query.until) && req.query.until === _todayLocal) {
-        const span = winU - winS;
-        winU = Math.floor(Date.now() / 1000);
-        winS = winU - span;
-      }
+      const winU = _okd(req.query.until) ? _localUnix(req.query.until, true) : Math.floor(Date.now() / 1000);
+      const winS = _okd(req.query.since) ? _localUnix(req.query.since, false) : (winU - 30 * 24 * 3600);
       try {
         const a = await igGet(`${igUid}`, {
           fields: 'username,followers_count,follows_count,media_count', access_token: igTok,
@@ -4899,11 +4888,6 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         if (sum != null) out.insights[key] = sum;
       };
       await igDailySumChunked('website_clicks', 'website_clicks');
-      // Profielbezoeken: Meta's total_value lijkt lager uit te komen dan de Instagram-app
-      // (mogelijk telt total_value unieke bezoekers i.p.v. totaal aantal bezoeken). De
-      // dagelijkse som is het totaal en sluit beter aan bij de app. Lukt de dagelijkse
-      // som, dan overschrijft die de total_value; anders blijft total_value staan.
-      await igDailySumChunked('profile_views', 'profile_views');
       // Meta geeft het account-cijfer voor bio-link-kliks niet meer; valt die weg,
       // dan nemen we de som van de per-post bio-link-kliks (zie enrichPost).
       if (out.insights.website_clicks == null) {

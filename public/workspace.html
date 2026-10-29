@@ -2502,21 +2502,23 @@ function presetToRange(preset){
   var iso=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
   var t=new Date(); var today=new Date(t.getFullYear(),t.getMonth(),t.getDate());
   var since=new Date(today), until=new Date(today);
-  if(preset==='last_7d'){since.setDate(today.getDate()-6);}
-  else if(preset==='last_14d'){since.setDate(today.getDate()-13);}
+  // "Afgelopen N dagen" = N volle dagen t/m gisteren, zonder vandaag. Zo telt Meta het
+  // zelf (gemeten: volle 30 dagen t/m gisteren = exact het getal in de Instagram-app).
+  var yest=new Date(today); yest.setDate(today.getDate()-1);
+  var lastN=function(n){until=new Date(yest);since=new Date(yest);since.setDate(yest.getDate()-(n-1));};
+  if(preset==='last_7d'){lastN(7);}
+  else if(preset==='last_14d'){lastN(14);}
   else if(preset==='this_week_mon_today'){var dow=(today.getDay()+6)%7;since.setDate(today.getDate()-dow);}
   else if(preset==='last_week_mon_sun'){var d2=(today.getDay()+6)%7;until.setDate(today.getDate()-d2-1);since=new Date(until);since.setDate(until.getDate()-6);}
   else if(preset==='this_month'){since=new Date(today.getFullYear(),today.getMonth(),1);}
   else if(preset==='last_month'){since=new Date(today.getFullYear(),today.getMonth()-1,1);until=new Date(today.getFullYear(),today.getMonth(),0);}
   else if(preset==='maximum'){since.setDate(today.getDate()-729);}
-  else {since.setDate(today.getDate()-29);} // last_30d / default
+  else {lastN(30);} // last_30d / default
   return {since:iso(since),until:iso(until)};
 }
-// Overzicht-cijfers gebruiken "Afgelopen 30 dagen" als VOORTSCHUIVEND venster (de
-// laatste 30x24 uur vanaf nu), net zoals de Instagram-app. Door geen datums mee te
-// sturen pakt de server dat rollende venster, i.p.v. een kalender-venster dat aan de
-// rand net een dag mist en daardoor afweek van de app.
-function ovDateQS(){return '';}
+// Overzicht-cijfers gebruiken dezelfde "Afgelopen 30 dagen" als de Rapportage
+// (30 volle dagen t/m gisteren), zodat overzicht, rapportage en Instagram-app gelijklopen.
+function ovDateQS(){var r=presetToRange('last_30d');return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
 function openReportPdf(){
   if(!CURRENT_CLIENT)return;
   var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);
@@ -3035,14 +3037,7 @@ async function openPostDetail(id){
 // ---- Rapportage: periode-state (eigen aan de rapportage-tab) ----
 var RPT_MODE='preset', RPT_PRESET='last_30d', RPT_SINCE=null, RPT_UNTIL=null;
 (function(){var t=new Date();RPT_UNTIL=t.toISOString().slice(0,10);RPT_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
-function rptDateQS(){
-  // "Afgelopen 30 dagen" (de standaard) als voortschuivend venster laten lopen, net
-  // als de Instagram-app: geen datums meesturen zodat de server de laatste 30x24 uur
-  // vanaf nu pakt. Andere presets en een eigen periode sturen wel vaste datums mee.
-  if(RPT_MODE!=='custom' && RPT_PRESET==='last_30d') return '';
-  var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);
-  return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);
-}
+function rptDateQS(){var r=(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);return '?since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until);}
 function rptPeriodLabel(){if(RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL){var ds=Math.round((new Date(RPT_UNTIL)-new Date(RPT_SINCE))/86400000)+1;return RPT_SINCE+' t/m '+RPT_UNTIL+' ('+ds+' dagen)';}var f=WS_PRESETS.filter(function(p){return p.k===RPT_PRESET;})[0];return f?f.l:'Afgelopen 30 dagen';}
 function rptSetPreset(k){RPT_MODE='preset';RPT_PRESET=k;loadMetaInsights();}
 function rptApplyDates(){var s=document.getElementById('rptDtSince').value,u=document.getElementById('rptDtUntil').value;if(!s||!u)return;RPT_MODE='custom';RPT_SINCE=s;RPT_UNTIL=u;loadMetaInsights();}
