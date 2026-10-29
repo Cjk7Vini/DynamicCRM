@@ -4815,6 +4815,11 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         if (sum != null) out.insights[key] = sum;
       };
       await igDailySumChunked('website_clicks', 'website_clicks');
+      // Profielbezoeken: Meta's total_value lijkt lager uit te komen dan de Instagram-app
+      // (mogelijk telt total_value unieke bezoekers i.p.v. totaal aantal bezoeken). De
+      // dagelijkse som is het totaal en sluit beter aan bij de app. Lukt de dagelijkse
+      // som, dan overschrijft die de total_value; anders blijft total_value staan.
+      await igDailySumChunked('profile_views', 'profile_views');
       // Meta geeft het account-cijfer voor bio-link-kliks niet meer; valt die weg,
       // dan nemen we de som van de per-post bio-link-kliks (zie enrichPost).
       if (out.insights.website_clicks == null) {
