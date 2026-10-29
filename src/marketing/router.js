@@ -4381,6 +4381,77 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Diagnose profielbezoeken: dagwaarden plus de som over verschillende 30-dagen-
+// definities naast elkaar, om te meten welke definitie de Instagram-app gebruikt.
+// Gebruik: /api/mkt/debug-profile-views?client=<klantnaam of id> (ingelogd).
+router.get('/api/mkt/debug-profile-views', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const q = String(req.query.client || '').trim();
+    if (!q) return res.status(400).json({ error: 'Geef ?client=<klantnaam of id> mee' });
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT id FROM marketing.clients WHERE workspace_id=$1 AND (id::text=$2 OR lower(name)=lower($2)) LIMIT 1', [wsId, q]
+    )).rows[0]);
+    const okClient = row ? await clientInWorkspace(row.id, wsId) : null;
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
+    const get = isIgLogin ? igGraphGet : graphGet;
+    const tok = isIgLogin ? creds.igLoginToken : token;
+    const uid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    if (!uid || !tok) return res.json({ success: false, error: 'Geen Instagram-koppeling voor deze klant' });
+
+    const DAY = 86400;
+    const now = Math.floor(Date.now() / 1000);
+    // Middernacht van vandaag (min daysBack dagen) in een tijdzone, als Unix-seconden.
+    const tzMidnight = (tz, daysBack) => {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+      const naive = Date.parse(today + 'T00:00:00Z') - daysBack * DAY * 1000;
+      const d = new Date(naive);
+      const off = new Date(d.toLocaleString('en-US', { timeZone: tz })).getTime() - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' })).getTime();
+      return Math.floor((naive - off) / 1000);
+    };
+    const out = { success: true, client: q, source: isIgLogin ? 'instagram-login' : 'facebook', igUserId: uid, now: new Date(now * 1000).toISOString(), windows: {}, daily: [], errors: [] };
+
+    // Som via total_value over een venster (zoals de rapportage het ophaalt).
+    const tv = async (label, s, u) => {
+      try {
+        const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', metric_type: 'total_value', since: String(s), until: String(u), access_token: tok });
+        const v = (((r.data || [])[0] || {}).total_value || {}).value;
+        out.windows[label] = { van: new Date(s * 1000).toISOString(), tot: new Date(u * 1000).toISOString(), profielbezoeken: v != null ? Number(v) : null };
+      } catch (e) { out.windows[label] = { error: e.message }; }
+    };
+    const A = 'Europe/Amsterdam'; const P = 'America/Los_Angeles';
+    await tv('voortschuivend_30d_tot_nu', now - 30 * DAY, now);
+    await tv('kalender_30d_tm_vandaag_amsterdam', tzMidnight(A, 29), now);
+    await tv('volle_30d_tm_gisteren_amsterdam', tzMidnight(A, 30), tzMidnight(A, 0));
+    await tv('volle_30d_tm_eergisteren_amsterdam', tzMidnight(A, 31), tzMidnight(A, 1));
+    await tv('volle_30d_tm_gisteren_pacific', tzMidnight(P, 30), tzMidnight(P, 0));
+    await tv('voortschuivend_28d_tot_nu', now - 28 * DAY, now);
+
+    // Dagwaarden van de afgelopen ~60 dagen, in twee stukken van max 30 dagen.
+    for (const [s, u] of [[now - 60 * DAY, now - 30 * DAY], [now - 30 * DAY, now]]) {
+      try {
+        const r = await get(`${uid}/insights`, { metric: 'profile_views', period: 'day', since: String(s), until: String(u), access_token: tok });
+        const vals = (((r.data || [])[0] || {}).values) || [];
+        vals.forEach((v) => out.daily.push({ end_time: v.end_time, value: Number(v.value) || 0 }));
+      } catch (e) { out.errors.push('dagwaarden: ' + e.message); }
+    }
+    out.daily.sort((a, b) => String(a.end_time).localeCompare(String(b.end_time)));
+    // Sommen van de laatste N dagwaarden, met en zonder de meest recente dag(en).
+    const last = (n, skip) => out.daily.slice(Math.max(0, out.daily.length - n - skip), out.daily.length - skip).reduce((s, x) => s + x.value, 0);
+    out.dagsommen = {
+      laatste_30_dagwaarden: last(30, 0),
+      laatste_30_zonder_laatste_dag: last(30, 1),
+      laatste_30_zonder_laatste_2_dagen: last(30, 2),
+      laatste_31_dagwaarden: last(31, 0),
+    };
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Vastgepinde klant voor de hoofd-overzichtspagina. Leeg = algemeen overzicht.
 router.get('/api/mkt/overview/pinned-client', requireMkt, async (req, res) => {
   try {
