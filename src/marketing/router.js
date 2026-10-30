@@ -5219,7 +5219,26 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
             }
           } catch (e) { /* deze breakdown overslaan */ }
         };
-        await fd('age', 'age', 0);
+        // Leeftijd zoals de Instagram-app: alleen volgers met bekend geslacht (F/M).
+        // Gemeten (Fleurs Marketing Agency): exact gelijk aan de app per leeftijdsgroep;
+        // inclusief onbekend geslacht week het tot ruim 2 procentpunt af. Lukt dit niet,
+        // dan de gewone leeftijdsverdeling als terugval.
+        try {
+          const r = await igGet(`${igUid}/insights`, {
+            metric: 'follower_demographics', period: 'lifetime',
+            breakdown: 'age,gender', metric_type: 'total_value', access_token: igTok,
+          });
+          const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+          const m = {};
+          ((bd && bd.results) || []).forEach((x) => {
+            const d = x.dimension_values || [];
+            if (d[1] === 'F' || d[1] === 'M') m[d[0] || '?'] = (m[d[0] || '?'] || 0) + (Number(x.value) || 0);
+          });
+          const arr = Object.keys(m).map((k) => ({ label: k, value: m[k] })).filter((x) => x.value > 0)
+            .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+          if (arr.length) dg.age = arr;
+        } catch (_) { /* terugval hieronder */ }
+        if (!dg.age) await fd('age', 'age', 0);
         await fd('gender', 'gender', 0);
         await fd('city', 'city', 5);
         await fd('country', 'country', 5);
