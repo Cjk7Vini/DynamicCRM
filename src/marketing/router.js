@@ -5205,6 +5205,57 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.views_by_type_split = await splitByType('views');
       out.interactions_by_type_split = await splitByType('total_interactions');
 
+      // CORRECTIE: Meta's total_interactions per contenttype telt "delen" dubbel.
+      // Gemeten (Fleurs Marketing Agency, 30 sep t/m 29 okt): total_interactions min
+      // shares = exact de som van de knoppen in de Instagram-app (vind-ik-leuks,
+      // opmerkingen, reposts, delen, opgeslagen, antwoorden): Reels 749-38=711,
+      // Verhalen 170-7=163, Berichten 69-2=67. Uitzetten zonder nieuwe code:
+      // MKT_FIX_SHARES_DOUBLE=0. De ruwe Meta-waarden blijven bewaard (_raw).
+      out.interactions_correction = null;
+      if (process.env.MKT_FIX_SHARES_DOUBLE !== '0' && (out.interactions_by_type || out.interactions_by_type_split)) {
+        try {
+          const sh = {}; let shOk = false;
+          for (const [cs, cu] of igChunks) {
+            try {
+              const r = await igGet(`${igUid}/insights`, { metric: 'shares', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
+              const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+              if (bd && Array.isArray(bd.results)) { shOk = true; bd.results.forEach((x) => { const t = (x.dimension_values || [])[0] || '?'; sh[t] = (sh[t] || 0) + (Number(x.value) || 0); }); }
+            } catch (_) { /* dit stuk overslaan */ }
+          }
+          if (shOk) {
+            const shSplitArr = await splitByType('shares');
+            const shSplit = {};
+            (shSplitArr || []).forEach((x) => { shSplit[x.type] = x; });
+            out.interactions_by_type_raw = out.interactions_by_type;
+            out.interactions_by_type_split_raw = out.interactions_by_type_split;
+            if (out.interactions_by_type) {
+              out.interactions_by_type = out.interactions_by_type
+                .map((x) => ({ ...x, value: Math.max(0, x.value - (sh[x.type] || 0)) }))
+                .sort((a, b) => b.value - a.value);
+            }
+            let splitExact = true;
+            if (out.interactions_by_type_split) {
+              out.interactions_by_type_split = out.interactions_by_type_split.map((x) => {
+                const s = sh[x.type] || 0;
+                if (!s) return x;
+                const tot = x.follower + x.non_follower;
+                const ss = shSplit[x.type];
+                if (ss && (ss.follower + ss.non_follower) === s) {
+                  return { ...x, follower: Math.max(0, x.follower - ss.follower), non_follower: Math.max(0, x.non_follower - ss.non_follower) };
+                }
+                // Geen exacte opsplitsing van delen: totaal exact corrigeren en de
+                // verhouding volgers/niet-volgers behouden (alleen de balkverdeling).
+                splitExact = false;
+                const nt = Math.max(0, tot - s);
+                const f = tot > 0 ? Math.round(x.follower * nt / tot) : 0;
+                return { ...x, follower: f, non_follower: nt - f };
+              }).sort((a, b) => (b.follower + b.non_follower) - (a.follower + a.non_follower));
+            }
+            out.interactions_correction = { regel: 'total_interactions min shares per contenttype', shares: sh, split_exact: splitExact };
+          }
+        } catch (_) { /* bij twijfel: ongecorrigeerde Meta-waarden laten staan */ }
+      }
+
       // Dagelijkse reeks over de periode voor de grafiek (weergaven en nieuwe
       // volgers per dag). Afgeschermd; ontbreekt hij, dan gewoon geen grafiek.
       out.series = null;
