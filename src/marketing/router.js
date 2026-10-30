@@ -4465,6 +4465,137 @@ router.get('/api/mkt/debug-profile-views', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Diagnose voor de open punten (netto volgers, interacties per contenttype, leeftijd,
+// actieve tijden). Haalt per punt meerdere varianten op bij Meta, over exact dezelfde
+// periode als de rapportage ("Afgelopen 30 dagen" = 30 volle dagen t/m gisteren).
+// Alleen lezen; verandert niets aan de rapportage.
+// Gebruik: /api/mkt/debug-insights?client=<klantnaam of id> (ingelogd).
+router.get('/api/mkt/debug-insights', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const q = String(req.query.client || '').trim();
+    if (!q) return res.status(400).json({ error: 'Geef ?client=<klantnaam of id> mee' });
+    const row = await withReadConnection(async (c) => (await c.query(
+      'SELECT id FROM marketing.clients WHERE workspace_id=$1 AND (id::text=$2 OR lower(name)=lower($2)) LIMIT 1', [wsId, q]
+    )).rows[0]);
+    const okClient = row ? await clientInWorkspace(row.id, wsId) : null;
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
+    const get = isIgLogin ? igGraphGet : graphGet;
+    const tok = isIgLogin ? creds.igLoginToken : token;
+    const uid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    if (!uid || !tok) return res.json({ success: false, error: 'Geen Instagram-koppeling voor deze klant' });
+
+    const DAY = 86400;
+    const A = 'Europe/Amsterdam';
+    const tzMidnight = (tz, daysBack) => {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+      const naive = Date.parse(today + 'T00:00:00Z') - daysBack * DAY * 1000;
+      const d = new Date(naive);
+      const off = new Date(d.toLocaleString('en-US', { timeZone: tz })).getTime() - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' })).getTime();
+      return Math.floor((naive - off) / 1000);
+    };
+    // Zelfde venster en zelfde opknip-methode als de rapportage.
+    const S = tzMidnight(A, 30);
+    const U = tzMidnight(A, 0) - 1;
+    const chunks = [];
+    for (let s = S; s <= U; s += 30 * DAY) chunks.push([s, Math.min(s + 30 * DAY - 1, U)]);
+    const out = { success: true, client: q, source: isIgLogin ? 'instagram-login' : 'facebook', periode: { van: new Date(S * 1000).toISOString(), tot: new Date(U * 1000).toISOString() } };
+
+    // total_value over het venster, optioneel met breakdown; som over de stukken.
+    const tv = async (metric, breakdown) => {
+      const map = {}; const fouten = [];
+      for (const [a, b] of chunks) {
+        try {
+          const params = { metric, metric_type: 'total_value', period: 'day', since: String(a), until: String(b), access_token: tok };
+          if (breakdown) params.breakdown = breakdown;
+          const r = await get(`${uid}/insights`, params);
+          const t = (((r.data || [])[0] || {}).total_value) || {};
+          if (breakdown) {
+            const b0 = (t.breakdowns || [])[0];
+            ((b0 && b0.results) || []).forEach((x) => { const k = (x.dimension_values || []).join('|') || '?'; map[k] = (map[k] || 0) + (Number(x.value) || 0); });
+          } else if (t.value != null) {
+            map.totaal = (map.totaal || 0) + Number(t.value);
+          }
+        } catch (e) { fouten.push(e.message); }
+      }
+      return fouten.length ? { waarden: map, fouten } : map;
+    };
+
+    // 1. Netto volgers
+    out.netto_volgers = {};
+    out.netto_volgers.follows_and_unfollows = await tv('follows_and_unfollows', null);
+    out.netto_volgers.follows_and_unfollows_per_type = await tv('follows_and_unfollows', 'follow_type');
+    let bruto = null; const brutoFouten = [];
+    for (const [a, b] of chunks) {
+      try {
+        const r = await get(`${uid}/insights`, { metric: 'follower_count', period: 'day', since: String(a), until: String(b), access_token: tok });
+        const vals = (((r.data || [])[0] || {}).values) || [];
+        if (vals.length) bruto = (bruto || 0) + vals.reduce((s, v) => s + (Number(v.value) || 0), 0);
+      } catch (e) { brutoFouten.push(e.message); }
+    }
+    out.netto_volgers.nieuwe_volgers_bruto_zoals_nu = bruto;
+    if (brutoFouten.length) out.netto_volgers.bruto_fouten = brutoFouten;
+
+    // 2. Interacties per contenttype, per soort interactie
+    out.interacties_per_type = {};
+    for (const m of ['total_interactions', 'likes', 'comments', 'saves', 'shares', 'reposts', 'replies']) {
+      out.interacties_per_type[m] = await tv(m, 'media_product_type');
+    }
+
+    // 3. Leeftijd per tijdvenster (in procenten, 1 decimaal)
+    const pct = (map) => { const tot = Object.values(map).reduce((s, v) => s + v, 0) || 1; const o = {}; Object.keys(map).sort().forEach((k) => { o[k] = Math.round(map[k] / tot * 1000) / 10; }); return o; };
+    const demo = async (metric, timeframe) => {
+      try {
+        const params = { metric, period: 'lifetime', breakdown: 'age', metric_type: 'total_value', access_token: tok };
+        if (timeframe) params.timeframe = timeframe;
+        const r = await get(`${uid}/insights`, params);
+        const b0 = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+        const map = {};
+        ((b0 && b0.results) || []).forEach((x) => { map[(x.dimension_values || [])[0] || '?'] = Number(x.value) || 0; });
+        return Object.keys(map).length ? pct(map) : { leeg: true };
+      } catch (e) { return { fout: e.message }; }
+    };
+    out.leeftijd = {};
+    for (const tf of ['this_week', 'last_14_days', 'last_30_days', 'last_90_days', 'this_month', 'prev_month', null]) {
+      out.leeftijd['volgers_' + (tf || 'zonder_timeframe')] = await demo('follower_demographics', tf);
+    }
+    out.leeftijd.bereikt_last_30_days = await demo('reached_audience_demographics', 'last_30_days');
+    out.leeftijd.betrokken_last_30_days = await demo('engaged_audience_demographics', 'last_30_days');
+
+    // 4. Actieve tijden: precies zoals de rapportage (hele venster in één keer; door de
+    // wintertijd is dat nu 30 dagen + 1 uur), binnen 30 dagen, en zonder periode.
+    const online = async (win) => {
+      try {
+        const params = { metric: 'online_followers', period: 'lifetime', access_token: tok };
+        if (win) { params.since = String(win[0]); params.until = String(win[1]); }
+        const r = await get(`${uid}/insights`, params);
+        const vals = (((r.data || [])[0] || {}).values) || [];
+        const sum = {}; const cnt = {}; let leeg = 0;
+        vals.forEach((v) => {
+          const o = v.value || {};
+          if (!Object.keys(o).length) leeg += 1;
+          Object.keys(o).forEach((h) => { sum[h] = (sum[h] || 0) + (Number(o[h]) || 0); cnt[h] = (cnt[h] || 0) + 1; });
+        });
+        const gemPerUur = {};
+        Object.keys(sum).sort((x, y) => Number(x) - Number(y)).forEach((h) => { gemPerUur[h] = Math.round(sum[h] / cnt[h]); });
+        return { aantal_dagen: vals.length, dagen_zonder_data: leeg, eerste: vals.length ? vals[0].end_time : null, laatste: vals.length ? vals[vals.length - 1].end_time : null, gemiddeld_per_uur_zoals_meta: gemPerUur };
+      } catch (e) { return { fout: e.message }; }
+    };
+    out.actieve_tijden = {
+      vensterlengte_uren: Math.round((U - S) / 3600),
+      zoals_rapportage: await online([S, U]),
+      binnen_30_dagen: await online([U - 30 * DAY + 1, U]),
+      zonder_periode: await online(null),
+    };
+
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Vastgepinde klant voor de hoofd-overzichtspagina. Leeg = algemeen overzicht.
 router.get('/api/mkt/overview/pinned-client', requireMkt, async (req, res) => {
   try {
