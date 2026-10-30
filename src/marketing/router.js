@@ -4581,6 +4581,38 @@ router.get('/api/mkt/debug-insights', requireMkt, async (req, res) => {
     out.leeftijd.bereikt_last_30_days = await demo('reached_audience_demographics', 'last_30_days');
     out.leeftijd.betrokken_last_30_days = await demo('engaged_audience_demographics', 'last_30_days');
 
+    // 5. Interacties per contenttype over verschillende vensters, om te meten hoe Meta
+    // de dagen voor dit totaal afbakent (Amsterdam- vs Pacific-dagen, opknippen).
+    const P = 'America/Los_Angeles';
+    const itBd = async (a, b) => {
+      try {
+        const r = await get(`${uid}/insights`, { metric: 'total_interactions', metric_type: 'total_value', breakdown: 'media_product_type', period: 'day', since: String(a), until: String(b), access_token: tok });
+        const b0 = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+        const m = {};
+        ((b0 && b0.results) || []).forEach((x) => { m[(x.dimension_values || [])[0] || '?'] = Number(x.value) || 0; });
+        return m;
+      } catch (e) { return { fout: e.message }; }
+    };
+    const sumMaps = (x, y) => {
+      if (x.fout || y.fout) return { fout: x.fout || y.fout };
+      const o = { ...x }; Object.keys(y).forEach((k) => { o[k] = (o[k] || 0) + y[k]; }); return o;
+    };
+    const span = (a, b) => `${new Date(a * 1000).toISOString()} -> ${new Date(b * 1000).toISOString()}`;
+    const iv = {};
+    if (chunks.length > 1) {
+      const c0 = await itBd(chunks[0][0], chunks[0][1]);
+      const c1 = await itBd(chunks[1][0], chunks[1][1]);
+      iv.zoals_rapportage = { venster: span(S, U), ...sumMaps(c0, c1) };
+      iv.alleen_groot_stuk = { venster: span(chunks[0][0], chunks[0][1]), ...c0 };
+      iv.alleen_klein_eindstuk = { venster: span(chunks[1][0], chunks[1][1]), ...c1 };
+    } else {
+      iv.zoals_rapportage = { venster: span(S, U), ...(await itBd(S, U)) };
+    }
+    iv.amsterdam_ingekort_tot_30_dagen = { venster: span(U - 30 * DAY + 1, U), ...(await itBd(U - 30 * DAY + 1, U)) };
+    iv.pacific_30_volle_dagen_tm_gisteren = { venster: span(tzMidnight(P, 30), tzMidnight(P, 0)), ...(await itBd(tzMidnight(P, 30), tzMidnight(P, 0))) };
+    iv.pacific_30_volle_dagen_tm_eergisteren = { venster: span(tzMidnight(P, 31), tzMidnight(P, 1)), ...(await itBd(tzMidnight(P, 31), tzMidnight(P, 1))) };
+    out.interacties_vensters = iv;
+
     // 4. Actieve tijden: precies zoals de rapportage (hele venster in één keer; door de
     // wintertijd is dat nu 30 dagen + 1 uur), binnen 30 dagen, en zonder periode.
     const online = async (win) => {
