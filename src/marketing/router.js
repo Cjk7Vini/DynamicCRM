@@ -4563,6 +4563,21 @@ router.get('/api/mkt/debug-insights', requireMkt, async (req, res) => {
     for (const tf of ['this_week', 'last_14_days', 'last_30_days', 'last_90_days', 'this_month', 'prev_month', null]) {
       out.leeftijd['volgers_' + (tf || 'zonder_timeframe')] = await demo('follower_demographics', tf);
     }
+    // Leeftijd x geslacht: met en zonder volgers met onbekend geslacht (U). De app
+    // toont leeftijd opgesplitst naar vrouwen/mannen en rekent mogelijk zonder U.
+    try {
+      const r = await get(`${uid}/insights`, { metric: 'follower_demographics', period: 'lifetime', breakdown: 'age,gender', metric_type: 'total_value', access_token: tok });
+      const b0 = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+      const alle = {}; const fm = {}; const perGeslacht = {};
+      ((b0 && b0.results) || []).forEach((x) => {
+        const dims = x.dimension_values || []; const age = dims[0] || '?'; const g = dims[1] || '?'; const v = Number(x.value) || 0;
+        alle[age] = (alle[age] || 0) + v; perGeslacht[g] = (perGeslacht[g] || 0) + v;
+        if (g === 'F' || g === 'M') fm[age] = (fm[age] || 0) + v;
+      });
+      out.leeftijd.volgers_leeftijd_x_geslacht_alle = Object.keys(alle).length ? pct(alle) : { leeg: true };
+      out.leeftijd.volgers_alleen_bekend_geslacht = Object.keys(fm).length ? pct(fm) : { leeg: true };
+      out.leeftijd.aantal_volgers_per_geslacht = perGeslacht;
+    } catch (e) { out.leeftijd.volgers_leeftijd_x_geslacht = { fout: e.message }; }
     out.leeftijd.bereikt_last_30_days = await demo('reached_audience_demographics', 'last_30_days');
     out.leeftijd.betrokken_last_30_days = await demo('engaged_audience_demographics', 'last_30_days');
 
