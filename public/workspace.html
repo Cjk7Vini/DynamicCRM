@@ -402,6 +402,38 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
         </div>
+        <div class="card" id="kpiCard" style="max-width:880px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">KPI's organisch</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Normen voor de AI-analyse van de organische Instagram-resultaten. Ze gelden voor alle klanten in deze workspace. Tussen de twee grenzen is een waarde gemiddeld. Welke KPI's per klant het zwaarst wegen, volgt uit de doelen die bij de klant zijn ingevuld.</p>
+          <div id="kpiMsg" class="inline-msg"></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+              <label style="display:flex;align-items:center;gap:8px;min-width:260px;font-weight:600;font-size:13.5px;cursor:pointer"><input type="checkbox" id="kpiErOn" style="width:16px;height:16px"> Engagement rate (gemiddeld per post)</label>
+              <span style="font-size:13px;color:var(--muted)">goed vanaf</span><input id="kpiErGoed" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%, zwak onder</span><input id="kpiErZwak" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+              <label style="display:flex;align-items:center;gap:8px;min-width:260px;font-weight:600;font-size:13.5px;cursor:pointer"><input type="checkbox" id="kpiNvOn" style="width:16px;height:16px"> Aandeel weergaven van niet-volgers</label>
+              <span style="font-size:13px;color:var(--muted)">goed vanaf</span><input id="kpiNvGoed" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%, zwak onder</span><input id="kpiNvZwak" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%</span>
+            </div>
+            <div style="padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="min-width:260px;font-weight:600;font-size:13.5px">Groei t.o.v. de vorige periode</span>
+                <span style="font-size:13px;color:var(--muted)">goed vanaf</span><input id="kpiTrGoed" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%, zwak onder</span><input id="kpiTrZwak" inputmode="decimal" style="width:70px;padding:6px 8px"><span style="font-size:13px;color:var(--muted)">%</span>
+              </div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kpiTr_weergaven"> Weergaven</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kpiTr_likes"> Vind-ik-leuks</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kpiTr_opmerkingen"> Opmerkingen</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kpiTr_opgeslagen"> Opgeslagen</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kpiTr_gedeeld"> Gedeeld</label>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
+            <button class="btn btn-primary" onclick="saveOrganicKpis()">KPI's opslaan</button>
+            <button class="btn btn-ghost" onclick="resetOrganicKpis()">Standaard herstellen</button>
+          </div>
+        </div>
         <div class="card" style="max-width:640px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">Werkplek-koppeling</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:14px">De gedeelde accounts van de werkplek, per platform. Klanten vallen hierop terug als ze zelf geen koppeling hebben. Tokens worden versleuteld opgeslagen en nooit volledig getoond.</p>
@@ -673,6 +705,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               <select id="dfStatus"><option value="active">Actief</option><option value="paused">Gepauzeerd</option><option value="archived">Gearchiveerd</option></select>
             </div>
             <div class="field"><label>Notities</label><textarea id="dfNotes" rows="3"></textarea></div>
+            <div class="field"><label>Branche</label><input id="dfBranche" maxlength="120" placeholder="Bijv. fysiotherapie, fitness, beauty"></div>
+            <div class="field"><label>Gewenste doelgroep</label><textarea id="dfAudience" rows="2" maxlength="500" placeholder="Wie wil de klant bereiken? Bijv. vrouwen van 30 tot 50 jaar in de regio Utrecht"></textarea></div>
+            <div class="field"><label>Belangrijkste doel(en)</label><div id="dfGoals"></div><div style="font-size:11.5px;color:var(--muted);margin-top:2px">De AI-analyses gebruiken deze doelgroep en doelen om de cijfers te beoordelen.</div></div>
             <div class="actions-split">
               <button class="btn btn-danger" id="dDeleteBtn" onclick="deleteClient()">Verwijderen</button>
               <button class="btn btn-primary" onclick="saveClient()">Wijzigingen opslaan</button>
@@ -1494,6 +1529,51 @@ async function resetBranding(){
     else showMsg('brMsg',false,d.error||'Terugzetten mislukt.');
   }catch(e){ showMsg('brMsg',false,'Netwerkfout.'); }
 }
+// ---- KPI's organisch (per workspace) ----
+var KPI_TREND_KEYS=['weergaven','likes','opmerkingen','opgeslagen','gedeeld'];
+function kpiSetForm(k){
+  if(!k)return;
+  var setV=function(id,v){var el=document.getElementById(id);if(el)el.value=(v==null?'':String(v).replace('.',','));};
+  var setC=function(id,v){var el=document.getElementById(id);if(el)el.checked=!!v;};
+  setC('kpiErOn',k.engagement_rate.enabled); setV('kpiErGoed',k.engagement_rate.goed); setV('kpiErZwak',k.engagement_rate.zwak);
+  setC('kpiNvOn',k.niet_volgers.enabled); setV('kpiNvGoed',k.niet_volgers.goed); setV('kpiNvZwak',k.niet_volgers.zwak);
+  setV('kpiTrGoed',k.trend.goed); setV('kpiTrZwak',k.trend.zwak);
+  KPI_TREND_KEYS.forEach(function(t){setC('kpiTr_'+t,k.trend_kpis[t]);});
+}
+function kpiReadForm(){
+  var n=function(id){var el=document.getElementById(id);var v=el?String(el.value).trim().replace(',','.'):'';return v===''?null:Number(v);};
+  var c=function(id){var el=document.getElementById(id);return !!(el&&el.checked);};
+  var tk={}; KPI_TREND_KEYS.forEach(function(t){tk[t]=c('kpiTr_'+t);});
+  return {engagement_rate:{enabled:c('kpiErOn'),goed:n('kpiErGoed'),zwak:n('kpiErZwak')},niet_volgers:{enabled:c('kpiNvOn'),goed:n('kpiNvGoed'),zwak:n('kpiNvZwak')},trend:{goed:n('kpiTrGoed'),zwak:n('kpiTrZwak')},trend_kpis:tk};
+}
+async function loadOrganicKpisForm(){
+  if(!document.getElementById('kpiCard'))return;
+  hideMsg('kpiMsg');
+  try{
+    var r=await fetch('/api/mkt/workspace/organic-kpis',{credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.success){
+      kpiSetForm(d.kpis);
+      if(!d.available)showMsg('kpiMsg',false,'Nog niet ingeschakeld: draai migratie 026 in Neon om eigen normen op te slaan. Tot die tijd gelden deze standaardwaarden.');
+    }
+  }catch(e){}
+}
+async function saveOrganicKpis(){
+  try{
+    var r=await fetch('/api/mkt/workspace/organic-kpis',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({kpis:kpiReadForm()})});
+    var d=await r.json();
+    if(r.ok&&d.success){ kpiSetForm(d.kpis); showMsg('kpiMsg',true,'KPI\'s opgeslagen. Ze gelden voor alle klanten in deze workspace.'); }
+    else showMsg('kpiMsg',false,(d&&d.error)||'Opslaan mislukt.');
+  }catch(e){ showMsg('kpiMsg',false,'Netwerkfout.'); }
+}
+async function resetOrganicKpis(){
+  if(!confirm('KPI\'s terugzetten naar de standaardwaarden?'))return;
+  try{
+    var r=await fetch('/api/mkt/workspace/organic-kpis',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({reset:true})});
+    var d=await r.json();
+    if(r.ok&&d.success){ kpiSetForm(d.kpis); showMsg('kpiMsg',true,'Teruggezet naar de standaardwaarden.'); }
+    else showMsg('kpiMsg',false,(d&&d.error)||'Terugzetten mislukt.');
+  }catch(e){ showMsg('kpiMsg',false,'Netwerkfout.'); }
+}
 var CLIENT_MODE=false;
 async function enterClientMode(){
   // Verberg alle beheer-navigatie: de klant ziet alleen de eigen content.
@@ -1594,7 +1674,7 @@ function navTo(view){
   document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
-  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();metaCheckLoginConfig();wsLoadMetaAssets();}
+  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();loadOrganicKpisForm();metaCheckLoginConfig();wsLoadMetaAssets();}
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='handleiding'){document.getElementById('viewHandleiding').classList.add('active');}
@@ -2089,6 +2169,10 @@ function ncPickRow(onclick,on,label){
 }
 function ncRenderGoals(){var box=document.getElementById('ncGoals'); if(!box)return; box.innerHTML=NC_GOAL_OPTS.map(function(o){return ncPickRow("ncToggleGoal('"+o[0]+"')",NC_GOALS.indexOf(o[0])>=0,o[1]);}).join('');}
 function ncToggleGoal(k){var i=NC_GOALS.indexOf(k);if(i>=0)NC_GOALS.splice(i,1);else NC_GOALS.push(k);ncRenderGoals();}
+// Doelen op het Gegevens-tabblad van een bestaande klant (zelfde opties als bij aanmaken).
+var DF_GOALS=[];
+function dfRenderGoals(){var box=document.getElementById('dfGoals'); if(!box)return; box.innerHTML=NC_GOAL_OPTS.map(function(o){return ncPickRow("dfToggleGoal('"+o[0]+"')",DF_GOALS.indexOf(o[0])>=0,o[1]);}).join('');}
+function dfToggleGoal(k){var i=DF_GOALS.indexOf(k);if(i>=0)DF_GOALS.splice(i,1);else DF_GOALS.push(k);dfRenderGoals();}
 function ncRenderChannels(){var box=document.getElementById('ncChannels'); if(!box)return; box.innerHTML=NC_CHANNEL_OPTS.map(function(o){return ncPickRow("ncToggleChannel('"+o[0]+"')",NC_CHANNELS.indexOf(o[0])>=0,o[1]);}).join('');}
 function ncToggleChannel(k){var i=NC_CHANNELS.indexOf(k);if(i>=0)NC_CHANNELS.splice(i,1);else NC_CHANNELS.push(k);ncRenderChannels();}
 async function uploadClientLogo(input){
@@ -2152,6 +2236,9 @@ function renderClientDetail(c){
   document.getElementById('dfColor').value=c.brand_color||'#6366f1';
   document.getElementById('dfStatus').value=c.status||'active';
   document.getElementById('dfNotes').value=c.notes||'';
+  var _dfB=document.getElementById('dfBranche'); if(_dfB)_dfB.value=c.branche||'';
+  var _dfA=document.getElementById('dfAudience'); if(_dfA)_dfA.value=c.audience||'';
+  DF_GOALS=Array.isArray(c.goals)?c.goals.slice():[]; dfRenderGoals();
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
   document.getElementById('dDeleteBtn').style.display=isOwnerMgr?'':'none';
   document.getElementById('tabIntegrations').style.display=isOwnerMgr?'':'none';
@@ -3100,10 +3187,15 @@ async function loadMetaInsights(){
   function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
   var RTL={IMAGE:'Bericht',CAROUSEL_ALBUM:'Carrousel',VIDEO:'Video',REELS:'Reel',ONBEKEND:'Overig'};
   var MPT={REELS:'Reels',VIDEO:'Video',CAROUSEL_CONTAINER:'Carrousels',CAROUSEL_ALBUM:'Carrousels',POST:'Berichten',IMAGE:'Berichten',FEED:'Berichten',STORY:'Verhalen',IGTV:'Video',AD:'Advertenties'};
+  // De AI-analyses gebruiken exact de cijfers die hier geladen worden; bij een nieuwe
+  // klant of periode vervalt een eerdere analyse.
+  window.__rptData=null; window.__rptClientId=null;
+  var _aib=document.getElementById('aiAnalyseBox'); if(_aib){_aib.style.display='none';_aib.innerHTML='';}
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-insights'+rptDateQS(),{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Kon Meta-cijfers niet laden.</div>';return;}
     if(!d.configured){box.innerHTML=rptDateBar()+'<div class="card" style="color:var(--muted);font-size:14px">Nog geen Meta-koppeling ingesteld. Vul in de Koppelingen-tab het access token en Instagram user ID in om cijfers te zien.</div>';return;}
+    window.__rptData=d; window.__rptClientId=CURRENT_CLIENT.id;
     // Campagnes + koppelingen ophalen voor de campagnesecties (alleen deze klant).
     var camps=null, linkedIds=[];
     try{ var cr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/meta-campaigns'+rptDateQS(),{credentials:'include'}); camps=await cr.json(); }catch(_){}
@@ -3344,36 +3436,97 @@ function rptActiveDay(wd){
   for(var i=0;i<7;i++){var b=document.getElementById('rptDay'+i);if(b)b.className='btn '+(i===wd?'btn-primary':'btn-ghost');}
 }
 
-// Doelgroep-analyse die het resultaat direct in de kaart toont (waar de knop staat).
+// ---- AI-analyses in de rapportage: Organisch, Campagnes en Doelgroep apart ----
+// Elke analyse krijgt exact de cijfers die de rapportage toont (window.__rptData).
+// KPI-oordelen komen van de server (KPI-normen van de workspace), niet van de AI.
+function rptActiveTab(){var c=document.getElementById('rptPaneCamp');return (c&&c.style.display!=='none')?'camp':'org';}
+function rptRange(){return (RPT_MODE==='custom'&&RPT_SINCE&&RPT_UNTIL)?{since:RPT_SINCE,until:RPT_UNTIL}:presetToRange(RPT_PRESET);}
+function rptAiReady(){return !!(CURRENT_CLIENT&&window.__rptData&&String(window.__rptClientId)===String(CURRENT_CLIENT.id));}
+function aiStatusStyle(s){var m={goed:['#166534','#dcfce7'],sterk:['#166534','#dcfce7'],gemiddeld:['#92400e','#fef3c7'],aandacht:['#92400e','#fef3c7'],zwak:['#991b1b','#fee2e2']};return m[s]||['#334155','#e2e8f0'];}
+function aiBadge(s){if(!s)return '';var st=aiStatusStyle(s);return '<span style="font-size:11px;font-weight:700;color:'+st[0]+';background:'+st[1]+';padding:3px 10px;border-radius:20px;text-transform:capitalize;white-space:nowrap">'+esc(s)+'</span>';}
+function aiList(title,arr){return (arr&&arr.length)?'<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">'+esc(title)+'</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.55">'+arr.map(function(x){return '<li style="margin-bottom:4px">'+esc(x)+'</li>';}).join('')+'</ul>':'';}
+function aiCard(title,status,body,foot){return '<div class="card" style="margin-bottom:18px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(99,102,241,.06),transparent)"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:15px;font-weight:700">'+esc(title)+'</span><span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span>'+aiBadge(status)+'</div>'+body+(foot?'<div style="font-size:11.5px;color:var(--faint);margin-top:12px">'+foot+'</div>':'')+'</div>';}
+function aiIsAdType(t){t=String(t||'').toUpperCase();return t==='AD'||t==='ADS'||t.indexOf('ADVERT')>=0||t.indexOf('PROMOT')>=0;}
+function rptOrganicFigures(){
+  var d=window.__rptData||{}, ins=d.insights||{}, pm=d.insights_prev||{};
+  var types=function(arr){return (arr||[]).filter(function(x){return !aiIsAdType(x.type);}).map(function(x){return {label:x.type,value:x.value};});};
+  return {views:ins.views,views_prev:pm.views,profile_views:ins.profile_views,profile_views_prev:pm.profile_views,website_clicks:ins.website_clicks,
+    followers:d.account?d.account.followers:null,follower_net:ins.follower_net,views_split:d.views_split||null,engagement:d.engagement_summary||null,
+    views_by_type:types(d.views_by_type),interactions_by_type:types(d.interactions_by_type),best_post:(d.topPosts&&d.topPosts[0])||null,worst_post:d.worstPost||null};
+}
+function aiKpiTable(rows){
+  if(!rows||!rows.length)return '';
+  var fmtN=function(v){return v==null?'-':Number(v).toLocaleString('nl-NL');};
+  var fmtP=function(v){return (v>0?'+':'')+String(v).replace('.',',')+'%';};
+  return '<div style="overflow-x:auto;margin:6px 0 4px"><table style="width:100%;border-collapse:collapse;font-size:13px">'+rows.map(function(k){
+    var val=(k.eenheid==='%')?(String(k.waarde).replace('.',',')+'%'):(k.verandering!=null?(fmtN(k.waarde)+' <span style="color:var(--muted)">('+fmtP(k.verandering)+' t.o.v. '+fmtN(k.vorige)+')</span>'):fmtN(k.waarde));
+    return '<tr style="border-top:1px solid var(--line)"><td style="padding:7px 6px;font-weight:600">'+esc(k.naam)+(k.basis?'<div style="font-size:11px;color:var(--muted);font-weight:400">'+esc(k.basis)+'</div>':'')+'</td>'+
+      '<td style="padding:7px 6px;text-align:right;white-space:nowrap">'+val+'</td>'+
+      '<td style="padding:7px 6px;text-align:right">'+(k.status?aiBadge(k.status):'<span style="font-size:11.5px;color:var(--muted)">geen oordeel</span>')+'</td>'+
+      '<td style="padding:7px 6px;font-size:11.5px;color:var(--muted)">'+esc(k.norm||'')+'</td></tr>';
+  }).join('')+'</table></div>';
+}
+// Doelgroep-analyse: alleen de doelgroepcijfers, vergeleken met de gewenste doelgroep.
 async function runDoelgroepAnalyse(btn){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('aiDoelgroepResult'); if(!box)return;
-  box.innerHTML='<div style="color:var(--muted);font-size:14px">AI leest de cijfers en schrijft een verslag...</div>';
+  if(!rptAiReady()){box.innerHTML='<div style="color:var(--muted);font-size:14px">De rapportage is nog aan het laden. Probeer het zo opnieuw.</div>';return;}
+  var d0=window.__rptData, dm=d0.demographics||{};
+  box.innerHTML='<div style="color:var(--muted);font-size:14px">Claude analyseert de doelgroep...</div>';
   var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Bezig...';}
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var fig={age:dm.age||[],gender:dm.gender||[],city:dm.city||[],country:dm.country||[],active_by_day:d0.activeTimesByDay||{},views_split:d0.views_split||null,followers:d0.account?d0.account.followers:null,follower_net:(d0.insights||{}).follower_net};
+    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/audience-analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({figures:fig})});
     var d=await r.json();
-    if(!r.ok||!d.success){box.innerHTML='<div style="color:#b91c1c;font-size:14px">'+esc((d&&d.error)||'AI-analyse mislukt.')+'</div>';}
-    else{var safe=esc(d.report).replace(/\n/g,'<br>');box.innerHTML='<div style="border-top:1px solid var(--line);margin-top:4px;padding-top:12px"><div style="font-weight:700;margin-bottom:8px">AI-analyse <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></div><div style="font-size:14px;line-height:1.7">'+safe+'</div><div style="font-size:11.5px;color:var(--faint);margin-top:12px">Gebaseerd op de Meta-cijfers van de gekozen periode. Controleer altijd zelf voor je dit met de klant deelt.</div></div>';}
+    if(!r.ok||!d.success||!d.analysis){box.innerHTML='<div style="color:#b91c1c;font-size:14px">'+esc((d&&d.error)||'Doelgroep-analyse mislukt.')+'</div>';}
+    else{
+      var a=d.analysis;
+      var mom=(d.momenten&&d.momenten.length)?'<div style="font-size:13px;margin-top:10px"><span style="color:var(--muted)">Beste momenten om te posten:</span> <strong>'+d.momenten.map(function(m){return esc(m.dag)+' '+String(m.van).padStart(2,'0')+':00 tot '+String(m.tot).padStart(2,'0')+':00';}).join(', ')+'</strong></div>':'';
+      var gw=d.gewenst?'':'<div style="font-size:12.5px;color:#92400e;background:#fef3c7;border-radius:8px;padding:7px 10px;margin-top:10px">Er is nog geen gewenste doelgroep ingevuld bij deze klant. Vul die in op het tabblad Gegevens voor een vergelijking.</div>';
+      box.innerHTML='<div style="border-top:1px solid var(--line);margin-top:4px;padding-top:12px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span style="font-weight:700">Doelgroep-analyse</span><span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></div>'+
+        (a.samenvatting?'<div style="font-size:14px;line-height:1.55">'+esc(a.samenvatting)+'</div>':'')+mom+gw+
+        aiList('Wie volgt het account',a.wie)+aiList('Vergelijking met de gewenste doelgroep',a.vergelijking)+aiList('Aandachtspunten voor de contentstrategie',a.acties)+
+        '<div style="font-size:11.5px;color:var(--faint);margin-top:12px">Gebaseerd op de doelgroepcijfers in deze rapportage. Tijden zijn Nederlandse tijd. Controleer altijd zelf voor je dit met de klant deelt.</div></div>';
+    }
   }catch(e){box.innerHTML='<div style="color:#b91c1c;font-size:14px">Netwerkfout.</div>';}
   if(btn){btn.disabled=false;btn.textContent=orig;}
 }
+// AI-analyse-knop: volgt het actieve tabblad (Organisch of Campagnes).
 async function runAiAnalysis(){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('aiAnalyseBox'); var btn=document.getElementById('aiAnalyseBtn');
   if(!box||!btn)return;
   box.style.display='block';
-  box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">AI leest de cijfers en schrijft een verslag...</div>';
-  btn.disabled=true; var orig=btn.textContent; btn.textContent='Bezig...';
+  if(!rptAiReady()){box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">De rapportage is nog aan het laden. Probeer het zo opnieuw.</div>';return;}
+  var tab=rptActiveTab(), d0=window.__rptData;
+  var orig=btn.textContent; btn.disabled=true; btn.textContent='Bezig...';
+  box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">Claude analyseert de '+(tab==='camp'?'campagnecijfers':'organische cijfers')+'...</div>';
+  var foot='Gebaseerd op exact de cijfers in deze rapportage ('+esc(rptPeriodLabel())+'). Controleer altijd zelf voor je dit met de klant deelt.';
   try{
-    var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
-    var d=await r.json();
-    if(!r.ok||!d.success){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">'+esc(d.error||'AI-analyse mislukt.')+'</div>';btn.disabled=false;btn.textContent=orig;return;}
-    var safe=esc(d.report).replace(/\n/g,'<br>');
-    box.innerHTML='<div class="card" style="margin-bottom:18px">'+
-      '<div class="section-h" style="margin-top:0"><h4 style="display:flex;align-items:center;gap:6px">AI-analyse <span style="font-size:11px;font-weight:600;color:var(--accent-2);border:1px solid var(--accent-2);border-radius:10px;padding:1px 7px">Claude</span></h4></div>'+
-      '<div style="font-size:14px;line-height:1.7">'+safe+'</div>'+
-      '<div style="font-size:11.5px;color:var(--faint);margin-top:12px">Gebaseerd op de Meta-cijfers van de laatste 30 dagen. Controleer altijd zelf voor je dit met de klant deelt.</div></div>';
+    if(tab==='camp'){
+      var ads=d0.ads;
+      if(!ads||ads.empty||ads.impressions==null){box.innerHTML='<div class="card" style="margin-bottom:18px;color:var(--muted);font-size:14px">Geen campagnecijfers in deze periode om te analyseren.</div>';}
+      else{
+        var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/kpi-analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({ads:ads,period:rptPeriodLabel()})});
+        var d=await r.json();
+        if(!r.ok||!d.success||!d.analysis){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">'+esc((d&&d.error)||'Campagne-analyse mislukt.')+'</div>';}
+        else{
+          var a=d.analysis;
+          var body=(a.eindoordeel?'<div style="font-size:14px;line-height:1.5">'+esc(a.eindoordeel)+'</div>':'')+(a.bottleneck&&a.bottleneck!=='Geen'?'<div style="font-size:13px;margin-top:6px"><span style="color:var(--muted)">Grootste knelpunt:</span> <strong>'+esc(a.bottleneck)+'</strong></div>':'')+aiList('Analyse',a.analyse)+aiList('Wat je kunt doen',a.acties);
+          box.innerHTML=aiCard('Campagne-analyse',a.status,body,foot);
+        }
+      }
+    }else{
+      var rng=rptRange();
+      var r2=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/ai/organic-analysis',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({figures:rptOrganicFigures(),since:rng.since,until:rng.until,period:rptPeriodLabel()})});
+      var d2=await r2.json();
+      if(!r2.ok||!d2.success||!d2.analysis){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">'+esc((d2&&d2.error)||'Organische analyse mislukt.')+'</div>';}
+      else{
+        var b2=d2.analysis;
+        var body2=aiKpiTable(d2.kpis)+(b2.eindoordeel?'<div style="font-size:14px;line-height:1.5;margin-top:10px">'+esc(b2.eindoordeel)+'</div>':'')+aiList('Analyse',b2.analyse)+aiList('Wat je kunt doen',b2.acties);
+        box.innerHTML=aiCard('Organische analyse',b2.status,body2,foot+' Oordelen volgens de KPI-normen van deze workspace (Instellingen, KPI\'s organisch).');
+      }
+    }
   }catch(e){box.innerHTML='<div class="card" style="margin-bottom:18px;color:#b91c1c;font-size:14px">Netwerkfout.</div>';}
   btn.disabled=false; btn.textContent=orig;
 }
@@ -4965,6 +5118,10 @@ async function createClientLogin(){
 async function saveClient(){
   if(!CURRENT_CLIENT)return; hideMsg('dEditMsg');
   var body={name:document.getElementById('dfName').value.trim(),contact_name:document.getElementById('dfContact').value.trim(),contact_email:document.getElementById('dfEmail').value.trim(),website:document.getElementById('dfWebsite').value.trim(),brand_color:document.getElementById('dfColor').value,status:document.getElementById('dfStatus').value,notes:document.getElementById('dfNotes').value.trim()};
+  var _dfB=document.getElementById('dfBranche'), _dfA=document.getElementById('dfAudience');
+  if(_dfB)body.branche=_dfB.value.trim();
+  if(_dfA)body.audience=_dfA.value.trim();
+  if(document.getElementById('dfGoals'))body.goals=DF_GOALS.slice();
   if(!body.name){showMsg('dEditMsg',false,'Klantnaam is verplicht.');return;}
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});

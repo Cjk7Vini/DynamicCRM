@@ -2323,6 +2323,96 @@ router.put('/api/mkt/workspace/branding', requireMkt, async (req, res) => {
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+// ---- Organische KPI-normen per werkplek (migratie 026) ----
+// Bepalen welke organische KPI's de AI-analyse meeneemt en wanneer een waarde goed,
+// gemiddeld of zwak is. Geldt voor alle klanten van de werkplek. Zonder eigen
+// instelling (of zonder migratie) gelden de standaardwaarden hieronder.
+// Engagement rate: norm van Fleur (>= 5% goed, 2-5% gemiddeld); marktgemiddelde per
+// bereik ligt rond 3,5%. Aandeel niet-volgers: Retensis (> 40% goed, < 20% laag);
+// marktgemiddelde rond 49% (Dash Social). Overige KPI's: t.o.v. de vorige periode.
+const DEFAULT_ORGANIC_KPIS = {
+  engagement_rate: { enabled: true, goed: 5, zwak: 2 },
+  niet_volgers: { enabled: true, goed: 40, zwak: 20 },
+  trend: { goed: 10, zwak: -10 },
+  trend_kpis: { weergaven: true, likes: true, opmerkingen: true, opgeslagen: true, gedeeld: true },
+};
+const ORGANIC_TREND_KEYS = ['weergaven', 'likes', 'opmerkingen', 'opgeslagen', 'gedeeld'];
+let _hasOrganicKpis = null;
+async function organicKpisAvailable() {
+  if (_hasOrganicKpis === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='workspaces' AND column_name='organic_kpis'"
+    )).rows);
+    if (r.length > 0) _hasOrganicKpis = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Vult ontbrekende of ongeldige waarden aan met de standaard.
+function normalizeOrganicKpis(src) {
+  const s = (src && typeof src === 'object') ? src : {};
+  const D = DEFAULT_ORGANIC_KPIS;
+  const num = (v, d) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
+  const band = (o, d) => {
+    const x = (o && typeof o === 'object') ? o : {};
+    const out = { goed: num(x.goed, d.goed), zwak: num(x.zwak, d.zwak) };
+    if (d.enabled !== undefined) out.enabled = (x.enabled === undefined) ? d.enabled : !!x.enabled;
+    if (!(out.goed > out.zwak)) { out.goed = d.goed; out.zwak = d.zwak; }
+    return out;
+  };
+  const tk = (s.trend_kpis && typeof s.trend_kpis === 'object') ? s.trend_kpis : {};
+  const trend_kpis = {};
+  ORGANIC_TREND_KEYS.forEach((k) => { trend_kpis[k] = (tk[k] === undefined) ? D.trend_kpis[k] : !!tk[k]; });
+  return {
+    engagement_rate: band(s.engagement_rate, D.engagement_rate),
+    niet_volgers: band(s.niet_volgers, D.niet_volgers),
+    trend: band(s.trend, D.trend),
+    trend_kpis,
+  };
+}
+async function loadOrganicKpis(wsId) {
+  if (!(await organicKpisAvailable())) return { kpis: normalizeOrganicKpis(null), custom: false };
+  const row = await withReadConnection(async (c) => (await c.query(
+    'SELECT organic_kpis FROM marketing.workspaces WHERE id=$1', [wsId]
+  )).rows[0]) || {};
+  return { kpis: normalizeOrganicKpis(row.organic_kpis), custom: !!row.organic_kpis };
+}
+router.get('/api/mkt/workspace/organic-kpis', requireMkt, async (req, res) => {
+  try {
+    const r = await loadOrganicKpis(req.session.mkt.workspaceId);
+    res.json({ success: true, kpis: r.kpis, custom: r.custom, defaults: DEFAULT_ORGANIC_KPIS, available: await organicKpisAvailable() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.put('/api/mkt/workspace/organic-kpis', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!(await organicKpisAvailable())) return res.status(503).json({ error: 'Nog niet ingeschakeld: draai eerst migratie 026 in Neon. Tot die tijd gelden de standaardwaarden.' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {};
+    if (b.reset) {
+      await withWriteConnection(async (c) => c.query('UPDATE marketing.workspaces SET organic_kpis=NULL WHERE id=$1', [wsId]));
+      return res.json({ success: true, kpis: normalizeOrganicKpis(null), custom: false });
+    }
+    const k = b.kpis || {};
+    // Strenge controle zodat er geen onzinnormen worden opgeslagen.
+    const chk = (o, label, min, max) => {
+      if (!o || typeof o !== 'object') return null;
+      const g = Number(o.goed); const z = Number(o.zwak);
+      if (!Number.isFinite(g) || !Number.isFinite(z)) return label + ': vul beide grenzen in.';
+      if (g < min || g > max || z < min || z > max) return label + ': waarden moeten tussen ' + min + ' en ' + max + ' liggen.';
+      if (!(g > z)) return label + ': de grens voor goed moet hoger zijn dan de grens voor zwak.';
+      return null;
+    };
+    const err = chk(k.engagement_rate, 'Engagement rate', 0, 100)
+      || chk(k.niet_volgers, 'Aandeel niet-volgers', 0, 100)
+      || chk(k.trend, 'Groei t.o.v. vorige periode', -100, 1000);
+    if (err) return res.status(400).json({ error: err });
+    const clean = normalizeOrganicKpis(k);
+    await withWriteConnection(async (c) => c.query('UPDATE marketing.workspaces SET organic_kpis=$1 WHERE id=$2', [JSON.stringify(clean), wsId]));
+    res.json({ success: true, kpis: clean, custom: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // Upload-handtekening voor het werkplek-logo (white-label). Alleen eigenaar/manager.
 // De browser uploadt rechtstreeks naar Cloudinary en bewaart daarna de URL via de
 // branding-PUT hierboven.
@@ -3852,6 +3942,236 @@ router.post('/api/mkt/clients/:clientId/ai/kpi-analysis', requireMkt, async (req
 });
 
 // =======================================================================
+// AI-ANALYSE ORGANISCH en DOELGROEP. De cijfers komen uit de body (exact wat de
+// rapportage toont). KPI-waarden en oordelen (goed/gemiddeld/zwak) rekent de code
+// uit volgens de KPI-normen van de werkplek; Claude schrijft alleen uitleg en acties
+// en kan dus geen cijfers of oordelen verzinnen.
+// =======================================================================
+const aiNum = (v) => (v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+const aiRound1 = (v) => Math.round(v * 10) / 10;
+const aiStatus3 = (v, goed, zwak) => (v == null ? null : (v >= goed ? 'goed' : (v < zwak ? 'zwak' : 'gemiddeld')));
+const aiPctStr = (v) => (v > 0 ? '+' : '') + String(v).replace('.', ',') + '%';
+
+// Naam, branche, doelen en gewenste doelgroep van de klant (velden uit migratie 023).
+async function clientProfileForAi(clientId, wsId) {
+  const base = await withReadConnection(async (c) => (await c.query(
+    'SELECT name FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [clientId, wsId]
+  )).rows[0]) || {};
+  const out = { name: base.name || null, branche: null, goals: [], audience: null };
+  if (await clientProfileAvailable()) {
+    try {
+      const p = await withReadConnection(async (c) => (await c.query(
+        'SELECT branche, goals, audience FROM marketing.clients WHERE id=$1 AND workspace_id=$2', [clientId, wsId]
+      )).rows[0]) || {};
+      out.branche = p.branche || null;
+      out.goals = Array.isArray(p.goals) ? p.goals : [];
+      out.audience = p.audience || null;
+    } catch (_) { /* zonder profiel verder */ }
+  }
+  return out;
+}
+// Zelfde route-keuze als de rapportage (Facebook, of Instagram-login als terugval).
+function aiIgRoute(creds) {
+  const token = creds.token;
+  const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
+  return { get: isIgLogin ? igGraphGet : graphGet, tok: isIgLogin ? creds.igLoginToken : token, uid: isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId };
+}
+// Zelfde meetvenster als de rapportage (datums in de accounttijdzone).
+function aiReportWindow(since, until) {
+  const tz = process.env.MKT_REPORT_TZ || 'Europe/Amsterdam';
+  const ok = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+  const off = (ms) => { const d = new Date(ms); return new Date(d.toLocaleString('en-US', { timeZone: tz })).getTime() - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' })).getTime(); };
+  const lu = (s, end) => { const n = new Date(s + (end ? 'T23:59:59Z' : 'T00:00:00Z')).getTime(); return Math.floor((n - off(n)) / 1000); };
+  const U = ok(until) ? lu(until, true) : Math.floor(Date.now() / 1000);
+  const S = ok(since) ? lu(since, false) : (U - 30 * 24 * 3600);
+  return { S, U };
+}
+// Som van een total_value-metric over een venster, in stukken van max 30 dagen.
+async function aiSumTotal(route, metric, S, U) {
+  let total = null;
+  for (let s = S; s <= U; s += 30 * 24 * 3600) {
+    const u = Math.min(s + 30 * 24 * 3600 - 1, U);
+    try {
+      const r = await route.get(`${route.uid}/insights`, { metric, metric_type: 'total_value', period: 'day', since: String(s), until: String(u), access_token: route.tok });
+      const t = (((r.data || [])[0] || {}).total_value) || {};
+      if (t.value != null) total = (total || 0) + Number(t.value);
+    } catch (_) { /* dit stuk overslaan */ }
+  }
+  return total;
+}
+
+router.post('/api/mkt/clients/:clientId/ai/organic-analysis', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+    const f = (b.figures && typeof b.figures === 'object') ? b.figures : null;
+    if (!f) return res.status(400).json({ error: 'Geen cijfers om te analyseren' });
+    const period = String(b.period || 'gekozen periode').slice(0, 60);
+    const { kpis: cfg } = await loadOrganicKpis(wsId);
+    const profile = await clientProfileForAi(okClient, wsId);
+
+    // Likes, opmerkingen, opgeslagen en gedeeld staan niet op het scherm: ophalen voor
+    // deze periode en de vorige (zelfde lengte, zelfde methode als de rapportage).
+    const LMAP = { likes: 'likes', opmerkingen: 'comments', opgeslagen: 'saves', gedeeld: 'shares' };
+    const fetched = {};
+    const want = Object.keys(LMAP).filter((k) => cfg.trend_kpis[k]);
+    if (want.length) {
+      const route = aiIgRoute(await resolveClientMeta(wsId, okClient));
+      if (route.uid && route.tok) {
+        const { S, U } = aiReportWindow(b.since, b.until);
+        const len = U - S;
+        for (const k of want) fetched[k] = { cur: await aiSumTotal(route, LMAP[k], S, U), prev: await aiSumTotal(route, LMAP[k], S - len, S) };
+      }
+    }
+
+    // KPI-tabel: waarde, norm en oordeel worden hier deterministisch bepaald.
+    const rows = [];
+    const ER = cfg.engagement_rate; const NV = cfg.niet_volgers; const T = cfg.trend;
+    if (ER.enabled) {
+      const e = f.engagement || {}; const v = aiNum(e.avg);
+      if (v != null) rows.push({ key: 'engagement_rate', naam: 'Engagement rate (gemiddeld per post)', waarde: v, eenheid: '%', status: aiStatus3(v, ER.goed, ER.zwak), norm: 'goed vanaf ' + ER.goed + '%, zwak onder ' + ER.zwak + '%', basis: aiNum(e.count) != null ? (aiNum(e.count) + ' posts') : null });
+    }
+    if (NV.enabled) {
+      const vs = f.views_split || {}; const a = aiNum(vs.follower); const n = aiNum(vs.non_follower);
+      if (a != null && n != null && (a + n) > 0) {
+        const v = aiRound1(n / (a + n) * 100);
+        rows.push({ key: 'niet_volgers', naam: 'Aandeel weergaven van niet-volgers', waarde: v, eenheid: '%', status: aiStatus3(v, NV.goed, NV.zwak), norm: 'goed vanaf ' + NV.goed + '%, zwak onder ' + NV.zwak + '%' });
+      }
+    }
+    const trendNorm = 'goed vanaf ' + aiPctStr(T.goed) + ', zwak onder ' + aiPctStr(T.zwak) + ' t.o.v. vorige periode';
+    const addTrend = (key, naam, cur, prev) => {
+      if (cur == null) return;
+      if (prev == null || prev === 0) { rows.push({ key, naam, waarde: cur, vorige: prev, verandering: null, status: null, norm: 'geen vergelijking met de vorige periode beschikbaar' }); return; }
+      const pct = aiRound1((cur - prev) / prev * 100);
+      rows.push({ key, naam, waarde: cur, vorige: prev, verandering: pct, status: aiStatus3(pct, T.goed, T.zwak), norm: trendNorm });
+    };
+    if (cfg.trend_kpis.weergaven) addTrend('weergaven', 'Weergaven', aiNum(f.views), aiNum(f.views_prev));
+    const NAMES = { likes: 'Vind-ik-leuks', opmerkingen: 'Opmerkingen', opgeslagen: 'Opgeslagen', gedeeld: 'Gedeeld' };
+    want.forEach((k) => { if (fetched[k]) addTrend(k, NAMES[k], fetched[k].cur, fetched[k].prev); });
+    if (!rows.length) return res.status(400).json({ error: 'Geen KPI-cijfers beschikbaar om te analyseren' });
+
+    // Context (alleen opgeschoonde velden uit de body).
+    const post = (p) => (p && typeof p === 'object') ? {
+      tekst: String(p.caption || '').slice(0, 120), type: String(p.media_type || p.type || '').slice(0, 20),
+      engagement: aiNum(p.engagement), weergaven: aiNum(p.views), likes: aiNum(p.likes), opmerkingen: aiNum(p.comments), opgeslagen: aiNum(p.saved), gedeeld: aiNum(p.shares),
+    } : null;
+    const typeList = (arr) => (Array.isArray(arr) ? arr.slice(0, 6).map((x) => ({ type: String((x && x.label) || '').slice(0, 20), waarde: aiNum(x && x.value) })) : []);
+    const ctx = {
+      volgers: aiNum(f.followers), netto_volgers: aiNum(f.follower_net),
+      profielbezoeken: aiNum(f.profile_views), profielbezoeken_vorige_periode: aiNum(f.profile_views_prev),
+      klikken_op_links: aiNum(f.website_clicks),
+      weergaven_per_contenttype: typeList(f.views_by_type), interacties_per_contenttype: typeList(f.interactions_by_type),
+      best_presterende_post: post(f.best_post), minst_presterende_post: post(f.worst_post),
+    };
+
+    const system = [
+      'Je bent een ervaren Nederlandse social-media-specialist. Je legt de ORGANISCHE Instagram-resultaten van een klant uit aan het marketingbureau dat de klant begeleidt.',
+      'Schrijf in het Nederlands, kort en concreet. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Het gaat ALLEEN over organische posts, reels en verhalen. Bespreek nooit advertenties of campagnes.',
+      'De KPI-tabel bevat vaste oordelen (goed, gemiddeld, zwak) volgens de normen van het bureau. Neem die oordelen letterlijk over, verander ze nooit en verzin geen andere normen.',
+      'Gebruik alleen de aangeleverde cijfers. Verzin nooit getallen.',
+      'Weeg de KPI\'s naar de doelen van de klant: bij "bereik" wegen weergaven en het aandeel niet-volgers het zwaarst; bij "interactie" de engagement rate, opmerkingen, opgeslagen en gedeeld; bij "aanvragen" of "websitebezoekers" de profielbezoeken, klikken op links en engagement. Zonder doelen: evenwichtig.',
+      'Gebruik de contenttypes en de best en minst presterende post als onderbouwing voor de acties.',
+      'Antwoord UITSLUITEND met een geldig JSON-object, zonder tekst eromheen, met exact deze velden:',
+      '{',
+      '  "eindoordeel": "1 tot 2 zinnen over hoe het organisch ervoor staat, met nadruk op de doelen van de klant",',
+      '  "status": "een van: goed, gemiddeld, zwak",',
+      '  "analyse": ["2 tot 4 observaties, elk 1 korte zin, over de belangrijkste KPI\'s"],',
+      '  "acties": ["2 tot 4 concrete acties voor de contentstrategie, meest impactvolle eerst"]',
+      '}',
+    ].join('\n');
+    const userText = 'Klant: ' + (profile.name || 'onbekend') + '\n'
+      + 'Branche: ' + (profile.branche || 'niet ingevuld') + '\n'
+      + 'Doelen: ' + (profile.goals.length ? profile.goals.join(', ') : 'niet ingevuld') + '\n'
+      + 'Periode: ' + period + '\n'
+      + 'KPI-tabel (oordelen staan vast):\n' + JSON.stringify(rows, null, 2) + '\n'
+      + 'Overige cijfers uit de rapportage:\n' + JSON.stringify(ctx, null, 2);
+
+    const raw = await callClaude(system, userText, 1200);
+    let j; try { j = extractJson(raw); } catch (_) { j = null; }
+    const cleanList = (v) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 4) : []);
+    const analysis = j ? {
+      eindoordeel: String(j.eindoordeel || '').slice(0, 500),
+      status: ['goed', 'gemiddeld', 'zwak'].includes(j.status) ? j.status : '',
+      analyse: cleanList(j.analyse), acties: cleanList(j.acties),
+    } : { eindoordeel: String(raw || '').slice(0, 600), status: '', analyse: [], acties: [] };
+    res.json({ success: true, analysis, kpis: rows, goals: profile.goals });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/api/mkt/clients/:clientId/ai/audience-analysis', requireMkt, async (req, res) => {
+  try {
+    if (mktClientLocked(req)) return res.status(403).json({ error: 'Geen toegang' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet geconfigureerd. Zet ANTHROPIC_API_KEY in Render.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const f = (req.body && typeof req.body.figures === 'object' && req.body.figures) ? req.body.figures : null;
+    if (!f) return res.status(400).json({ error: 'Geen doelgroepcijfers om te analyseren' });
+    const profile = await clientProfileForAi(okClient, wsId);
+
+    const cleanArr = (arr) => (Array.isArray(arr) ? arr.map((x) => ({ label: String((x && x.label) || '?').slice(0, 40), value: aiNum(x && x.value) || 0 })).filter((x) => x.value > 0) : []);
+    const toPct = (arr) => { const t = arr.reduce((s, x) => s + x.value, 0); return t ? arr.map((x) => ({ label: x.label, procent: aiRound1(x.value / t * 100) })) : []; };
+    const leeftijd = toPct(cleanArr(f.age));
+    const GN = { F: 'vrouw', M: 'man' };
+    const geslacht = toPct(cleanArr(f.gender).filter((x) => x.label === 'F' || x.label === 'M')).map((x) => ({ label: GN[x.label], procent: x.procent }));
+    const plaatsen = cleanArr(f.city).slice(0, 5).map((x) => ({ plaats: x.label, volgers: x.value }));
+    const landen = cleanArr(f.country).slice(0, 5).map((x) => ({ land: x.label, volgers: x.value }));
+    const vs = f.views_split || {}; const vf = aiNum(vs.follower); const vn = aiNum(vs.non_follower);
+    const nietVolgersPct = (vf != null && vn != null && (vf + vn) > 0) ? aiRound1(vn / (vf + vn) * 100) : null;
+
+    // Beste postmomenten per weekdag: het drukste aaneengesloten blok van 3 uur.
+    const DAYS = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+    const momenten = [];
+    const byDay = (f.active_by_day && typeof f.active_by_day === 'object') ? f.active_by_day : {};
+    for (let wd = 0; wd < 7; wd += 1) {
+      const arr = Array.isArray(byDay[wd]) ? byDay[wd] : [];
+      const h = {}; arr.forEach((x) => { const hh = aiNum(x && x.hour); if (hh != null && hh >= 0 && hh <= 23) h[hh] = aiNum(x.value) || 0; });
+      if (!Object.keys(h).length) continue;
+      let best = null; let bestSum = -1;
+      for (let s = 0; s <= 21; s += 1) { const sum = (h[s] || 0) + (h[s + 1] || 0) + (h[s + 2] || 0); if (sum > bestSum) { bestSum = sum; best = s; } }
+      momenten.push({ dag: DAYS[wd], van: best, tot: best + 3, gemiddeld_online: Math.round(bestSum / 3) });
+    }
+    momenten.sort((a, b) => b.gemiddeld_online - a.gemiddeld_online);
+    const feiten = { leeftijd, geslacht, plaatsen, landen, volgers: aiNum(f.followers), netto_volgers: aiNum(f.follower_net), aandeel_weergaven_niet_volgers: nietVolgersPct, beste_postmomenten: momenten.slice(0, 7) };
+    if (!leeftijd.length && !geslacht.length && !plaatsen.length && !landen.length) return res.status(400).json({ error: 'Geen doelgroepcijfers beschikbaar (Meta geeft die pas vanaf ongeveer 100 volgers).' });
+
+    const system = [
+      'Je bent een ervaren Nederlandse social-media-strateeg. Je analyseert de WERKELIJKE Instagram-doelgroep van een klant en vergelijkt die met de GEWENSTE doelgroep, voor het marketingbureau dat de klant begeleidt.',
+      'Schrijf in het Nederlands, kort en concreet. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Gebruik alleen de aangeleverde cijfers en neem percentages exact over. Verzin nooit getallen. Bij plaatsen en landen staan aantallen volgers, geen percentages: noem daar geen percentages.',
+      'Is er geen gewenste doelgroep ingevuld, zeg dat dan in de vergelijking in 1 zin (vul de gewenste doelgroep in bij de klantgegevens) en geef je advies alleen op basis van de werkelijke doelgroep, de branche en de doelen.',
+      'Gebruik de beste postmomenten (tijden zijn Nederlandse tijd) in je acties.',
+      'Antwoord UITSLUITEND met een geldig JSON-object, zonder tekst eromheen, met exact deze velden:',
+      '{',
+      '  "samenvatting": "1 tot 2 zinnen over wie de doelgroep werkelijk is",',
+      '  "wie": ["2 tot 4 opvallende feiten over leeftijd, geslacht en locatie"],',
+      '  "vergelijking": ["1 tot 4 overeenkomsten of verschillen met de gewenste doelgroep"],',
+      '  "acties": ["2 tot 4 concrete aandachtspunten voor de contentstrategie, inclusief wanneer posten"]',
+      '}',
+    ].join('\n');
+    const userText = 'Klant: ' + (profile.name || 'onbekend') + '\n'
+      + 'Branche: ' + (profile.branche || 'niet ingevuld') + '\n'
+      + 'Doelen: ' + (profile.goals.length ? profile.goals.join(', ') : 'niet ingevuld') + '\n'
+      + 'Gewenste doelgroep: ' + (profile.audience ? String(profile.audience).slice(0, 600) : 'niet ingevuld') + '\n'
+      + 'Werkelijke doelgroep (Meta):\n' + JSON.stringify(feiten, null, 2);
+
+    const raw = await callClaude(system, userText, 1200);
+    let j; try { j = extractJson(raw); } catch (_) { j = null; }
+    const cleanList = (v) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 4) : []);
+    const analysis = j ? {
+      samenvatting: String(j.samenvatting || '').slice(0, 500),
+      wie: cleanList(j.wie), vergelijking: cleanList(j.vergelijking), acties: cleanList(j.acties),
+    } : { samenvatting: String(raw || '').slice(0, 600), wie: [], vergelijking: [], acties: [] };
+    res.json({ success: true, analysis, momenten: momenten.slice(0, 3), gewenst: profile.audience || null });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // AD MACHINE - creatie- en keuringsskills (Claude) in de workspace
 // =======================================================================
 
@@ -4974,9 +5294,16 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         // berekende engagement rate tellen mee; alleen tonen als er meer dan 1 is.
         const _ranked = out.topPosts.filter((p) => p.engagement != null);
         out.worstPost = _ranked.length > 1 ? _ranked[_ranked.length - 1] : null;
+        // Gemiddelde engagement rate over ALLE posts in de periode (niet alleen de top
+        // 10), voor de organische KPI-analyse. Zelfde DHC-formule als de posttabel.
+        const _engVals = allPosts.map((p) => p.engagement).filter((v) => v != null);
+        out.engagement_summary = _engVals.length
+          ? { avg: Math.round((_engVals.reduce((s, v) => s + v, 0) / _engVals.length) * 100) / 100, count: _engVals.length }
+          : null;
       } else {
         out.topPosts = [];
         out.worstPost = null;
+        out.engagement_summary = null;
       }
 
       // --- Accountstatistieken (laatste 28 dagen). Vereist de permissie
