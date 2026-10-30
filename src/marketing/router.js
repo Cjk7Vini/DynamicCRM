@@ -5052,6 +5052,29 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
         }
       } catch (_) { /* geen netto beschikbaar */ }
 
+      // NETTO volgers zoals Instagram ze toont: volgers erbij (FOLLOWER) min ontvolgingen
+      // (NON_FOLLOWER) uit follows_and_unfollows, over exact de gekozen periode. Gemeten
+      // (Fleurs Marketing Agency): 92 - 65 = 27, gelijk aan de app. Lukt dit niet, dan
+      // blijft de snapshot-berekening hierboven als terugval staan.
+      try {
+        let fIn = null; let fOut = 0;
+        for (const [cs, cu] of igChunks) {
+          try {
+            const r = await igGet(`${igUid}/insights`, { metric: 'follows_and_unfollows', metric_type: 'total_value', breakdown: 'follow_type', period: 'day', since: String(cs), until: String(cu), access_token: igTok });
+            const bd = ((((r.data || [])[0] || {}).total_value || {}).breakdowns || [])[0];
+            ((bd && bd.results) || []).forEach((x) => {
+              const dv = (x.dimension_values || [])[0]; const v = Number(x.value) || 0;
+              if (dv === 'FOLLOWER') fIn = (fIn || 0) + v;
+              else if (dv === 'NON_FOLLOWER') fOut += v;
+            });
+          } catch (_) { /* dit stuk overslaan */ }
+        }
+        if (fIn != null) {
+          out.insights.follower_net = fIn - fOut;
+          out.insights.follower_net_since = new Date(igS * 1000).toISOString().slice(0, 10);
+        }
+      } catch (_) { /* netto via snapshots blijft staan */ }
+
       // Vorige, even lange periode voor de procentuele verandering (best-effort).
       // Alleen voor de venster-metrics, zodat de vergelijking eerlijk is.
       out.insights_prev = {};
@@ -5210,16 +5233,30 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
       out.activeTimes = null;
       out.activeTimesByDay = null; // per weekdag (0=zondag) voor de dagkiezer
       try {
-        const r = await igGet(`${igUid}/insights`, { metric: 'online_followers', period: 'lifetime', ...igWin, access_token: igTok });
+        // Meta weigert hier vensters langer dan 30 dagen (door de wintertijd kan de
+        // periode 30 dagen + 1 uur zijn); daarom het venster tot max 30 dagen inkorten.
+        const owS = Math.max(igS, igU - 30 * 24 * 3600 + 1);
+        const r = await igGet(`${igUid}/insights`, { metric: 'online_followers', period: 'lifetime', since: String(owS), until: String(igU), access_token: igTok });
         const vals = ((r.data || [])[0] || {}).values || [];
         if (vals.length) {
           const sum = {}; const cnt = {};
           const dsum = {}; const dcnt = {}; // per weekdag
+          // Meta geeft per dag (end_time = middernacht Amerikaanse tijd na die dag) de
+          // uren 0-23 in Amerikaanse (Pacific) tijd. Per uur rekenen we het echte moment
+          // uit en zetten we dat om naar uur en weekdag in de accounttijdzone. Gemeten:
+          // na omrekening klopt het patroon met de Instagram-app (CET).
+          const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: _RPT_TZ, hour: '2-digit', hourCycle: 'h23', weekday: 'short' });
+          const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
           vals.forEach((v) => {
             const o = v.value || {};
-            const wd = v.end_time ? new Date(v.end_time).getUTCDay() : null;
-            Object.keys(o).forEach((h) => {
-              const val = Number(o[h]) || 0;
+            const base = v.end_time ? Date.parse(v.end_time) - 24 * 3600 * 1000 : NaN;
+            if (isNaN(base)) return;
+            Object.keys(o).forEach((hk) => {
+              const val = Number(o[hk]) || 0;
+              const parts = fmt.formatToParts(new Date(base + Number(hk) * 3600 * 1000));
+              const h = Number((parts.find((p) => p.type === 'hour') || {}).value);
+              const wd = WD[(parts.find((p) => p.type === 'weekday') || {}).value];
+              if (isNaN(h)) return;
               sum[h] = (sum[h] || 0) + val; cnt[h] = (cnt[h] || 0) + 1;
               if (wd != null) { dsum[wd] = dsum[wd] || {}; dcnt[wd] = dcnt[wd] || {}; dsum[wd][h] = (dsum[wd][h] || 0) + val; dcnt[wd][h] = (dcnt[wd][h] || 0) + 1; }
             });
