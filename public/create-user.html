@@ -1316,10 +1316,16 @@ function renderAccounts(accs){
     if(a.last_seen_at)track+=' · laatst actief: '+formatDateTime(a.last_seen_at);
     if(a.last_login_at&&a.last_seen_at)track+=' · laatste sessie: '+sessieDuur(a.last_login_at,a.last_seen_at);
     if(a.logins_deze_maand!=null)track+=' · logins deze maand: '+a.logins_deze_maand;
-    var onl=a.online?' <span style="color:#16a34a;font-weight:700;font-size:11px">&#9679; nu online</span>':'';
+    // Ook platform-admin? Dan staan die logins (met het admin-wachtwoord) op een eigen regel.
+    var pa=a.platform_admin, paTrack='';
+    if(pa){
+      paTrack='als platform-admin: laatst ingelogd: '+(pa.last_login_at?formatDateTime(pa.last_login_at):'nooit');
+      if(pa.last_seen_at)paTrack+=' · laatst actief: '+formatDateTime(pa.last_seen_at);
+    }
+    var onl=(a.online||(pa&&pa.online))?' <span style="color:#16a34a;font-weight:700;font-size:11px">&#9679; nu online'+((!a.online&&pa&&pa.online)?' (platform-admin)':'')+'</span>':'';
     var roleSel='<select onchange="changeRole('+a.id+',this.value)" style="padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">'+roles.map(function(r){return '<option value="'+r+'" '+(a.role===r?'selected':'')+'>'+r+'</option>';}).join('')+'</select>';
     var koppel=(a.role==='client'&&a.client_name)?('<div style="color:var(--text-3);font-size:11px">klant: '+esc(a.client_name)+'</div>'):'';
-    return '<tr><td><div style="font-weight:600">'+esc(a.email)+onl+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">'+track+'</div></td>'+
+    return '<tr><td><div style="font-weight:600">'+esc(a.email)+onl+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">'+track+'</div>'+(paTrack?'<div style="color:var(--text-3);font-size:11px">'+paTrack+'</div>':'')+'</td>'+
       '<td>'+roleSel+'</td><td>'+status+'</td>'+
       '<td style="text-align:right;white-space:nowrap">'+
         '<button class="mini" onclick="resetPw('+a.id+')">Reset ww</button>'+
