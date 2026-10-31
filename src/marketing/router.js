@@ -129,7 +129,31 @@ async function requireMkt(req, res, next) {
       if (blocked) { delete req.session.mkt; return res.status(403).json({ error: 'Toegang ingetrokken' }); }
     }
   } catch (_) { /* infrafout: doorlaten zodat legitieme gebruikers niet worden uitgesloten */ }
+  touchMktSeen(m.accountId);
   return next();
+}
+// Inloggedrag van marketing-accounts (migratie 027), net als bij de dashboard-gebruikers.
+// "Laatst actief" hooguit 1x per minuut per account bijwerken, niet-blokkerend.
+const _mktSeen = new Map();
+function touchMktSeen(accountId) {
+  if (!accountId) return;
+  const now = Date.now();
+  if (now - (_mktSeen.get(accountId) || 0) < 60 * 1000) return;
+  _mktSeen.set(accountId, now);
+  withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_seen_at=now() WHERE id=$1', [accountId])).catch(() => {});
+}
+// Een login vastleggen: laatst ingelogd + laatst actief, en een regel in het logboek.
+// Zonder migratie 027 wordt (zoals voorheen) alleen last_login_at bijgewerkt.
+async function recordMktLogin(accountId, workspaceId) {
+  try {
+    await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now(), last_seen_at=now() WHERE id=$1', [accountId]));
+  } catch (_) {
+    await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [accountId]));
+  }
+  try {
+    await withWriteConnection(async (c) => c.query('INSERT INTO marketing.login_events (account_id, workspace_id) VALUES ($1,$2)', [accountId, workspaceId]));
+  } catch (_) { /* logboek nog niet aanwezig (migratie 027) */ }
+  _mktSeen.set(accountId, Date.now());
 }
 function requireMktPlatform(req, res, next) {
   if (req.session && req.session.mkt && req.session.mkt.platformAdmin) return next();
@@ -281,6 +305,22 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
       return { ws, accounts, clients };
     });
     if (!data) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    // Inloggedrag (migratie 027), net als bij de dashboard-gebruikers: laatst actief,
+    // nu online (geldige sessie) en logins deze maand. Zonder migratie: overslaan.
+    try {
+      const extra = await withReadConnection(async (c) => (await c.query(
+        `SELECT a.id, a.last_seen_at,
+                EXISTS (SELECT 1 FROM session s WHERE s.sess->'mkt'->>'accountId' = a.id::text AND s.expire > NOW()) AS online,
+                (SELECT COUNT(*)::int FROM marketing.login_events e
+                  WHERE e.account_id = a.id AND e.ingelogd_op >= date_trunc('month', NOW())) AS logins_deze_maand
+           FROM marketing.accounts a WHERE a.workspace_id=$1`, [req.params.id]
+      )).rows);
+      const byId = Object.fromEntries(extra.map((x) => [String(x.id), x]));
+      data.accounts.forEach((a) => {
+        const x = byId[String(a.id)];
+        if (x) { a.last_seen_at = x.last_seen_at; a.online = x.online; a.logins_deze_maand = x.logins_deze_maand; }
+      });
+    } catch (_) { /* migratie 027 nog niet gedraaid: zonder extra inloggedrag */ }
     res.json({ success: true, workspace: data.ws, accounts: data.accounts, client_count: data.clients });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -477,7 +517,7 @@ router.post('/api/mkt/auth/login', async (req, res) => {
       if (acc.license_end && new Date(acc.license_end) < new Date())
         return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
       req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email, clientId: acc.client_id || null };
-      await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
+      await recordMktLogin(acc.id, acc.workspace_id);
       return req.session.save(() => res.json({
         success: true, platformAdmin: false,
         account: { id: acc.id, email: acc.email, role: acc.role, name: acc.full_name },
@@ -520,7 +560,7 @@ router.post('/api/mkt/auth/choose-workspace', async (req, res) => {
     if (acc.license_end && new Date(acc.license_end) < new Date())
       return res.status(403).json({ error: 'De licentie van deze workspace is verlopen' });
     req.session.mkt = { accountId: acc.id, workspaceId: acc.workspace_id, role: acc.role, email: acc.email, clientId: acc.client_id || null };
-    await withWriteConnection(async (c) => c.query('UPDATE marketing.accounts SET last_login_at=now() WHERE id=$1', [acc.id]));
+    await recordMktLogin(acc.id, acc.workspace_id);
     return req.session.save(() => res.json({
       success: true, platformAdmin: false,
       account: { id: acc.id, email: acc.email, role: acc.role, name: acc.full_name },

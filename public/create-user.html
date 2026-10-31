@@ -1310,10 +1310,16 @@ function renderAccounts(accs){
   var roles=['owner','manager','member','client'];
   document.getElementById('wsmAccounts').innerHTML='<table class="acc-tbl"><tbody>'+accs.map(function(a){
     var status=a.banned?'<span class="acc-badge acc-off">geband</span>':(a.active?'<span class="acc-badge acc-on">actief</span>':'<span class="acc-badge acc-off">inactief</span>');
-    var last=a.last_login_at?new Date(a.last_login_at).toLocaleDateString('nl-NL'):'nooit';
+    // Inloggedrag, net als bij de dashboard-accounts (laatst actief, sessie en logins
+    // deze maand verschijnen zodra migratie 027 gedraaid is).
+    var track='laatst ingelogd: '+(a.last_login_at?formatDateTime(a.last_login_at):'nooit');
+    if(a.last_seen_at)track+=' · laatst actief: '+formatDateTime(a.last_seen_at);
+    if(a.last_login_at&&a.last_seen_at)track+=' · laatste sessie: '+sessieDuur(a.last_login_at,a.last_seen_at);
+    if(a.logins_deze_maand!=null)track+=' · logins deze maand: '+a.logins_deze_maand;
+    var onl=a.online?' <span style="color:#16a34a;font-weight:700;font-size:11px">&#9679; nu online</span>':'';
     var roleSel='<select onchange="changeRole('+a.id+',this.value)" style="padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">'+roles.map(function(r){return '<option value="'+r+'" '+(a.role===r?'selected':'')+'>'+r+'</option>';}).join('')+'</select>';
     var koppel=(a.role==='client'&&a.client_name)?('<div style="color:var(--text-3);font-size:11px">klant: '+esc(a.client_name)+'</div>'):'';
-    return '<tr><td><div style="font-weight:600">'+esc(a.email)+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">laatste login: '+last+'</div></td>'+
+    return '<tr><td><div style="font-weight:600">'+esc(a.email)+onl+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">'+track+'</div></td>'+
       '<td>'+roleSel+'</td><td>'+status+'</td>'+
       '<td style="text-align:right;white-space:nowrap">'+
         '<button class="mini" onclick="resetPw('+a.id+')">Reset ww</button>'+
