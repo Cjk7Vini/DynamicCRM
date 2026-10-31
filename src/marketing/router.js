@@ -113,8 +113,17 @@ async function requireMkt(req, res, next) {
   const m = req.session && req.session.mkt;
   if (!m) return res.status(401).json({ error: 'Niet ingelogd' });
   if (m.platformAdmin) {
-    if (m.workspaceId) return next();
-    return res.status(401).json({ error: 'Niet ingelogd' });
+    if (!m.workspaceId) return res.status(401).json({ error: 'Niet ingelogd' });
+    // Mag deze platform-admin (nog) in deze workspace? (migratie 028)
+    try {
+      const scope = await platformScope(m);
+      if (scope && !scope.includes(Number(m.workspaceId))) {
+        m.workspaceId = null;
+        return req.session.save(() => res.status(403).json({ error: 'Geen toegang tot deze workspace' }));
+      }
+    } catch (_) { /* infrafout: doorlaten, net als bij gewone accounts */ }
+    touchPlatformSeen(m);
+    return next();
   }
   if (!m.accountId) return res.status(401).json({ error: 'Niet ingelogd' });
   try {
@@ -154,6 +163,44 @@ async function recordMktLogin(accountId, workspaceId) {
     await withWriteConnection(async (c) => c.query('INSERT INTO marketing.login_events (account_id, workspace_id) VALUES ($1,$2)', [accountId, workspaceId]));
   } catch (_) { /* logboek nog niet aanwezig (migratie 027) */ }
   _mktSeen.set(accountId, Date.now());
+}
+// Platform-admins (dashboard-admins die in de workspace inloggen). Migratie 028:
+// public.users.mkt_workspace_ids bepaalt welke workspaces iemand mag zien.
+// NULL = alle workspaces (zoals voorheen). Lege lijst = geen enkele.
+// Geeft null (alles) of een lijst met workspace-id's terug.
+async function platformScope(m) {
+  try {
+    const byId = !!m.userId;
+    const r = await withReadConnection(async (c) => (await c.query(
+      `SELECT mkt_workspace_ids FROM public.users
+        WHERE ${byId ? 'id=$1' : 'lower(email)=lower($1)'} AND role='admin'
+          AND active=TRUE AND (banned IS NULL OR banned=FALSE)`, [byId ? m.userId : m.email]
+    )).rows[0]);
+    if (!r) return []; // geen actieve admin meer: geen workspaces
+    return r.mkt_workspace_ids == null ? null : r.mkt_workspace_ids.map(Number);
+  } catch (e) {
+    if (e && e.code === '42703') return null; // kolom bestaat nog niet (migratie 028 niet gedraaid)
+    throw e;
+  }
+}
+// Login en activiteit van een platform-admin vastleggen op de eigen gebruiker
+// (public.users), net als een dashboard-login. Niet-blokkerend.
+function recordPlatformLogin(userId) {
+  withWriteConnection(async (c) => {
+    await c.query('UPDATE public.users SET last_login_at=NOW(), last_seen_at=NOW() WHERE id=$1', [userId]);
+    await c.query('INSERT INTO login_events (user_id) VALUES ($1)', [userId]);
+  }).catch(() => {});
+  _mktSeen.set('u' + userId, Date.now());
+}
+function touchPlatformSeen(m) {
+  const key = m.userId ? 'u' + m.userId : 'e' + String(m.email || '').toLowerCase();
+  const now = Date.now();
+  if (now - (_mktSeen.get(key) || 0) < 60 * 1000) return;
+  _mktSeen.set(key, now);
+  withWriteConnection(async (c) => c.query(
+    m.userId ? 'UPDATE public.users SET last_seen_at=NOW() WHERE id=$1'
+             : "UPDATE public.users SET last_seen_at=NOW() WHERE lower(email)=lower($1) AND role='admin'",
+    [m.userId || m.email])).catch(() => {});
 }
 function requireMktPlatform(req, res, next) {
   if (req.session && req.session.mkt && req.session.mkt.platformAdmin) return next();
@@ -321,6 +368,23 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
         if (x) { a.last_seen_at = x.last_seen_at; a.online = x.online; a.logins_deze_maand = x.logins_deze_maand; }
       });
     } catch (_) { /* migratie 027 nog niet gedraaid: zonder extra inloggedrag */ }
+    // Is het e-mailadres ook een platform-admin? Dan ook die logins tonen: wie met het
+    // admin-wachtwoord inlogt, logt in als platform-admin en niet op het account zelf.
+    try {
+      const emails = data.accounts.map((a) => String(a.email || '').toLowerCase());
+      const pa = await withReadConnection(async (c) => (await c.query(
+        `SELECT lower(u.email) AS email, u.last_login_at, u.last_seen_at,
+                EXISTS (SELECT 1 FROM session s WHERE s.expire > NOW()
+                          AND s.sess->'mkt'->>'platformAdmin' = 'true'
+                          AND lower(s.sess->'mkt'->>'email') = lower(u.email)) AS online
+           FROM public.users u WHERE u.role='admin' AND lower(u.email) = ANY($1::text[])`, [emails]
+      )).rows);
+      const byEmail = Object.fromEntries(pa.map((x) => [x.email, x]));
+      data.accounts.forEach((a) => {
+        const x = byEmail[String(a.email || '').toLowerCase()];
+        if (x) a.platform_admin = { last_login_at: x.last_login_at, last_seen_at: x.last_seen_at, online: x.online };
+      });
+    } catch (_) { /* zonder platform-admin-gegevens */ }
     res.json({ success: true, workspace: data.ws, accounts: data.accounts, client_count: data.clients });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -531,7 +595,8 @@ router.post('/api/mkt/auth/login', async (req, res) => {
         WHERE email=$1 AND role='admin' AND active=TRUE AND (banned IS NULL OR banned=FALSE)`, [em]
     )).rows[0]);
     if (admin && await bcrypt.compare(password, admin.password_hash)) {
-      req.session.mkt = { platformAdmin: true, role: 'platform_admin', email: admin.email, workspaceId: null };
+      req.session.mkt = { platformAdmin: true, role: 'platform_admin', email: admin.email, userId: admin.id, workspaceId: null };
+      recordPlatformLogin(admin.id);
       return req.session.save(() => res.json({ success: true, platformAdmin: true, email: admin.email }));
     }
 
@@ -579,6 +644,14 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
     const m = req.session.mkt;
     if (m.platformAdmin) {
       let workspace = null;
+      // Workspace buiten het toegestane bereik (migratie 028)? Terug naar de kiezer.
+      if (m.workspaceId) {
+        try {
+          const scope = await platformScope(m);
+          if (scope && !scope.includes(Number(m.workspaceId))) { m.workspaceId = null; await new Promise((r) => req.session.save(r)); }
+        } catch (_) { /* infrafout: requireMkt controleert per aanvraag opnieuw */ }
+      }
+      touchPlatformSeen(m);
       if (m.workspaceId) {
         workspace = await withReadConnection(async (c) => (await c.query(
           `SELECT id, name, slug, modules, license_type, license_end, max_seats, max_clients
@@ -605,11 +678,14 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
 // ---- PLATFORM-ADMIN: overzicht + workspace kiezen -------------------------
 router.get('/api/mkt/platform/workspaces', requireMktPlatform, async (req, res) => {
   try {
+    const scope = await platformScope(req.session.mkt); // null = alle (migratie 028)
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT w.id, w.name, w.slug, w.license_type, w.license_end, w.active,
               (SELECT COUNT(*)::int FROM marketing.accounts a WHERE a.workspace_id=w.id) AS accounts,
               (SELECT COUNT(*)::int FROM marketing.clients cl WHERE cl.workspace_id=w.id) AS clients
-         FROM marketing.workspaces w ORDER BY w.name ASC`
+         FROM marketing.workspaces w
+        WHERE $1::int[] IS NULL OR w.id = ANY($1::int[])
+        ORDER BY w.name ASC`, [scope]
     )).rows);
     res.json({ success: true, workspaces: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -619,6 +695,8 @@ router.post('/api/mkt/platform/enter', requireMktPlatform, async (req, res) => {
     const { workspaceId } = req.body || {};
     const ws = await withReadConnection(async (c) => (await c.query('SELECT id, name, slug FROM marketing.workspaces WHERE id=$1', [workspaceId])).rows[0]);
     if (!ws) return res.status(404).json({ error: 'Workspace niet gevonden' });
+    const scope = await platformScope(req.session.mkt); // migratie 028
+    if (scope && !scope.includes(Number(ws.id))) return res.status(403).json({ error: 'Geen toegang tot deze workspace' });
     req.session.mkt.workspaceId = ws.id;
     req.session.save(() => res.json({ success: true, workspace: ws }));
   } catch (e) { res.status(500).json({ error: e.message }); }
