@@ -2989,6 +2989,28 @@ async function resolveClientMeta(wsId, clientId) {
   };
 }
 
+// Route voor de Instagram-cijfers (rapportage, AI-analyses, debug-pagina's).
+// Regel: de Facebook-route (Facebook-token + Instagram-account) gaat voor; de
+// Instagram-login is een terugval voor klanten zonder Facebook-route.
+// Uitzondering (bijv. Serac): de klant is wel via Facebook gekoppeld (nodig voor
+// advertenties en pagina), maar het Instagram-account is niet met dat token gedeeld.
+// Dan faalt de Facebook-route al op het account zelf. Alleen als de Instagram-login
+// van HETZELFDE Instagram-account is, vallen we dan terug op die Instagram-login.
+// Werkt de Facebook-route, dan verandert er niets (bijv. Fleur).
+async function pickIgRoute(creds) {
+  const fb = { isIgLogin: false, get: graphGet, tok: creds.token, uid: creds.igUserId };
+  const ig = { isIgLogin: true, get: igGraphGet, tok: creds.igLoginToken, uid: creds.igLoginUserId || 'me' };
+  if (!creds.igLoginToken) return fb;
+  if (!(creds.token && creds.igUserId)) return ig;
+  if (!creds.igLoginUserId || String(creds.igLoginUserId) !== String(creds.igUserId)) return fb;
+  try {
+    await graphGet(`${creds.igUserId}`, { fields: 'id,username', access_token: creds.token });
+    return fb;
+  } catch (e) {
+    return { ...ig, fbFallback: (e && e.message) ? e.message : 'Facebook-route faalde' };
+  }
+}
+
 // =======================================================================
 // STAP 7 - PUBLICEREN naar Meta (Instagram / Facebook) via Graph API
 // Werkt met een access token dat per klant is opgeslagen (Koppelingen-tab).
@@ -4089,10 +4111,8 @@ async function clientProfileForAi(clientId, wsId) {
   return out;
 }
 // Zelfde route-keuze als de rapportage (Facebook, of Instagram-login als terugval).
-function aiIgRoute(creds) {
-  const token = creds.token;
-  const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
-  return { get: isIgLogin ? igGraphGet : graphGet, tok: isIgLogin ? creds.igLoginToken : token, uid: isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId };
+async function aiIgRoute(creds) {
+  return pickIgRoute(creds);
 }
 // Zelfde meetvenster als de rapportage (datums in de accounttijdzone).
 function aiReportWindow(since, until) {
@@ -4138,7 +4158,7 @@ router.post('/api/mkt/clients/:clientId/ai/organic-analysis', requireMkt, async 
     const fetched = {};
     const want = Object.keys(LMAP).filter((k) => cfg.trend_kpis[k]);
     if (want.length) {
-      const route = aiIgRoute(await resolveClientMeta(wsId, okClient));
+      const route = await aiIgRoute(await resolveClientMeta(wsId, okClient));
       if (route.uid && route.tok) {
         const { S, U } = aiReportWindow(b.since, b.until);
         const len = U - S;
@@ -4835,10 +4855,11 @@ router.get('/api/mkt/debug-profile-views', requireMkt, async (req, res) => {
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
-    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
-    const get = isIgLogin ? igGraphGet : graphGet;
-    const tok = isIgLogin ? creds.igLoginToken : token;
-    const uid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    const route = await pickIgRoute(creds);
+    const isIgLogin = route.isIgLogin;
+    const get = route.get;
+    const tok = route.tok;
+    const uid = route.uid;
     if (!uid || !tok) return res.json({ success: false, error: 'Geen Instagram-koppeling voor deze klant' });
 
     const DAY = 86400;
@@ -4921,10 +4942,11 @@ router.get('/api/mkt/debug-insights', requireMkt, async (req, res) => {
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
-    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
-    const get = isIgLogin ? igGraphGet : graphGet;
-    const tok = isIgLogin ? creds.igLoginToken : token;
-    const uid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    const route = await pickIgRoute(creds);
+    const isIgLogin = route.isIgLogin;
+    const get = route.get;
+    const tok = route.tok;
+    const uid = route.uid;
     if (!uid || !tok) return res.json({ success: false, error: 'Geen Instagram-koppeling voor deze klant' });
 
     const DAY = 86400;
@@ -5291,10 +5313,11 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     // gebruiken we die. Een los/oud Instagram-login-token wordt dan genegeerd, zodat
     // het nooit een goede Facebook-koppeling verdringt. Alleen klanten zonder enige
     // Facebook-route (geen Instagram-account) vallen terug op de Instagram-login.
-    const isIgLogin = !!creds.igLoginToken && !(token && creds.igUserId);
-    const igGet = isIgLogin ? igGraphGet : graphGet;
-    const igTok = isIgLogin ? creds.igLoginToken : token;
-    const igUid = isIgLogin ? (creds.igLoginUserId || 'me') : creds.igUserId;
+    const igRoute = await pickIgRoute(creds);
+    const isIgLogin = igRoute.isIgLogin;
+    const igGet = igRoute.get;
+    const igTok = igRoute.tok;
+    const igUid = igRoute.uid;
     if (!token && !isIgLogin) {
       return res.json({ success: true, configured: false });
     }
@@ -5302,6 +5325,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
     const out = { configured: true, account: null, topPosts: null, ads: null, errors: {} };
     // Welke bron de Instagram-cijfers leveren, zodat het in de UI zichtbaar is.
     out.source = isIgLogin ? 'instagram-login' : 'facebook';
+    if (igRoute.fbFallback) out.source_note = 'Facebook-route gaf geen toegang tot Instagram; cijfers via Instagram-login.';
 
     // --- Instagram account: volgers + aantal media ---
     if (igUid) {
