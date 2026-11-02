@@ -526,15 +526,26 @@ async function checkAdmin() {
     const data = await res.json();
     if (!res.ok || !data.user || data.user.role !== 'admin') {
       document.getElementById('loginOverlay').style.display = 'flex';
-      return;
+      return false;
     }
+    // Alleen de superadmin, of een admin die de superadmin toegang heeft gegeven.
+    if (!data.user.create_user_access) {
+      const err = document.getElementById('loginErr');
+      err.textContent = 'Dit account heeft geen toegang tot create-user.';
+      err.style.display = 'block';
+      document.getElementById('loginOverlay').style.display = 'flex';
+      return false;
+    }
+    window.IS_SUPERADMIN = !!data.user.is_superadmin;
     const email = data.user.email || '';
     document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
     document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
     // userRoleTxt niet aanwezig in deze pagina
     document.getElementById('loginOverlay').style.display = 'none';
+    return true;
   } catch {
     document.getElementById('loginOverlay').style.display = 'flex';
+    return false;
   }
 }
 
@@ -560,12 +571,10 @@ async function doOverlayLogin() {
     });
     const data = await res.json();
     if (data.success && data.user && data.user.role === 'admin') {
-      const email = data.user.email || '';
-      document.getElementById('userInitials').textContent = email.slice(0,2).toUpperCase();
-      document.getElementById('userEmailDisplay').textContent = email.length > 28 ? email.slice(0,28)+'...' : email;
-      // userRoleTxt niet aanwezig in deze pagina
-      document.getElementById('loginOverlay').style.display = 'none';
-      loadUsers();
+      // Toegang tot create-user controleren (alleen de superadmin, of met vinkje).
+      if (await checkAdmin()) { loadUsers(); }
+      btn.disabled = false;
+      btn.textContent = 'Inloggen';
     } else {
       err.textContent = data.error || 'Onjuiste inloggegevens of geen admin toegang.';
       err.style.display = 'block';
@@ -1091,6 +1100,18 @@ function openUserModal(id) {
     </div>`;
   }
 
+  // Toegang tot create-user: alleen de superadmin ziet en zet dit, en alleen bij andere admins.
+  if (window.IS_SUPERADMIN && u.role === 'admin' && String(u.email || '').toLowerCase() !== 'admin@dynamic-health-consultancy.nl') {
+    html += `<div class="modal-section">
+      <div class="modal-section-title">Toegang tot create-user</div>
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="cuAccess" ${u.create_user_access ? 'checked' : ''} onchange="saveCreateUserAccess(${u.id}, this)" style="width:auto">
+        Deze admin mag inloggen op create-user
+      </label>
+      <div id="cuAccessMsg" style="font-size:12px;color:#6b7280;margin-top:6px">Standaard uit. Het churn-dashboard blijft voor deze admin gewoon werken.</div>
+    </div>`;
+  }
+
   // Account acties
   html += `<div class="modal-section">
     <div class="modal-section-title">Account</div>
@@ -1170,6 +1191,26 @@ async function modalAction(action) {
 function closeModal() {
   document.getElementById('userModal').classList.remove('open');
   _currentModalUserId = null;
+}
+
+async function saveCreateUserAccess(userId, cb) {
+  const msg = document.getElementById('cuAccessMsg');
+  const want = cb.checked;
+  cb.disabled = true;
+  try {
+    const res = await fetch('/api/admin/users/' + userId + '/create-user-access', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ enabled: want })
+    });
+    const d = await res.json();
+    if (res.ok && d.success) {
+      const u = (window._users || []).find(x => x.id === userId); if (u) u.create_user_access = want;
+      msg.style.color = '#065f46'; msg.textContent = want ? 'Opgeslagen: deze admin heeft toegang tot create-user.' : 'Opgeslagen: geen toegang tot create-user.';
+    } else {
+      cb.checked = !want; msg.style.color = '#991b1b'; msg.textContent = d.error || 'Opslaan mislukt.';
+    }
+  } catch (e) { cb.checked = !want; msg.style.color = '#991b1b'; msg.textContent = 'Netwerkfout.'; }
+  cb.disabled = false;
 }
 
 function handleModalClick(e) {

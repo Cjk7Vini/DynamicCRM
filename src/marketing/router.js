@@ -94,9 +94,20 @@ function slugify(s) {
 }
 
 // ---- guards ------------------------------------------------------------
-function requireDhcAdmin(req, res, next) {
-  if (req.session && req.session.role === 'admin') return next();
-  return res.status(403).json({ error: 'Admin toegang vereist' });
+// Beheer vanuit create-user: alleen de superadmin, plus admins met toegang tot
+// create-user (public.users.create_user_access, migratie 029). Zelfde regel als in
+// server.js. Zonder migratie: alleen de superadmin. Terugval: CREATE_USER_ALL_ADMINS=1.
+async function requireDhcAdmin(req, res, next) {
+  if (!req.session || req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
+  if (isMktSuperadmin(req) || process.env.CREATE_USER_ALL_ADMINS === '1') return next();
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT create_user_access FROM public.users WHERE id=$1 AND role='admin' AND active=TRUE AND (banned IS NULL OR banned=FALSE)",
+      [req.session.userId]
+    )).rows[0]);
+    if (r && r.create_user_access === true) return next();
+  } catch (_) { /* kolom ontbreekt of infrafout: alleen de superadmin */ }
+  return res.status(403).json({ error: 'Geen toegang tot create-user' });
 }
 // Zichtbare werkplekken voor admins (migratie 028). De superadmin ziet altijd alles en
 // is de enige die de zichtbaarheid van andere admins mag instellen.
