@@ -98,6 +98,45 @@ function requireDhcAdmin(req, res, next) {
   if (req.session && req.session.role === 'admin') return next();
   return res.status(403).json({ error: 'Admin toegang vereist' });
 }
+// Zichtbare werkplekken voor admins (migratie 028). De superadmin ziet altijd alles en
+// is de enige die de zichtbaarheid van andere admins mag instellen.
+const MKT_SUPERADMIN_EMAIL = 'admin@dynamic-health-consultancy.nl';
+function isMktSuperadmin(req) {
+  return !!req.session && req.session.role === 'admin' &&
+    String(req.session.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL;
+}
+// null = alle werkplekken; anders de lijst met toegestane werkplek-id's.
+async function adminScope(req) {
+  if (isMktSuperadmin(req)) return null;
+  return platformScope({ userId: req.session.userId, email: req.session.email });
+}
+// create-user: werkplek (:id) moet zichtbaar zijn voor deze admin.
+async function adminWsGuard(req, res, next) {
+  try {
+    const scope = await adminScope(req);
+    if (scope && !scope.includes(Number(req.params.id))) return res.status(403).json({ error: 'Geen toegang tot deze workspace' });
+    return next();
+  } catch (e) { return res.status(500).json({ error: 'Toegang kon niet worden gecontroleerd' }); }
+}
+// create-user: account (:id) moet in een zichtbare werkplek zitten.
+async function adminAccGuard(req, res, next) {
+  try {
+    const scope = await adminScope(req);
+    if (!scope) return next();
+    const acc = await withReadConnection(async (c) => (await c.query('SELECT workspace_id FROM marketing.accounts WHERE id=$1', [req.params.id])).rows[0]);
+    if (!acc || !scope.includes(Number(acc.workspace_id))) return res.status(403).json({ error: 'Geen toegang tot dit account' });
+    return next();
+  } catch (e) { return res.status(500).json({ error: 'Toegang kon niet worden gecontroleerd' }); }
+}
+// create-user: alleen admins die alle werkplekken zien (bijv. een werkplek aanmaken).
+async function adminAllGuard(req, res, next) {
+  try {
+    const scope = await adminScope(req);
+    if (scope) return res.status(403).json({ error: 'Alleen een admin met toegang tot alle workspaces' });
+    return next();
+  } catch (e) { return res.status(500).json({ error: 'Toegang kon niet worden gecontroleerd' }); }
+}
+
 // Ingelogd op de marketing-module (account OF platform-admin, workspace optioneel).
 // Gebruikt door /me zodat een platform-admin zonder gekozen workspace de kiezer kan zien.
 function requireMktSession(req, res, next) {
@@ -169,6 +208,7 @@ async function recordMktLogin(accountId, workspaceId) {
 // NULL = alle workspaces (zoals voorheen). Lege lijst = geen enkele.
 // Geeft null (alles) of een lijst met workspace-id's terug.
 async function platformScope(m) {
+  if (String((m && m.email) || '').toLowerCase() === MKT_SUPERADMIN_EMAIL) return null; // superadmin ziet altijd alles
   try {
     const byId = !!m.userId;
     const r = await withReadConnection(async (c) => (await c.query(
@@ -220,19 +260,21 @@ router.get(['/marketing', '/workspace', '/workspace.html'], (req, res) => {
 // Lijst van alle marketing-workspaces met licentie + aantal accounts.
 router.get('/api/mkt/admin/workspaces', requireDhcAdmin, async (req, res) => {
   try {
+    const scope = await adminScope(req); // null = alle (migratie 028)
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT w.*,
               (SELECT COUNT(*) FROM marketing.accounts a WHERE a.workspace_id = w.id) AS accounts,
               (SELECT email FROM marketing.accounts a WHERE a.workspace_id = w.id AND a.role='owner' ORDER BY a.id ASC LIMIT 1) AS owner_email
          FROM marketing.workspaces w
-        ORDER BY w.created_at DESC`
+        WHERE $1::int[] IS NULL OR w.id = ANY($1::int[])
+        ORDER BY w.created_at DESC`, [scope]
     )).rows);
     res.json({ success: true, workspaces: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Nieuwe workspace + eigenaar-account + licentie aanmaken.
-router.post('/api/mkt/admin/workspaces', requireDhcAdmin, async (req, res) => {
+router.post('/api/mkt/admin/workspaces', requireDhcAdmin, adminAllGuard, async (req, res) => {
   try {
     const { name, ownerEmail, ownerName, ownerPassword,
             licenseType, maxSeats, maxClients, modules } = req.body || {};
@@ -292,7 +334,7 @@ router.post('/api/mkt/admin/workspaces', requireDhcAdmin, async (req, res) => {
 });
 
 // Licentie van een workspace bijwerken.
-router.patch('/api/mkt/admin/workspaces/:id/license', requireDhcAdmin, async (req, res) => {
+router.patch('/api/mkt/admin/workspaces/:id/license', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const { licenseType, maxSeats, maxClients, modules, active } = req.body || {};
@@ -336,7 +378,7 @@ async function activeOwnerCount(client, workspaceId, exceptId) {
 }
 
 // Detail van één workspace incl. accounts + aantal klanten.
-router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) => {
+router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const data = await withReadConnection(async (c) => {
       const ws = (await c.query('SELECT * FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0];
@@ -373,7 +415,7 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
     try {
       const emails = data.accounts.map((a) => String(a.email || '').toLowerCase());
       const pa = await withReadConnection(async (c) => (await c.query(
-        `SELECT lower(u.email) AS email, u.last_login_at, u.last_seen_at,
+        `SELECT u.id, lower(u.email) AS email, u.last_login_at, u.last_seen_at,
                 EXISTS (SELECT 1 FROM session s WHERE s.expire > NOW()
                           AND s.sess->'mkt'->>'platformAdmin' = 'true'
                           AND lower(s.sess->'mkt'->>'email') = lower(u.email)) AS online
@@ -382,15 +424,63 @@ router.get('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) =>
       const byEmail = Object.fromEntries(pa.map((x) => [x.email, x]));
       data.accounts.forEach((a) => {
         const x = byEmail[String(a.email || '').toLowerCase()];
-        if (x) a.platform_admin = { last_login_at: x.last_login_at, last_seen_at: x.last_seen_at, online: x.online };
+        if (x) a.platform_admin = { user_id: x.id, superadmin: x.email === MKT_SUPERADMIN_EMAIL, last_login_at: x.last_login_at, last_seen_at: x.last_seen_at, online: x.online };
       });
     } catch (_) { /* zonder platform-admin-gegevens */ }
-    res.json({ success: true, workspace: data.ws, accounts: data.accounts, client_count: data.clients });
+    res.json({ success: true, workspace: data.ws, accounts: data.accounts, client_count: data.clients, can_manage_visibility: isMktSuperadmin(req) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Zichtbare werkplekken van een admin (platform-admin) lezen en instellen. Alleen de
+// superadmin. NULL = alle werkplekken, ook nieuwe. Een lijst = alleen die werkplekken.
+router.get('/api/mkt/admin/platform-admins/:userId/workspaces', requireDhcAdmin, async (req, res) => {
+  try {
+    if (!isMktSuperadmin(req)) return res.status(403).json({ error: 'Alleen de superadmin' });
+    const data = await withReadConnection(async (c) => {
+      const u = (await c.query("SELECT id, email FROM public.users WHERE id=$1 AND role='admin'", [req.params.userId])).rows[0];
+      if (!u) return null;
+      const workspaces = (await c.query('SELECT id, name FROM marketing.workspaces ORDER BY name ASC')).rows;
+      let ids = null; let migration = true;
+      try { ids = (await c.query('SELECT mkt_workspace_ids FROM public.users WHERE id=$1', [u.id])).rows[0].mkt_workspace_ids; }
+      catch (e) { if (e && e.code === '42703') migration = false; else throw e; }
+      return { u, workspaces, ids, migration };
+    });
+    if (!data) return res.status(404).json({ error: 'Admin niet gevonden' });
+    res.json({
+      success: true, user: { id: data.u.id, email: data.u.email },
+      superadmin: String(data.u.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL,
+      migration: data.migration, all: data.ids == null,
+      selected: data.ids == null ? [] : data.ids.map(Number), workspaces: data.workspaces,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.put('/api/mkt/admin/platform-admins/:userId/workspaces', requireDhcAdmin, async (req, res) => {
+  try {
+    if (!isMktSuperadmin(req)) return res.status(403).json({ error: 'Alleen de superadmin' });
+    const b = req.body || {};
+    const out = await withWriteConnection(async (c) => {
+      const u = (await c.query("SELECT id, email FROM public.users WHERE id=$1 AND role='admin'", [req.params.userId])).rows[0];
+      if (!u) return { code: 404, error: 'Admin niet gevonden' };
+      if (String(u.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL) return { code: 400, error: 'De superadmin ziet altijd alle workspaces' };
+      let ids = null;
+      if (!b.all) {
+        if (!Array.isArray(b.workspace_ids)) return { code: 400, error: 'Geef workspace_ids mee, of all: true' };
+        const want = [...new Set(b.workspace_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+        const known = want.length ? (await c.query('SELECT id FROM marketing.workspaces WHERE id = ANY($1::int[])', [want])).rows.map((r) => Number(r.id)) : [];
+        if (known.length !== want.length) return { code: 400, error: 'Onbekende workspace in de selectie' };
+        ids = known.sort((x, y) => x - y);
+      }
+      try { await c.query('UPDATE public.users SET mkt_workspace_ids=$1 WHERE id=$2', [ids, u.id]); }
+      catch (e) { if (e && e.code === '42703') return { code: 503, error: 'Draai eerst migratie 028 in Neon' }; throw e; }
+      return { ok: true, ids };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true, all: out.ids == null, selected: out.ids || [] });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Klanten van een workspace incl. koppelingen/ID's en tellingen (voor beheer op afstand).
-router.get('/api/mkt/admin/workspaces/:id/clients', requireDhcAdmin, async (req, res) => {
+router.get('/api/mkt/admin/workspaces/:id/clients', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const wsId = req.params.id;
     const rows = await withReadConnection(async (c) => (await c.query(
@@ -426,7 +516,7 @@ router.get('/api/mkt/admin/workspaces/:id/clients', requireDhcAdmin, async (req,
 });
 
 // Account toevoegen aan een workspace.
-router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, async (req, res) => {
+router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const { email, full_name, role, password, client_id } = req.body || {};
     const VALID_ROLE = ['owner', 'manager', 'member', 'client'];
@@ -459,7 +549,7 @@ router.post('/api/mkt/admin/workspaces/:id/accounts', requireDhcAdmin, async (re
 });
 
 // Wachtwoord van een account resetten (support).
-router.post('/api/mkt/admin/accounts/:id/reset-password', requireDhcAdmin, async (req, res) => {
+router.post('/api/mkt/admin/accounts/:id/reset-password', requireDhcAdmin, adminAccGuard, async (req, res) => {
   try {
     const { password } = req.body || {};
     if (!validPassword(password)) return res.status(400).json({ error: 'Wachtwoord: min. 8 tekens, hoofd- en kleine letter en een cijfer' });
@@ -473,7 +563,7 @@ router.post('/api/mkt/admin/accounts/:id/reset-password', requireDhcAdmin, async
 });
 
 // Account bijwerken: rol, actief, banned. Beschermt de laatste eigenaar.
-router.patch('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) => {
+router.patch('/api/mkt/admin/accounts/:id', requireDhcAdmin, adminAccGuard, async (req, res) => {
   try {
     const { role, active, banned } = req.body || {};
     const VALID_ROLE = ['owner', 'manager', 'member', 'client'];
@@ -502,7 +592,7 @@ router.patch('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) =>
 });
 
 // Account verwijderen (beschermt de laatste eigenaar).
-router.delete('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) => {
+router.delete('/api/mkt/admin/accounts/:id', requireDhcAdmin, adminAccGuard, async (req, res) => {
   try {
     const result = await withWriteConnection(async (c) => {
       const acc = (await c.query('SELECT id, workspace_id, role FROM marketing.accounts WHERE id=$1', [req.params.id])).rows[0];
@@ -521,7 +611,7 @@ router.delete('/api/mkt/admin/accounts/:id', requireDhcAdmin, async (req, res) =
 });
 
 // Workspace resetten: verwijdert alle klanten (troubleshoot). Accounts blijven.
-router.post('/api/mkt/admin/workspaces/:id/reset', requireDhcAdmin, async (req, res) => {
+router.post('/api/mkt/admin/workspaces/:id/reset', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const n = await withWriteConnection(async (c) => {
       const ws = (await c.query('SELECT id FROM marketing.workspaces WHERE id=$1', [req.params.id])).rows[0];
@@ -535,7 +625,7 @@ router.post('/api/mkt/admin/workspaces/:id/reset', requireDhcAdmin, async (req, 
 });
 
 // Workspace volledig verwijderen (cascade: accounts, klanten, licentie-events).
-router.delete('/api/mkt/admin/workspaces/:id', requireDhcAdmin, async (req, res) => {
+router.delete('/api/mkt/admin/workspaces/:id', requireDhcAdmin, adminWsGuard, async (req, res) => {
   try {
     const done = await withWriteConnection(async (c) => (await c.query(
       'DELETE FROM marketing.workspaces WHERE id=$1 RETURNING id', [req.params.id]

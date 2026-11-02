@@ -1270,6 +1270,7 @@ async function openWorkspace(id){
     document.getElementById('wsmClients').value=d.workspace.max_clients;
     document.getElementById('wsmStorage').value=(d.workspace.storage_quota_mb!=null?Math.round(d.workspace.storage_quota_mb/1024):10);
     document.getElementById('wsmClientCount').textContent='· '+d.client_count+' klant'+(d.client_count===1?'':'en');
+    CAN_MANAGE_VIS=!!d.can_manage_visibility;
     renderAccounts(d.accounts);
     loadWsClients(id);
     waRoleChange();
@@ -1306,6 +1307,7 @@ async function loadWsClients(id){
     }).join('');
   }catch(e){ panel.textContent='Netwerkfout.'; }
 }
+var CAN_MANAGE_VIS=false;
 function renderAccounts(accs){
   var roles=['owner','manager','member','client'];
   document.getElementById('wsmAccounts').innerHTML='<table class="acc-tbl"><tbody>'+accs.map(function(a){
@@ -1328,11 +1330,12 @@ function renderAccounts(accs){
     return '<tr><td><div style="font-weight:600">'+esc(a.email)+onl+'</div>'+koppel+'<div style="color:var(--text-3);font-size:11px">'+track+'</div>'+(paTrack?'<div style="color:var(--text-3);font-size:11px">'+paTrack+'</div>':'')+'</td>'+
       '<td>'+roleSel+'</td><td>'+status+'</td>'+
       '<td style="text-align:right;white-space:nowrap">'+
+        ((pa&&CAN_MANAGE_VIS&&!pa.superadmin&&pa.user_id)?'<button class="mini" onclick="openVis('+pa.user_id+')">Werkplekken</button>':'')+
         '<button class="mini" onclick="resetPw('+a.id+')">Reset ww</button>'+
         '<button class="mini" onclick="toggleAcc('+a.id+','+(a.active?'false':'true')+')">'+(a.active?'Deactiveer':'Activeer')+'</button>'+
         '<button class="mini" style="color:#991b1b;border-color:#fecaca" onclick="delAcc('+a.id+",'"+esc(a.email).replace(/'/g,"")+"')\">Verwijder</button>"+
       '</td></tr>';
-  }).join('')+'</tbody></table>';
+  }).join('')+'</tbody></table><div id="wsmVis"></div>';
 }
 async function saveWsLicense(){
   if(!CURRENT_WS)return;
@@ -1353,6 +1356,42 @@ async function addAccount(){
     var d=await r.json();
     if(r.ok&&d.success){ wsmMsg(true,'Account aangemaakt ('+d.account.email+'). Wachtwoord: '+d.temp_password); document.getElementById('waEmail').value=''; document.getElementById('waName').value=''; openWorkspace(CURRENT_WS.id); }
     else wsmMsg(false,d.error||'Mislukt.');
+  }catch(e){ wsmMsg(false,'Netwerkfout.'); }
+}
+// Zichtbare werkplekken van een platform-admin (alleen de superadmin ziet deze knop).
+async function openVis(userId){
+  var box=document.getElementById('wsmVis'); if(!box)return;
+  box.innerHTML='<div style="margin-top:12px;font-size:12px;color:var(--text-3)">Laden...</div>';
+  try{
+    var r=await fetch('/api/mkt/admin/platform-admins/'+userId+'/workspaces',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){ box.innerHTML='<div style="margin-top:12px;font-size:12px;color:#991b1b">'+esc(d.error||'Kon niet laden.')+'</div>'; return; }
+    if(!d.migration){ box.innerHTML='<div style="margin-top:12px;font-size:12px;color:#991b1b">Draai eerst migratie 028 in Neon. Tot die tijd ziet deze admin alle workspaces.</div>'; return; }
+    var sel={}; d.selected.forEach(function(id){sel[id]=1;});
+    var list=d.workspaces.map(function(w){
+      return '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;cursor:pointer"><input type="checkbox" class="visWs" value="'+w.id+'" '+((d.all||sel[w.id])?'checked':'')+(d.all?' disabled':'')+' style="width:auto"> '+esc(w.name)+'</label>';
+    }).join('');
+    box.innerHTML='<div style="margin-top:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px">'+
+      '<div style="font-weight:600;font-size:13px;margin-bottom:2px">Zichtbare workspaces voor '+esc(d.user.email)+'</div>'+
+      '<div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px">Geldt in de workspace-kiezer en hier in het beheer. Het churn-dashboard blijft ongewijzigd.</div>'+
+      '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0 6px;cursor:pointer;font-weight:600"><input type="checkbox" id="visAll" '+(d.all?'checked':'')+' onchange="visAllChange()" style="width:auto"> Alle workspaces (ook nieuwe)</label>'+
+      list+
+      '<div style="margin-top:10px"><button class="mini" style="background:#111827;color:#fff;border-color:#111827" onclick="saveVis('+d.user.id+')">Opslaan</button><button class="mini" onclick="closeVis()">Sluiten</button></div></div>';
+  }catch(e){ box.innerHTML='<div style="margin-top:12px;font-size:12px;color:#991b1b">Netwerkfout.</div>'; }
+}
+function closeVis(){ var b=document.getElementById('wsmVis'); if(b)b.innerHTML=''; }
+function visAllChange(){
+  var all=document.getElementById('visAll').checked;
+  Array.prototype.forEach.call(document.querySelectorAll('.visWs'),function(cb){ cb.disabled=all; if(all)cb.checked=true; });
+}
+async function saveVis(userId){
+  var all=document.getElementById('visAll').checked;
+  var ids=Array.prototype.filter.call(document.querySelectorAll('.visWs'),function(cb){return cb.checked;}).map(function(cb){return Number(cb.value);});
+  if(!all&&!ids.length&&!confirm('Geen enkele workspace aangevinkt. Deze admin ziet dan geen enkele workspace. Doorgaan?'))return;
+  try{
+    var r=await fetch('/api/mkt/admin/platform-admins/'+userId+'/workspaces',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(all?{all:true}:{workspace_ids:ids})});
+    var d=await r.json();
+    if(r.ok&&d.success){ wsmMsg(true,all?'Opgeslagen: alle workspaces zichtbaar.':('Opgeslagen: '+d.selected.length+' workspace(s) zichtbaar.')); closeVis(); }
+    else wsmMsg(false,d.error||'Opslaan mislukt.');
   }catch(e){ wsmMsg(false,'Netwerkfout.'); }
 }
 async function resetPw(id){
