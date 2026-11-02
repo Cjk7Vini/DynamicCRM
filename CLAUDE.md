@@ -29,7 +29,9 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 
 ### Klantsituaties
 - **Fleur's Marketingagency** (klant "Fleurs Marketing Agency"): gekoppeld via Facebook (Business Suite), met het werkplek-Instagram 17841466806875640. Dit is de referentie voor 1 op 1 met de Instagram-app.
-- **Serac** (klant 13, werkplek Dynamic Health Consultancy): gekoppeld via Facebook voor advertenties (act_716966690997314) en de pagina (201507526585686). Het Instagram-account (17841403209406746, @serac.fitness) kon niet via het bedrijfsportfolio of een partnertoewijzing met Dynamic worden gedeeld. Daarom is Serac als Instagram-tester gekoppeld via de Instagram-login. De rapportage gebruikt daardoor de uitzondering hierboven. Dit hoort niet de normale route te zijn: na de app review moet Serac het Instagram-account alsnog via het bedrijfsportfolio delen.
+- **Serac** (klant 13, werkplek Dynamic Health Consultancy): Serac heeft een koppeling via het bedrijfsportfolio met Dynamic, maar **alleen voor Facebook** (de pagina 201507526585686). De advertenties van Serac lopen via het **advertentieaccount van Dynamic** (act_716966690997314), niet via een eigen advertentieaccount. Het Instagram-account (17841403209406746, @serac.fitness) kon niet in de rechten van het portfolio of een partnertoewijzing worden meegenomen. Daarom is Serac via een losse Instagram-login (als Instagram-tester) gekoppeld. De rapportage gebruikt daardoor de uitzondering hierboven. Dit hoort niet de normale route te zijn: na de app review moet Serac het Instagram-account alsnog via het bedrijfsportfolio delen.
+- Omdat Serac op het advertentieaccount van Dynamic draait, kunnen in het campagnedeel van Serac ook andere campagnes op dat account verschijnen, tenzij alleen gekoppelde campagnes worden getoond.
+- Het Facebook-token van Serac stond op een kortlevend token zonder vervaldatum en is op 20-10-2026 verlopen. Opnieuw koppelen en direct verlengen is nodig.
 - Het Facebook-token van een klant nooit leegmaken als er een advertentieaccount of pagina aan hangt.
 
 ### App review en live gaan
@@ -46,6 +48,12 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - `website_clicks` is vervallen. Klikken op de bio-link = de som per feedpost van `profile_activity` BIO_LINK_CLICKED.
 - Correctieregels alleen als ze bewezen zijn door meting, nooit als schatting.
 - Meten via de debug-pagina's (eigenaar of manager): `/api/mkt/debug-insights?client=<id>` en `/api/mkt/debug-profile-views?client=<id>`.
+
+## Werkplekken zijn gescheiden
+- Elke werkplek is op zichzelf en hoort bij één gebruiker of bureau. Werkplekken worden nooit aan elkaar gekoppeld, en data mag nooit van de ene naar de andere werkplek lopen.
+- In de code hangt alles aan `workspace_id`, en elke aanvraag controleert dat de klant bij de werkplek van de sessie hoort (`clientInWorkspace`). Meta-gegevens komen alleen uit de eigen klant- of werkplekkoppeling.
+- Let op met de hand ingevulde ID's: een advertentieaccount- of Instagram-ID van een andere organisatie in een klant zetten werkt als een achterdeur, als het token bij Meta toegang heeft. Dat is niet toegestaan.
+- Fleur (platform-admin, gebruiker 31) mag alleen bij de werkplekken van Dynamic en van haar eigen bureau. Dat wordt ingesteld via `mkt_workspace_ids`.
 
 ## Platform-admins
 - Een dashboard-admin die in de workspace inlogt met het admin-wachtwoord is platform-admin. De login wordt vastgelegd op `public.users` en niet op het marketing-account.
