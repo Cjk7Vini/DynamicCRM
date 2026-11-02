@@ -167,6 +167,29 @@ const isSuperadmin = (req) =>
   !!req.session && req.session.role === 'admin' &&
   String(req.session.email || '').toLowerCase() === SUPERADMIN_EMAIL;
 
+// ==================== TOEGANG TOT CREATE-USER ====================
+// Alleen de superadmin, plus admins die de superadmin daar expliciet toegang toe geeft
+// (public.users.create_user_access, migratie 029). Zonder migratie: alleen de superadmin.
+// Terugval (oude situatie, elke admin): env CREATE_USER_ALL_ADMINS=1.
+async function hasCreateUserAccess(req) {
+  if (!req.session || req.session.role !== 'admin') return false;
+  if (isSuperadmin(req)) return true;
+  if (process.env.CREATE_USER_ALL_ADMINS === '1') return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT create_user_access FROM public.users WHERE id=$1 AND role='admin' AND active=TRUE AND (banned IS NULL OR banned=FALSE)",
+      [req.session.userId]
+    )).rows[0]);
+    return !!(r && r.create_user_access === true);
+  } catch (e) {
+    return false; // kolom ontbreekt (migratie 029) of infrafout: alleen de superadmin
+  }
+}
+async function requireCreateUserAccess(req, res, next) {
+  if (await hasCreateUserAccess(req)) return next();
+  return res.status(403).json({ error: 'Geen toegang tot create-user' });
+}
+
 // Centrale error-logger: schrijft naar error_log, groepeert op fingerprint.
 // Faalt altijd stil (mag zelf nooit een request laten crashen).
 async function logError(errOrMsg, ctx = {}) {
@@ -4026,7 +4049,7 @@ ${nazorgEnabled ? `<p style="margin:0;font-size:15px;color:#3A3D40;"><strong>Naz
 }
 
 // POST /api/admin/create-user-licensed
-app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
+app.post('/api/admin/create-user-licensed', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { email, password, role, practiceCode, licenseType, praktijkNaam, nazorgEnabled, nazorgLicenseType, calculatorEnabled, organisationCodes, orgLicenseType, roleLabel } = req.body;
@@ -4146,7 +4169,7 @@ app.post('/api/admin/create-user-licensed', requireAuth, async (req, res) => {
 });
 
 // Keep old endpoint for backward compat
-app.post('/api/admin/create-user', requireAuth, async (req, res) => {
+app.post('/api/admin/create-user', requireAuth, requireCreateUserAccess, async (req, res) => {
   if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
   req.body.licenseType = req.body.licenseType || '12m';
   req.body.nazorgEnabled = false;
@@ -4164,7 +4187,7 @@ app.post('/api/admin/create-user', requireAuth, async (req, res) => {
 });
 
 // GET /api/admin/users
-app.get('/api/admin/users', requireAuth, async (req, res) => {
+app.get('/api/admin/users', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { search } = req.query;
@@ -4193,6 +4216,14 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
       } catch (e) {
         rows.forEach(u => { u.logins_deze_maand = 0; });
       }
+      // Toegang tot create-user (migratie 029). Zonder kolom: niemand behalve de superadmin.
+      try {
+        const acc = (await client.query("SELECT id FROM public.users WHERE role='admin' AND create_user_access=TRUE")).rows;
+        const set = new Set(acc.map(a => String(a.id)));
+        rows.forEach(u => { u.create_user_access = set.has(String(u.id)); });
+      } catch (e) {
+        rows.forEach(u => { u.create_user_access = false; });
+      }
       return rows;
     });
     res.json({ success: true, users });
@@ -4200,7 +4231,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
 });
 
 // GET /api/admin/login-report — inloggedrag per gebruiker, per maand (admin-only)
-app.get('/api/admin/login-report', requireAuth, async (req, res) => {
+app.get('/api/admin/login-report', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     // Kolommen: de laatste 12 maanden, nieuwste eerst (YYYY-MM).
@@ -4241,7 +4272,7 @@ app.get('/api/admin/login-report', requireAuth, async (req, res) => {
 });
 
 // PATCH /api/admin/users/:id
-app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
+app.patch('/api/admin/users/:id', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { id } = req.params;
@@ -4289,7 +4320,7 @@ app.patch('/api/admin/users/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/admin/users/:id
-app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
+app.delete('/api/admin/users/:id', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     await withWriteConnection(async (client) => { await client.query("DELETE FROM public.users WHERE id=$1 AND role!='admin'", [req.params.id]); });
@@ -4297,8 +4328,27 @@ app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
   } catch (error) { console.error('Delete user error:', error); res.status(500).json({ error: 'Fout bij verwijderen gebruiker' }); }
 });
 
+// PATCH /api/admin/users/:id/create-user-access: alleen de superadmin
+app.patch('/api/admin/users/:id/create-user-access', requireAuth, async (req, res) => {
+  try {
+    if (!isSuperadmin(req)) return res.status(403).json({ error: 'Alleen de superadmin' });
+    const enabled = req.body && req.body.enabled === true;
+    const out = await withWriteConnection(async (c) => {
+      const u = (await c.query('SELECT id, email, role FROM public.users WHERE id=$1', [req.params.id])).rows[0];
+      if (!u) return { code: 404, error: 'Gebruiker niet gevonden' };
+      if (u.role !== 'admin') return { code: 400, error: 'Alleen admins kunnen toegang tot create-user krijgen' };
+      if (String(u.email || '').toLowerCase() === SUPERADMIN_EMAIL) return { code: 400, error: 'De superadmin heeft altijd toegang' };
+      try { await c.query('UPDATE public.users SET create_user_access=$1 WHERE id=$2', [enabled, u.id]); }
+      catch (e) { if (e && e.code === '42703') return { code: 503, error: 'Draai eerst migratie 029 in Neon' }; throw e; }
+      return { ok: true };
+    });
+    if (out.error) return res.status(out.code).json({ error: out.error });
+    res.json({ success: true, enabled });
+  } catch (error) { console.error('create-user-access error:', error); res.status(500).json({ error: 'Opslaan mislukt' }); }
+});
+
 // PATCH /api/admin/users/:id/calculator — toggle calculator licentie
-app.patch('/api/admin/users/:id/calculator', requireAuth, async (req, res) => {
+app.patch('/api/admin/users/:id/calculator', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { calculator } = req.body;
@@ -4477,7 +4527,9 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
         role_label: user.role_label || null,
         practice_code: user.practice_code,
         organisation_codes: user.organisation_codes || null,
-        licenties: user.licenties || []
+        licenties: user.licenties || [],
+        is_superadmin: isSuperadmin(req),
+        create_user_access: await hasCreateUserAccess(req)
       }
     });
   } catch (error) {
@@ -5127,7 +5179,7 @@ app.get('/nazorg-portaal.html', requireAuth, async (req, res, next) => {
 
 
 // PATCH /api/admin/users/:id/profile
-app.patch('/api/admin/users/:id/profile', requireAuth, async (req, res) => {
+app.patch('/api/admin/users/:id/profile', requireAuth, requireCreateUserAccess, async (req, res) => {
   try {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Admin toegang vereist' });
     const { id } = req.params;

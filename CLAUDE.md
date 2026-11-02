@@ -54,6 +54,11 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Let op met de hand ingevulde ID's: een advertentieaccount- of Instagram-ID van een andere organisatie in een klant zetten werkt als een achterdeur, als het token bij Meta toegang heeft. Dat is niet toegestaan.
 - Fleur (platform-admin, gebruiker 31) mag alleen bij de werkplekken van Dynamic en van haar eigen bureau. Dat wordt ingesteld via `mkt_workspace_ids`.
 
+## Toegang tot create-user
+- Alleen de superadmin (`admin@dynamic-health-consultancy.nl`) mag in create-user. Andere admins alleen als de superadmin dat aanvinkt in het gebruikersvenster ("Toegang tot create-user", `public.users.create_user_access`, migratie 029). Standaard uit.
+- Dit geldt voor de pagina en voor alle routes die create-user gebruikt: `/api/admin/users*`, `/api/admin/create-user*`, `/api/admin/login-report` en `/api/mkt/admin/*`. Het churn-dashboard en het portaal (`/api/admin/praktijk-overzicht`, `/api/admin/praktijken`) blijven voor alle admins.
+- Zonder migratie 029: alleen de superadmin. Terugval naar de oude situatie (elke admin): env `CREATE_USER_ALL_ADMINS=1`.
+
 ## Platform-admins
 - Een dashboard-admin die in de workspace inlogt met het admin-wachtwoord is platform-admin. De login wordt vastgelegd op `public.users` en niet op het marketing-account.
 - Welke workspaces een platform-admin ziet: `public.users.mkt_workspace_ids` (migratie 028). NULL = alle workspaces. Dit geldt in de workspace-kiezer en in create-user (tab Marketing), niet in het churn-dashboard.
