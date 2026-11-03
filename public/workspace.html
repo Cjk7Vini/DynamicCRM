@@ -293,7 +293,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .ag-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ov-prog{height:6px;background:var(--panel-3);border-radius:4px;overflow:hidden;margin:2px 0 10px}
 .ov-prog span{display:block;height:100%;background:var(--accent)}
-.ov-task{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.ov-task{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px;min-width:0}
 .ov-task:last-child{border-bottom:none}
 .ov-task .ag-chk{margin:0}
 .ov-task.done .ov-tt{text-decoration:line-through;color:var(--muted)}
@@ -1937,7 +1937,7 @@ async function loadOverzicht(){
       '</div>'+
       '<div class="ovside">'+
         '<div class="ovcard" id="ovPrioCard" style="display:flex;flex-direction:column;min-height:300px">'+
-          '<div class="ovch"><div class="t">Jouw prio’s voor vandaag'+(pinnedName?' <span style="font-weight:500;color:var(--muted);font-size:13px">&middot; '+esc(pinnedName)+'</span>':'')+'</div></div><div id="ovPrioList">'+prio+'</div>'+
+          '<div class="ovch"><div class="t">Jouw prio’s voor vandaag</div></div>'+(pinnedName?'<div style="font-size:12.5px;color:var(--muted);margin:-6px 0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(pinnedName)+'</div>':'')+'<div id="ovPrioList">'+prio+'</div>'+
           '<div style="margin-top:auto;text-align:right;padding-top:12px"><a class="ovlnk" onclick="navTo(\'agenda\')">Open agenda &rarr;</a></div></div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+bellIcon+' Aandachtspunten</div>'+(nClientsOpen?'<a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle ('+nClientsOpen+') &rarr;</a>':'')+'</div>'+aandacht+'</div>'+
@@ -2946,12 +2946,13 @@ async function ovLoadPrio(){
     var td=(d.items||[]).slice().sort(agPrioSort);
     od.concat(td).forEach(function(x){OV_TASKS[String(x.id)]=x;});
     var nDone=td.filter(function(x){return x.done;}).length, nAll=td.length;
+    var pinned=d.pinned_client_id!=null;
     function row(x,late){
       var id=String(x.id);
       return '<div class="ov-task'+(x.done?' done':'')+'"><input type="checkbox" class="ag-chk" '+(x.done?'checked':'')+' onchange="ovToggleTask(\''+id+'\',this.checked)">'+
         (x.planned_time?'<span style="font-size:12px;color:var(--muted);min-width:38px">'+esc(x.planned_time)+'</span>':'')+
-        '<span class="ov-tt" style="flex:1;cursor:pointer" onclick="navTo(\'agenda\')">'+(x.priority==='hoog'?'<span class="ag-flag">&#9873;</span> ':'')+esc(x.title)+'</span>'+
-        '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap"><span class="ov-dot" style="background:'+esc(agColor(x))+'"></span>'+esc(x.client_name||'Intern')+'</span>'+
+        '<div style="flex:1;min-width:0;cursor:pointer" onclick="navTo(\'agenda\')"><div class="ov-tt" style="overflow-wrap:break-word">'+(x.priority==='hoog'?'<span class="ag-flag">&#9873;</span> ':'')+esc(x.title)+'</div>'+
+        (pinned?'':'<div style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-top:2px;min-width:0" title="'+esc(x.client_name||'Intern')+'"><span class="ov-dot" style="background:'+esc(agColor(x))+'"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.client_name||'Intern')+'</span></div>')+'</div>'+
         (late?'<span class="ag-late" style="font-size:11px;white-space:nowrap">'+esc(agDayLbl(x.planned_date||x.due_date))+'</span>':'')+'</div>';
     }
     var h='';
