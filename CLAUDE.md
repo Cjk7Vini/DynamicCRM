@@ -54,6 +54,16 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Let op met de hand ingevulde ID's: een advertentieaccount- of Instagram-ID van een andere organisatie in een klant zetten werkt als een achterdeur, als het token bij Meta toegang heeft. Dat is niet toegestaan.
 - Fleur (platform-admin, gebruiker 31) mag alleen bij de werkplekken van Dynamic en van haar eigen bureau. Dat wordt ingesteld via `mkt_workspace_ids`.
 
+## Agenda (To do & planning)
+- Eén takenlijst (`marketing.client_items`, kind `todo`), drie weergaven: menu "Agenda" (alle klanten), de To do-tab per klant (vast op die klant) en "Jouw prio's voor vandaag" op het overzicht. Afvinken op de ene plek is overal afgevinkt.
+- Migratie 030: `planned_date` (gepland op) naast `due_date` (deadline), tijd, duur, prioriteit (laag/normaal/hoog), type (taak/afspraak), interne taken (`client_id` leeg).
+- Herhaling: een reeks is een rij met kind `todo_series`. De keren worden berekend, niet opgeslagen. Een aangepaste of afgevinkte keer wordt een eigen rij met `series_id` + `occ_date`; een overgeslagen keer kind `todo_skip`.
+- Alleen voor het team. Klant-logins krijgen 403 op `/api/mkt/agenda*` en houden in hun To do-tab de oude lijst.
+- Prio's op het overzicht: is er bij Gegevens een klant vastgezet (`overview_client_id`), dan alleen die klant, anders alle klanten. Een teamlid ziet de eigen taken en taken zonder eigenaar; de platform-admin alles.
+- Achterstallig: niet afgevinkte taken van eerdere dagen, plus gemiste herhalingen van de laatste 7 dagen.
+- Zonder migratie 030: het overzicht en de klanttab werken zoals voorheen; het menu Agenda meldt dat de migratie nodig is.
+- Later: een abonnementslink (iCal) zodat Google- en Apple-agenda de taken kunnen tonen (eenrichting).
+
 ## Toegang tot create-user
 - Alleen de superadmin (`admin@dynamic-health-consultancy.nl`) mag in create-user. Andere admins alleen als de superadmin dat aanvinkt in het gebruikersvenster ("Toegang tot create-user", `public.users.create_user_access`, migratie 029). Standaard uit.
 - Dit geldt voor de pagina en voor alle routes die create-user gebruikt: `/api/admin/users*`, `/api/admin/create-user*`, `/api/admin/login-report` en `/api/mkt/admin/*`. Het churn-dashboard en het portaal (`/api/admin/praktijk-overzicht`, `/api/admin/praktijken`) blijven voor alle admins.
