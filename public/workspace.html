@@ -464,6 +464,12 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
         </div>
+        <div class="card" id="agCatCard" style="max-width:880px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Agenda-categorieën</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Geef soorten werk een eigen kleur, bijvoorbeeld Meeting, Content maken of Admin. Bij een taak kies je dan een categorie, en in de agenda schakel je tussen "Kleur op klant" en "Kleur op categorie".</p>
+          <div id="agCatMsg" class="inline-msg"></div>
+          <div id="agCatList"><div style="color:var(--muted);font-size:13px">Laden...</div></div>
+        </div>
         <div class="card" id="kpiCard" style="max-width:880px;margin-bottom:16px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">KPI's organisch</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Normen voor de AI-analyse van de organische Instagram-resultaten. Ze gelden voor alle klanten in deze workspace. Tussen de twee grenzen is een waarde gemiddeld. Welke KPI's per klant het zwaarst wegen, volgt uit de doelen die bij de klant zijn ingevuld.</p>
@@ -1045,9 +1051,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <label><input type="radio" name="agPrio" value="laag"><span>Laag<small>Onderaan de lijst</small></span></label>
     </div>
     <div class="ag-row2">
+      <div class="field" id="agCatWrap"><label>Categorie</label><select id="agCat"></select></div>
       <div class="field"><label>Toewijzen aan</label><select id="agAssignee"></select></div>
-      <div class="field"><label>Link (optioneel)</label><input id="agUrl" placeholder="https://"></div>
     </div>
+    <div class="field"><label>Link (optioneel)</label><input id="agUrl" placeholder="https://"></div>
     <div class="ag-row2">
       <div class="field"><label>Herhalen</label><select id="agRecur" onchange="agRecurChange()"><option value="">Niet herhalen</option><option value="daily">Elke dag</option><option value="weekdays">Elke werkdag (ma t/m vr)</option><option value="weekly">Elke week</option><option value="biweekly">Om de week</option><option value="monthly">Elke maand</option></select></div>
       <div class="field" id="agUntilWrap" style="display:none"><label>Herhalen tot en met (optioneel)</label><input type="date" id="agUntil"></div>
@@ -1785,7 +1792,7 @@ function navTo(view){
   document.getElementById('topNewClient').style.display=(view==='clients'&&ME&&ME.role!=='client')?'':'none';
   if(view==='clients'){document.getElementById('viewClients').classList.add('active');loadClients();}
   else if(view==='clientDetail'){document.getElementById('viewClientDetail').classList.add('active');}
-  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();loadOrganicKpisForm();metaCheckLoginConfig();wsLoadMetaAssets();}
+  else if(view==='wssettings'){document.getElementById('viewWsSettings').classList.add('active');loadWsIntegrations();loadBrandingForm();loadOrganicKpisForm();loadAgCatsForm();metaCheckLoginConfig();wsLoadMetaAssets();}
   else if(view==='reporting'){document.getElementById('viewReporting').classList.add('active');loadReportingOverview();}
   else if(view==='koppelingen'){document.getElementById('viewKoppelingen').classList.add('active');loadKoppelingenOverview();}
   else if(view==='agenda'){document.getElementById('viewAgenda').classList.add('active');AG.data=null;openAgenda('agMainRoot',null);}
@@ -2539,6 +2546,7 @@ function dTabShow(which){
 // =================== AGENDA (To do & planning) ===================
 // Eén takenlijst, meerdere weergaven: de agenda over alle klanten (menu Agenda), de
 // To do-tab per klant (vast gefilterd op die klant) en de prio's op het overzicht.
+var AG_COLOR_MODE=(function(){try{return localStorage.getItem('agColorMode')==='categorie'?'categorie':'klant';}catch(e){return 'klant';}})();
 var AG={root:null,fixed:null,view:'week',anchor:null,client:'all',mine:false,showDone:false,weekend:false,data:null,clients:[],map:{},edit:null,drag:null};
 var AG_DAYS=['zo','ma','di','wo','do','vr','za'];
 var AG_DAYS_L=['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
@@ -2558,7 +2566,12 @@ function agRange(){
   if(AG.view==='list')return {from:t,to:agAdd(t,27)};
   var m=agMonday(AG.anchor);return {from:m,to:agAdd(m,6)};
 }
-function agColor(it){return it.client_color||(it.client_id?'#5bd3de':'#8ba8ae');}
+function agHasCats(){return !!(AG.data&&AG.data.categories&&AG.data.categories.length);}
+function agColor(it){
+  if(AG_COLOR_MODE==='categorie'&&agHasCats())return it.category_color||'#8ba8ae';
+  return it.client_color||(it.client_id?'#5bd3de':'#8ba8ae');
+}
+function agSetColorMode(m){AG_COLOR_MODE=m;try{localStorage.setItem('agColorMode',m);}catch(e){}agRender();}
 function agIni(n){n=String(n||'').trim();if(!n)return '';var p=n.split(/[\s@.]+/).filter(Boolean);return ((p[0]||'').charAt(0)+(p[1]||'').charAt(0)).toUpperCase();}
 function agSortKey(it){var pr=it.priority==='hoog'?0:it.priority==='laag'?2:1;return (it.planned_time||'99:99')+'|'+pr+'|'+String(it.title||'').toLowerCase();}
 function agPrioSort(a,b){var pa=a.priority==='hoog'?0:a.priority==='laag'?2:1,pb=b.priority==='hoog'?0:b.priority==='laag'?2:1;if(pa!==pb)return pa-pb;var ta=a.planned_time||'99:99',tb=b.planned_time||'99:99';return ta<tb?-1:ta>tb?1:0;}
@@ -2597,6 +2610,7 @@ function agCard(it,big){
   if(it.planned_time)meta.push(esc(it.planned_time)+(it.duration_min?' &middot; '+it.duration_min+' min':''));
   else if(it.duration_min)meta.push(it.duration_min+' min');
   if(showClient)meta.push(esc(it.client_name||'Intern'));
+  if(it.category_name)meta.push('<span style="display:inline-flex;align-items:center;gap:4px"><span class="ov-dot" style="width:7px;height:7px;background:'+esc(it.category_color||'#8ba8ae')+'"></span>'+esc(it.category_name)+'</span>');
   if(it.item_type==='afspraak')meta.push('Afspraak');
   if(it.due_date&&it.due_date!==it.planned_date){var late=!it.done&&it.due_date<agToday();meta.push('<span class="'+(late?'ag-late':'')+'">deadline '+esc(agDayLbl(it.due_date))+'</span>');}
   if(it.virtual||it.series_id)meta.push('&#8635;');
@@ -2625,7 +2639,11 @@ function agRender(){
   if(AG.view!=='list')h+='<div class="ag-nav"><button onclick="agStep(-1)" title="Vorige">&#8249;</button><button onclick="agGoToday()">Vandaag</button><button onclick="agStep(1)" title="Volgende">&#8250;</button></div>';
   if(!AG.fixed)h+='<select onchange="agSetClient(this.value)">'+opts+'</select>';
   if(d.me)h+='<label class="ag-tog"><input type="checkbox" '+(AG.mine?'checked':'')+' onchange="AG.mine=this.checked;agLoad()"> Alleen mijn taken</label>';
+  if(agHasCats())h+='<div class="ag-seg" title="Waar de kleur van een taak voor staat"><button class="'+(AG_COLOR_MODE!=='categorie'?'on':'')+'" onclick="agSetColorMode(\'klant\')">Kleur op klant</button><button class="'+(AG_COLOR_MODE==='categorie'?'on':'')+'" onclick="agSetColorMode(\'categorie\')">Kleur op categorie</button></div>';
   h+='</div>';
+  if(agHasCats()&&AG_COLOR_MODE==='categorie'){
+    h+='<div style="display:flex;flex-wrap:wrap;gap:12px;margin:-4px 0 12px;font-size:12px;color:var(--ink-2)">'+d.categories.map(function(c){return '<span style="display:inline-flex;align-items:center;gap:6px"><span class="ov-dot" style="background:'+esc(c.color)+'"></span>'+esc(c.name)+'</span>';}).join('')+'<span style="display:inline-flex;align-items:center;gap:6px;color:var(--muted)"><span class="ov-dot" style="background:#8ba8ae"></span>Geen categorie</span></div>';
+  }
   // Openstaande taken van eerdere dagen.
   var od=(d.overdue||[]).filter(function(it){return !it.done;});
   if(od.length){
@@ -2731,6 +2749,9 @@ function agFillSelects(clientVal,assigneeVal){
   cs.value=clientVal!=null&&clientVal!==''?String(clientVal):'intern';
   cs.disabled=!!AG.fixed;
   document.getElementById('agAssignee').innerHTML=memberOptions(assigneeVal==null?'':assigneeVal);
+  var cats=(AG.data&&AG.data.categories)||null, cw=document.getElementById('agCatWrap');
+  if(cw)cw.style.display=cats?'':'none';
+  document.getElementById('agCat').innerHTML='<option value="">Geen categorie</option>'+(cats||[]).map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
 }
 function agSetPrio(v){Array.prototype.forEach.call(document.querySelectorAll('input[name="agPrio"]'),function(r){r.checked=(r.value===(v||'normaal'));});}
 function agGetPrio(){var v='normaal';Array.prototype.forEach.call(document.querySelectorAll('input[name="agPrio"]'),function(r){if(r.checked)v=r.value;});return v;}
@@ -2745,6 +2766,7 @@ function agOpenNew(day,title){
   document.getElementById('agType').value='taak'; document.getElementById('agUrl').value='';
   document.getElementById('agRecur').value=''; document.getElementById('agRecur').disabled=false; document.getElementById('agUntil').value=''; agRecurChange();
   agSetPrio('normaal');
+  document.getElementById('agCat').value='';
   document.getElementById('agScopeWrap').style.display='none';
   document.getElementById('agDelBtn').style.display='none';
   document.getElementById('agModal').classList.add('open');
@@ -2768,6 +2790,7 @@ async function agEdit(id){
   document.getElementById('agDue').value=it.due_date||'';
   document.getElementById('agType').value=it.item_type||'taak';
   document.getElementById('agUrl').value=it.url||'';
+  document.getElementById('agCat').value=it.category_id?String(it.category_id):'';
   agSetPrio(it.priority);
   var rs=document.getElementById('agRecur'); rs.value=''; rs.disabled=false; document.getElementById('agUntil').value='';
   document.getElementById('agScopeWrap').style.display=rec?'':'none';
@@ -2792,7 +2815,8 @@ function agFormData(){
     priority:agGetPrio(),
     assignee_account_id:document.getElementById('agAssignee').value||'',
     recur:document.getElementById('agRecur').value||'',
-    recur_until:document.getElementById('agUntil').value||''
+    recur_until:document.getElementById('agUntil').value||'',
+    category_id:document.getElementById('agCat').value||''
   };
 }
 async function agReq(method,url,body){
@@ -2811,12 +2835,12 @@ async function agSave(){
     if(!it){await agReq('POST','/api/mkt/agenda/items',f);}
     else if(it.virtual||it.series_id){
       if(agScope()==='all'){
-        var s={title:f.title,client_id:f.client_id,planned_time:f.planned_time,duration_min:f.duration_min,item_type:f.item_type,url:f.url,priority:f.priority,assignee_account_id:f.assignee_account_id};
+        var s={title:f.title,client_id:f.client_id,planned_time:f.planned_time,duration_min:f.duration_min,item_type:f.item_type,url:f.url,priority:f.priority,assignee_account_id:f.assignee_account_id,category_id:f.category_id};
         if(f.recur){s.recur=f.recur;s.recur_until=f.recur_until;}
         else{s.recur_until=agAdd(it.occ_date||it.planned_date,-1);} // "Niet herhalen" = reeks stopt vanaf deze keer
         await agReq('PATCH','/api/mkt/agenda/items/'+it.series_id,s);
       } else {
-        var one={title:f.title,client_id:f.client_id,planned_date:f.planned_date||it.planned_date,planned_time:f.planned_time,duration_min:f.duration_min,due_date:f.due_date,item_type:f.item_type,url:f.url,priority:f.priority,assignee_account_id:f.assignee_account_id};
+        var one={title:f.title,client_id:f.client_id,planned_date:f.planned_date||it.planned_date,planned_time:f.planned_time,duration_min:f.duration_min,due_date:f.due_date,item_type:f.item_type,url:f.url,priority:f.priority,assignee_account_id:f.assignee_account_id,category_id:f.category_id};
         if(it.virtual)await agReq('POST','/api/mkt/agenda/series/'+it.series_id+'/occurrence',{occ_date:it.occ_date,action:'update',changes:one});
         else await agReq('PATCH','/api/mkt/agenda/items/'+it.id,one);
       }
@@ -2843,6 +2867,48 @@ async function agDelete(){
     else await agReq('DELETE','/api/mkt/agenda/items/'+it.id);
     agCloseModal(); agLoad();
   }catch(e){showMsg('agMsg',false,e.message||'Verwijderen mislukt.');}
+}
+// ---- Instellingen: agenda-categorieën ----
+var AG_CAT_PRESETS=['#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#8b5cf6','#ec4899','#64748b'];
+async function loadAgCatsForm(){
+  var box=document.getElementById('agCatList'); if(!box)return; hideMsg('agCatMsg');
+  try{
+    var r=await fetch('/api/mkt/agenda/categories',{credentials:'include'}); var d=await r.json();
+    if(!r.ok||!d.success){box.innerHTML='';showMsg('agCatMsg',false,(d&&d.error)||'Kon de categorieën niet laden.');return;}
+    if(!d.available){box.innerHTML='<div style="color:var(--muted);font-size:13px">Draai migratie 031 in Neon om categorieën te gebruiken.</div>';return;}
+    var rows=(d.categories||[]).map(function(c){
+      return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="color" id="agcc_'+c.id+'" value="'+esc(c.color)+'" style="width:44px;height:36px;padding:2px;flex:none">'+
+        '<input id="agcn_'+c.id+'" value="'+esc(c.name)+'" maxlength="40" style="flex:1;padding:8px 10px">'+
+        '<button class="btn btn-ghost" style="padding:7px 12px" onclick="agCatSave('+c.id+')">Opslaan</button>'+
+        '<button class="btn btn-ghost" style="padding:7px 12px;color:#f87171" onclick="agCatDel('+c.id+')">Verwijderen</button></div>';
+    }).join('');
+    var next=AG_CAT_PRESETS[(d.categories||[]).length%AG_CAT_PRESETS.length];
+    box.innerHTML=(rows||'<div style="color:var(--muted);font-size:13px;margin-bottom:10px">Nog geen categorieën.</div>')+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><input type="color" id="agccNew" value="'+next+'" style="width:44px;height:36px;padding:2px;flex:none">'+
+      '<input id="agcnNew" placeholder="Nieuwe categorie, bijv. Meeting" maxlength="40" style="flex:1;padding:8px 10px" onkeydown="if(event.key===\'Enter\')agCatAdd()">'+
+      '<button class="btn btn-primary" style="padding:8px 14px" onclick="agCatAdd()">Toevoegen</button></div>';
+  }catch(e){box.innerHTML='';showMsg('agCatMsg',false,'Netwerkfout.');}
+}
+async function agCatReq(method,url,body){
+  var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:body?JSON.stringify(body):undefined});
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok||!d.success)throw new Error(d.error||'Opslaan mislukt.');
+  return d;
+}
+async function agCatAdd(){
+  var name=(document.getElementById('agcnNew').value||'').trim(), color=document.getElementById('agccNew').value;
+  if(!name){showMsg('agCatMsg',false,'Geef de categorie een naam.');return;}
+  try{await agCatReq('POST','/api/mkt/agenda/categories',{name:name,color:color});showMsg('agCatMsg',true,'Categorie toegevoegd.');loadAgCatsForm();}
+  catch(e){showMsg('agCatMsg',false,e.message);}
+}
+async function agCatSave(id){
+  try{await agCatReq('PATCH','/api/mkt/agenda/categories/'+id,{name:document.getElementById('agcn_'+id).value,color:document.getElementById('agcc_'+id).value});showMsg('agCatMsg',true,'Opgeslagen.');}
+  catch(e){showMsg('agCatMsg',false,e.message);}
+}
+async function agCatDel(id){
+  if(!confirm('Deze categorie verwijderen? Taken met deze categorie blijven gewoon staan, zonder categorie.'))return;
+  try{await agCatReq('DELETE','/api/mkt/agenda/categories/'+id);showMsg('agCatMsg',true,'Verwijderd.');loadAgCatsForm();}
+  catch(e){showMsg('agCatMsg',false,e.message);}
 }
 // ---- Overzicht: prio's voor vandaag (zelfde taken als de agenda) ----
 var OV_TASKS={};
