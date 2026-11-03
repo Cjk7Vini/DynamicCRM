@@ -759,7 +759,8 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
              FROM marketing.workspaces WHERE id=$1`, [m.workspaceId]
         )).rows[0]) || null;
       }
-      return res.json({ success: true, platformAdmin: true, email: m.email, workspace });
+      // superadmin: alleen dit account ziet technische details zoals de "Bron" van de cijfers.
+      return res.json({ success: true, platformAdmin: true, email: m.email, workspace, superadmin: String(m.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL });
     }
     const data = await withReadConnection(async (c) => (await c.query(
       `SELECT a.id, a.email, a.full_name, a.role, a.client_id,
