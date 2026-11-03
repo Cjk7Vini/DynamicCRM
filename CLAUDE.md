@@ -65,6 +65,11 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Categorieën met een eigen kleur (migratie 031, `marketing.agenda_categories`, `client_items.category_id`): per werkplek bij Instellingen, beheer door eigenaar of manager. In de agenda de schakelaar "Kleur op klant" of "Kleur op categorie" (per browser onthouden). Een categorie verwijderen laat de taken staan. Zonder migratie 031 werkt de agenda zonder categorieën.
 - Later: een abonnementslink (iCal) zodat Google- en Apple-agenda de taken kunnen tonen (eenrichting).
 
+## Beveiligingsheaders
+- `helmet` in `src/server.js` zet HSTS, X-Frame-Options, nosniff en Referrer-Policy. De volledige CSP van helmet staat bewust uit, omdat de pagina's veel inline scripts gebruiken.
+- Daarnaast: Permissions-Policy (camera, microfoon, locatie, betalingen en USB uit) en een basis-CSP (`base-uri 'self'; object-src 'none'; frame-ancestors 'self'; upgrade-insecure-requests`). Terugdraaien: env `SECURITY_HEADERS_EXTRA=0`.
+- Volgende stap (apart en per pagina getest): een strengere CSP met `script-src`, eerst als Report-Only.
+
 ## Toegang tot create-user
 - Alleen de superadmin (`admin@dynamic-health-consultancy.nl`) mag in create-user. Andere admins alleen als de superadmin dat aanvinkt in het gebruikersvenster ("Toegang tot create-user", `public.users.create_user_access`, migratie 029). Standaard uit.
 - Dit geldt voor de pagina en voor alle routes die create-user gebruikt: `/api/admin/users*`, `/api/admin/create-user*`, `/api/admin/login-report` en `/api/mkt/admin/*`. Het churn-dashboard en het portaal (`/api/admin/praktijk-overzicht`, `/api/admin/praktijken`) blijven voor alle admins.
