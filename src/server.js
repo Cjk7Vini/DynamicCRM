@@ -118,6 +118,21 @@ app.use(
   })
 );
 
+// Extra beveiligingsheaders (securityheaders.com).
+// - Permissions-Policy: browserfuncties die de site niet gebruikt staan uit.
+// - Basis-CSP: beperkt insluiten (frame-ancestors), <base>-manipulatie en plug-ins, en
+//   dwingt HTTPS af voor alles wat geladen wordt. Scripts en stijlen worden (nog) niet
+//   beperkt: de pagina's gebruiken veel inline scripts. Een strengere CSP is een aparte stap.
+// Terugdraaien zonder deploy van code: env SECURITY_HEADERS_EXTRA=0.
+const SECURITY_HEADERS_EXTRA = process.env.SECURITY_HEADERS_EXTRA !== '0';
+app.use((req, res, next) => {
+  if (SECURITY_HEADERS_EXTRA) {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+    res.setHeader('Content-Security-Policy', "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; upgrade-insecure-requests");
+  }
+  next();
+});
+
 app.use(cors({
   origin: ['https://dynamic-health-consultancy.nl', 'https://dynamiccrm.onrender.com', 'https://cap-it.eu', 'https://www.cap-it.eu'],
   credentials: true,
