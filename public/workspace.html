@@ -773,6 +773,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               <select id="dfStatus"><option value="active">Actief</option><option value="paused">Gepauzeerd</option><option value="archived">Gearchiveerd</option></select>
             </div>
             <div class="field"><label>Notities</label><textarea id="dfNotes" rows="3"></textarea></div>
+            <div class="field"><label>Logo</label>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div id="dfLogoPreview" style="width:60px;height:60px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);overflow:hidden;flex:none">Geen</div>
+                <input type="file" id="dfLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="dfUploadLogo(this)">
+                <button class="btn btn-ghost" type="button" id="dfLogoBtn" onclick="document.getElementById('dfLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Logo uploaden</button>
+                <button class="btn btn-ghost" type="button" id="dfLogoDel" onclick="dfRemoveLogo()" style="padding:7px 12px;font-size:12.5px;color:#f87171;display:none">Verwijderen</button>
+              </div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:4px">PNG, JPG of WebP, max 5 MB. Wordt direct opgeslagen en getoond in de klantenlijst.</div>
+            </div>
             <div class="field"><label>Branche</label><input id="dfBranche" maxlength="120" placeholder="Bijv. fysiotherapie, fitness, beauty"></div>
             <div class="field"><label>Gewenste doelgroep</label><textarea id="dfAudience" rows="2" maxlength="500" placeholder="Wie wil de klant bereiken? Bijv. vrouwen van 30 tot 50 jaar in de regio Utrecht"></textarea></div>
             <div class="field"><label>Belangrijkste doel(en)</label><div id="dfGoals"></div><div style="font-size:11.5px;color:var(--muted);margin-top:2px">De AI-analyses gebruiken deze doelgroep en doelen om de cijfers te beoordelen.</div></div>
@@ -1754,7 +1763,9 @@ async function loadWorkspacesPicker(){
     if(!d.workspaces.length){ el.innerHTML='<div style="color:var(--muted);font-size:14px">Nog geen workspaces. Maak er een aan via create-user.</div>'; return; }
     el.innerHTML=d.workspaces.map(function(w){
       return '<div class="cl-card" style="cursor:pointer;padding:16px" onclick="enterWorkspace('+w.id+')"><div class="cl-top">'+
-        '<div class="cl-ava" style="width:40px;height:40px;font-size:15px;background:linear-gradient(135deg,var(--accent),var(--accent-2))">'+esc(initials(w.name))+'</div>'+
+        (w.logo_url
+          ? '<div class="cl-ava"'+avaAttrs(w.name,w.logo_url,'linear-gradient(135deg,var(--accent),var(--accent-2))').replace(' style="',' style="width:40px;height:40px;font-size:15px;')+'>'+avaInner(w.name,w.logo_url)+'</div>'
+          : '<div class="cl-ava" style="width:40px;height:40px;font-size:15px;background:linear-gradient(135deg,var(--accent),var(--accent-2))">'+esc(initials(w.name))+'</div>')+
         '<span class="status '+(w.active?'active':'archived')+'">'+(w.active?'actief':'inactief')+'</span></div>'+
         '<h4 style="margin:12px 0 3px">'+esc(w.name)+'</h4><div class="mut">'+w.clients+' klanten · '+w.accounts+' accounts · '+esc(w.license_type)+'</div></div>';
     }).join('');
@@ -2273,7 +2284,9 @@ async function loadClients(){
       var oa=Number(c.open_actions)||0;
       var bell=oa>0?('<span title="'+oa+' post(s) waar de klant wijzigingen heeft gevraagd" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#fff;background:#dc2626;padding:3px 8px;border-radius:20px;margin-left:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:block"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>'+oa+'</span>'):'';
       return '<div class="cl-card" onclick="openClient('+c.id+')"><div class="cl-top" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-        '<div class="cl-ava" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>'+
+        (c.logo_url
+          ? '<div class="cl-ava"'+avaAttrs(c.name,c.logo_url,col)+'>'+avaInner(c.name,c.logo_url)+'</div>'
+          : '<div class="cl-ava" style="background:'+esc(col)+'">'+esc(initials(c.name))+'</div>')+
         '<span class="status '+esc(c.status)+'">'+esc(c.status)+'</span>'+bell+'</div>'+
         '<h4>'+esc(c.name)+'</h4><div class="mut">'+esc(c.contact_name||c.contact_email||'Geen contact')+'</div></div>';
     }).join('')+'</div>';
@@ -2345,10 +2358,21 @@ async function openClient(id){
     }
   }catch(e){alert('Netwerkfout.');}
 }
+// Avatar: logo als dat er is, anders de initialen. Laadt het logo niet, dan alsnog de initialen.
+function avaInner(name,logo){
+  var ini=esc(initials(name||''));
+  if(!logo||!/^https?:\/\//i.test(String(logo)))return ini;
+  return '<img src="'+esc(logo)+'" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit" onerror="var p=this.parentNode;p.style.background=p.getAttribute(\'data-bg\')||\'\';p.textContent=p.getAttribute(\'data-ini\')||\'\'">';
+}
+function avaAttrs(name,logo,bg){return ' data-ini="'+esc(initials(name||''))+'" data-bg="'+esc(bg||'')+'"'+(logo?' style="background:#fff;padding:3px"':'');}
 function renderClientDetail(c){
   hideMsg('dEditMsg');
   document.getElementById('dName').textContent=c.name;
-  var b=document.getElementById('dBadge'); b.textContent=initials(c.name); b.style.background=c.brand_color||'#6366f1';
+  var b=document.getElementById('dBadge');
+  b.setAttribute('data-ini',initials(c.name)); b.setAttribute('data-bg',c.brand_color||'#6366f1');
+  if(c.logo_url){ b.innerHTML=avaInner(c.name,c.logo_url); b.style.background='#fff'; b.style.padding='3px'; }
+  else { b.textContent=initials(c.name); b.style.background=c.brand_color||'#6366f1'; b.style.padding=''; }
+  dfShowLogo(c.logo_url||'');
   document.getElementById('dfName').value=c.name||'';
   document.getElementById('dfContact').value=c.contact_name||'';
   document.getElementById('dfEmail').value=c.contact_email||'';
@@ -5643,6 +5667,44 @@ async function createClientLogin(){
     if(r.ok&&d.success){showMsg('clientLoginMsg',true,'Klant-login aangemaakt voor '+email+'. Deel de inloglink /workspace.html met de klant.');document.getElementById('clPass').value='';}
     else {showMsg('clientLoginMsg',false,d.error||'Aanmaken mislukt.');}
   }catch(e){showMsg('clientLoginMsg',false,'Netwerkfout.');}
+}
+function dfShowLogo(url){
+  var lp=document.getElementById('dfLogoPreview'), del=document.getElementById('dfLogoDel'); if(!lp)return;
+  if(url){lp.innerHTML='<img src="'+esc(url)+'" alt="" style="width:100%;height:100%;object-fit:contain;background:#fff">';}
+  else{lp.innerHTML='';lp.textContent='Geen';}
+  if(del)del.style.display=url?'':'none';
+  var canEdit=!(ME&&ME.role==='client'), ub=document.getElementById('dfLogoBtn');
+  if(ub)ub.style.display=canEdit?'':'none'; if(del&&!canEdit)del.style.display='none';
+}
+async function dfSaveLogo(url){
+  var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({logo_url:url})});
+  var d=await r.json();
+  if(r.ok&&d.success){CURRENT_CLIENT=d.client;renderClientDetail(d.client);showMsg('dEditMsg',true,url?'Logo opgeslagen.':'Logo verwijderd.');}
+  else showMsg('dEditMsg',false,d.error||'Opslaan mislukt.');
+}
+async function dfUploadLogo(input){
+  if(!CURRENT_CLIENT)return;
+  var file=input.files&&input.files[0]; input.value=''; if(!file)return;
+  if(['image/png','image/jpeg','image/webp'].indexOf(file.type)<0){showMsg('dEditMsg',false,'Alleen PNG, JPG of WebP.');return;}
+  if(file.size>5*1024*1024){showMsg('dEditMsg',false,'Afbeelding is te groot (max 5 MB).');return;}
+  var btn=document.getElementById('dfLogoBtn'); if(btn){btn.disabled=true;btn.textContent='Uploaden...';}
+  try{
+    var sr=await fetch('/api/mkt/clients/logo/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var sd=await sr.json();
+    if(!sr.ok||!sd.success){showMsg('dEditMsg',false,sd.error||'Kon upload niet voorbereiden.');}
+    else{
+      var fd=new FormData(); fd.append('file',file); fd.append('api_key',sd.apiKey); fd.append('timestamp',sd.timestamp); fd.append('signature',sd.signature); fd.append('folder',sd.folder);
+      var cr=await fetch('https://api.cloudinary.com/v1_1/'+sd.cloudName+'/auto/upload',{method:'POST',body:fd});
+      var cd=await cr.json();
+      if(!cr.ok||!cd.secure_url)showMsg('dEditMsg',false,(cd.error&&cd.error.message)||'Upload naar Cloudinary mislukt.');
+      else await dfSaveLogo(cd.secure_url);
+    }
+  }catch(e){showMsg('dEditMsg',false,'Netwerkfout bij uploaden.');}
+  if(btn){btn.disabled=false;btn.textContent='Logo uploaden';}
+}
+async function dfRemoveLogo(){
+  if(!CURRENT_CLIENT||!confirm('Logo van deze klant verwijderen?'))return;
+  try{await dfSaveLogo('');}catch(e){showMsg('dEditMsg',false,'Netwerkfout.');}
 }
 async function saveClient(){
   if(!CURRENT_CLIENT)return; hideMsg('dEditMsg');

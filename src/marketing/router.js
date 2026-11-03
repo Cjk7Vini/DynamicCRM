@@ -781,8 +781,9 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
 router.get('/api/mkt/platform/workspaces', requireMktPlatform, async (req, res) => {
   try {
     const scope = await platformScope(req.session.mkt); // null = alle (migratie 028)
+    const withLogo = await workspaceBrandingAvailable(); // logo_url (migratie 022)
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT w.id, w.name, w.slug, w.license_type, w.license_end, w.active,
+      `SELECT w.id, w.name, w.slug, w.license_type, w.license_end, w.active,${withLogo ? ' w.logo_url,' : ''}
               (SELECT COUNT(*)::int FROM marketing.accounts a WHERE a.workspace_id=w.id) AS accounts,
               (SELECT COUNT(*)::int FROM marketing.clients cl WHERE cl.workspace_id=w.id) AS clients
          FROM marketing.workspaces w
@@ -830,8 +831,9 @@ router.get('/api/mkt/clients', requireMkt, async (req, res) => {
     const includeArchived = String(req.query.archived || '') === '1';
     // Klant-account ziet uitsluitend de eigen klant-brand.
     const lock = mktClientLocked(req) ? mktLockedClientId(req) : null;
+    const withLogo = await clientProfileAvailable(); // logo_url (migratie 023)
     const rows = await withReadConnection(async (c) => (await c.query(
-      `SELECT cl.id, cl.name, cl.contact_name, cl.contact_email, cl.website, cl.brand_color, cl.status, cl.archived, cl.created_at,
+      `SELECT cl.id, cl.name, cl.contact_name, cl.contact_email, cl.website, cl.brand_color, cl.status, cl.archived, cl.created_at,${withLogo ? ' cl.logo_url,' : ''}
               (SELECT COUNT(*)::int FROM marketing.content_posts p
                  WHERE p.workspace_id = cl.workspace_id AND p.client_id = cl.id AND p.approval = 'changes') AS open_actions
          FROM marketing.clients cl
