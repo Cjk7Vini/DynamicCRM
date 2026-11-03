@@ -1842,6 +1842,22 @@ async function agendaAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Categorieën met een eigen kleur (migratie 031). Zonder migratie: geen categorieën.
+let _hasAgCats = null;
+async function agCatsAvailable() {
+  if (_hasAgCats === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='client_items' AND column_name='category_id'"
+    )).rows);
+    const t = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.tables WHERE table_schema='marketing' AND table_name='agenda_categories'"
+    )).rows);
+    const ok = r.length > 0 && t.length > 0;
+    if (ok) _hasAgCats = true;
+    return ok;
+  } catch (_) { return false; }
+}
 const AG_PRIO = ['laag', 'normaal', 'hoog'];
 const AG_TYPES = ['taak', 'afspraak'];
 const AG_RECUR = ['daily', 'weekdays', 'weekly', 'biweekly', 'monthly'];
@@ -1897,9 +1913,17 @@ const AG_COLS = `ci.id, ci.kind, ci.client_id, ci.title, ci.url, ci.done, ci.cre
   to_char(ci.planned_time,'HH24:MI') AS planned_time, ci.duration_min, ci.priority, ci.item_type,
   ci.recur, to_char(ci.recur_until,'YYYY-MM-DD') AS recur_until, ci.series_id, to_char(ci.occ_date,'YYYY-MM-DD') AS occ_date,
   cl.name AS client_name, cl.brand_color AS client_color`;
-const AG_FROM = `FROM marketing.client_items ci
+const AG_FROM_BASE = `FROM marketing.client_items ci
   LEFT JOIN marketing.accounts ac ON ac.id = ci.assignee_account_id
   LEFT JOIN marketing.clients cl ON cl.id = ci.client_id`;
+// Kolommen en joins, met of zonder categorieën (migratie 031).
+function agSql(cats) {
+  return cats
+    ? { cols: AG_COLS + `, ci.category_id, cat.name AS category_name, cat.color AS category_color`,
+        from: AG_FROM_BASE + `
+  LEFT JOIN marketing.agenda_categories cat ON cat.id = ci.category_id AND cat.workspace_id = ci.workspace_id` }
+    : { cols: AG_COLS, from: AG_FROM_BASE };
+}
 // Filter: klant ('all' | 'intern' | id) en "alleen mijn taken".
 async function agFilter(req, q) {
   const wsId = req.session.mkt.workspaceId;
@@ -1930,17 +1954,19 @@ function agVirtual(s, d) {
     title: s.title, url: s.url, done: false, assignee_account_id: s.assignee_account_id, assignee_name: s.assignee_name,
     due_date: null, planned_date: d, planned_time: s.planned_time, duration_min: s.duration_min,
     priority: s.priority, item_type: s.item_type, recur: s.recur,
+    category_id: s.category_id ?? null, category_name: s.category_name ?? null, category_color: s.category_color ?? null,
   };
 }
 // Taken + herhalingen in [from, to], plus achterstallig en ongepland.
 async function agBuild(f, from, to, opts = {}) {
   const today = agToday();
+  const { cols: AG_C, from: AG_F } = agSql(await agCatsAvailable());
   return withReadConnection(async (c) => {
     const p1 = [f.wsId];
     const w1 = agWhere(f, p1);
     p1.push(from, to);
     const items = (await c.query(
-      `SELECT ${AG_COLS} ${AG_FROM}
+      `SELECT ${AG_C} ${AG_F}
         WHERE ${w1} AND ci.kind='todo'
           AND COALESCE(ci.planned_date, ci.due_date) BETWEEN $${p1.length - 1} AND $${p1.length}
         ORDER BY COALESCE(ci.planned_date, ci.due_date), ci.planned_time NULLS LAST, ci.created_at`, p1
@@ -1951,7 +1977,7 @@ async function agBuild(f, from, to, opts = {}) {
     const w2 = agWhere(f, p2);
     p2.push(to, vFrom);
     const series = (await c.query(
-      `SELECT ${AG_COLS} ${AG_FROM}
+      `SELECT ${AG_C} ${AG_F}
         WHERE ${w2} AND ci.kind='todo_series' AND ci.planned_date <= $${p2.length - 1}
           AND (ci.recur_until IS NULL OR ci.recur_until >= $${p2.length})`, p2
     )).rows;
@@ -1979,7 +2005,7 @@ async function agBuild(f, from, to, opts = {}) {
       const w3 = agWhere(f, p3);
       p3.push(today);
       const od = (await c.query(
-        `SELECT ${AG_COLS} ${AG_FROM}
+        `SELECT ${AG_C} ${AG_F}
           WHERE ${w3} AND ci.kind='todo' AND ci.done=false
             AND COALESCE(ci.planned_date, ci.due_date) < $${p3.length}
           ORDER BY COALESCE(ci.planned_date, ci.due_date) ASC LIMIT 100`, p3
@@ -1990,7 +2016,7 @@ async function agBuild(f, from, to, opts = {}) {
       const p4 = [f.wsId];
       const w4 = agWhere(f, p4);
       out.unplanned = (await c.query(
-        `SELECT ${AG_COLS} ${AG_FROM}
+        `SELECT ${AG_C} ${AG_F}
           WHERE ${w4} AND ci.kind='todo' AND ci.done=false AND ci.planned_date IS NULL AND ci.due_date IS NULL
           ORDER BY ci.created_at DESC LIMIT 100`, p4
       )).rows;
@@ -2019,7 +2045,10 @@ router.get('/api/mkt/agenda', requireMkt, async (req, res) => {
     const clients = await withReadConnection(async (c) => (await c.query(
       'SELECT id, name, brand_color FROM marketing.clients WHERE workspace_id=$1 AND archived=false ORDER BY name ASC', [wsId]
     )).rows);
-    res.json({ success: true, available: true, from, to, ...data, clients, me: req.session.mkt.accountId || null });
+    const categories = (await agCatsAvailable()) ? await withReadConnection(async (c) => (await c.query(
+      'SELECT id, name, color FROM marketing.agenda_categories WHERE workspace_id=$1 ORDER BY position ASC, id ASC', [wsId]
+    )).rows) : null;
+    res.json({ success: true, available: true, from, to, ...data, clients, categories, me: req.session.mkt.accountId || null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Prio's voor het overzicht: taken van vandaag + achterstallig. Is er bij Gegevens een
@@ -2068,6 +2097,16 @@ async function agFields(req, b, partial) {
   if (b.done !== undefined) v.done = b.done === true;
   if (b.recur !== undefined) { if (b.recur && !AG_RECUR.includes(b.recur)) return { error: 'Ongeldige herhaling' }; v.recur = b.recur || null; }
   if (b.recur_until !== undefined) { if (b.recur_until && !validateDueDate(b.recur_until)) return { error: 'Ongeldige einddatum' }; v.recur_until = validateDueDate(b.recur_until); }
+  if (b.category_id !== undefined && await agCatsAvailable()) {
+    if (b.category_id === null || b.category_id === '') v.category_id = null;
+    else {
+      const ok = await withReadConnection(async (c) => (await c.query(
+        'SELECT id FROM marketing.agenda_categories WHERE id=$1 AND workspace_id=$2', [b.category_id, wsId]
+      )).rows[0]);
+      if (!ok) return { error: 'Categorie niet gevonden' };
+      v.category_id = ok.id;
+    }
+  }
   return { v };
 }
 const AG_RET = `RETURNING id`;
@@ -2081,7 +2120,8 @@ router.post('/api/mkt/agenda/items', requireMkt, async (req, res) => {
     const v = r.v;
     if (v.recur && !v.planned_date) return res.status(400).json({ error: 'Een terugkerende taak heeft een startdatum nodig' });
     const wsId = req.session.mkt.workspaceId;
-    const row = await withWriteConnection(async (c) => (await c.query(
+    const row = await withWriteConnection(async (c) => {
+      const r2 = (await c.query(
       `INSERT INTO marketing.client_items
          (workspace_id, client_id, kind, title, url, created_by, assignee_account_id, due_date,
           planned_date, planned_time, duration_min, priority, item_type, recur, recur_until)
@@ -2089,7 +2129,10 @@ router.post('/api/mkt/agenda/items', requireMkt, async (req, res) => {
       [wsId, v.client_id ?? null, v.recur ? 'todo_series' : 'todo', v.title, v.url ?? null, req.session.mkt.accountId || null,
        v.assignee_account_id ?? null, v.due_date ?? null, v.planned_date ?? null, v.planned_time ?? null,
        v.duration_min ?? null, v.priority || 'normaal', v.item_type || 'taak', v.recur || null, v.recur ? (v.recur_until ?? null) : null]
-    )).rows[0]);
+      )).rows[0];
+      if (v.category_id) await c.query('UPDATE marketing.client_items SET category_id=$1 WHERE id=$2 AND workspace_id=$3', [v.category_id, r2.id, wsId]);
+      return r2;
+    });
     res.json({ success: true, id: row.id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2159,10 +2202,77 @@ router.post('/api/mkt/agenda/series/:id/occurrence', requireMkt, async (req, res
          ('duration_min' in v) ? v.duration_min : s.duration_min,
          v.priority || s.priority, v.item_type || s.item_type, s.id, occ, v.done === true, v.done === true ? new Date() : null]
       )).rows[0];
+      if (await agCatsAvailable()) {
+        const cat = ('category_id' in v) ? v.category_id
+          : (await c.query('SELECT category_id FROM marketing.client_items WHERE id=$1', [s.id])).rows[0]?.category_id ?? null;
+        if (cat) await c.query('UPDATE marketing.client_items SET category_id=$1 WHERE id=$2', [cat, row.id]);
+      }
       return { created: row.id };
     });
     if (id.exists) return res.status(409).json({ error: 'Deze keer is al aangepast. Ververs de agenda.' });
     res.json({ success: true, id: id.created });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Categorieën beheren (Instellingen). Lezen: het team. Wijzigen: eigenaar of manager.
+function agCatInput(b) {
+  const name = String((b && b.name) || '').trim().slice(0, 40);
+  const color = String((b && b.color) || '').trim();
+  if (!name) return { error: 'Geef de categorie een naam' };
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return { error: 'Kies een geldige kleur' };
+  return { name, color: color.toLowerCase() };
+}
+router.get('/api/mkt/agenda/categories', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agCatsAvailable())) return res.json({ success: true, available: false, categories: [] });
+    const rows = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, name, color, position FROM marketing.agenda_categories WHERE workspace_id=$1 ORDER BY position ASC, id ASC', [req.session.mkt.workspaceId]
+    )).rows);
+    res.json({ success: true, available: true, categories: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/api/mkt/agenda/categories', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!(await agCatsAvailable())) return res.status(503).json({ error: 'Categorieën zijn nog niet ingeschakeld (migratie 031).' });
+    const v = agCatInput(req.body); if (v.error) return res.status(400).json({ error: v.error });
+    const wsId = req.session.mkt.workspaceId;
+    const row = await withWriteConnection(async (c) => {
+      const n = (await c.query('SELECT COUNT(*)::int AS n, COALESCE(MAX(position),0) AS p FROM marketing.agenda_categories WHERE workspace_id=$1', [wsId])).rows[0];
+      if (n.n >= 30) return { error: 'Maximaal 30 categorieën' };
+      return (await c.query('INSERT INTO marketing.agenda_categories (workspace_id, name, color, position) VALUES ($1,$2,$3,$4) RETURNING id, name, color, position', [wsId, v.name, v.color, n.p + 1])).rows[0];
+    });
+    if (row.error) return res.status(400).json({ error: row.error });
+    res.json({ success: true, category: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/api/mkt/agenda/categories/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!(await agCatsAvailable())) return res.status(503).json({ error: 'Categorieën zijn nog niet ingeschakeld (migratie 031).' });
+    const v = agCatInput(req.body); if (v.error) return res.status(400).json({ error: v.error });
+    const row = await withWriteConnection(async (c) => (await c.query(
+      'UPDATE marketing.agenda_categories SET name=$1, color=$2 WHERE id=$3 AND workspace_id=$4 RETURNING id, name, color, position',
+      [v.name, v.color, req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Categorie niet gevonden' });
+    res.json({ success: true, category: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/api/mkt/agenda/categories/:id', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    if (!(await agCatsAvailable())) return res.status(503).json({ error: 'Categorieën zijn nog niet ingeschakeld (migratie 031).' });
+    const wsId = req.session.mkt.workspaceId;
+    const n = await withWriteConnection(async (c) => {
+      const d = (await c.query('DELETE FROM marketing.agenda_categories WHERE id=$1 AND workspace_id=$2 RETURNING id', [req.params.id, wsId])).rows[0];
+      if (!d) return 0;
+      // Taken met deze categorie houden hun klantkleur; de categorie verdwijnt alleen.
+      await c.query('UPDATE marketing.client_items SET category_id=NULL WHERE workspace_id=$1 AND category_id=$2', [wsId, d.id]);
+      return 1;
+    });
+    if (!n) return res.status(404).json({ error: 'Categorie niet gevonden' });
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Herhaalinstelling van een reeks (voor het venster "hele reeks bewerken").

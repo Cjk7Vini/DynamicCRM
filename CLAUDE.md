@@ -62,6 +62,7 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Prio's op het overzicht: is er bij Gegevens een klant vastgezet (`overview_client_id`), dan alleen die klant, anders alle klanten. Een teamlid ziet de eigen taken en taken zonder eigenaar; de platform-admin alles.
 - Achterstallig: niet afgevinkte taken van eerdere dagen, plus gemiste herhalingen van de laatste 7 dagen.
 - Zonder migratie 030: het overzicht en de klanttab werken zoals voorheen; het menu Agenda meldt dat de migratie nodig is.
+- Categorieën met een eigen kleur (migratie 031, `marketing.agenda_categories`, `client_items.category_id`): per werkplek bij Instellingen, beheer door eigenaar of manager. In de agenda de schakelaar "Kleur op klant" of "Kleur op categorie" (per browser onthouden). Een categorie verwijderen laat de taken staan. Zonder migratie 031 werkt de agenda zonder categorieën.
 - Later: een abonnementslink (iCal) zodat Google- en Apple-agenda de taken kunnen tonen (eenrichting).
 
 ## Toegang tot create-user
