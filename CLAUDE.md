@@ -62,5 +62,6 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 ## Platform-admins
 - Een dashboard-admin die in de workspace inlogt met het admin-wachtwoord is platform-admin. De login wordt vastgelegd op `public.users` en niet op het marketing-account.
 - Welke workspaces een platform-admin ziet: `public.users.mkt_workspace_ids` (migratie 028). NULL = alle workspaces. Dit geldt in de workspace-kiezer en in create-user (tab Marketing), niet in het churn-dashboard.
+- Het label "Bron" (Facebook of Instagram-login) in de rapportage is alleen zichtbaar voor de superadmin in de workspace (`IS_SUPER`, vlag `superadmin` uit `/api/mkt/auth/me`). Andere gebruikers zien het niet.
 - Instellen via create-user, tab Marketing, knop "Werkplekken" bij het account. Alleen de superadmin (`admin@dynamic-health-consultancy.nl`) ziet die knop en mag dit wijzigen. De superadmin ziet zelf altijd alles.
 - Fleur heeft één e-mailadres met twee accounts: dashboard-admin (gebruiker 31) en owner van haar marketing-werkplek (account 2). Het wachtwoord bepaalt de route. Zijn beide wachtwoorden gelijk, dan wint het marketing-account en komt ze niet meer bij Dynamic.
