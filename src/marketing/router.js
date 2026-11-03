@@ -1825,6 +1825,377 @@ router.get('/api/mkt/my-tasks', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// =======================================================================
+// AGENDA (To do als dag-, week- en lijstweergave) - migratie 030
+// Eén takenlijst (marketing.client_items, kind 'todo'), meerdere weergaven:
+// de agenda over alle klanten, de To do-tab per klant en de prio's op het overzicht.
+// Alleen voor het team (geen klant-logins). Alles strikt binnen de eigen werkplek.
+// =======================================================================
+let _hasAgenda = null;
+async function agendaAvailable() {
+  if (_hasAgenda === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='client_items' AND column_name='planned_date'"
+    )).rows);
+    if (r.length > 0) _hasAgenda = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+const AG_PRIO = ['laag', 'normaal', 'hoog'];
+const AG_TYPES = ['taak', 'afspraak'];
+const AG_RECUR = ['daily', 'weekdays', 'weekly', 'biweekly', 'monthly'];
+const AG_TZ = process.env.MKT_REPORT_TZ || 'Europe/Amsterdam';
+function agToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: AG_TZ }).format(new Date()); }
+function agAddDays(ymd, n) { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function agTime(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(v).trim());
+  if (!m) return null;
+  const h = Number(m[1]); const mi = Number(m[2]);
+  if (h > 23 || mi > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+function agDuration(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = parseInt(v, 10);
+  return (Number.isInteger(n) && n > 0 && n <= 24 * 60) ? n : null;
+}
+// Alle data van een reeks binnen [from, to].
+function agOccurrences(start, recur, until, from, to) {
+  const out = [];
+  if (!start || !AG_RECUR.includes(recur)) return out;
+  const end = (until && until < to) ? until : to;
+  if (recur === 'monthly') {
+    const s = new Date(start + 'T00:00:00Z'); const day = s.getUTCDate();
+    for (let k = 0; k < 400; k++) {
+      const y = s.getUTCFullYear(); const mo = s.getUTCMonth() + k;
+      const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+      const d = new Date(Date.UTC(y, mo, Math.min(day, last))).toISOString().slice(0, 10);
+      if (d > end) break;
+      if (d >= from) out.push(d);
+    }
+    return out;
+  }
+  const step = recur === 'daily' || recur === 'weekdays' ? 1 : recur === 'weekly' ? 7 : 14;
+  let d = start;
+  // Snel vooruit naar het venster.
+  if (d < from && step > 1) {
+    const diff = Math.floor((Date.parse(from + 'T00:00:00Z') - Date.parse(d + 'T00:00:00Z')) / 86400000);
+    d = agAddDays(d, Math.floor(diff / step) * step);
+  } else if (d < from) { d = from; }
+  for (let k = 0; k < 800 && d <= end; k++) {
+    const wd = new Date(d + 'T00:00:00Z').getUTCDay();
+    if (d >= from && !(recur === 'weekdays' && (wd === 0 || wd === 6))) out.push(d);
+    d = agAddDays(d, step);
+  }
+  return out;
+}
+const AG_COLS = `ci.id, ci.kind, ci.client_id, ci.title, ci.url, ci.done, ci.created_at,
+  ci.assignee_account_id, COALESCE(ac.full_name, ac.email) AS assignee_name,
+  to_char(ci.due_date,'YYYY-MM-DD') AS due_date, to_char(ci.planned_date,'YYYY-MM-DD') AS planned_date,
+  to_char(ci.planned_time,'HH24:MI') AS planned_time, ci.duration_min, ci.priority, ci.item_type,
+  ci.recur, to_char(ci.recur_until,'YYYY-MM-DD') AS recur_until, ci.series_id, to_char(ci.occ_date,'YYYY-MM-DD') AS occ_date,
+  cl.name AS client_name, cl.brand_color AS client_color`;
+const AG_FROM = `FROM marketing.client_items ci
+  LEFT JOIN marketing.accounts ac ON ac.id = ci.assignee_account_id
+  LEFT JOIN marketing.clients cl ON cl.id = ci.client_id`;
+// Filter: klant ('all' | 'intern' | id) en "alleen mijn taken".
+async function agFilter(req, q) {
+  const wsId = req.session.mkt.workspaceId;
+  const f = { wsId, client: 'all', mine: null };
+  const cq = String(q.client || 'all');
+  if (cq === 'intern') f.client = 'intern';
+  else if (cq !== 'all' && cq !== '') {
+    const ok = await clientInWorkspace(cq, wsId);
+    if (!ok) return { error: 'Klant niet gevonden' };
+    f.client = ok;
+  }
+  if (String(q.mine || '') === '1' && req.session.mkt.accountId) f.mine = req.session.mkt.accountId;
+  if (String(q.mine || '') === 'me_or_open' && req.session.mkt.accountId) f.meOrOpen = req.session.mkt.accountId;
+  return f;
+}
+function agWhere(f, params) {
+  const w = ['ci.workspace_id=$1'];
+  if (f.client === 'intern') w.push('ci.client_id IS NULL');
+  else if (f.client !== 'all') { params.push(f.client); w.push(`ci.client_id=$${params.length}`); }
+  if (f.mine) { params.push(f.mine); w.push(`ci.assignee_account_id=$${params.length}`); }
+  if (f.meOrOpen) { params.push(f.meOrOpen); w.push(`(ci.assignee_account_id=$${params.length} OR ci.assignee_account_id IS NULL)`); }
+  return w.join(' AND ');
+}
+function agVirtual(s, d) {
+  return {
+    id: 'v:' + s.id + ':' + d, virtual: true, kind: 'todo', series_id: s.id, occ_date: d,
+    client_id: s.client_id, client_name: s.client_name, client_color: s.client_color,
+    title: s.title, url: s.url, done: false, assignee_account_id: s.assignee_account_id, assignee_name: s.assignee_name,
+    due_date: null, planned_date: d, planned_time: s.planned_time, duration_min: s.duration_min,
+    priority: s.priority, item_type: s.item_type, recur: s.recur,
+  };
+}
+// Taken + herhalingen in [from, to], plus achterstallig en ongepland.
+async function agBuild(f, from, to, opts = {}) {
+  const today = agToday();
+  return withReadConnection(async (c) => {
+    const p1 = [f.wsId];
+    const w1 = agWhere(f, p1);
+    p1.push(from, to);
+    const items = (await c.query(
+      `SELECT ${AG_COLS} ${AG_FROM}
+        WHERE ${w1} AND ci.kind='todo'
+          AND COALESCE(ci.planned_date, ci.due_date) BETWEEN $${p1.length - 1} AND $${p1.length}
+        ORDER BY COALESCE(ci.planned_date, ci.due_date), ci.planned_time NULLS LAST, ci.created_at`, p1
+    )).rows;
+    // Reeksen die het venster raken (inclusief de 7 dagen voor vandaag voor achterstallig).
+    const vFrom = (opts.withOverdue && agAddDays(today, -7) < from) ? agAddDays(today, -7) : from;
+    const p2 = [f.wsId];
+    const w2 = agWhere(f, p2);
+    p2.push(to, vFrom);
+    const series = (await c.query(
+      `SELECT ${AG_COLS} ${AG_FROM}
+        WHERE ${w2} AND ci.kind='todo_series' AND ci.planned_date <= $${p2.length - 1}
+          AND (ci.recur_until IS NULL OR ci.recur_until >= $${p2.length})`, p2
+    )).rows;
+    const exc = new Set();
+    if (series.length) {
+      const ex = (await c.query(
+        `SELECT series_id, to_char(occ_date,'YYYY-MM-DD') AS occ FROM marketing.client_items
+          WHERE workspace_id=$1 AND series_id = ANY($2::int[]) AND occ_date BETWEEN $3 AND $4`,
+        [f.wsId, series.map((s) => s.id), vFrom, to]
+      )).rows;
+      ex.forEach((e) => exc.add(e.series_id + ':' + e.occ));
+    }
+    const virt = []; const virtOverdue = [];
+    for (const s of series) {
+      for (const d of agOccurrences(s.planned_date, s.recur, s.recur_until, vFrom, to)) {
+        if (exc.has(s.id + ':' + d)) continue;
+        if (d >= from) virt.push(agVirtual(s, d));
+        // Gemiste herhalingen van de laatste 7 dagen tellen als achterstallig.
+        if (opts.withOverdue && d < today && d >= agAddDays(today, -7)) virtOverdue.push(agVirtual(s, d));
+      }
+    }
+    const out = { items: items.concat(virt), today };
+    if (opts.withOverdue) {
+      const p3 = [f.wsId];
+      const w3 = agWhere(f, p3);
+      p3.push(today);
+      const od = (await c.query(
+        `SELECT ${AG_COLS} ${AG_FROM}
+          WHERE ${w3} AND ci.kind='todo' AND ci.done=false
+            AND COALESCE(ci.planned_date, ci.due_date) < $${p3.length}
+          ORDER BY COALESCE(ci.planned_date, ci.due_date) ASC LIMIT 100`, p3
+      )).rows;
+      out.overdue = od.concat(virtOverdue).slice(0, 120);
+    }
+    if (opts.withUnplanned) {
+      const p4 = [f.wsId];
+      const w4 = agWhere(f, p4);
+      out.unplanned = (await c.query(
+        `SELECT ${AG_COLS} ${AG_FROM}
+          WHERE ${w4} AND ci.kind='todo' AND ci.done=false AND ci.planned_date IS NULL AND ci.due_date IS NULL
+          ORDER BY ci.created_at DESC LIMIT 100`, p4
+      )).rows;
+    }
+    return out;
+  });
+}
+function agGuard(req, res) {
+  if (mktClientLocked(req)) { res.status(403).json({ error: 'De agenda is alleen voor het team' }); return false; }
+  return true;
+}
+router.get('/api/mkt/agenda', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.json({ success: true, available: false });
+    const today = agToday();
+    const okd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    const from = okd(req.query.from) ? req.query.from : today;
+    let to = okd(req.query.to) ? req.query.to : agAddDays(from, 6);
+    if (to < from) to = from;
+    if (Date.parse(to) - Date.parse(from) > 62 * 86400000) to = agAddDays(from, 62);
+    const f = await agFilter(req, req.query);
+    if (f.error) return res.status(404).json({ error: f.error });
+    const data = await agBuild(f, from, to, { withOverdue: true, withUnplanned: true });
+    const wsId = req.session.mkt.workspaceId;
+    const clients = await withReadConnection(async (c) => (await c.query(
+      'SELECT id, name, brand_color FROM marketing.clients WHERE workspace_id=$1 AND archived=false ORDER BY name ASC', [wsId]
+    )).rows);
+    res.json({ success: true, available: true, from, to, ...data, clients, me: req.session.mkt.accountId || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Prio's voor het overzicht: taken van vandaag + achterstallig. Is er bij Gegevens een
+// klant vastgezet (overview_client_id), dan alleen die klant; anders alle klanten.
+router.get('/api/mkt/agenda/today', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.json({ success: true, available: false });
+    const wsId = req.session.mkt.workspaceId;
+    let pinned = null;
+    try {
+      pinned = (await withReadConnection(async (c) => (await c.query(
+        'SELECT overview_client_id FROM marketing.workspaces WHERE id=$1', [wsId]
+      )).rows[0]))?.overview_client_id ?? null;
+      if (pinned != null && !(await clientInWorkspace(pinned, wsId))) pinned = null;
+    } catch (_) { pinned = null; }
+    const f = { wsId, client: pinned != null ? pinned : 'all', mine: null };
+    // Een teamlid ziet de eigen taken en de taken die nog van niemand zijn; de platform-admin alles.
+    if (req.session.mkt.accountId) f.meOrOpen = req.session.mkt.accountId;
+    const today = agToday();
+    const data = await agBuild(f, today, today, { withOverdue: true });
+    res.json({ success: true, available: true, today, pinned_client_id: pinned, items: data.items, overdue: data.overdue || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Velden van een taak uit het verzoek halen en controleren.
+async function agFields(req, b, partial) {
+  const wsId = req.session.mkt.workspaceId;
+  const v = {};
+  if (!partial || b.title !== undefined) {
+    const t = String(b.title || '').trim();
+    if (!t) return { error: 'Wat moet er gebeuren? Vul een taaknaam in.' };
+    v.title = t.slice(0, 500);
+  }
+  if (b.client_id !== undefined) {
+    if (b.client_id === null || b.client_id === '' || b.client_id === 'intern') v.client_id = null;
+    else { const ok = await clientInWorkspace(b.client_id, wsId); if (!ok) return { error: 'Klant niet gevonden' }; v.client_id = ok; }
+  }
+  if (b.planned_date !== undefined) { if (b.planned_date && !validateDueDate(b.planned_date)) return { error: 'Ongeldige datum' }; v.planned_date = validateDueDate(b.planned_date); }
+  if (b.due_date !== undefined) { if (b.due_date && !validateDueDate(b.due_date)) return { error: 'Ongeldige deadline' }; v.due_date = validateDueDate(b.due_date); }
+  if (b.planned_time !== undefined) { if (b.planned_time && !agTime(b.planned_time)) return { error: 'Ongeldige tijd' }; v.planned_time = agTime(b.planned_time); }
+  if (b.duration_min !== undefined) v.duration_min = agDuration(b.duration_min);
+  if (b.priority !== undefined) { if (!AG_PRIO.includes(b.priority)) return { error: 'Ongeldige prioriteit' }; v.priority = b.priority; }
+  if (b.item_type !== undefined) { if (!AG_TYPES.includes(b.item_type)) return { error: 'Ongeldig type' }; v.item_type = b.item_type; }
+  if (b.assignee_account_id !== undefined) v.assignee_account_id = await validateAssignee(wsId, b.assignee_account_id);
+  if (b.url !== undefined) { let u = String(b.url || '').trim().slice(0, 2000); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; v.url = u || null; }
+  if (b.done !== undefined) v.done = b.done === true;
+  if (b.recur !== undefined) { if (b.recur && !AG_RECUR.includes(b.recur)) return { error: 'Ongeldige herhaling' }; v.recur = b.recur || null; }
+  if (b.recur_until !== undefined) { if (b.recur_until && !validateDueDate(b.recur_until)) return { error: 'Ongeldige einddatum' }; v.recur_until = validateDueDate(b.recur_until); }
+  return { v };
+}
+const AG_RET = `RETURNING id`;
+router.post('/api/mkt/agenda/items', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.status(503).json({ error: 'De agenda is nog niet ingeschakeld (migratie 030).' });
+    const b = req.body || {};
+    const r = await agFields(req, b, false);
+    if (r.error) return res.status(400).json({ error: r.error });
+    const v = r.v;
+    if (v.recur && !v.planned_date) return res.status(400).json({ error: 'Een terugkerende taak heeft een startdatum nodig' });
+    const wsId = req.session.mkt.workspaceId;
+    const row = await withWriteConnection(async (c) => (await c.query(
+      `INSERT INTO marketing.client_items
+         (workspace_id, client_id, kind, title, url, created_by, assignee_account_id, due_date,
+          planned_date, planned_time, duration_min, priority, item_type, recur, recur_until)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ${AG_RET}`,
+      [wsId, v.client_id ?? null, v.recur ? 'todo_series' : 'todo', v.title, v.url ?? null, req.session.mkt.accountId || null,
+       v.assignee_account_id ?? null, v.due_date ?? null, v.planned_date ?? null, v.planned_time ?? null,
+       v.duration_min ?? null, v.priority || 'normaal', v.item_type || 'taak', v.recur || null, v.recur ? (v.recur_until ?? null) : null]
+    )).rows[0]);
+    res.json({ success: true, id: row.id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Een taak of een hele reeks bijwerken.
+router.patch('/api/mkt/agenda/items/:id', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.status(503).json({ error: 'De agenda is nog niet ingeschakeld (migratie 030).' });
+    const wsId = req.session.mkt.workspaceId;
+    const cur = await withReadConnection(async (c) => (await c.query(
+      "SELECT id, kind FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND kind IN ('todo','todo_series')", [req.params.id, wsId]
+    )).rows[0]);
+    if (!cur) return res.status(404).json({ error: 'Taak niet gevonden' });
+    const r = await agFields(req, req.body || {}, true);
+    if (r.error) return res.status(400).json({ error: r.error });
+    const v = r.v;
+    if (cur.kind === 'todo') { delete v.recur; delete v.recur_until; }
+    if (cur.kind === 'todo_series') { delete v.done; if (v.recur === null) delete v.recur; if ('planned_date' in v && !v.planned_date) delete v.planned_date; }
+    const sets = []; const vals = [];
+    for (const [k, val] of Object.entries(v)) { vals.push(val); sets.push(`${k}=$${vals.length}`); }
+    if ('done' in v) sets.push(v.done ? 'done_at=now()' : 'done_at=NULL');
+    if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
+    vals.push(cur.id, wsId);
+    await withWriteConnection(async (c) => c.query(
+      `UPDATE marketing.client_items SET ${sets.join(', ')} WHERE id=$${vals.length - 1} AND workspace_id=$${vals.length}`, vals
+    ));
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Eén keer uit een reeks aanpassen, afvinken of overslaan. Maakt (of werkt bij) een
+// losse rij met series_id + occ_date; de reeks zelf blijft ongewijzigd.
+router.post('/api/mkt/agenda/series/:id/occurrence', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.status(503).json({ error: 'De agenda is nog niet ingeschakeld (migratie 030).' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {};
+    const occ = validateDueDate(b.occ_date);
+    if (!occ) return res.status(400).json({ error: 'Ongeldige datum' });
+    const s = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, client_id, title, url, assignee_account_id, to_char(planned_time,'HH24:MI') AS planned_time, duration_min, priority, item_type,
+              to_char(planned_date,'YYYY-MM-DD') AS planned_date, recur, to_char(recur_until,'YYYY-MM-DD') AS recur_until
+         FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND kind='todo_series'`, [req.params.id, wsId]
+    )).rows[0]);
+    if (!s) return res.status(404).json({ error: 'Reeks niet gevonden' });
+    if (!agOccurrences(s.planned_date, s.recur, s.recur_until, occ, occ).includes(occ)) return res.status(400).json({ error: 'Deze datum hoort niet bij de reeks' });
+    const action = b.action === 'skip' ? 'skip' : 'update';
+    let v = {};
+    if (action === 'update') {
+      const r = await agFields(req, b.changes || {}, true);
+      if (r.error) return res.status(400).json({ error: r.error });
+      v = r.v; delete v.recur; delete v.recur_until;
+    }
+    const id = await withWriteConnection(async (c) => {
+      const ex = (await c.query('SELECT id FROM marketing.client_items WHERE workspace_id=$1 AND series_id=$2 AND occ_date=$3', [wsId, s.id, occ])).rows[0];
+      if (ex) return { exists: ex.id };
+      const row = (await c.query(
+        `INSERT INTO marketing.client_items
+           (workspace_id, client_id, kind, title, url, created_by, assignee_account_id, planned_date, planned_time,
+            duration_min, priority, item_type, series_id, occ_date, done, done_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        [wsId, ('client_id' in v) ? v.client_id : s.client_id, action === 'skip' ? 'todo_skip' : 'todo',
+         v.title || s.title, ('url' in v) ? v.url : s.url, req.session.mkt.accountId || null,
+         ('assignee_account_id' in v) ? v.assignee_account_id : s.assignee_account_id,
+         ('planned_date' in v && v.planned_date) ? v.planned_date : occ,
+         ('planned_time' in v) ? v.planned_time : s.planned_time,
+         ('duration_min' in v) ? v.duration_min : s.duration_min,
+         v.priority || s.priority, v.item_type || s.item_type, s.id, occ, v.done === true, v.done === true ? new Date() : null]
+      )).rows[0];
+      return { created: row.id };
+    });
+    if (id.exists) return res.status(409).json({ error: 'Deze keer is al aangepast. Ververs de agenda.' });
+    res.json({ success: true, id: id.created });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Herhaalinstelling van een reeks (voor het venster "hele reeks bewerken").
+router.get('/api/mkt/agenda/series/:id', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.status(503).json({ error: 'De agenda is nog niet ingeschakeld (migratie 030).' });
+    const row = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, recur, to_char(recur_until,'YYYY-MM-DD') AS recur_until, to_char(planned_date,'YYYY-MM-DD') AS planned_date
+         FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND kind='todo_series'`, [req.params.id, req.session.mkt.workspaceId]
+    )).rows[0]);
+    if (!row) return res.status(404).json({ error: 'Reeks niet gevonden' });
+    res.json({ success: true, series: row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Taak verwijderen. Een reeks: de reeks plus alle aangepaste keren.
+router.delete('/api/mkt/agenda/items/:id', requireMkt, async (req, res) => {
+  try {
+    if (!agGuard(req, res)) return;
+    if (!(await agendaAvailable())) return res.status(503).json({ error: 'De agenda is nog niet ingeschakeld (migratie 030).' });
+    const wsId = req.session.mkt.workspaceId;
+    const n = await withWriteConnection(async (c) => {
+      const cur = (await c.query("SELECT id, kind FROM marketing.client_items WHERE id=$1 AND workspace_id=$2 AND kind IN ('todo','todo_series')", [req.params.id, wsId])).rows[0];
+      if (!cur) return 0;
+      if (cur.kind === 'todo_series') await c.query('DELETE FROM marketing.client_items WHERE workspace_id=$1 AND series_id=$2', [wsId, cur.id]);
+      await c.query('DELETE FROM marketing.client_items WHERE id=$1 AND workspace_id=$2', [cur.id, wsId]);
+      return 1;
+    });
+    if (!n) return res.status(404).json({ error: 'Taak niet gevonden' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Eerstvolgende geplande posts over alle klanten, voor de overzichtspagina.
 router.get('/api/mkt/upcoming-posts', requireMkt, async (req, res) => {
   try {
