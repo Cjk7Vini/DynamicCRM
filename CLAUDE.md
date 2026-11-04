@@ -34,7 +34,11 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Het Facebook-token van een klant nooit leegmaken als er een advertentieaccount of pagina aan hangt.
 
 ### App review en live gaan
-- Zolang de Meta-app in ontwikkelmodus staat, moet elke gebruiker een app-rol hebben (tester, ontwikkelaar of beheerder). Op naam toevoegen werkt alleen bij Facebook-vrienden. Gebruik anders de gebruikersnaam of het numerieke Facebook-ID uit de profiel-URL. De uitnodiging accepteren gaat via Facebook: Instellingen en privacy, Je activiteit, Apps en websites, Verzoeken.
+- Zolang de Meta-app in ontwikkelmodus staat, moet elke gebruiker een app-rol hebben (tester, ontwikkelaar of beheerder). Meta vereist sinds november 2026 een Meta-ontwikkelaarsaccount, ook voor testers ("A Facebook Developer Account is required to be added to an app"). Werkwijze:
+  1. De persoon registreert zich gratis op developers.facebook.com (Get started, telefoon bevestigen).
+  2. De persoon stuurt de Facebook-gebruikersnaam of het numerieke Facebook-ID uit de profiel-URL.
+  3. Toevoegen als Tester met die gebruikersnaam of dat ID, niet op naam (op naam zoeken geeft geen keuzelijst meer en leidt tot "does not resolve to a valid user ID").
+  4. De persoon accepteert op developers.facebook.com/requests.
 - Instagram-testers (Instagram-login) zijn een aparte rol. Accepteren gaat op instagram.com in de browser (niet in de app): Instellingen, Apps en websites, Testeruitnodigingen. Het account moet een zakelijk of creator-account zijn.
 - Na de app review: controleren dat alle klanten via de Facebook-route lopen, het delen via het bedrijfsportfolio of een partnertoewijzing werkt, en tokens automatisch worden ververst (`/api/mkt/cron/refresh-meta-tokens`).
 
