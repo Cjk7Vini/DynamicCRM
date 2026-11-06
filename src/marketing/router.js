@@ -3668,6 +3668,24 @@ async function graphGet(pathAndId, params) {
   if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
   return j;
 }
+// Lijst of insights met ALLE pagina's. Meta geeft standaard maar 25 regels per pagina;
+// zonder dit vielen campagnes, ad sets en advertenties stil weg. Volgt alleen
+// 'paging.next' van Meta zelf (graph.facebook.com), met een veilige bovengrens.
+async function graphGetAll(pathAndId, params, maxPages = 40) {
+  const first = await graphGet(pathAndId, { limit: '500', ...params });
+  const data = (first.data || []).slice();
+  let next = first.paging && first.paging.next;
+  let pages = 1;
+  while (next && pages < maxPages && /^https:\/\/graph\.facebook\.com\//.test(next)) {
+    const r = await fetch(next);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+    (j.data || []).forEach((x) => data.push(x));
+    next = j.paging && j.paging.next;
+    pages += 1;
+  }
+  return { data };
+}
 
 // Thumbnail-URL voor een Cloudinary-video: Cloudinary levert een stilstaand
 // voorbeeldframe als je dezelfde URL met een afbeeldings-extensie opvraagt.
@@ -4515,7 +4533,7 @@ router.post('/api/mkt/clients/:clientId/ai/analysis', requireMkt, async (req, re
 
       if (campIds.length) {
         try {
-          const ins = await graphGet(`${creds.adAccount}/insights`, {
+          const ins = await graphGetAll(`${creds.adAccount}/insights`, {
             level: 'campaign',
             fields: 'spend,impressions,reach,clicks,ctr,cpc,cpm',
             date_preset: 'last_30d',
@@ -5381,16 +5399,16 @@ router.get('/api/mkt/clients/:clientId/meta-campaigns', requireMkt, async (req, 
 
     const out = { configured: true, campaigns: [], error: null };
     try {
-      const list = await graphGet(`${adAccount}/campaigns`, {
+      const list = await graphGetAll(`${adAccount}/campaigns`, {
         fields: 'name,objective,status,effective_status,daily_budget,lifetime_budget,start_time',
-        limit: '50', access_token: token,
+        access_token: token,
       });
       // Cijfers per campagne (laatste 30 dagen), gebundeld opgehaald.
       const stats = {};
       try {
-        const ins = await graphGet(`${adAccount}/insights`, {
+        const ins = await graphGetAll(`${adAccount}/insights`, {
           level: 'campaign', fields: 'campaign_id,spend,impressions,reach,clicks,ctr',
-          ...adsDateSel(req), limit: '200', access_token: token,
+          ...adsDateSel(req), access_token: token,
         });
         (ins.data || []).forEach((r) => { stats[r.campaign_id] = r; });
       } catch (_) { /* cijfers optioneel */ }
@@ -6459,7 +6477,7 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
 
       if (campIds.length) {
         try {
-          const ins = await graphGet(`${creds.adAccount}/insights`, {
+          const ins = await graphGetAll(`${creds.adAccount}/insights`, {
             level: 'campaign',
             fields: 'spend,impressions,reach,clicks,ctr,unique_ctr,cpc,cpm,frequency,inline_link_clicks,unique_inline_link_clicks,actions',
             ...adsDateSel(req),
@@ -6527,17 +6545,45 @@ router.get('/api/mkt/clients/:clientId/meta-insights', requireMkt, async (req, r
           };
           const common = { ...adsDateSel(req), filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token };
           // Prestaties per niveau (alleen entiteiten met data in de periode).
-          const adsetR = await graphGet(`${creds.adAccount}/insights`, { level: 'adset', fields: 'campaign_id,adset_id,spend,impressions,reach,clicks,ctr,cpc,actions', ...common });
-          const adR = await graphGet(`${creds.adAccount}/insights`, { level: 'ad', fields: 'adset_id,ad_id,spend,impressions,reach,clicks,ctr,actions', ...common });
+          const adsetR = await graphGetAll(`${creds.adAccount}/insights`, { level: 'adset', fields: 'campaign_id,adset_id,spend,impressions,reach,clicks,ctr,cpc,actions', ...common });
+          const adR = await graphGetAll(`${creds.adAccount}/insights`, { level: 'ad', fields: 'adset_id,ad_id,spend,impressions,reach,clicks,ctr,actions', ...common });
           // Entiteiten met live-status (ook zonder uitgaven), zodat zichtbaar is wat live staat.
-          const adsetsList = await graphGet(`${creds.adAccount}/adsets`, { fields: 'id,name,effective_status,campaign_id,start_time', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
-          const adsList = await graphGet(`${creds.adAccount}/ads`, { fields: 'id,name,effective_status,adset_id', limit: '500', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
+          const adsetsList = await graphGetAll(`${creds.adAccount}/adsets`, { fields: 'id,name,effective_status,campaign_id,start_time', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
+          const adsList = await graphGetAll(`${creds.adAccount}/ads`, { fields: 'id,name,effective_status,adset_id', filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: campIds }]), access_token: token });
           const adsetMx = {}; (adsetR.data || []).forEach((r) => { adsetMx[r.adset_id] = metricsOf(r); });
           const adMx = {}; (adR.data || []).forEach((r) => { adMx[r.ad_id] = metricsOf(r); });
           const camps = {};
           campIds.forEach((id) => { camps[id] = { id, adsets: {} }; });
           (adsetsList.data || []).forEach((s) => { const c = camps[s.campaign_id]; if (!c) return; c.adsets[s.id] = { id: s.id, name: s.name, status: s.effective_status || null, live: s.effective_status === 'ACTIVE', start_time: s.start_time || null, ...(adsetMx[s.id] || {}), ads: [] }; });
           (adsList.data || []).forEach((a) => { for (const cid in camps) { const s = camps[cid].adsets[a.adset_id]; if (s) { s.ads.push({ id: a.id, name: a.name, status: a.effective_status || null, live: a.effective_status === 'ACTIVE', ...(adMx[a.id] || {}) }); break; } } });
+          // Ad sets en advertenties zonder cijfers in de gekozen periode (meestal gepauzeerd):
+          // haal hun totaal sinds de start op. Staat in een APART veld 'lifetime' en telt
+          // dus niet mee in de periodetotalen hieronder. Fout hier: gewoon zonder totaal.
+          if (common.date_preset !== 'maximum') {
+            const lifetimeFor = async (level, idField, items) => {
+              const ids = items.map((x) => String(x.id));
+              const got = {};
+              for (let i = 0; i < ids.length; i += 50) {
+                const chunk = ids.slice(i, i + 50);
+                const life = await graphGetAll(`${creds.adAccount}/insights`, {
+                  level,
+                  fields: level === 'adset' ? 'adset_id,spend,impressions,reach,clicks,ctr,cpc,actions' : 'ad_id,spend,impressions,reach,clicks,ctr,actions',
+                  date_preset: 'maximum',
+                  filtering: JSON.stringify([{ field: `${level}.id`, operator: 'IN', value: chunk }]),
+                  access_token: token,
+                });
+                (life.data || []).forEach((r) => { got[String(r[idField])] = metricsOf(r); });
+              }
+              items.forEach((x) => { if (got[String(x.id)]) x.lifetime = got[String(x.id)]; });
+            };
+            const noSet = []; const noAd = [];
+            Object.values(camps).forEach((c) => Object.values(c.adsets).forEach((st) => {
+              if (!adsetMx[st.id]) noSet.push(st);
+              (st.ads || []).forEach((a) => { if (!adMx[a.id]) noAd.push(a); });
+            }));
+            try { if (noSet.length) await lifetimeFor('adset', 'adset_id', noSet); } catch (_) { /* zonder totaal */ }
+            try { if (noAd.length) await lifetimeFor('ad', 'ad_id', noAd); } catch (_) { /* zonder totaal */ }
+          }
           // Campagne-totalen: som van de ad sets.
           const sumUp = (list) => {
             let spend = 0; let impressions = 0; let reach = 0; let clicks = 0; let results = 0; let anyRes = false;
