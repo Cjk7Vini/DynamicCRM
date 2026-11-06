@@ -42,6 +42,10 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Instagram-testers (Instagram-login) zijn een aparte rol. Accepteren gaat op instagram.com in de browser (niet in de app): Instellingen, Apps en websites, Testeruitnodigingen. Het account moet een zakelijk of creator-account zijn.
 - Na de app review: controleren dat alle klanten via de Facebook-route lopen, het delen via het bedrijfsportfolio of een partnertoewijzing werkt, en tokens automatisch worden ververst (`/api/mkt/cron/refresh-meta-tokens`).
 
+### Advertentiecijfers (Marketing API)
+- Meta geeft standaard maar 25 regels per pagina. Lijsten en insights altijd met `graphGetAll` ophalen (volgt `paging.next`), nooit met een losse `graphGet`, anders vallen campagnes, ad sets of advertenties stil weg.
+- Ad sets en advertenties zonder cijfers in de gekozen periode (meestal gepauzeerd) krijgen hun totaal sinds start in een apart veld `lifetime`. Dat telt nooit mee in de periodetotalen; de weergave toont het gedempt met "totaal sinds start".
+
 ### Gemeten definities (1 op 1 met de Instagram-app)
 - "Afgelopen 30 dagen" = 30 volle dagen tot en met gisteren (Amsterdamse dagen). Meta accepteert maximaal 30 dagen per `total_value`-aanvraag, daarom in stukken knippen. Let op de zomertijd: 30 volle dagen kan 721 uur zijn.
 - Netto volgers = `follows_and_unfollows` met breakdown `follow_type`: FOLLOWER min NON_FOLLOWER.
