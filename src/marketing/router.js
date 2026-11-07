@@ -3261,7 +3261,9 @@ router.get('/api/mkt/meta/oauth/start', requireMkt, (req, res) => {
     // Alleen met META_LOGIN_MODE=business gebruiken we de zakelijke config_id-login.
     const useClassic = process.env.META_LOGIN_MODE !== 'business';
     if (!useClassic && configId) url += '&config_id=' + encodeURIComponent(configId);
-    else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES);
+    // auth_type=rerequest: Facebook vraagt ook rechten opnieuw die eerder zijn
+    // overgeslagen of geweigerd (anders worden nieuwe rechten stil niet verleend).
+    else url += '&scope=' + encodeURIComponent(META_OAUTH_SCOPES) + '&auth_type=rerequest';
     res.redirect(url);
   } catch (e) { res.status(500).send('Fout bij starten koppeling: ' + e.message); }
 });
@@ -3338,12 +3340,17 @@ router.get('/api/mkt/meta/callback', requireMkt, async (req, res) => {
     // Reset de accounts-cache zodat de nieuwe login meteen verse accounts geeft.
     try { _wsAssetsCache.delete(wsId); } catch (_) {}
     // Bouw een duidelijke statusmelding met de verleende permissies.
-    const need = ['instagram_basic', 'instagram_manage_insights', 'pages_show_list', 'pages_read_engagement', 'ads_read', 'ads_management'];
+    // Alle rechten die de knop vraagt (META_LOGIN_SCOPES of de standaard), behalve public_profile.
+    const need = META_OAUTH_SCOPES.split(',').map((x) => x.trim()).filter((x) => x && x !== 'public_profile');
     let msg = 'Je Facebook- en Instagram-koppeling is opgeslagen.';
     if (grantedScopes.length) {
       const lines = need.map((p) => (grantedScopes.includes(p) ? '&#9989; ' : '&#10060; ') + p).join('<br>');
       const days = Math.round(expSecs / 86400);
       msg += '<br><br><strong>Verleende permissies:</strong><br>' + lines + '<br><br>Token geldig: ~' + days + ' dagen' + (exchanged ? '' : ' (kortlevend: omwisseling naar langlevend mislukte)');
+      const missing = need.filter((x) => !grantedScopes.includes(x));
+      if (missing.length) {
+        msg += '<br><br><strong style="color:#f59e0b">Niet verleend:</strong> ' + missing.join(', ') + '. Klik opnieuw op Koppel met Facebook, kies in het Facebook-scherm "Instellingen bewerken" en zet alles aan. Zolang een recht ontbreekt werkt dat onderdeel niet (bijv. publiceren zonder instagram_content_publish).';
+      }
       if (!grantedScopes.includes('instagram_basic')) {
         msg += '<br><br><strong style="color:#f59e0b">Let op:</strong> instagram_basic is niet verleend, dus Instagram-accounts verschijnen niet. Log opnieuw in en vink bij het inloggen Instagram aan (Alle Instagram, Alles selecteren).';
       }
@@ -3371,6 +3378,13 @@ function igRedirectUri(req) {
 async function igGraphGet(pathAndId, params) {
   const qs = new URLSearchParams(params).toString();
   const r = await fetch(`${IG_GRAPH}/${pathAndId}?${qs}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+  return j;
+}
+async function igGraphPost(pathAndId, params) {
+  const body = new URLSearchParams(params);
+  const r = await fetch(`${IG_GRAPH}/${pathAndId}`, { method: 'POST', body });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
   return j;
@@ -3908,35 +3922,52 @@ function friendlyPublishError(msg, channel) {
   const m = String(msg || '');
   if (/\(#?10\)|code\s*10|does not have permission|permission for this action/i.test(m)) {
     if (channel === 'instagram') {
-      return 'Instagram weigert het publiceren (rechtenfout, code 10). Het access token mist de permissie instagram_content_publish. Genereer het token opnieuw met die permissie erbij en sla het weer op bij de koppeling. Voor echte klantaccounts is daarnaast Meta App Review nodig.';
+      return 'Instagram weigert het publiceren (rechtenfout, code 10). De koppeling mist het recht om te publiceren (instagram_content_publish bij Koppel met Facebook, instagram_business_content_publish bij Koppel via Instagram). Koppel opnieuw en geef dat recht. Voor echte klantaccounts is daarnaast Meta App Review nodig.';
     }
     return 'Meta weigert het publiceren (rechtenfout, code 10). Het access token mist de benodigde permissie. Genereer het token opnieuw met de juiste rechten en sla het weer op bij de koppeling.';
   }
   return m;
 }
 
-async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption) {
+// Route voor publiceren naar Instagram: dezelfde keuze als de rapportage (pickIgRoute).
+// Facebook-route zoals altijd; klanten met alleen "Koppel via Instagram" publiceren via
+// graph.instagram.com met hun Instagram-login (instagram_business_content_publish).
+async function igPublishRoute(creds) {
+  const r = await pickIgRoute(creds);
+  if (r.isIgLogin) {
+    if (!r.tok) throw new Error('Geen Instagram-koppeling voor deze klant');
+    if (!creds.igLoginUserId) throw new Error('Het Instagram-account van de Instagram-login is onbekend. Koppel opnieuw via Instagram.');
+    return { igId: String(creds.igLoginUserId), token: r.tok, get: igGraphGet, post: igGraphPost, isIgLogin: true };
+  }
+  if (!r.tok) throw new Error('Geen Meta access token (niet bij de klant en niet op de workspace)');
+  if (!r.uid) throw new Error('Instagram user ID ontbreekt in de koppelingen');
+  return { igId: String(r.uid), token: r.tok, get: graphGet, post: graphPost, isIgLogin: false };
+}
+
+async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption, igRoute) {
   const cap = (caption != null) ? String(caption) : '';
   if (channel === 'instagram') {
-    if (!intg.meta_ig_user_id) throw new Error('Instagram user ID ontbreekt in de koppelingen');
+    // igRoute (uit igPublishRoute) bepaalt account, token en API; zonder: Facebook-route.
+    const R = igRoute || { igId: intg.meta_ig_user_id, token, get: graphGet, post: graphPost };
+    if (!R.igId) throw new Error('Instagram user ID ontbreekt in de koppelingen');
     if (!mediaUrl) throw new Error('Instagram vereist een afbeelding of video');
-    const igId = intg.meta_ig_user_id;
+    const igId = R.igId; const tk = R.token;
     const createParams = mediaType === 'video'
-      ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: token }
-      : { image_url: mediaUrl, caption: cap, access_token: token };
-    const created = await graphPost(`${igId}/media`, createParams);
+      ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk }
+      : { image_url: mediaUrl, caption: cap, access_token: tk };
+    const created = await R.post(`${igId}/media`, createParams);
     if (mediaType === 'video') {
       let ready = false;
       for (let i = 0; i < 20 && !ready; i++) {
         await new Promise((r) => setTimeout(r, 3000));
-        const st = await graphGet(`${created.id}`, { fields: 'status_code', access_token: token });
+        const st = await R.get(`${created.id}`, { fields: 'status_code', access_token: tk });
         if (st.status_code === 'FINISHED') ready = true;
         else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
       }
       if (!ready) throw new Error('Video-verwerking duurt te lang');
     }
-    const pub = await graphPost(`${igId}/media_publish`, { creation_id: created.id, access_token: token });
-    return { id: pub.id, channel: 'instagram' };
+    const pub = await R.post(`${igId}/media_publish`, { creation_id: created.id, access_token: tk });
+    return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook' };
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
   const pageId = intg.meta_page_id;
@@ -3953,7 +3984,8 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption)
 // Publiceert een carousel (meerdere foto's/video's) als organische Instagram-post.
 // Elk item wordt eerst een container; video's worden verwerkt; daarna een carousel-
 // container en dan publiceren. items = [{ url, mediaType }]. Alleen Instagram.
-async function publishCarouselToInstagram(igId, token, items, caption) {
+async function publishCarouselToInstagram(igId, token, items, caption, api) {
+  const gGet = (api && api.get) || graphGet; const gPost = (api && api.post) || graphPost;
   if (!igId) throw new Error('Instagram user ID ontbreekt in de koppelingen');
   const list = (Array.isArray(items) ? items : []).slice(0, 10);
   if (list.length < 2) throw new Error('Een carousel heeft minimaal 2 bestanden nodig (maximaal 10)');
@@ -3962,7 +3994,7 @@ async function publishCarouselToInstagram(igId, token, items, caption) {
     const params = (it.mediaType === 'video')
       ? { media_type: 'VIDEO', video_url: it.url, is_carousel_item: 'true', access_token: token }
       : { image_url: it.url, is_carousel_item: 'true', access_token: token };
-    const c = await graphPost(`${igId}/media`, params);
+    const c = await gPost(`${igId}/media`, params);
     return { id: c.id, isVideo: it.mediaType === 'video' };
   }));
   // 2) Wachten tot alle video-containers klaar zijn (parallel, max ~75s totaal).
@@ -3970,7 +4002,7 @@ async function publishCarouselToInstagram(igId, token, items, caption) {
   await Promise.all(containers.map(async (c) => {
     if (!c.isVideo) return;
     while (Date.now() < deadline) {
-      const st = await graphGet(`${c.id}`, { fields: 'status_code', access_token: token });
+      const st = await gGet(`${c.id}`, { fields: 'status_code', access_token: token });
       if (st.status_code === 'FINISHED') return;
       if (st.status_code === 'ERROR') throw new Error('Een van de video\'s kon niet door Instagram verwerkt worden. Probeer een ander/korter videobestand.');
       await new Promise((r) => setTimeout(r, 3000));
@@ -3978,7 +4010,7 @@ async function publishCarouselToInstagram(igId, token, items, caption) {
     throw new Error('De video-verwerking bij Instagram duurt te lang. Probeer het over een halve minuut opnieuw of gebruik kortere/kleinere video\'s.');
   }));
   // 3) Carousel-container aanmaken.
-  const carousel = await graphPost(`${igId}/media`, {
+  const carousel = await gPost(`${igId}/media`, {
     media_type: 'CAROUSEL',
     children: containers.map((c) => c.id).join(','),
     caption: (caption != null) ? String(caption) : '',
@@ -3988,13 +4020,13 @@ async function publishCarouselToInstagram(igId, token, items, caption) {
   const d2 = Date.now() + 30 * 1000;
   while (Date.now() < d2) {
     let sc = null;
-    try { const st = await graphGet(`${carousel.id}`, { fields: 'status_code', access_token: token }); sc = st.status_code; } catch (_) { sc = null; }
+    try { const st = await gGet(`${carousel.id}`, { fields: 'status_code', access_token: token }); sc = st.status_code; } catch (_) { sc = null; }
     if (sc === 'FINISHED') break;
     if (sc === 'ERROR') throw new Error('De carousel kon niet door Instagram verwerkt worden');
     await new Promise((r) => setTimeout(r, 2500));
   }
   // 5) Publiceren.
-  const pub = await graphPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token });
+  const pub = await gPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token });
   return { id: pub.id, channel: 'instagram', carousel: true, items: list.length };
 }
 
@@ -4011,7 +4043,14 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     // Client-koppeling met terugval op de workspace-koppeling.
     const creds = await resolveClientMeta(wsId, okClient);
     const token = creds.token;
-    if (!token) return res.status(400).json({ error: 'Geen Meta access token (niet bij de klant en niet op de workspace)' });
+    // Instagram: Facebook-route of Instagram-login (zelfde keuze als de rapportage).
+    // Facebook-pagina: alleen via een Facebook-koppeling.
+    let igRoute = null;
+    if (channel === 'instagram') {
+      try { igRoute = await igPublishRoute(creds); } catch (e) { return res.status(400).json({ error: e.message }); }
+    } else if (!token) {
+      return res.status(400).json({ error: 'Publiceren naar Facebook vraagt een Facebook-koppeling (Koppel met Facebook). Deze klant heeft alleen Instagram gekoppeld.' });
+    }
     const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
     const cap = (caption != null) ? String(caption) : '';
 
@@ -4021,7 +4060,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
       if (channel !== 'instagram') return res.status(400).json({ error: 'Een carousel kan alleen op Instagram geplaatst worden' });
       const items = await resolveCarouselAssets(wsId, okClient, carouselAssetIds);
       if (items.length < 2) return res.status(400).json({ error: 'Kies minimaal 2 publieke bestanden (uit Content) voor de carousel' });
-      result = await publishCarouselToInstagram(creds.igUserId, token, items, cap);
+      result = await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, cap, igRoute);
     } else {
       // Enkel bestand (foto/video) of alleen tekst (Facebook).
       let mediaUrl = null, mediaType = 'image';
@@ -4035,7 +4074,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
         mediaUrl = asset.url;
         mediaType = asset.resource_type === 'video' ? 'video' : 'image';
       }
-      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap);
+      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap, igRoute);
     }
 
     // Post markeren als gepubliceerd.
@@ -6783,14 +6822,16 @@ async function runScheduler() {
         // Client-koppeling met terugval op de workspace-koppeling.
         const creds = await resolveClientMeta(post.workspace_id, post.client_id);
         const token = creds.token;
-        if (!token) throw new Error('Geen Meta access token in de koppelingen');
+        // Instagram: Facebook-route of Instagram-login; Facebook-pagina: alleen met Facebook-token.
+        const igRoute = channel === 'instagram' ? await igPublishRoute(creds) : null;
+        if (channel !== 'instagram' && !token) throw new Error('Publiceren naar Facebook vraagt een Facebook-koppeling (Koppel met Facebook).');
         let mediaUrl = null, mediaType = 'image';
         if (post.asset_url && post.asset_provider === 'cloudinary') {
           mediaUrl = post.asset_url;
           mediaType = post.asset_type === 'video' ? 'video' : 'image';
         }
         const caption = post.body || post.title || '';
-        await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption);
+        await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute);
         await withWriteConnection(async (c) => c.query(
           `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
         ));
