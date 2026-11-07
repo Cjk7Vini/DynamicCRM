@@ -2659,6 +2659,12 @@ function integrationsView(row) {
   out.notes = row ? (row.notes || '') : '';
   for (const f of INT_SECRET) out[f] = maskSecret(row ? row[f] : null);
   out.encrypted = !!mktKey();
+  // Status van "Koppel via Instagram" (geen token, alleen of het er is en voor welk account).
+  out.ig_login = {
+    connected: !!(row && row.ig_login_token),
+    username: (row && row.ig_login_username) || null,
+    expires_at: (row && row.ig_login_expires_at) || null,
+  };
   return out;
 }
 
