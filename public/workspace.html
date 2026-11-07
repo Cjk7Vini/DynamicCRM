@@ -4243,6 +4243,17 @@ async function loadIntegrations(){
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/integrations',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){showMsg('intMsg',false,d.error||'Kon koppelingen niet laden.');return;}
     var g=d.integrations;
+    // Status van "Koppel via Instagram" tonen, zodat zichtbaar is of en met welk account het gekoppeld is.
+    var _igst=document.getElementById('igLoginStatus');
+    if(_igst){
+      var il=g&&g.ig_login;
+      if(il&&il.connected){
+        var _till=il.expires_at?(' &middot; geldig tot '+esc(new Date(il.expires_at).toLocaleDateString('nl-NL'))):'';
+        _igst.innerHTML='<span style="color:#16a34a;font-weight:700">&#10003; Gekoppeld via Instagram'+(il.username?(': @'+esc(il.username)):'')+'</span>'+_till;
+      } else {
+        _igst.innerHTML='<span style="color:var(--muted)">Nog niet gekoppeld via Instagram.</span>';
+      }
+    }
     INT_PLAIN.forEach(function(f){var el=document.getElementById('int_'+f);if(el)el.value=g[f]||'';});
     // ID's en tokens worden gemaskeerd getoond (leeg veld + hint). Overschrijf om te wijzigen.
     INT_MASKED.concat(INT_SECRET).forEach(function(f){var el=document.getElementById('int_'+f);if(el){var s=g[f]||{};el.value='';el.placeholder=s.set?(s.hint+' (ingesteld)'):'Nog niet ingesteld';}});
