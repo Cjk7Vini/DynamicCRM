@@ -42,6 +42,11 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Instagram-testers (Instagram-login) zijn een aparte rol. Accepteren gaat op instagram.com in de browser (niet in de app): Instellingen, Apps en websites, Testeruitnodigingen. Het account moet een zakelijk of creator-account zijn.
 - Na de app review: controleren dat alle klanten via de Facebook-route lopen, het delen via het bedrijfsportfolio of een partnertoewijzing werkt, en tokens automatisch worden ververst (`/api/mkt/cron/refresh-meta-tokens`).
 
+### Publiceren
+- Publiceren naar Instagram ("Nu publiceren", carrousel en de planner) gebruikt dezelfde routekeuze als de rapportage (`igPublishRoute`, op basis van `pickIgRoute`): Facebook-route met `instagram_content_publish`, of bij alleen "Koppel via Instagram" graph.instagram.com met `instagram_business_content_publish`.
+- Publiceren naar een Facebook-pagina vraagt altijd een Facebook-koppeling (`pages_manage_posts`).
+- De knop "Koppel met Facebook" vraagt de rechten uit `META_LOGIN_SCOPES` (Render) met `auth_type=rerequest`, zodat eerder overgeslagen rechten opnieuw gevraagd worden. Het scherm na het koppelen toont per recht of het verleend is.
+
 ### Advertentiecijfers (Marketing API)
 - Meta geeft standaard maar 25 regels per pagina. Lijsten en insights altijd met `graphGetAll` ophalen (volgt `paging.next`), nooit met een losse `graphGet`, anders vallen campagnes, ad sets of advertenties stil weg.
 - Ad sets en advertenties zonder cijfers in de gekozen periode (meestal gepauzeerd) krijgen hun totaal sinds start in een apart veld `lifetime`. Dat telt nooit mee in de periodetotalen; de weergave toont het gedempt met "totaal sinds start".
