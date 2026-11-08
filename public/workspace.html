@@ -4953,10 +4953,17 @@ async function shareApprovalLink(){
   }catch(e){showMsg('postsMsg',false,'Netwerkfout.');}
 }
 function copyShareLink(){var el=document.getElementById('shareLinkIn');if(!el)return;el.select();try{navigator.clipboard.writeText(el.value);el.nextElementSibling;}catch(e){document.execCommand('copy');}var b=event.target;var t=b.textContent;b.textContent='Gekopieerd';setTimeout(function(){b.textContent=t;},1400);}
-var PUBLISH_POST=null;
+var PUBLISH_POST=null, PUBLISH_BOTH=false;
+// Keuze "Instagram en Facebook" alleen tonen als de server het ondersteunt (migratie 032).
+function syncBothOption(sel){
+  if(!sel)return; var has=null;
+  for(var i=0;i<sel.options.length;i++){if(sel.options[i].value==='both'){has=sel.options[i];break;}}
+  if(PUBLISH_BOTH&&!has){var o=document.createElement('option');o.value='both';o.textContent='Instagram en Facebook';sel.appendChild(o);}
+  else if(!PUBLISH_BOTH&&has){sel.removeChild(has);}
+}
 function pubChannelChanged(){
   var ch=document.getElementById('pubChannel').value;
-  document.getElementById('pubAssetHint').textContent=ch==='instagram'?'Instagram vereist een bestand.':'Facebook kan met of zonder bestand.';
+  document.getElementById('pubAssetHint').textContent=ch==='instagram'?'Instagram vereist een bestand.':(ch==='both'?'Instagram vereist een bestand. Dezelfde post gaat ook naar de Facebook-pagina.':'Facebook kan met of zonder bestand.');
 }
 async function openPublish(postId){
   hideMsg('publishMsg');
@@ -4964,7 +4971,7 @@ async function openPublish(postId){
   try{
     var pr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}); var pd=await pr.json();
     var post=(pd.posts||[]).filter(function(x){return String(x.id)===String(postId);})[0];
-    PUBLISH_POST=post||{id:postId};
+    PUBLISH_POST=post||{id:postId}; PUBLISH_BOTH=!!pd.publish_both; syncBothOption(document.getElementById('pubChannel'));
     document.getElementById('pubCaption').value=post?((post.body||post.title)||''):'';
     document.getElementById('pubChannel').value='instagram';
     // assets ophalen voor de keuzelijst
@@ -4995,15 +5002,15 @@ async function publishNow(){
   } else {
     var channel=document.getElementById('pubChannel').value;
     var assetId=document.getElementById('pubAsset').value;
-    if(channel==='instagram'&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
+    if((channel==='instagram'||channel==='both')&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
     body={channel:channel,caption:caption,assetId:assetId||null,postId:PUBLISH_POST?PUBLISH_POST.id:null};
   }
   btn.disabled=true; btn.textContent=isCar?'Carousel plaatsen (kan even duren)...':'Publiceren...';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':'Gepubliceerd.')+' Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
-    else {showMsg('publishMsg',false,d.error||'Publiceren mislukt.');}
+    if(r.ok&&d.success){showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':(d.both?'Gepubliceerd op Instagram en Facebook.':'Gepubliceerd.'))+' Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
+    else {showMsg('publishMsg',false,d.error||'Publiceren mislukt.'); if(d.partial||(d.skipped&&d.skipped.length))loadPosts();}
   }catch(e){showMsg('publishMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Nu publiceren';
 }
@@ -5414,7 +5421,7 @@ function renderList(posts){
       var appBadge=approvalBadge(p.approval);
       var autoBadge='';
       if(p.published_at){autoBadge='<span class="status published">Auto-gepubliceerd</span>';}
-      else if(p.auto_publish){autoBadge='<span class="status scheduled">Auto: '+esc((p.publish_channel==='facebook')?'Facebook':'Instagram')+'</span>';}
+      else if(p.auto_publish){autoBadge='<span class="status scheduled">Auto: '+esc((p.publish_channel==='facebook')?'Facebook':(p.publish_channel==='both'?'Instagram + Facebook':'Instagram'))+'</span>';}
       var appBtn='';
       if(canManage){
         if(p.approval==='none'){appBtn='<button class="icon-btn" title="Ter goedkeuring sturen" onclick="setApproval('+p.id+',\'pending\')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>';}
@@ -5459,7 +5466,7 @@ async function loadPosts(){
     var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
     _CONTENT_POSTS=d.posts||[];
-    POST_EXTRAS=!!d.extras; POST_ACTIVITY=!!d.activity;
+    POST_EXTRAS=!!d.extras; POST_ACTIVITY=!!d.activity; PUBLISH_BOTH=!!d.publish_both;
     await loadCustomLabels();
     await loadBoardColumns();
     if(POST_EXTRAS&&!MKT_MEMBERS.length)await loadMembers();
@@ -5531,7 +5538,7 @@ function openNewPost(){
   document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
   document.getElementById('pfType').value='bericht';PF_CAROUSEL=[];
   document.getElementById('pfWhen').value='';
-  document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';document.getElementById('pfPublishChannel').value='instagram';
+  document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';syncBothOption(document.getElementById('pfPublishChannel'));document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
   PF_COVER='';var pfcc0=document.getElementById('pfCoverColor');if(pfcc0)pfcc0.value='#6366f1';renderPfCover();
   PF_ASSIGNEES=[];PF_CHECKLIST=[];pfShowExtras();renderPfAssignees();renderPfChecklist();
@@ -5552,7 +5559,7 @@ function openEditPost(id){
     document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
     document.getElementById('pfType').value=p.post_type||'bericht';PF_CAROUSEL=Array.isArray(p.carousel_asset_ids)?p.carousel_asset_ids.slice():[];
     document.getElementById('pfWhen').value=toLocalInput(p.scheduled_at);
-    document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook')?'facebook':'instagram';
+    document.getElementById('pfAuto').checked=!!p.auto_publish;document.getElementById('pfAutoCh').style.display=p.auto_publish?'block':'none';syncBothOption(document.getElementById('pfPublishChannel'));document.getElementById('pfPublishChannel').value=(p.publish_channel==='facebook'||(p.publish_channel==='both'&&PUBLISH_BOTH))?p.publish_channel:'instagram';
     PF_LABELS=Array.isArray(p.labels)?p.labels.slice():[];renderPfLabels();
     PF_COVER=p.cover_color||'';var pfcc1=document.getElementById('pfCoverColor');if(pfcc1)pfcc1.value=/^#[0-9a-fA-F]{6}$/.test(PF_COVER)?PF_COVER:'#6366f1';renderPfCover();
     PF_ASSIGNEES=Array.isArray(p.assignees)?p.assignees.slice():[];
@@ -5575,6 +5582,8 @@ async function savePost(){
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
   var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:(document.getElementById('pfType').value==='carrousel'?PF_CAROUSEL:[]),cover_color:PF_COVER};
+  // Staat "beide" (tijdelijk) uit, dan het opgeslagen kanaal van een bestaande post niet wijzigen.
+  if(EDIT_POST&&EDIT_POST.publish_channel==='both'&&!PUBLISH_BOTH)delete payload.publish_channel;
   if(auto&&!when){showMsg('postMsg',false,'Kies een datum/tijd om automatisch te publiceren.');return;}
   btn.disabled=true; btn.textContent='Bezig...';
   try{
