@@ -1223,6 +1223,38 @@ async function postActivityAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Publiceren naar Instagram EN Facebook (migratie 032): per kanaal vastleggen wanneer
+// de post daar geplaatst is, zodat een nieuwe poging nooit dubbel plaatst.
+// Kill switch: MKT_PUBLISH_BOTH=0 zet alles terug naar de oude werking (geen keuze
+// "beide", geen per-kanaal registratie, en de planner laat posts met 'both' liggen).
+let _hasPublishBoth = null;
+async function publishBothAvailable() {
+  if (process.env.MKT_PUBLISH_BOTH === '0') return false;
+  if (_hasPublishBoth === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name IN ('ig_published_at','fb_published_at')"
+    )).rows);
+    if (r.length === 2) _hasPublishBoth = true;
+    return r.length === 2;
+  } catch (_) { return false; }
+}
+// Kanaal-keuze voor automatisch publiceren: 'both' alleen als het beschikbaar is.
+async function normalizePublishChannel(v) {
+  if (v === 'facebook') return 'facebook';
+  if (v === 'both' && await publishBothAvailable()) return 'both';
+  return 'instagram';
+}
+// Na een geslaagde plaatsing: per kanaal vastleggen (best-effort, alleen met migratie 032).
+async function markChannelPublished(postId, wsId, clientId, channel) {
+  if (!postId || !(await publishBothAvailable())) return;
+  const col = channel === 'facebook' ? 'fb_published_at' : 'ig_published_at';
+  try {
+    await withWriteConnection(async (c) => c.query(
+      `UPDATE marketing.content_posts SET ${col}=now(), updated_at=now() WHERE id=$1 AND workspace_id=$2 AND client_id=$3`, [postId, wsId, clientId]
+    ));
+  } catch (_) { /* registratie niet blokkerend */ }
+}
 // Een activiteit vastleggen (best-effort; nooit de hoofdactie laten mislukken).
 async function logPostActivity(wsId, postId, actorId, actorName, action, detail) {
   try {
@@ -1295,10 +1327,12 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasCarousel = await postCarouselAvailable();
     const hasBoardWeek = await postBoardWeekAvailable();
     const hasCover = await postCoverAvailable();
+    const hasBoth = await publishBothAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
+              ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
               ${hasLabels ? 'p.labels,' : ''}
               ${hasBlocks ? 'p.content_blocks,' : ''}
               ${hasType ? 'p.post_type,' : ''}
@@ -1317,7 +1351,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
-    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable() });
+    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable(), publish_both: hasBoth });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1348,7 +1382,7 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
       if (ok) assetId = ok.id;
     }
     const autoPub = auto_publish === true && !!when;
-    const pubCh = (publish_channel === 'facebook') ? 'facebook' : 'instagram';
+    const pubCh = await normalizePublishChannel(publish_channel);
     const extras = await postExtrasAvailable();
     const assignees = extras ? await sanitizeAssignees(wsId, req.body && req.body.assignees) : [];
     const checklist = extras ? (sanitizeChecklist(req.body && req.body.checklist) || []) : [];
@@ -1481,14 +1515,38 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
         if (ok) { sets.push(`asset_id=$${i++}`); vals.push(ok.id); }
       }
     }
-    if (b.publish_channel !== undefined && (b.publish_channel === 'instagram' || b.publish_channel === 'facebook')) {
+    if (b.publish_channel !== undefined && (b.publish_channel === 'instagram' || b.publish_channel === 'facebook' || (b.publish_channel === 'both' && await publishBothAvailable()))) {
       sets.push(`publish_channel=$${i++}`); vals.push(b.publish_channel);
     }
-    // Automatisch publiceren aan/uit. Bij aanzetten: teller en status resetten zodat de planner opnieuw kan afvuren.
+    // Automatisch publiceren aan/uit.
+    // Het formulier stuurt bij ELKE keer opslaan auto_publish=true mee. Vroeger zette dat
+    // published_at altijd terug, waardoor de planner een al geplaatste post met een tijd in
+    // het verleden binnen een minuut opnieuw plaatste. Nu:
+    // - nog niet geplaatst: teller en fout resetten (opnieuw proberen), zoals voorheen;
+    // - al geplaatst: alleen opnieuw plannen als er bewust een NIEUWE tijd in de toekomst
+    //   is gekozen; anders blijft de post geplaatst en gebeurt er niets.
+    // Terugval naar de oude werking: MKT_AUTOPUB_OLD_RESET=1.
     if (b.auto_publish !== undefined) {
       const on = b.auto_publish === true;
       sets.push(`auto_publish=$${i++}`); vals.push(on);
-      if (on) { sets.push(`publish_attempts=0`); sets.push(`published_at=NULL`); sets.push(`publish_error=NULL`); }
+      if (on && process.env.MKT_AUTOPUB_OLD_RESET === '1') {
+        sets.push(`publish_attempts=0`); sets.push(`published_at=NULL`); sets.push(`publish_error=NULL`);
+      } else if (on) {
+        const old = await withReadConnection(async (c) => (await c.query(
+          'SELECT published_at, scheduled_at FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2', [req.params.id, wsId]
+        )).rows[0]);
+        if (old && !old.published_at) {
+          sets.push(`publish_attempts=0`); sets.push(`publish_error=NULL`);
+        } else if (old && old.published_at) {
+          const nw = (b.scheduled_at !== undefined && b.scheduled_at !== '' && b.scheduled_at !== null) ? new Date(b.scheduled_at) : null;
+          const oldT = old.scheduled_at ? new Date(old.scheduled_at).getTime() : null;
+          const replanned = nw && !isNaN(nw.getTime()) && nw.getTime() > Date.now() && nw.getTime() !== oldT;
+          if (replanned) {
+            sets.push(`publish_attempts=0`); sets.push(`published_at=NULL`); sets.push(`publish_error=NULL`);
+            if (await publishBothAvailable()) { sets.push(`ig_published_at=NULL`); sets.push(`fb_published_at=NULL`); }
+          }
+        }
+      }
     }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     sets.push(`updated_at=now()`);
@@ -3930,7 +3988,8 @@ function friendlyPublishError(msg, channel) {
     if (channel === 'instagram') {
       return 'Instagram weigert het publiceren (rechtenfout, code 10). De koppeling mist het recht om te publiceren (instagram_content_publish bij Koppel met Facebook, instagram_business_content_publish bij Koppel via Instagram). Koppel opnieuw en geef dat recht. Voor echte klantaccounts is daarnaast Meta App Review nodig.';
     }
-    return 'Meta weigert het publiceren (rechtenfout, code 10). Het access token mist de benodigde permissie. Genereer het token opnieuw met de juiste rechten en sla het weer op bij de koppeling.';
+    // De letterlijke melding van Meta blijft erbij: die noemt de echte oorzaak (pagina, rol, recht).
+    return 'Facebook weigert het publiceren (rechtenfout). Controleer bij Koppel met Facebook dat de pagina van de klant is aangevinkt, dat pages_manage_posts is verleend en dat het account content mag maken op de pagina. Melding van Meta: ' + m;
   }
   return m;
 }
@@ -3977,14 +4036,41 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
   const pageId = intg.meta_page_id;
-  let pageToken = token;
-  try { const pg = await graphGet(`${pageId}`, { fields: 'access_token', access_token: token }); if (pg.access_token) pageToken = pg.access_token; } catch (_) { /* val terug op het meegegeven token */ }
-  if (mediaUrl && mediaType === 'image') {
-    const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
-    return { id: pub.post_id || pub.id, channel: 'facebook' };
-  }
-  const pub = await graphPost(`${pageId}/feed`, { message: cap, access_token: pageToken });
-  return { id: pub.id, channel: 'facebook' };
+  // Pagina-token ophalen. Lukt dat niet, dan proberen we het meegegeven token (dat kan
+  // zelf al een pagina-token zijn, bij een met de hand geplakt token). Mislukt het posten
+  // daarna, dan geven we de reden van het pagina-token mee, zodat de echte oorzaak
+  // (pagina niet aangevinkt, geen rol op de pagina) zichtbaar is.
+  let pageToken = token; let pageTokErr = null;
+  try {
+    const pg = await graphGet(`${pageId}`, { fields: 'access_token', access_token: token });
+    if (pg.access_token) pageToken = pg.access_token; else pageTokErr = 'Meta gaf geen pagina-token terug voor pagina ' + pageId;
+  } catch (e) { pageTokErr = (e && e.message) ? e.message : 'pagina-token ophalen mislukt'; }
+  const withPageHint = (e) => {
+    const m = (e && e.message) ? e.message : String(e);
+    return new Error(pageTokErr ? (m + ' [pagina-token: ' + pageTokErr + ']') : m);
+  };
+  try {
+    if (mediaUrl && mediaType === 'image') {
+      const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
+      return { id: pub.post_id || pub.id, channel: 'facebook' };
+    }
+    if (mediaUrl && mediaType === 'video') {
+      // Video naar de pagina (vroeger ging alleen de tekst mee, zonder video).
+      const pub = await graphVideoPost(`${pageId}/videos`, { file_url: mediaUrl, description: cap, access_token: pageToken });
+      return { id: pub.post_id || pub.id, channel: 'facebook', video: true };
+    }
+    const pub = await graphPost(`${pageId}/feed`, { message: cap, access_token: pageToken });
+    return { id: pub.id, channel: 'facebook' };
+  } catch (e) { throw withPageHint(e); }
+}
+// Video-uploads naar een Facebook-pagina gaan via de video-host van Meta.
+const GRAPH_VIDEO = 'https://graph-video.facebook.com/v21.0';
+async function graphVideoPost(pathAndId, params) {
+  const body = new URLSearchParams(params);
+  const r = await fetch(`${GRAPH_VIDEO}/${pathAndId}`, { method: 'POST', body });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(metaErrorMessage(j));
+  return j;
 }
 
 // Publiceert een carousel (meerdere foto's/video's) als organische Instagram-post.
@@ -4044,6 +4130,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
     const { channel, caption, assetId, postId, carouselAssetIds } = req.body || {};
+    if (channel === 'both') return publishBothNow(req, res, wsId, okClient);
     if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
 
     // Client-koppeling met terugval op de workspace-koppeling.
@@ -4091,6 +4178,8 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
           [postId, wsId, okClient]
         ));
       } catch (_) { /* niet blokkerend */ }
+      // Per kanaal vastleggen (migratie 032), zodat de planner dit kanaal niet nog eens plaatst.
+      await markChannelPublished(postId, wsId, okClient, channel);
     }
     res.json({ success: true, result });
   } catch (e) {
@@ -4098,6 +4187,78 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     res.status(400).json({ error: friendlyPublishError(e.message, ch) });
   }
 });
+
+// "Nu publiceren" naar Instagram EN Facebook. Eerst alles controleren (koppeling,
+// bestand, pagina), pas daarna plaatsen, zodat er niet half gepubliceerd wordt door
+// een fout die vooraf te zien was. Een kanaal dat voor deze post al geplaatst is
+// (per-kanaal registratie, migratie 032) wordt overgeslagen: nooit dubbel.
+const CH_LABEL = { instagram: 'Instagram', facebook: 'Facebook' };
+async function publishBothNow(req, res, wsId, okClient) {
+  const { caption, assetId, postId, carouselAssetIds } = req.body || {};
+  try {
+    if (!(await publishBothAvailable())) return res.status(400).json({ error: 'Publiceren naar beide kanalen is nog niet beschikbaar (migratie 032 ontbreekt of staat uit).' });
+    if (Array.isArray(carouselAssetIds) && carouselAssetIds.length >= 2) return res.status(400).json({ error: 'Een carousel kan alleen op Instagram geplaatst worden' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    const token = creds.token;
+    // Vooraf controleren.
+    let igRoute;
+    try { igRoute = await igPublishRoute(creds); } catch (e) { return res.status(400).json({ error: 'Instagram: ' + e.message + ' Er is niets geplaatst.' }); }
+    if (!token) return res.status(400).json({ error: 'Facebook: publiceren naar Facebook vraagt een Facebook-koppeling (Koppel met Facebook). Er is niets geplaatst.' });
+    if (!creds.pageId) return res.status(400).json({ error: 'Facebook: er is geen Facebook-pagina gekoppeld bij deze klant. Er is niets geplaatst.' });
+    if (!assetId) return res.status(400).json({ error: 'Instagram vereist een bestand. Kies er een. Er is niets geplaatst.' });
+    const asset = await withReadConnection(async (c) => (await c.query(
+      'SELECT url, resource_type, provider FROM marketing.assets WHERE id=$1 AND client_id=$2 AND workspace_id=$3',
+      [assetId, okClient, wsId]
+    )).rows[0]);
+    if (!asset) return res.status(404).json({ error: 'Gekozen bestand niet gevonden' });
+    if (asset.provider !== 'cloudinary' || !asset.url) return res.status(400).json({ error: 'Alleen bestanden met een publieke URL kunnen worden gepubliceerd' });
+    const mediaUrl = asset.url;
+    const mediaType = asset.resource_type === 'video' ? 'video' : 'image';
+    const cap = (caption != null) ? String(caption) : '';
+    const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
+
+    // Kanalen die voor deze post al geplaatst zijn, overslaan.
+    let done = { instagram: false, facebook: false };
+    if (postId) {
+      const prow = await withReadConnection(async (c) => (await c.query(
+        'SELECT ig_published_at, fb_published_at FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2 AND client_id=$3',
+        [postId, wsId, okClient]
+      )).rows[0]);
+      if (prow) done = { instagram: !!prow.ig_published_at, facebook: !!prow.fb_published_at };
+    }
+    const results = {}; const skipped = []; const errors = [];
+    for (const ch of ['instagram', 'facebook']) {
+      if (done[ch]) { skipped.push(ch); continue; }
+      try {
+        results[ch] = await publishToMeta(intg, token, ch, mediaUrl, mediaType, cap, ch === 'instagram' ? igRoute : null);
+        await markChannelPublished(postId, wsId, okClient, ch);
+      } catch (e) {
+        errors.push(CH_LABEL[ch] + ' mislukt: ' + friendlyPublishError(e.message, ch));
+      }
+    }
+    const okList = Object.keys(results).map((ch) => CH_LABEL[ch]);
+    if (!errors.length) {
+      if (postId) {
+        try {
+          await withWriteConnection(async (c) => c.query(
+            `UPDATE marketing.content_posts SET status='published', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND client_id=$3`,
+            [postId, wsId, okClient]
+          ));
+        } catch (_) { /* niet blokkerend */ }
+      }
+      return res.json({ success: true, both: true, results, skipped,
+        result: { id: Object.values(results).map((r) => r && r.id).filter(Boolean).join(', ') || '-' } });
+    }
+    const parts = [];
+    if (okList.length) parts.push('Geplaatst op ' + okList.join(' en ') + '.');
+    if (skipped.length) parts.push('Al eerder geplaatst op ' + skipped.map((c) => CH_LABEL[c]).join(' en ') + ', overgeslagen.');
+    parts.push(errors.join(' '));
+    if (postId && (okList.length || skipped.length)) parts.push('Klik nog eens op Nu publiceren om alleen het mislukte kanaal opnieuw te proberen.');
+    return res.status(400).json({ error: parts.join(' '), partial: okList.length > 0, results, skipped });
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+}
 
 // =======================================================================
 // STAP 8 - ADVERTENTIECAMPAGNES (Meta Marketing API)
@@ -6804,8 +6965,12 @@ async function runScheduler() {
   if (schedulerBusy) return;
   schedulerBusy = true;
   try {
+    // Met migratie 032 (en zonder kill switch) ook de per-kanaal registratie; anders
+    // precies de oude werking en blijven posts met 'both' liggen.
+    const both = await publishBothAvailable();
     const due = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel,
+              ${both ? 'p.ig_published_at, p.fb_published_at,' : ''}
               a.url AS asset_url, a.resource_type AS asset_type, a.provider AS asset_provider,
               i.meta_access_token, i.meta_ig_user_id, i.meta_page_id
          FROM marketing.content_posts p
@@ -6814,6 +6979,7 @@ async function runScheduler() {
         WHERE p.auto_publish = true AND p.published_at IS NULL
           AND p.scheduled_at IS NOT NULL AND p.scheduled_at <= now()
           AND p.publish_attempts < 5
+          ${both ? '' : "AND COALESCE(p.publish_channel,'') <> 'both'"}
         ORDER BY p.scheduled_at ASC
         LIMIT 5`
     )).rows);
@@ -6823,30 +6989,45 @@ async function runScheduler() {
       await withWriteConnection(async (c) => c.query(
         'UPDATE marketing.content_posts SET publish_attempts = publish_attempts + 1 WHERE id=$1', [post.id]
       ));
-      try {
-        const channel = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
-        // Client-koppeling met terugval op de workspace-koppeling.
-        const creds = await resolveClientMeta(post.workspace_id, post.client_id);
-        const token = creds.token;
-        // Instagram: Facebook-route of Instagram-login; Facebook-pagina: alleen met Facebook-token.
-        const igRoute = channel === 'instagram' ? await igPublishRoute(creds) : null;
-        if (channel !== 'instagram' && !token) throw new Error('Publiceren naar Facebook vraagt een Facebook-koppeling (Koppel met Facebook).');
-        let mediaUrl = null, mediaType = 'image';
-        if (post.asset_url && post.asset_provider === 'cloudinary') {
-          mediaUrl = post.asset_url;
-          mediaType = post.asset_type === 'video' ? 'video' : 'image';
+      const isBoth = both && post.publish_channel === 'both';
+      const single = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
+      const targets = isBoth ? ['instagram', 'facebook'] : [single];
+      const errors = [];
+      for (const channel of targets) {
+        // Al geplaatst op dit kanaal (eerdere poging of met de hand)? Dan niet nog eens.
+        if (both && ((channel === 'instagram' && post.ig_published_at) || (channel === 'facebook' && post.fb_published_at))) continue;
+        try {
+          // Client-koppeling met terugval op de workspace-koppeling.
+          const creds = await resolveClientMeta(post.workspace_id, post.client_id);
+          const token = creds.token;
+          // Instagram: Facebook-route of Instagram-login; Facebook-pagina: alleen met Facebook-token.
+          const igRoute = channel === 'instagram' ? await igPublishRoute(creds) : null;
+          if (channel !== 'instagram' && !token) throw new Error('Publiceren naar Facebook vraagt een Facebook-koppeling (Koppel met Facebook).');
+          let mediaUrl = null, mediaType = 'image';
+          if (post.asset_url && post.asset_provider === 'cloudinary') {
+            mediaUrl = post.asset_url;
+            mediaType = post.asset_type === 'video' ? 'video' : 'image';
+          }
+          const caption = post.body || post.title || '';
+          await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute);
+          // Direct per kanaal vastleggen, vóór het volgende kanaal.
+          await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
+        } catch (e) {
+          const msg = friendlyPublishError(e.message, channel);
+          errors.push(isBoth ? (CH_LABEL[channel] + ' mislukt: ' + msg) : msg);
         }
-        const caption = post.body || post.title || '';
-        await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute);
-        await withWriteConnection(async (c) => c.query(
-          `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
-        ));
-      } catch (e) {
-        const ch = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
-        await withWriteConnection(async (c) => c.query(
-          `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [friendlyPublishError(e.message, ch).slice(0, 500), post.id]
-        ));
       }
+      try {
+        if (!errors.length) {
+          await withWriteConnection(async (c) => c.query(
+            `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
+          ));
+        } else {
+          await withWriteConnection(async (c) => c.query(
+            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [errors.join(' ').slice(0, 500), post.id]
+          ));
+        }
+      } catch (_) { /* volgende minuut opnieuw */ }
     }
     try { await runAssetRetentionIfDue(); } catch (_) { /* opruimen niet kritisch */ }
     try { await runFollowerSnapshotsIfDue(); } catch (_) { /* snapshots niet kritisch */ }

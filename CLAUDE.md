@@ -44,7 +44,10 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 
 ### Publiceren
 - Publiceren naar Instagram ("Nu publiceren", carrousel en de planner) gebruikt dezelfde routekeuze als de rapportage (`igPublishRoute`, op basis van `pickIgRoute`): Facebook-route met `instagram_content_publish`, of bij alleen "Koppel via Instagram" graph.instagram.com met `instagram_business_content_publish`.
-- Publiceren naar een Facebook-pagina vraagt altijd een Facebook-koppeling (`pages_manage_posts`).
+- Publiceren naar een Facebook-pagina vraagt altijd een Facebook-koppeling (`pages_manage_posts`). Foto via `/photos`, video via graph-video `/videos` (`file_url`), alleen tekst via `/feed`. Faalt het pagina-token, dan staat de reden in de foutmelding (`[pagina-token: ...]`).
+- Naar beide tegelijk ("Instagram en Facebook", `publish_channel='both'`, migratie 032): per kanaal `ig_published_at` / `fb_published_at`. Een nieuwe poging plaatst alleen het kanaal dat nog niet gelukt is, nooit dubbel. "Nu publiceren" controleert eerst koppeling, bestand en pagina en plaatst pas daarna. Zonder migratie of met `MKT_PUBLISH_BOTH=0`: oude werking, de keuze is weg en de planner laat posts met 'both' liggen.
+- Opslaan van een post met automatisch publiceren zet een al geplaatste post niet meer terug (dat gaf dubbele posts). Alleen een bewust nieuwe tijd in de toekomst plant opnieuw in. Oude werking: `MKT_AUTOPUB_OLD_RESET=1`.
+- Rechten van een koppeling meten: `/api/mkt/meta/assets-debug` (werkplek-token van de gekozen werkplek). Een recht met status "declined" vraagt Facebook alleen opnieuw dankzij `auth_type=rerequest`.
 - De knop "Koppel met Facebook" vraagt de rechten uit `META_LOGIN_SCOPES` (Render) met `auth_type=rerequest`, zodat eerder overgeslagen rechten opnieuw gevraagd worden. Het scherm na het koppelen toont per recht of het verleend is.
 
 ### Advertentiecijfers (Marketing API)
