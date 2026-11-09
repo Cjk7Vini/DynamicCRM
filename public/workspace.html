@@ -304,6 +304,11 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
   .side{display:none}
   .topbar,.content{padding-left:18px;padding-right:18px}
 }
+/* Laad-indicator: draaiend icoon bij "Laden..." en bij het wisselen van periode. */
+.ws-spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:wsspin .8s linear infinite;vertical-align:-3px;margin-right:8px;flex-shrink:0}
+@keyframes wsspin{to{transform:rotate(360deg)}}
+.ws-busy>*{opacity:.45;pointer-events:none;transition:opacity .15s}
+.ws-busy-ov{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:450;background:var(--panel);border:1px solid var(--line-2);border-radius:999px;padding:10px 18px;display:flex;align-items:center;font-size:13.5px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
@@ -411,13 +416,13 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="content">
       <!-- OVERZICHT -->
       <section class="view active" id="viewOverzicht">
-        <div id="ovRoot"><div class="empty">Laden...</div></div>
+        <div id="ovRoot"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- CLIENT-HOME (overzicht voor de ingelogde client) -->
       <section class="view" id="viewAgenda"><div id="agMainRoot"></div></section>
       <section class="view" id="viewClientHome">
-        <div id="clientHomeBody"><div class="empty">Laden...</div></div>
+        <div id="clientHomeBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- WERKPLEK-KOPPELING (workspace-niveau) -->
@@ -468,7 +473,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">Agenda-categorieën</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Geef soorten werk een eigen kleur, bijvoorbeeld Meeting, Content maken of Admin. Bij een taak kies je dan een categorie, en in de agenda schakel je tussen "Kleur op klant" en "Kleur op categorie".</p>
           <div id="agCatMsg" class="inline-msg"></div>
-          <div id="agCatList"><div style="color:var(--muted);font-size:13px">Laden...</div></div>
+          <div id="agCatList"><div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div class="card" id="kpiCard" style="max-width:880px;margin-bottom:16px">
           <div style="font-size:15px;font-weight:700;margin-bottom:4px">KPI's organisch</div>
@@ -563,7 +568,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="section-h"><span class="pill">Rapportage over alle klanten</span></div>
         <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Overzicht van de eigen werkplek-data per klant. Meta-cijfers per klant staan in de Rapportage-tab van die klant.</div>
         <div id="repOverviewMsg" class="inline-msg"></div>
-        <div id="repOverviewBody"><div class="empty">Laden...</div></div>
+        <div id="repOverviewBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- BEHEER (clienten per klant) -->
@@ -571,7 +576,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="section-h"><span class="pill">Beheer: clienten per klant</span></div>
         <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Welke client-logins zijn aan welke klant gekoppeld. Binnenkort kun je hier ook clienten uitnodigen.</div>
         <div id="beheerMsg" class="inline-msg"></div>
-        <div id="beheerBody"><div class="empty">Laden...</div></div>
+        <div id="beheerBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- KOPPELINGEN (werkplek-breed live-overzicht, alleen seats) -->
@@ -579,7 +584,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
         <div class="section-h"><span class="pill">Koppelingen die live staan</span></div>
         <div style="font-size:13px;color:var(--muted);margin:-4px 0 16px">Per klant zie je welke Meta-kanalen gekoppeld zijn. Een nieuwe koppeling zet je in de Koppelingen-tab van de betreffende klant.</div>
         <div id="koppOverviewMsg" class="inline-msg"></div>
-        <div id="koppOverviewBody"><div class="empty">Laden...</div></div>
+        <div id="koppOverviewBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- HANDLEIDING -->
@@ -725,7 +730,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <span class="pill" id="clientLimitPill">Klanten: -</span>
         </div>
         <div id="clientsMsg" class="inline-msg"></div>
-        <div id="clientsBody"><div class="empty">Laden...</div></div>
+        <div id="clientsBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
       </section>
 
       <!-- KLANT DETAIL -->
@@ -747,15 +752,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <button id="tabReport" onclick="dTab(this,'report')">Rapportage</button>
         </div>
         <div id="clientReportBar" style="display:none;margin:4px 0 14px"></div>
-        <div id="dOverview"><div id="dOverviewBody"><div class="empty">Laden...</div></div></div>
+        <div id="dOverview"><div id="dOverviewBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div></div>
         <div id="dCampReview" style="display:none">
           <div id="campReviewMsg" class="inline-msg"></div>
-          <div id="campReviewBody"><div class="empty">Laden...</div></div>
+          <div id="campReviewBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dAdMachine" style="display:none">
           <div class="section-h"><span class="pill">Ad Machine</span></div>
           <div style="font-size:13px;color:var(--muted);margin:-4px 0 14px">Creatie en keuring met Claude: van concurrentie-analyse en concept tot hooks, scripts, teksten en de keuring van je ad en landingspagina. Kies een onderdeel.</div>
-          <div id="admBody"><div class="empty">Laden...</div></div>
+          <div id="admBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dInfo">
           <div id="dEditMsg" class="inline-msg"></div>
@@ -830,7 +835,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
           <div id="postsMsg" class="inline-msg"></div>
-          <div id="postsBody"><div class="empty">Laden...</div></div>
+          <div id="postsBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dTodo" style="display:none">
           <div id="agClientRoot"></div>
@@ -838,14 +843,14 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="section-h"><span class="pill">To do</span></div>
           <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px">Wat de klant of jij nog moet regelen. Voeg eventueel een link toe (bv. naar een vragenlijst).</div>
           <div id="todoMsg" class="inline-msg"></div>
-          <div id="todoBody"><div class="empty">Laden...</div></div>
+          <div id="todoBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
           </div>
         </div>
         <div id="dDocs" style="display:none">
           <div class="section-h"><span class="pill">Documenten</span></div>
           <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px">Belangrijke links en bestanden (contract, bedrijfsinfo, Google Drive-map).</div>
           <div id="docsMsg" class="inline-msg"></div>
-          <div id="docsBody"><div class="empty">Laden...</div></div>
+          <div id="docsBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dAssets" style="display:none">
           <span class="back" onclick="backToPlanning()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:10px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Terug naar planning</span>
@@ -857,7 +862,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             </div>
           </div>
           <div id="assetsMsg" class="inline-msg"></div>
-          <div id="assetsBody"><div class="empty">Laden...</div></div>
+          <div id="assetsBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dCampaigns" style="display:none">
           <div class="section-h">
@@ -865,7 +870,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <button class="btn btn-primary" id="newCampBtn" onclick="openCampaign()">+ Nieuwe campagne</button>
           </div>
           <div id="campMsg" class="inline-msg"></div>
-          <div id="campBody"><div class="empty">Laden...</div></div>
+          <div id="campBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
         <div id="dIntegrations" style="display:none">
           <div id="intMsg" class="inline-msg"></div>
@@ -982,7 +987,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           </div>
           <div id="reportMsg" class="inline-msg"></div>
           <div id="aiAnalyseBox" style="display:none"></div>
-          <div id="reportBody"><div class="empty">Laden...</div></div>
+          <div id="reportBody"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
         </div>
       </section>
     </div>
@@ -1116,7 +1121,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <h3 id="cdTitle">Campagne</h3>
     <div class="sub">Beheer de advertentiesets en advertenties. Wijzigingen gaan direct naar Meta.</div>
     <div id="cdMsg" class="inline-msg"></div>
-    <div id="cdBody" style="max-height:60vh;overflow:auto"><div class="empty">Laden...</div></div>
+    <div id="cdBody" style="max-height:60vh;overflow:auto"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeCampDetail()">Sluiten</button></div>
   </div>
 </div>
@@ -1728,7 +1733,7 @@ function showClientHome(){
 function detailBack(){ if(CLIENT_MODE){ showClientHome(); } else { navTo('clients'); } }
 async function renderClientHome(clientId,clientName){
   var box=document.getElementById('clientHomeBody'); if(!box)return;
-  box.innerHTML='<div class="empty">Laden...</div>';
+  box.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   var posts=[], items=[];
   try{var r=await fetch('/api/mkt/clients/'+clientId+'/posts',{credentials:'include'});var d=await r.json();if(d&&d.success)posts=d.posts||[];}catch(e){}
   try{var r2=await fetch('/api/mkt/clients/'+clientId+'/items?kind=todo',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)items=(d2.items||[]).filter(function(x){return !x.done;});}catch(e){}
@@ -1755,7 +1760,7 @@ function showPicker(email){
   loadWorkspacesPicker();
 }
 async function loadWorkspacesPicker(){
-  var el=document.getElementById('pkList'); el.innerHTML='<div style="color:var(--muted);font-size:14px">Laden...</div>';
+  var el=document.getElementById('pkList'); el.innerHTML='<div style="color:var(--muted);font-size:14px"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/platform/workspaces',{credentials:'include'});
     var d=await r.json();
@@ -1821,7 +1826,7 @@ function toggleProfileMenu(forceClose){
 }
 async function loadBeheer(){
   var box=document.getElementById('beheerBody'); if(!box)return; hideMsg('beheerMsg');
-  box.innerHTML='<div class="empty">Laden...</div>';
+  box.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/client-users',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){box.innerHTML='';showMsg('beheerMsg',false,(d&&d.error)||'Kon beheer niet laden.');return;}
@@ -1931,7 +1936,7 @@ async function loadOverzicht(){
         '</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+(pinnedName?('Cijfers van '+esc(pinnedName)):'Jouw best presterende post')+'</div><a class="ovlnk" onclick="navTo(\'reporting\')">Open rapportage &rarr;</a></div>'+
-          '<div id="ovBestPost"><div style="color:var(--muted);font-size:13px">Cijfers laden...</div></div></div>'+
+          '<div id="ovBestPost"><div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Cijfers laden...</div></div></div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">'+calIcon+' Jouw posts voor deze week</div><a class="ovlnk" onclick="navTo(\'clients\')">Bekijk hele planning &rarr;</a></div>'+postsHtml+'</div>'+
       '</div>'+
@@ -1943,7 +1948,7 @@ async function loadOverzicht(){
           '<div class="ovch"><div class="t">'+bellIcon+' Aandachtspunten</div>'+(nClientsOpen?'<a class="ovlnk" onclick="navTo(\'clients\')">Bekijk alle ('+nClientsOpen+') &rarr;</a>':'')+'</div>'+aandacht+'</div>'+
         '<div class="ovcard">'+
           '<div class="ovch"><div class="t">Actieve campagnes</div><a class="ovlnk" onclick="perKlant(\'campreview\')">Bekijk campagnes &rarr;</a></div>'+
-          '<div id="ovCampaigns"><div style="color:var(--muted);font-size:13px">Cijfers laden...</div></div></div>'+
+          '<div id="ovCampaigns"><div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Cijfers laden...</div></div></div>'+
       '</div>'+
     '</div>';
   // Cijfers automatisch laden. Elk endpoint meldt zelf of er iets gekoppeld is en
@@ -1957,8 +1962,8 @@ async function loadOverzicht(){
 function ovLoadPinnedCards(cid){
   var iv=function(v){return v!=null?Number(v).toLocaleString('nl-NL'):'-';};
   var pb=document.getElementById('ovBestPost'); var cb=document.getElementById('ovCampaigns');
-  if(pb)pb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
-  if(cb)cb.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
+  if(pb)pb.innerHTML='<div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Laden...</div>';
+  if(cb)cb.innerHTML='<div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Laden...</div>';
   fetch('/api/mkt/clients/'+cid+'/meta-insights'+ovDateQS(),{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(pb){
       if(!d||!d.success||!d.configured){ pb.innerHTML='<div style="color:var(--muted);font-size:13px">Nog geen Instagram gekoppeld voor deze klant.</div>'; }
@@ -2006,7 +2011,7 @@ function ovLoadPinnedCards(cid){
 // Best presterende post van het eigen (werkplek-)Instagram, op aanvraag.
 function ovLoadBestPost(){
   var box=document.getElementById('ovBestPost'); if(!box)return;
-  box.innerHTML='<div style="color:var(--muted);font-size:13px">Laden... dit kan even duren, we halen de cijfers bij Meta op.</div>';
+  box.innerHTML='<div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Laden... dit kan even duren, we halen de cijfers bij Meta op.</div>';
   fetch('/api/mkt/overview/own-account?part=post',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d||!d.success){box.innerHTML='<div style="color:#f87171;font-size:13px">'+esc((d&&d.error)||'Kon niet laden.')+'</div>';return;}
     if(!d.postConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen Instagram gekoppeld bij de klanten of op werkplek-niveau.</div>';return;}
@@ -2031,7 +2036,7 @@ function ovLoadBestPost(){
 // Actieve campagnes van deze workspace, op aanvraag.
 function ovLoadCampaigns(){
   var box=document.getElementById('ovCampaigns'); if(!box)return;
-  box.innerHTML='<div style="color:var(--muted);font-size:13px">Laden... we halen de campagnes bij Meta op.</div>';
+  box.innerHTML='<div style="color:var(--muted);font-size:13px"><span class="ws-spin"></span>Laden... we halen de campagnes bij Meta op.</div>';
   fetch('/api/mkt/overview/own-account?part=campaigns',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d||!d.success){box.innerHTML='<div style="color:#f87171;font-size:13px">'+esc((d&&d.error)||'Kon niet laden.')+'</div>';return;}
     if(!d.campaignsConfigured){box.innerHTML='<div style="color:var(--muted);font-size:13px;line-height:1.6">Nog geen Meta ad-account gekoppeld (werkplek of klant).</div>';return;}
@@ -2150,7 +2155,7 @@ async function extendWsToken(){
 // ---- Rapportage (werkplek-breed, seats) ----
 async function loadReportingOverview(){
   var body=document.getElementById('repOverviewBody'); hideMsg('repOverviewMsg');
-  body.innerHTML='<div class="empty">Laden...</div>';
+  body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   function mb(b){return ((Number(b)||0)/1048576).toFixed(1)+' MB';}
   try{
     var r=await fetch('/api/mkt/reporting/overview',{credentials:'include'}); var d=await r.json();
@@ -2186,7 +2191,7 @@ async function loadReportingOverview(){
 // ---- Koppelingen (werkplek-breed live-overzicht, seats) ----
 async function loadKoppelingenOverview(){
   var body=document.getElementById('koppOverviewBody'); hideMsg('koppOverviewMsg');
-  body.innerHTML='<div class="empty">Laden...</div>';
+  body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   // Groen = ingesteld (er staat iets ingevuld). Of de koppeling ook echt werkt,
   // zie je pas na "Test verbinding" (die pingt Meta live).
   function dot(on){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px"><span style="width:9px;height:9px;border-radius:50%;background:'+(on?'#16a34a':'var(--line)')+'"></span>'+(on?'ingesteld':'-')+'</span>';}
@@ -2268,7 +2273,7 @@ async function testWorkspaceKoppeling(btn){
 }
 // ---- Klanten ----
 async function loadClients(){
-  var body=document.getElementById('clientsBody'); hideMsg('clientsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  var body=document.getElementById('clientsBody'); hideMsg('clientsMsg'); body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/clients',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('clientsMsg',false,d.error||'Kon klanten niet laden.');return;}
@@ -2422,7 +2427,7 @@ async function loadClientOverview(){
   var box=document.getElementById('dOverviewBody'); if(!box)return;
   if(!CURRENT_CLIENT){box.innerHTML='';return;}
   var cid=CURRENT_CLIENT.id;
-  box.innerHTML='<div class="empty">Laden...</div>';
+  box.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   var posts=[], items=[];
   try{var r=await fetch('/api/mkt/clients/'+cid+'/posts',{credentials:'include'});var d=await r.json();if(d&&d.success)posts=d.posts||[];}catch(e){}
   try{var r2=await fetch('/api/mkt/clients/'+cid+'/items?kind=todo',{credentials:'include'});var d2=await r2.json();if(d2&&d2.success)items=(d2.items||[]).filter(function(x){return !x.done;});}catch(e){}
@@ -2475,7 +2480,7 @@ async function loadClientOverview(){
           statCard('Openstaande taken',nTasks,'Ga naar to do','todo')+
         '</div>'+
         '<div class="card">'+cardHead('Content voor deze week',cardLink('Bekijk hele planning','content'))+weekHtml+'</div>'+
-        '<div id="ovwCijfers"><div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px;padding-top:2px">Cijfers laden...</div></div></div>'+
+        '<div id="ovwCijfers"><div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Cijfers</div><div style="color:var(--muted);font-size:13px;padding-top:2px"><span class="ws-spin"></span>Cijfers laden...</div></div></div>'+
         '<div class="card">'+cardHead('Actieve campagnes',cardLink('Open campagnes','campreview'))+
           '<div style="color:var(--muted);font-size:13px;padding-top:6px;line-height:1.6">De lopende advertentiecampagnes en hun resultaten (besteed, leads, CPL, budget) staan onder Campagnes.</div></div>'+
       '</div>'+
@@ -2609,7 +2614,7 @@ async function openAgenda(rootId,fixedClientId){
 }
 async function agLoad(){
   var root=document.getElementById(AG.root); if(!root)return;
-  if(!AG.data)root.innerHTML='<div class="empty">Laden...</div>';
+  if(!AG.data)root.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   var rg=agRange();
   var cl=AG.fixed||AG.client;
   try{
@@ -2989,7 +2994,7 @@ function setTodoBadge(myOpen){
 }
 async function loadClientItems(kind){
   if(!CURRENT_CLIENT)return; var c=clientItemsCtx(kind); var body=document.getElementById(c.body); if(!body)return;
-  body.innerHTML='<div class="empty">Laden...</div>';
+  body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   if(kind==='todo'&&!MKT_MEMBERS.length)await loadMembers();
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/items?kind='+kind,{credentials:'include'}); var d=await r.json();
@@ -3067,7 +3072,7 @@ function openViewer(url,type){
 function closeViewer(){document.getElementById('viewerModal').classList.remove('open');document.getElementById('viewerBox').innerHTML='';}
 async function loadAssets(){
   if(!CURRENT_CLIENT)return;
-  var body=document.getElementById('assetsBody'); hideMsg('assetsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  var body=document.getElementById('assetsBody'); hideMsg('assetsMsg'); body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('assetsMsg',false,d.error||'Kon assets niet laden.');return;}
@@ -3166,6 +3171,21 @@ function openReportPdf(){
   window.open('/report.html?client='+encodeURIComponent(CURRENT_CLIENT.id)+'&since='+encodeURIComponent(r.since)+'&until='+encodeURIComponent(r.until),'_blank');
 }
 
+// Laad-indicator over bestaande inhoud (bij het wisselen van periode): oude cijfers
+// gedimd, bovenaan een draaiend icoon. Altijd weer uitzetten in een finally.
+function wsBusy(el,on,text){
+  if(!el)return;
+  var ov=document.getElementById('wsBusyOv');
+  if(on){
+    el.classList.add('ws-busy');
+    if(!ov){ov=document.createElement('div');ov.id='wsBusyOv';ov.className='ws-busy-ov';document.body.appendChild(ov);}
+    ov.innerHTML='<span class="ws-spin"></span><span>'+esc(text||'Cijfers ophalen bij Meta...')+'</span>';
+    ov.style.display='flex';
+  } else {
+    el.classList.remove('ws-busy');
+    if(ov)ov.style.display='none';
+  }
+}
 // ---- Campagnes-tabblad (inzage + opmerkingen), zichtbaar voor klant en team ----
 var WS_MODE='preset', WS_PRESET='last_30d', WS_SINCE=null, WS_UNTIL=null;
 (function(){var t=new Date();WS_UNTIL=t.toISOString().slice(0,10);WS_SINCE=new Date(t.getTime()-29*86400000).toISOString().slice(0,10);})();
@@ -3270,7 +3290,7 @@ function campPerfBlock(a,perLblOverride){
 async function loadCampReview(){
   if(!CURRENT_CLIENT)return;
   var box=document.getElementById('campReviewBody');
-  box.innerHTML='<div id="campSections"><div class="empty">Laden...</div></div>';
+  box.innerHTML='<div id="campSections"><div class="empty"><span class="ws-spin"></span>Laden...</div></div>';
   loadCampSections();
 }
 function cmiVal(id){var e=document.getElementById(id);return e?e.value.trim():'';}
@@ -3294,6 +3314,7 @@ async function saveClientMetaIds(){
 }
 async function loadCampSections(){
   var box=document.getElementById('campSections'); if(!box)return;
+  wsBusy(box,true,'Campagnecijfers ophalen bij Meta...');
   try{
     var lr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaign-links',{credentials:'include'}); var ld=await lr.json();
     var linked=(ld&&ld.success&&ld.links)?ld.links.map(String):[];
@@ -3314,6 +3335,7 @@ async function loadCampSections(){
     if(adsData)renderKpiAnalyseStart(adsData);
     camps.forEach(function(c){loadCampFeedback(c.id);});
   }catch(e){box.innerHTML='<div class="empty">Kon campagnes niet laden.</div>';}
+  finally{wsBusy(box,false);}
 }
 // ---- Claude KPI-analyse tussen "Campagne data algemeen" en de campagnes ----
 function kpiStatusStyle(s){var m={sterk:['#166534','#dcfce7'],goed:['#166534','#dcfce7'],aandacht:['#92400e','#fef3c7'],zwak:['#991b1b','#fee2e2']};return m[s]||['#334155','#e2e8f0'];}
@@ -3385,7 +3407,7 @@ async function loadAdMachine(){
   var body=document.getElementById('admBody'); if(!body||!CURRENT_CLIENT)return;
   if(ME&&ME.role==='client'){ body.innerHTML='<div class="card" style="color:var(--muted);font-size:14px">De Ad Machine is beschikbaar voor het team.</div>'; return; }
   if(ADM_CONFIG){ admRenderList(); return; }
-  body.innerHTML='<div class="empty">Laden...</div>';
+  body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/admachine/skills',{credentials:'include'});
     var d=await r.json();
@@ -3645,7 +3667,7 @@ async function loadReport(){
   if(!CURRENT_CLIENT)return; var body=document.getElementById('reportBody'); hideMsg('reportMsg');
   // De rapportage toont de Instagram-cijfers (tab Organisch) en de Meta Ads
   // (tab Campagnes). De content/assets-tellers staan in het klant-overzicht.
-  body.innerHTML='<div id="metaReport"><div class="card" style="color:var(--muted);font-size:14px">Rapportage laden...</div></div>';
+  body.innerHTML='<div id="metaReport"><div class="card" style="color:var(--muted);font-size:14px"><span class="ws-spin"></span>Rapportage laden...</div></div>';
   loadMetaInsights();
 }
 var _METAPOSTS=[];
@@ -3659,7 +3681,7 @@ async function openPostDetail(id){
   if(p.thumb)head+='<img src="'+esc(p.thumb)+'" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-bottom:12px">';
   head+='<div style="font-size:14px;line-height:1.5;margin-bottom:6px">'+esc(p.caption||'(geen tekst)')+'</div>';
   head+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+esc(p.media_type||'')+(p.timestamp?(' · '+esc(fmtWhen(p.timestamp))):'')+(p.permalink?(' · <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2)">bekijk op Instagram</a>'):'')+'</div>';
-  box.innerHTML=head+'<div class="stats">'+tile('Likes',p.likes,true)+tile('Reacties',p.comments)+'</div><div id="postDetailStats" style="margin-top:12px;color:var(--muted);font-size:13px">Cijfers laden...</div>';
+  box.innerHTML=head+'<div class="stats">'+tile('Likes',p.likes,true)+tile('Reacties',p.comments)+'</div><div id="postDetailStats" style="margin-top:12px;color:var(--muted);font-size:13px"><span class="ws-spin"></span>Cijfers laden...</div>';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/media/'+encodeURIComponent(id)+'/insights',{credentials:'include'});
     var d=await r.json();
@@ -3743,6 +3765,10 @@ function metricsLegendHTML(){
 }
 async function loadMetaInsights(){
   var box=document.getElementById('metaReport'); if(!box)return;
+  wsBusy(box,true,'Rapportage ophalen bij Meta...');
+  try{ return await loadMetaInsightsInner(box); } finally { wsBusy(box,false); }
+}
+async function loadMetaInsightsInner(box){
   function tile(k,v,acc){return '<div class="stat"><div class="k">'+esc(k)+'</div><div class="v'+(acc?' accent':'')+'">'+esc(v)+'</div></div>';}
   var RTL={IMAGE:'Bericht',CAROUSEL_ALBUM:'Carrousel',VIDEO:'Video',REELS:'Reel',ONBEKEND:'Overig'};
   var MPT={REELS:'Reels',VIDEO:'Video',CAROUSEL_CONTAINER:'Carrousels',CAROUSEL_ALBUM:'Carrousels',POST:'Berichten',IMAGE:'Berichten',FEED:'Berichten',STORY:'Verhalen',IGTV:'Video',AD:'Advertenties'};
@@ -4308,7 +4334,7 @@ async function testClientIntegration(btn){
 var CAMP_OBJ_LABEL={OUTCOME_TRAFFIC:'Verkeer',OUTCOME_AWARENESS:'Naamsbekendheid',OUTCOME_ENGAGEMENT:'Betrokkenheid'};
 async function loadCampaigns(){
   if(!CURRENT_CLIENT)return; var body=document.getElementById('campBody'); hideMsg('campMsg');
-  body.innerHTML='<div class="empty">Laden...</div>';
+  body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/campaigns',{credentials:'include'}); var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('campMsg',false,d.error||'Kon campagnes niet laden.');return;}
@@ -4369,7 +4395,7 @@ function closeCampDetail(){document.getElementById('campDetailModal').classList.
 async function openCampDetail(id,name){
   CD_CAMP=id; hideMsg('cdMsg');
   document.getElementById('cdTitle').textContent=name||'Campagne';
-  document.getElementById('cdBody').innerHTML='<div class="empty">Laden...</div>';
+  document.getElementById('cdBody').innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   document.getElementById('campDetailModal').classList.add('open');
   renderCampDetail();
 }
@@ -5459,7 +5485,7 @@ function renderList(posts){
 }
 async function loadPosts(){
   if(!CURRENT_CLIENT)return;
-  var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty">Laden...</div>';
+  var body=document.getElementById('postsBody'); hideMsg('postsMsg'); body.innerHTML='<div class="empty"><span class="ws-spin"></span>Laden...</div>';
   var st=(CONTENT_VIEW==='list')?document.getElementById('postFilter').value:'';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts'+(st?('?status='+st):''),{credentials:'include'});
@@ -5604,7 +5630,7 @@ async function savePost(){
 var _PC_ME=null;
 async function loadContentComments(postId){
   var box=document.getElementById('pfComments'); if(!box)return;
-  box.innerHTML='<div style="font-size:13px;color:var(--muted)">Laden...</div>';
+  box.innerHTML='<div style="font-size:13px;color:var(--muted)"><span class="ws-spin"></span>Laden...</div>';
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts/'+postId+'/comments',{credentials:'include'});
     var d=await r.json(); if(d&&d.me!=null)_PC_ME=d.me;
