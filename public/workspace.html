@@ -1409,6 +1409,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
       <div id="pfBlocks"></div>
       <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
+      <button type="button" class="btn btn-ghost" id="pfAiBtn" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAiToggle()">Schrijf met AI</button>
+      <div id="pfAiBox" style="display:none;margin-top:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px">
+        <label style="font-size:12.5px;color:var(--muted)">Waar gaat de post over? <span style="font-weight:400">(onderwerp, aanbod, doel)</span></label>
+        <textarea id="pfAiPrompt" rows="3" maxlength="1500" style="margin-top:4px" placeholder="Bijv. review van Daisy over haar nieuwe website, doel: meer aanvragen"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn btn-primary" id="pfAiGo" style="padding:7px 14px;font-size:12.5px" onclick="pfAiGenerate()">Maak 3 teksten</button>
+          <span id="pfAiHint" style="font-size:12px;color:var(--muted)">Gebruikt het klantprofiel (doelgroep, branche) en de best scorende eigen posts.</span>
+        </div>
+        <div id="pfAiOut" style="margin-top:10px"></div>
+      </div>
     </div>
     <div class="row2">
       <div class="field"><label>Kanaal</label>
@@ -5777,13 +5787,60 @@ function renderPfBlocks(){
   }).join('');
 }
 function pfAddText(){PF_BLOCKS.push({type:'text',text:''});renderPfBlocks();}
+// ---- AI-teksten voor deze post (zelfde AI als bij advertenties) ----
+var _PF_AI_VARIANTS=[];
+function pfAiToggle(){
+  var box=document.getElementById('pfAiBox'); if(!box)return;
+  var open=box.style.display==='none';
+  box.style.display=open?'block':'none';
+  if(open){var pr=document.getElementById('pfAiPrompt');if(pr&&!pr.value.trim()){var t=(document.getElementById('pfTitle').value||'').trim();if(t)pr.value=t;}if(pr)pr.focus();}
+}
+function pfAiReset(){var box=document.getElementById('pfAiBox');if(box)box.style.display='none';var o=document.getElementById('pfAiOut');if(o)o.innerHTML='';var pr=document.getElementById('pfAiPrompt');if(pr)pr.value='';var h=document.getElementById('pfAiHint');if(h){h.style.color='var(--muted)';h.textContent='Gebruikt het klantprofiel (doelgroep, branche) en de best scorende eigen posts.';}_PF_AI_VARIANTS=[];var b=document.getElementById('pfAiBtn');if(b)b.style.display=(ME&&ME.role!=='client')?'':'none';}
+async function pfAiGenerate(){
+  if(!CURRENT_CLIENT)return;
+  var pr=document.getElementById('pfAiPrompt'), hint=document.getElementById('pfAiHint'), out=document.getElementById('pfAiOut'), btn=document.getElementById('pfAiGo');
+  var brief=(pr.value||'').trim();
+  if(brief.length<5){hint.style.color='#f87171';hint.textContent='Beschrijf eerst kort waar de post over gaat.';return;}
+  var current=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
+  btn.disabled=true; btn.textContent='Bezig...'; hint.style.color='var(--muted)'; hint.innerHTML='<span class="ws-spin"></span>AI schrijft drie teksten...'; out.innerHTML='';
+  var cid=CURRENT_CLIENT.id;
+  try{
+    var r=await fetch('/api/mkt/clients/'+cid+'/ai/post-captions',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({prompt:brief,post_type:document.getElementById('pfType').value,current_text:current})});
+    var d=await r.json();
+    if(!CURRENT_CLIENT||String(CURRENT_CLIENT.id)!==String(cid))return;
+    if(!r.ok||!d.success){hint.style.color='#f87171';hint.textContent=(d&&d.error)||'Het lukte niet om teksten te maken.';return;}
+    _PF_AI_VARIANTS=d.variants||[];
+    hint.style.color='var(--muted)';
+    hint.textContent=(d.used_top_posts?('Gebaseerd op het klantprofiel en '+d.used_top_posts+' best scorende posts.'):'Gebaseerd op het klantprofiel (geen eigen postcijfers gevonden).');
+    out.innerHTML=(d.keywords&&d.keywords.length?('<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Zoekwoorden: '+esc(d.keywords.join(', '))+'</div>'):'')+
+      _PF_AI_VARIANTS.map(function(v,i){
+        return '<div style="border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:8px;background:var(--panel)">'+
+          '<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">VARIANT '+(i+1)+'</div>'+
+          '<div style="font-size:13px;white-space:pre-wrap;line-height:1.45">'+esc(v.text)+'</div>'+
+          (v.hashtags&&v.hashtags.length?('<div style="font-size:12.5px;color:var(--accent-2);margin-top:6px">'+esc(v.hashtags.join(' '))+'</div>'):'')+
+          '<button type="button" class="btn btn-ghost" style="padding:5px 11px;font-size:12px;margin-top:8px" onclick="pfAiUse('+i+')">Gebruik deze</button>'+
+        '</div>';
+      }).join('')+
+      (d.tip?('<div style="font-size:12px;color:var(--muted)">Tip: '+esc(d.tip)+'</div>'):'');
+  }catch(e){hint.style.color='#f87171';hint.textContent='Netwerkfout. Probeer het opnieuw.';}
+  finally{btn.disabled=false;btn.textContent='Maak 3 teksten';}
+}
+function pfAiUse(i){
+  var v=_PF_AI_VARIANTS[i]; if(!v)return;
+  var full=v.text+(v.hashtags&&v.hashtags.length?('\n\n'+v.hashtags.join(' ')):'');
+  var idx=-1; for(var k=0;k<PF_BLOCKS.length;k++){if(PF_BLOCKS[k].type==='text'){idx=k;break;}}
+  var has=PF_BLOCKS.some(function(b){return b.type==='text'&&b.text&&b.text.trim();});
+  if(has&&!confirm('De huidige tekst in het eerste tekstblok vervangen door deze AI-tekst?'))return;
+  if(idx<0){PF_BLOCKS.push({type:'text',text:full});} else {PF_BLOCKS[idx].text=full;}
+  renderPfBlocks();
+}
 function pfDelBlock(i){if(PF_BLOCKS[i]&&PF_BLOCKS[i].type==='media')return;PF_BLOCKS.splice(i,1);if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];renderPfBlocks();}
 function pfTextInput(i,el){if(PF_BLOCKS[i])PF_BLOCKS[i].text=el.value;}
 function pfbDrag(e,i){_PFB_DRAG=i;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(i));}catch(_){}}
 function pfbOver(e){e.preventDefault();}
 function pfbDrop(e,i){e.preventDefault();var from=_PFB_DRAG;_PFB_DRAG=null;if(from==null||from===i)return;var item=PF_BLOCKS.splice(from,1)[0];var target=(from<i)?i-1:i;PF_BLOCKS.splice(target,0,item);renderPfBlocks();}
 function openNewPost(){
-  EDIT_POST=null; hideMsg('postMsg'); pfShowPublishBtn(false);
+  EDIT_POST=null; hideMsg('postMsg'); pfShowPublishBtn(false); pfAiReset();
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
@@ -5804,7 +5861,7 @@ function openEditPost(id){
   fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d.success)return;
     var p=d.posts.filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
-    EDIT_POST=p; hideMsg('postMsg'); pfShowPublishBtn(true);
+    EDIT_POST=p; hideMsg('postMsg'); pfShowPublishBtn(true); pfAiReset();
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
