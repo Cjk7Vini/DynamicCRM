@@ -2620,6 +2620,122 @@ async function ensureContentColumns(wsId) {
     });
   }
 }
+// =======================================================================
+// TRELLO-IMPORT - een geexporteerd Trello-bord (JSON) inlezen bij een klant.
+// De workspace leest het bestand en stuurt de kaarten in kleine porties hierheen.
+// Lijsten worden kolommen (zoeken op naam, anders aanmaken), labels worden labels
+// (idem), kaarten worden posts. Alleen eigenaar of manager. Elke portie in een
+// transactie: lukt er iets niet, dan wordt die portie in zijn geheel teruggedraaid.
+// =======================================================================
+const TRELLO_COLORS = {
+  green: '#4bce97', yellow: '#f5cd47', orange: '#fea362', red: '#f87168', purple: '#9f8fef', blue: '#579dff', sky: '#6cc3e0', lime: '#94c748', pink: '#e774bb', black: '#8590a2',
+  green_dark: '#1f845a', yellow_dark: '#946f00', orange_dark: '#c25100', red_dark: '#c9372c', purple_dark: '#6e5dc6', blue_dark: '#0c66e4', sky_dark: '#227d9b', lime_dark: '#5b7f24', pink_dark: '#ae4787', black_dark: '#626f86',
+  green_light: '#baf3db', yellow_light: '#f8e6a0', orange_light: '#fedec8', red_light: '#ffd5d2', purple_light: '#dfd8fd', blue_light: '#cce0ff', sky_light: '#c6edfb', lime_light: '#d3f1a7', pink_light: '#fdd0ec', black_light: '#dcdfe4',
+};
+const TRELLO_COLOR_NL = { green: 'Groen', yellow: 'Geel', orange: 'Oranje', red: 'Rood', purple: 'Paars', blue: 'Blauw', sky: 'Lichtblauw', lime: 'Limoen', pink: 'Roze', black: 'Grijs' };
+router.post('/api/mkt/import/trello', requireMkt, async (req, res) => {
+  try {
+    if (!mktIsOwnerOrManager(req)) return res.status(403).json({ error: 'Alleen eigenaar of manager' });
+    const wsId = req.session.mkt.workspaceId;
+    const b = req.body || {};
+    const okClient = await clientInWorkspace(b.client_id, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const channel = POST_CHANNELS.includes(b.channel) ? b.channel : 'instagram';
+    // Starttijd van de import volgens de SERVER-klok: de eerste portie krijgt hem terug en
+    // stuurt hem bij de volgende porties mee (zo telt de klok van de computer niet mee).
+    const startedAt = b.import_started_at ? new Date(b.import_started_at) : new Date();
+    if (isNaN(startedAt.getTime())) return res.status(400).json({ error: 'Ongeldige starttijd' });
+    const str = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+    const cards = (Array.isArray(b.cards) ? b.cards : []).slice(0, 200).map((c) => ({
+      title: str(c && c.title, 200),
+      desc: str(c && c.desc, 4000),
+      list: str(c && c.list, 40),
+      due: (c && c.due && !isNaN(new Date(c.due).getTime())) ? new Date(c.due) : null,
+      labels: (Array.isArray(c && c.labels) ? c.labels : []).slice(0, 10).map((l) => {
+        const color = str(l && l.color, 20).toLowerCase();
+        const base = color.replace(/_(dark|light)$/, '');
+        return { name: str(l && l.name, 40) || TRELLO_COLOR_NL[base] || 'Label', color: TRELLO_COLORS[color] || '#6366f1' };
+      }),
+      checklist: (Array.isArray(c && c.checklist) ? c.checklist : []).slice(0, 50).map((x) => ({ text: str(x && x.text, 200), done: !!(x && x.done) })).filter((x) => x.text),
+      attachments: (Array.isArray(c && c.attachments) ? c.attachments : []).slice(0, 20)
+        .map((a) => ({ name: str(a && a.name, 120), url: str(a && a.url, 500) })).filter((a) => /^https?:\/\//i.test(a.url)),
+    })).filter((c) => c.title);
+    if (!cards.length) return res.json({ success: true, created: 0, skipped: 0, columns_created: 0, labels_created: 0, import_started_at: startedAt.toISOString() });
+
+    const hasCols = await contentColumnsAvailable();
+    const hasColColor = hasCols && await contentColumnsColorAvailable();
+    const hasLabelDefs = await contentLabelDefsAvailable();
+    const hasLabels = await contentLabelsAvailable();
+    const extras = await postExtrasAvailable();
+    if (hasCols) await ensureContentColumns(wsId);
+
+    const result = await withWriteConnection(async (c) => {
+      await c.query('BEGIN');
+      try {
+        let columnsCreated = 0; let labelsCreated = 0; let created = 0; let skipped = 0;
+        // Kolommen: zoeken op naam (hoofdletters maken niet uit), anders achteraan aanmaken.
+        const colByName = {};
+        if (hasCols) {
+          (await c.query('SELECT col_key, label FROM marketing.content_columns WHERE workspace_id=$1', [wsId])).rows
+            .forEach((r) => { colByName[String(r.label).trim().toLowerCase()] = r.col_key; });
+          for (const name of [...new Set(cards.map((x) => x.list).filter(Boolean))]) {
+            const k = name.toLowerCase();
+            if (colByName[k]) continue;
+            const pos = (await c.query('SELECT COALESCE(MAX(position),-1)+1 AS p FROM marketing.content_columns WHERE workspace_id=$1', [wsId])).rows[0].p;
+            const colKey = 'col_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            await c.query(
+              hasColColor
+                ? 'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position, color) VALUES ($1,$2,$3,$4,NULL)'
+                : 'INSERT INTO marketing.content_columns (workspace_id, col_key, label, position) VALUES ($1,$2,$3,$4)',
+              [wsId, colKey, name, pos]
+            );
+            colByName[k] = colKey; columnsCreated++;
+          }
+        }
+        // Labels: zoeken op naam, anders aanmaken met de Trello-kleur.
+        const labelByName = {};
+        if (hasLabelDefs && hasLabels) {
+          (await c.query('SELECT id, label FROM marketing.content_labels WHERE workspace_id=$1', [wsId])).rows
+            .forEach((r) => { labelByName[String(r.label).trim().toLowerCase()] = r.id; });
+          for (const card of cards) {
+            for (const l of card.labels) {
+              const k = l.name.toLowerCase();
+              if (labelByName[k]) continue;
+              const row = (await c.query('INSERT INTO marketing.content_labels (workspace_id, label, color) VALUES ($1,$2,$3) RETURNING id', [wsId, l.name, l.color])).rows[0];
+              labelByName[k] = row.id; labelsCreated++;
+            }
+          }
+        }
+        // Kaarten die al bestonden vóór de import (zelfde titel bij deze klant) overslaan.
+        const existing = new Set();
+        if (b.skip_existing !== false) {
+          (await c.query('SELECT lower(title) AS t FROM marketing.content_posts WHERE workspace_id=$1 AND client_id=$2 AND created_at < $3', [wsId, okClient, startedAt])).rows
+            .forEach((r) => existing.add(r.t));
+        }
+        for (const card of cards) {
+          if (existing.has(card.title.toLowerCase())) { skipped++; continue; }
+          const status = (hasCols && card.list && colByName[card.list.toLowerCase()]) || 'idea';
+          let body = card.desc;
+          if (card.attachments.length) body = (body ? body + '\n\n' : '') + 'Bijlagen uit Trello:\n' + card.attachments.map((a) => '- ' + (a.name || 'bijlage') + ': ' + a.url).join('\n');
+          const labelIds = (hasLabelDefs && hasLabels) ? [...new Set(card.labels.map((l) => labelByName[l.name.toLowerCase()]).filter(Boolean))].map((id) => 'c' + id) : [];
+          const cols = ['workspace_id', 'client_id', 'title', 'body', 'channel', 'status', 'scheduled_at', 'auto_publish', 'publish_channel', 'created_by'];
+          const vals = [wsId, okClient, card.title, body || null, channel, status, card.due, false, 'instagram', req.session.mkt.accountId || null];
+          if (hasLabels) { cols.push('labels'); vals.push(labelIds); }
+          if (extras) { cols.push('checklist'); vals.push(JSON.stringify(card.checklist)); }
+          const ph = vals.map((_, i) => '$' + (i + 1) + ((extras && cols[i] === 'checklist') ? '::jsonb' : ''));
+          await c.query(`INSERT INTO marketing.content_posts (${cols.join(', ')}) VALUES (${ph.join(', ')})`, vals);
+          created++;
+        }
+        await c.query('COMMIT');
+        return { created, skipped, columns_created: columnsCreated, labels_created: labelsCreated };
+      } catch (err) {
+        try { await c.query('ROLLBACK'); } catch (_) { /* verbinding al stuk */ }
+        throw err;
+      }
+    });
+    res.json({ success: true, ...result, import_started_at: startedAt.toISOString() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 router.get('/api/mkt/columns', requireMkt, async (req, res) => {
   try {
     if (!(await contentColumnsAvailable())) {
