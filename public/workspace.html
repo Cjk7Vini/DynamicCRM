@@ -351,6 +351,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div id="profileMenu" style="display:none;margin:-8px 4px 10px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:hidden">
       <a onclick="navTo('wssettings');toggleProfileMenu(true)" style="display:block;padding:9px 12px;font-size:13px;cursor:pointer">Instellingen</a>
       <a onclick="navTo('beheer');toggleProfileMenu(true)" style="display:block;padding:9px 12px;font-size:13px;cursor:pointer;border-top:1px solid var(--line)">Beheer</a>
+      <a onclick="openTrelloImport();toggleProfileMenu(true)" style="display:block;padding:9px 12px;font-size:13px;cursor:pointer;border-top:1px solid var(--line)">Trello-bord importeren</a>
     </div>
     <div id="platformBar" style="display:none;margin:-6px 4px 12px"><a onclick="switchWorkspace()" style="font-size:12px;color:var(--accent-2);cursor:pointer;font-weight:600">&#8592; Alle workspaces</a></div>
     <div class="nav-label">Werkplek</div>
@@ -1840,6 +1841,105 @@ function toggleProfileMenu(forceClose){
   var m=document.getElementById('profileMenu'); if(!m)return;
   if(forceClose===true){m.style.display='none';return;}
   m.style.display=(m.style.display==='none'||!m.style.display)?'block':'none';
+}
+// ---- Trello-bord importeren (JSON-export van Trello) ----
+var _TI={cards:null,board:''};
+async function openTrelloImport(){
+  var ov=document.getElementById('tiOverlay');
+  if(!ov){ov=document.createElement('div');ov.id='tiOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:420;padding:16px';ov.onclick=function(e){if(e.target===ov&&!_TI.busy)ov.style.display='none';};document.body.appendChild(ov);}
+  _TI={cards:null,board:'',busy:false};
+  ov.innerHTML='<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:520px;max-width:100%;max-height:90vh;overflow:auto">'+
+    '<div style="font-weight:700;font-size:16px;margin-bottom:4px">Trello-bord importeren</div>'+
+    '<div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">In Trello: open het bord, menu (&middot;&middot;&middot;), <strong>Afdrukken, exporteren en delen</strong>, <strong>Exporteren als JSON</strong>. Sla het bestand op en kies het hieronder. Elke kaart wordt een post bij de gekozen klant; lijsten worden kolommen en labels worden labels.</div>'+
+    '<div class="field"><label>Bij welke klant?</label><select id="tiClient"><option value="">Laden...</option></select></div>'+
+    '<div class="field"><label>Kanaal voor de posts</label><select id="tiChannel"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="linkedin">LinkedIn</option><option value="tiktok">TikTok</option><option value="other">Overig</option></select></div>'+
+    '<div class="field"><label>Trello-bestand (.json)</label><input type="file" id="tiFile" accept=".json,application/json" onchange="tiRead(this)"></div>'+
+    '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0"><input type="checkbox" id="tiSkipClosed" checked style="width:auto" onchange="tiRebuild()"> Gearchiveerde kaarten en lijsten overslaan</label>'+
+    '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0 10px"><input type="checkbox" id="tiSkipExisting" checked style="width:auto"> Kaarten overslaan als de klant al een post met dezelfde titel heeft</label>'+
+    '<div id="tiPreview" style="font-size:13px;color:var(--muted);min-height:20px"></div>'+
+    '<div id="tiMsg" style="font-size:13px;margin-top:8px"></div>'+
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn btn-ghost" type="button" id="tiClose" onclick="if(!_TI.busy)document.getElementById(\'tiOverlay\').style.display=\'none\'">Sluiten</button><button class="btn btn-primary" type="button" id="tiGo" onclick="tiImport()" disabled>Importeren</button></div>'+
+  '</div>';
+  ov.style.display='flex';
+  try{
+    var r=await fetch('/api/mkt/clients',{credentials:'include'}); var d=await r.json();
+    var sel=document.getElementById('tiClient'); if(!sel)return;
+    var list=(d&&d.success&&d.clients)?d.clients.filter(function(c){return !c.archived;}):[];
+    sel.innerHTML='<option value="">Kies een klant</option>'+list.map(function(c){return '<option value="'+c.id+'"'+((CURRENT_CLIENT&&String(CURRENT_CLIENT.id)===String(c.id))?' selected':'')+'>'+esc(c.name)+'</option>';}).join('');
+  }catch(e){}
+}
+var _TI_RAW=null;
+function tiRead(input){
+  var f=input.files&&input.files[0]; var pv=document.getElementById('tiPreview'); var go=document.getElementById('tiGo');
+  _TI_RAW=null; _TI.cards=null; go.disabled=true; document.getElementById('tiMsg').textContent='';
+  if(!f)return;
+  if(f.size>50*1024*1024){pv.style.color='#f87171';pv.textContent='Dit bestand is te groot (max 50 MB).';return;}
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var j=JSON.parse(String(rd.result||''));
+      if(!j||!Array.isArray(j.cards)||!Array.isArray(j.lists))throw new Error('geen Trello-export');
+      _TI_RAW=j; tiRebuild();
+    }catch(e){pv.style.color='#f87171';pv.textContent='Dit lijkt geen Trello-export (JSON). Kies het bestand van "Exporteren als JSON".';}
+  };
+  rd.onerror=function(){pv.style.color='#f87171';pv.textContent='Het bestand kon niet gelezen worden.';};
+  rd.readAsText(f);
+}
+function tiRebuild(){
+  var j=_TI_RAW; var pv=document.getElementById('tiPreview'); var go=document.getElementById('tiGo'); if(!j||!pv)return;
+  var skipClosed=document.getElementById('tiSkipClosed').checked;
+  var lists={}; (j.lists||[]).forEach(function(l){if(l&&l.id)lists[l.id]={name:String(l.name||'').trim(),closed:!!l.closed,pos:Number(l.pos)||0};});
+  var labelsById={}; (j.labels||[]).forEach(function(l){if(l&&l.id)labelsById[l.id]={name:l.name||'',color:l.color||''};});
+  var checks={}; (j.checklists||[]).forEach(function(c){if(!c||!c.idCard)return;(checks[c.idCard]=checks[c.idCard]||[]).push(c);});
+  var skipped=0;
+  var cards=(j.cards||[]).filter(function(c){
+    if(!c||!String(c.name||'').trim())return false;
+    var l=lists[c.idList];
+    if(skipClosed&&(c.closed||(l&&l.closed))){skipped++;return false;}
+    return true;
+  }).sort(function(a,b){var la=lists[a.idList],lb=lists[b.idList];return ((la?la.pos:0)-(lb?lb.pos:0))||((Number(a.pos)||0)-(Number(b.pos)||0));}).map(function(c){
+    var lbls=(Array.isArray(c.labels)&&c.labels.length)?c.labels:(Array.isArray(c.idLabels)?c.idLabels.map(function(id){return labelsById[id];}).filter(Boolean):[]);
+    var cl=[]; (checks[c.id]||[]).forEach(function(ch){(ch.checkItems||[]).forEach(function(it){cl.push({text:String(it.name||''),done:it.state==='complete'});});});
+    return {title:String(c.name||'').trim(),desc:String(c.desc||''),list:(lists[c.idList]&&lists[c.idList].name)||'',due:c.due||c.start||null,
+      labels:lbls.map(function(l){return {name:l.name||'',color:l.color||''};}),checklist:cl,
+      attachments:(Array.isArray(c.attachments)?c.attachments:[]).map(function(a){return {name:a.name||'',url:a.url||''};})};
+  });
+  _TI.cards=cards; _TI.board=String(j.name||'Trello-bord');
+  var nLists=Object.keys(lists).filter(function(k){return !(skipClosed&&lists[k].closed);}).length;
+  var nLabels={}; cards.forEach(function(c){c.labels.forEach(function(l){nLabels[(l.name||l.color).toLowerCase()]=1;});});
+  pv.style.color='var(--ink-2)';
+  var nl=Object.keys(nLabels).length, mv=function(n,een,meer){return n+' '+(n===1?een:meer);};
+  pv.innerHTML='<strong>'+esc(_TI.board)+'</strong>: '+mv(cards.length,'kaart','kaarten')+', '+mv(nLists,'lijst','lijsten')+', '+mv(nl,'label','labels')+(skipped?(' ('+skipped+' gearchiveerd overgeslagen)'):'')+'.';
+  go.disabled=!cards.length;
+}
+async function tiImport(){
+  var cid=document.getElementById('tiClient').value; var msg=document.getElementById('tiMsg');
+  if(!cid){msg.style.color='#f87171';msg.textContent='Kies eerst een klant.';return;}
+  if(!_TI.cards||!_TI.cards.length)return;
+  // In kleine porties versturen (de server neemt maximaal ongeveer 100 KB per keer aan).
+  var batches=[],cur=[],size=0;
+  _TI.cards.forEach(function(c){var n=JSON.stringify(c).length;if(cur.length&&(size+n>60000||cur.length>=100)){batches.push(cur);cur=[];size=0;}cur.push(c);size+=n;});
+  if(cur.length)batches.push(cur);
+  _TI.busy=true; var go=document.getElementById('tiGo'), cl=document.getElementById('tiClose'); go.disabled=true; cl.disabled=true;
+  var tot={created:0,skipped:0,columns_created:0,labels_created:0}, started=null, failed=null;
+  for(var i=0;i<batches.length;i++){
+    msg.style.color='var(--muted)'; msg.innerHTML='<span class="ws-spin"></span>Importeren '+(i+1)+' van '+batches.length+'...';
+    try{
+      var body={client_id:cid,channel:document.getElementById('tiChannel').value,skip_existing:document.getElementById('tiSkipExisting').checked,cards:batches[i]};
+      if(started)body.import_started_at=started;
+      var r=await fetch('/api/mkt/import/trello',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+      var d=await r.json().catch(function(){return {};});
+      if(!r.ok||!d.success){failed=(d&&d.error)||('fout '+r.status);break;}
+      started=d.import_started_at||started;
+      ['created','skipped','columns_created','labels_created'].forEach(function(k){tot[k]+=Number(d[k])||0;});
+    }catch(e){failed='netwerkfout';break;}
+  }
+  _TI.busy=false; cl.disabled=false;
+  var mv=function(n,een,meer){return n+' '+(n===1?een:meer);};
+  var sum=mv(tot.created,'post','posts')+' aangemaakt'+(tot.skipped?(', '+tot.skipped+' overgeslagen (bestond al)'):'')+(tot.columns_created?(', '+mv(tot.columns_created,'kolom','kolommen')+' toegevoegd'):'')+(tot.labels_created?(', '+mv(tot.labels_created,'label','labels')+' toegevoegd'):'')+'.';
+  if(failed){msg.style.color='#f87171';msg.textContent='Gestopt: '+failed+'. Tot dan toe: '+sum+' Probeer het opnieuw met "Kaarten overslaan als de klant al een post met dezelfde titel heeft" aan, dan wordt niets dubbel.';go.disabled=false;}
+  else{msg.style.color='var(--ok)';msg.textContent='Klaar: '+sum;}
+  try{await loadBoardColumns();if(CURRENT_CLIENT&&String(CURRENT_CLIENT.id)===String(cid)&&document.getElementById('postsBody'))loadPosts();}catch(_){}
 }
 async function loadBeheer(){
   var box=document.getElementById('beheerBody'); if(!box)return; hideMsg('beheerMsg');

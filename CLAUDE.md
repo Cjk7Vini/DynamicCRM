@@ -72,6 +72,8 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Nieuwe labels: naam plus een kleur uit een raster (`LABEL_PALETTE`) of een eigen kleur.
 - "Schrijf met AI" in het postvenster: `POST /api/mkt/clients/:id/ai/post-captions` (alleen team). Zelfde AI als bij advertenties (`callClaude`), met het klantprofiel en best-effort de 5 best scorende eigen Instagram-posts als context; geeft 3 varianten met zoekwoorden en hashtags. Em-dashes en dubbele streepjes worden er altijd uitgehaald (`aiCleanText`).
 - Voorbeeldbeelden laden een verkleinde versie (`thumbUrl`), openen en publiceren gebruiken het origineel. Bord vegen met de muis op een lege plek; bestanden naar Content slepen uploadt ze.
+- Kolommen verslepen: de kop van een kolom is sleepbaar (eigen kolommen, team); de pijltjes blijven werken.
+- Trello-import (profielmenu, "Trello-bord importeren", alleen eigenaar/manager): de workspace leest de JSON-export van Trello en stuurt de kaarten in porties van max ~60 KB naar `POST /api/mkt/import/trello` (de server neemt standaard maar ~100 KB per aanvraag aan). Lijsten worden kolommen en labels worden labels (zoeken op naam, anders aanmaken), kaarten worden posts (titel, beschrijving, datum, checklist, http(s)-bijlagen als links). Elke portie in een transactie. "Overslaan als de titel al bestaat" kijkt alleen naar posts van vóór de import (starttijd volgens de server-klok).
 - "Jouw posts voor deze week" op het overzicht volgt de vastgezette klant (`overview_client_id`), net als de cijfers en de prio's.
 
 ## Werkplekken zijn gescheiden
