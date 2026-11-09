@@ -18,6 +18,8 @@ Dit bestand wordt in elke sessie ingelezen. Houd het actueel.
 - "Workspace" is iets anders dan "dashboard". Het dashboard is het churn-dashboard in `src/server.js`.
 
 ## Meta-koppelingen (Instagram en Facebook)
+Zie ook `PROBLEMEN-META.md`: de problemen van oktober en november 2026 (code 10 bij publiceren, testers, verschil in leads, weggevallen leads, grenzen van de API) met oorzaak, oplossing en controle, plus wat volgens de voorwaarden van Meta wel en niet mag.
+
 Er zijn twee routes voor de Instagram-cijfers:
 1. **Facebook-route (de hoofdkoppeling):** een Facebook-token met een Instagram-account-ID, via graph.facebook.com. Dit is de standaard, en de enige route voor advertenties en de pagina.
 2. **Instagram-login:** een token via graph.instagram.com, per klant (`ig_login_token`). Dit is een terugval voor klanten zonder Facebook-route.
