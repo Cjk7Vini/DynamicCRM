@@ -70,6 +70,8 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 ## Content planning
 - Het bord werkt zoals Trello: de kolommen (bijv. Ideeen, Week 1, Week 2) zijn de `status` van een post, en je verplaatst een kaart door te slepen. Het veld "Status" staat bewust verborgen in het postvenster (op verzoek van Fleur, november 2026); de status zelf geef je aan met labels. Het verborgen veld houdt de kolom van een bestaande post ongewijzigd en zet een nieuwe post in de eerste kolom.
 - Nieuwe labels: naam plus een kleur uit een raster (`LABEL_PALETTE`) of een eigen kleur.
+- "Schrijf met AI" in het postvenster: `POST /api/mkt/clients/:id/ai/post-captions` (alleen team). Zelfde AI als bij advertenties (`callClaude`), met het klantprofiel en best-effort de 5 best scorende eigen Instagram-posts als context; geeft 3 varianten met zoekwoorden en hashtags. Em-dashes en dubbele streepjes worden er altijd uitgehaald (`aiCleanText`).
+- Voorbeeldbeelden laden een verkleinde versie (`thumbUrl`), openen en publiceren gebruiken het origineel. Bord vegen met de muis op een lege plek; bestanden naar Content slepen uploadt ze.
 - "Jouw posts voor deze week" op het overzicht volgt de vastgezette klant (`overview_client_id`), net als de cijfers en de prio's.
 
 ## Werkplekken zijn gescheiden

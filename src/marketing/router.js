@@ -4915,6 +4915,102 @@ router.post('/api/mkt/clients/:clientId/ai/ad-suggestion', requireMkt, async (re
 });
 
 // =======================================================================
+// AI-TEKSTEN VOOR ORGANISCHE POSTS - dezelfde AI als bij advertenties, maar met
+// het klantprofiel en (best-effort) de best scorende eigen Instagram-posts als
+// context. Geeft 3 varianten met zoekwoorden en hashtags terug. Alleen voor het team.
+// =======================================================================
+function aiCleanText(v, max) {
+  // Geen em-dashes of dubbele streepjes in de teksten (huisregel).
+  return String(v == null ? '' : v).replace(/\u2014|\u2013|--/g, ', ').replace(/ ,/g, ',').slice(0, max);
+}
+router.post('/api/mkt/clients/:clientId/ai/post-captions', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten' });
+    if (!aiConfigured()) return res.status(503).json({ error: 'AI is nog niet ingesteld. Vraag de beheerder om de AI-sleutel in te stellen.' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const b = req.body || {};
+    const brief = String(b.prompt || '').trim().slice(0, 1500);
+    if (brief.length < 5) return res.status(400).json({ error: 'Beschrijf kort waar de post over gaat (minimaal een paar woorden).' });
+    const TYPES = { bericht: 'een gewone Instagram-post met beeld', reel: 'een Reel (korte video)', story: 'een story (korte tekst, geen hashtags nodig)', carrousel: 'een carrousel (meerdere beelden)' };
+    const pType = TYPES[b.post_type] ? b.post_type : 'bericht';
+    const current = String(b.current_text || '').trim().slice(0, 2200);
+
+    // Klantprofiel (de extra velden alleen als migratie 023 er is).
+    const hasProfile = await clientProfileAvailable();
+    const client = await withReadConnection(async (c) => (await c.query(
+      `SELECT name, website, notes${hasProfile ? ', branche, audience, goals' : ''} FROM marketing.clients WHERE id=$1 AND workspace_id=$2`,
+      [okClient, wsId]
+    )).rows[0]) || {};
+
+    // Best scorende recente posts van deze klant (best-effort, mag ontbreken).
+    let topPosts = [];
+    try {
+      const creds = await resolveClientMeta(wsId, okClient);
+      const r = await pickIgRoute(creds);
+      if (r && r.tok && r.uid) {
+        const m = await r.get(`${r.uid}/media`, { fields: 'caption,media_type,like_count,comments_count', limit: '25', access_token: r.tok });
+        topPosts = (m.data || [])
+          .map((x) => ({ caption: String(x.caption || '').slice(0, 300), type: x.media_type, score: (Number(x.like_count) || 0) + 2 * (Number(x.comments_count) || 0) }))
+          .filter((x) => x.caption)
+          .sort((a, c) => c.score - a.score)
+          .slice(0, 5);
+      }
+    } catch (_) { /* geen koppeling of geen cijfers: zonder voorbeelden verder */ }
+
+    const system = [
+      'Je bent een ervaren Nederlandse social-media-copywriter voor organische Instagram-posts.',
+      'Schrijf altijd in het Nederlands. Gebruik NOOIT em-dashes of dubbele streepjes.',
+      'Regels voor goede organische teksten:',
+      '- De eerste zin is een sterke haak die nieuwsgierig maakt (die zie je voor "meer").',
+      '- Verwerk 2 tot 4 zoekwoorden waarop de doelgroep zoekt, natuurlijk in de tekst (Instagram-zoeken leest de tekst).',
+      '- Schrijf voor de doelgroep van de klant, in de toon van de voorbeelden als die er zijn.',
+      '- Sluit af met een duidelijke oproep (reageren, opslaan, delen, link in bio of contact).',
+      '- 3 tot 6 relevante hashtags, mix van breed en niche; geen spam.',
+      '- Geen beloftes of claims die niet in de briefing staan.',
+      'Antwoord UITSLUITEND met een geldig JSON-object, zonder uitleg eromheen, met exact deze velden:',
+      '{',
+      '  "variants": [ { "text": "de posttekst zonder hashtags, max 1500 tekens, mag emoji bevatten", "hashtags": ["#voorbeeld"] } ],',
+      '  "keywords": ["de gebruikte zoekwoorden"],',
+      '  "tip": "1 korte zin met een tip voor het beeld of het tijdstip"',
+      '}',
+      'Geef precies 3 varianten die duidelijk van elkaar verschillen (bijv. vraag, verhaal, tips).',
+    ].join('\n');
+    const goals = Array.isArray(client.goals) ? client.goals.join(', ') : (client.goals || '');
+    const ctx = [
+      'Briefing: ' + brief,
+      'Soort post: ' + TYPES[pType],
+      'Klant: ' + (client.name || 'onbekend'),
+      client.branche ? ('Branche: ' + client.branche) : '',
+      client.audience ? ('Doelgroep: ' + String(client.audience).slice(0, 1000)) : '',
+      goals ? ('Doelen: ' + String(goals).slice(0, 300)) : '',
+      client.website ? ('Website: ' + client.website) : '',
+      client.notes ? ('Notities over de klant: ' + String(client.notes).slice(0, 500)) : '',
+      current ? ('Huidige concepttekst (mag als basis dienen): ' + current) : '',
+      topPosts.length ? ('Best scorende eigen posts van deze klant (leer van toon en onderwerp, niet kopieren):\n' + topPosts.map((x, i) => (i + 1) + '. [' + x.type + ', score ' + x.score + '] ' + x.caption).join('\n')) : '',
+    ].filter(Boolean).join('\n');
+
+    const raw = await callClaude(system, ctx, 2500);
+    const j = extractJson(raw);
+    const variants = (Array.isArray(j.variants) ? j.variants : []).slice(0, 5).map((v) => ({
+      text: aiCleanText(v && v.text, 2000).trim(),
+      hashtags: (Array.isArray(v && v.hashtags) ? v.hashtags : [])
+        .map((h) => String(h || '').trim().replace(/\s+/g, '')).filter(Boolean)
+        .map((h) => (h.startsWith('#') ? h : '#' + h)).slice(0, 10),
+    })).filter((v) => v.text);
+    if (!variants.length) return res.status(502).json({ error: 'De AI gaf geen bruikbare tekst terug. Probeer het nog eens.' });
+    res.json({
+      success: true,
+      variants,
+      keywords: (Array.isArray(j.keywords) ? j.keywords : []).map((k) => aiCleanText(k, 60)).filter(Boolean).slice(0, 8),
+      tip: aiCleanText(j.tip, 300),
+      used_top_posts: topPosts.length,
+    });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// =======================================================================
 // AI-ANALYSE - leest de advertentie- en accountcijfers en geeft een
 // verslag in gewone taal terug (wat gaat goed, wat kan beter, tips).
 // =======================================================================
