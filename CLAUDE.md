@@ -9,6 +9,7 @@ Dit bestand wordt in elke sessie ingelezen. Houd het actueel.
 - Bij risicovolle wijzigingen: de terugvaloptie (kill switch of terugdraai-SQL) direct klaar hebben.
 - Alle teksten in het Nederlands, zonder em-dashes.
 - Controle voor elke push: `node --check`, de inline scripts parsen (`new Function`), grep op em-dashes, en een test met stubs voor de gewijzigde logica.
+- Openstaande problemen staan in `PROBLEMEN.md`, elk met een volgende stap en een controle. Is een probleem opgelost, haal het daar weg en zet de les (oorzaak, oplossing, hoe herkennen) in `KENNISBANK.md`.
 - Migraties staan in `migrations/NNN_*.sql` en worden door de eigenaar zelf in Neon gedraaid. Code moet ook werken zolang een migratie nog niet gedraaid is.
 
 ## Structuur
@@ -18,7 +19,7 @@ Dit bestand wordt in elke sessie ingelezen. Houd het actueel.
 - "Workspace" is iets anders dan "dashboard". Het dashboard is het churn-dashboard in `src/server.js`.
 
 ## Meta-koppelingen (Instagram en Facebook)
-Zie ook `PROBLEMEN-META.md`: de problemen van oktober en november 2026 (code 10 bij publiceren, testers, verschil in leads, weggevallen leads, grenzen van de API) met oorzaak, oplossing en controle, plus wat volgens de voorwaarden van Meta wel en niet mag.
+Zie ook `KENNISBANK.md` (opgeloste problemen met Meta, grenzen van de API, wat volgens de voorwaarden mag) en `PROBLEMEN.md` (wat nog open staat).
 
 Er zijn twee routes voor de Instagram-cijfers:
 1. **Facebook-route (de hoofdkoppeling):** een Facebook-token met een Instagram-account-ID, via graph.facebook.com. Dit is de standaard, en de enige route voor advertenties en de pagina.
