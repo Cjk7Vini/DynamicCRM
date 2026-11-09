@@ -759,8 +759,16 @@ router.get('/api/mkt/auth/me', requireMktSession, async (req, res) => {
              FROM marketing.workspaces WHERE id=$1`, [m.workspaceId]
         )).rows[0]) || null;
       }
+      // Naam voor de begroeting: uit een marketing-account met hetzelfde e-mailadres (alleen de naam).
+      let name = null;
+      try {
+        const nr = await withReadConnection(async (c) => (await c.query(
+          "SELECT full_name FROM marketing.accounts WHERE lower(email)=lower($1) AND full_name IS NOT NULL AND btrim(full_name) <> '' ORDER BY id ASC LIMIT 1", [m.email || '']
+        )).rows[0]);
+        if (nr) name = nr.full_name;
+      } catch (_) { /* naam optioneel */ }
       // superadmin: alleen dit account ziet technische details zoals de "Bron" van de cijfers.
-      return res.json({ success: true, platformAdmin: true, email: m.email, workspace, superadmin: String(m.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL });
+      return res.json({ success: true, platformAdmin: true, email: m.email, name, workspace, superadmin: String(m.email || '').toLowerCase() === MKT_SUPERADMIN_EMAIL });
     }
     const data = await withReadConnection(async (c) => (await c.query(
       `SELECT a.id, a.email, a.full_name, a.role, a.client_id,
@@ -866,7 +874,7 @@ function sanitizeClientProfile(b) {
   b = b || {};
   if (typeof b.logo_url === 'string') { const u = b.logo_url.trim().slice(0, 500); if (!u || /^https?:\/\//i.test(u)) out.logo_url = u || null; }
   if (typeof b.branche === 'string') out.branche = b.branche.trim().slice(0, 120) || null;
-  if (typeof b.audience === 'string') out.audience = b.audience.trim().slice(0, 500) || null;
+  if (typeof b.audience === 'string') out.audience = b.audience.trim().slice(0, 2000) || null;
   if (b.goals !== undefined) out.goals = Array.isArray(b.goals) ? b.goals.map((x) => String(x)).filter((x) => CLIENT_GOALS.includes(x)) : [];
   if (b.channels !== undefined) out.channels = Array.isArray(b.channels) ? b.channels.map((x) => String(x)).filter((x) => CLIENT_CHANNELS.includes(x)) : [];
   return out;

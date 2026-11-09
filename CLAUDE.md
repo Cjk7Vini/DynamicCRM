@@ -66,6 +66,11 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Correctieregels alleen als ze bewezen zijn door meting, nooit als schatting.
 - Meten via de debug-pagina's (eigenaar of manager): `/api/mkt/debug-insights?client=<id>` en `/api/mkt/debug-profile-views?client=<id>`.
 
+## Content planning
+- Het bord werkt zoals Trello: de kolommen (bijv. Ideeen, Week 1, Week 2) zijn de `status` van een post, en je verplaatst een kaart door te slepen. Het veld "Status" staat bewust verborgen in het postvenster (op verzoek van Fleur, november 2026); de status zelf geef je aan met labels. Het verborgen veld houdt de kolom van een bestaande post ongewijzigd en zet een nieuwe post in de eerste kolom.
+- Nieuwe labels: naam plus een kleur uit een raster (`LABEL_PALETTE`) of een eigen kleur.
+- "Jouw posts voor deze week" op het overzicht volgt de vastgezette klant (`overview_client_id`), net als de cijfers en de prio's.
+
 ## Werkplekken zijn gescheiden
 - Elke werkplek is op zichzelf en hoort bij één gebruiker of bureau. Werkplekken worden nooit aan elkaar gekoppeld, en data mag nooit van de ene naar de andere werkplek lopen.
 - In de code hangt alles aan `workspace_id`, en elke aanvraag controleert dat de klant bij de werkplek van de sessie hoort (`clientInWorkspace`). Meta-gegevens komen alleen uit de eigen klant- of werkplekkoppeling.
