@@ -402,8 +402,10 @@
                 alertBox.innerHTML = '<div class="alert alert-error">Vul je volledige naam in.</div>';
                 return;
             }
-            if (!telefoon) {
-                alertBox.innerHTML = '<div class="alert alert-error">Vul je telefoonnummer in.</div>';
+            // Alleen de cijfers versturen; "06-12345678" of "+31 6 ..." werd anders geweigerd.
+            const telefoonCijfers = telefoon.replace(/\D/g, '');
+            if (telefoonCijfers.length < 10) {
+                alertBox.innerHTML = '<div class="alert alert-error">Vul een geldig telefoonnummer in (minimaal 10 cijfers).</div>';
                 return;
             }
             if (!emailadres) {
@@ -428,7 +430,7 @@
                     body: JSON.stringify({
                         volledige_naam,
                         emailadres,
-                        telefoon,
+                        telefoon: telefoonCijfers,
                         doel,
                         bron,
                         toestemming: toestemming ? 'true' : 'false',
@@ -448,7 +450,9 @@
                         + '&lid=' + encodeURIComponent(leadId);
                 } else {
                     const data = await res.json().catch(() => ({}));
-                    alertBox.innerHTML = `<div class="alert alert-error">${data.error || 'Er is iets misgegaan. Probeer het opnieuw.'}</div>`;
+                    const why = (Array.isArray(data.details) && data.details.length) ? ('Controleer je gegevens: ' + data.details.join(' ')) : 'Er is iets misgegaan. Probeer het opnieuw.';
+                    alertBox.innerHTML = '<div class="alert alert-error"></div>';
+                    alertBox.firstChild.textContent = why;
                     btn.disabled = false;
                     btn.textContent = 'Plan mijn gratis kennismaking';
                 }
