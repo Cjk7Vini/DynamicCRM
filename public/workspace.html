@@ -5126,7 +5126,12 @@ async function publishNow(){
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
-    if(r.ok&&d.success){showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':(d.both?'Gepubliceerd op Instagram en Facebook.':'Gepubliceerd.'))+' Post-ID: '+(d.result&&d.result.id||'-'));setTimeout(function(){closePublish();loadPosts();},1500);}
+    if(r.ok&&d.success){
+      var cw=d.cover_warning||(d.result&&d.result.cover_warning)||null;
+      showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':(d.both?'Gepubliceerd op Instagram en Facebook.':'Gepubliceerd.'))+' Post-ID: '+(d.result&&d.result.id||'-')+(cw?(' Let op: geplaatst op Instagram, maar zonder eigen omslag ('+cw+').'):''));
+      // Met een waarschuwing blijft het venster open, zodat de melding gelezen kan worden.
+      if(!cw)setTimeout(function(){closePublish();loadPosts();},1500); else loadPosts();
+    }
     else {showMsg('publishMsg',false,d.error||'Publiceren mislukt.'); if(d.partial||(d.skipped&&d.skipped.length))loadPosts();}
   }catch(e){showMsg('publishMsg',false,'Netwerkfout.');}
   btn.disabled=false; btn.textContent='Nu publiceren';
@@ -5602,7 +5607,7 @@ function renderList(posts){
       }
       var note=(p.approval==='changes'&&p.approval_note)?('<div class="cap" style="margin-top:8px;color:var(--err)">'+(CLIENT_MODE?'Jouw feedback: ':'Klantfeedback: ')+esc(p.approval_note)+'</div>'):'';
       if(p.client_note){ note+='<div class="cap" style="margin-top:6px;color:var(--accent-2)">'+(CLIENT_MODE?'Jouw notitie: ':'Notitie klant: ')+esc(p.client_note)+'</div>'; }
-      if(!CLIENT_MODE&&p.publish_error){ note+='<div class="cap" style="margin-top:6px;color:var(--warn)">Auto-publiceren mislukt: '+esc(p.publish_error)+'</div>'; }
+      if(!CLIENT_MODE&&p.publish_error){ note+='<div class="cap" style="margin-top:6px;color:var(--warn)">'+(p.published_at?'Let op: ':'Auto-publiceren mislukt: ')+esc(p.publish_error)+'</div>'; }
       note+=clientActs;
       var thumb='';
       if(p.asset_url){

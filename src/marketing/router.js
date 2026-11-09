@@ -4190,6 +4190,16 @@ async function igPublishRoute(creds) {
 // Type post (bericht/reel/story/carrousel) telt mee bij het plaatsen, tenzij MKT_SCHED_TYPES=0
 // (dan de oude werking: alles als bericht of Reel, en de planner slaat carrousels niet over).
 function schedTypesOn() { return process.env.MKT_SCHED_TYPES !== '0'; }
+// Omslag van een Reel altijd als JPEG van maximaal 1080 pixels breed aanleveren (via een
+// transformatie in de link van de beeldopslag). Zo klopt het formaat en de grootte, ook
+// als er een PNG, WebP of groot bestand is gekozen. Andere links blijven ongewijzigd.
+function coverJpegUrl(url) {
+  const u = String(url || '');
+  const m = u.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+  if (!m) return u;
+  const rest = m[2].replace(/\.[a-z0-9]+(\?.*)?$/i, '') + '.jpg';
+  return m[1] + 'c_limit,w_1080,q_auto,f_jpg/' + rest;
+}
 async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption, igRoute, opts) {
   const cap = (caption != null) ? String(caption) : '';
   const isStory = !!(opts && opts.postType === 'story' && schedTypesOn());
@@ -4206,21 +4216,38 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
         ? { media_type: 'STORIES', video_url: mediaUrl, access_token: tk }
         : { media_type: 'STORIES', image_url: mediaUrl, access_token: tk })
       : (mediaType === 'video'
-        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk, ...((opts && opts.coverUrl) ? { cover_url: opts.coverUrl } : {}) }
+        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk }
         : { image_url: mediaUrl, caption: cap, access_token: tk });
-    const created = await R.post(`${igId}/media`, createParams);
-    if (mediaType === 'video') {
-      let ready = false;
-      for (let i = 0; i < 20 && !ready; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
-        const st = await R.get(`${created.id}`, { fields: 'status_code', access_token: tk });
-        if (st.status_code === 'FINISHED') ready = true;
-        else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
+    // Container maken en (bij video) wachten tot Instagram klaar is met verwerken.
+    const createAndWait = async (params) => {
+      const created = await R.post(`${igId}/media`, params);
+      if (mediaType === 'video') {
+        let ready = false;
+        for (let i = 0; i < 20 && !ready; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const st = await R.get(`${created.id}`, { fields: 'status_code', access_token: tk });
+          if (st.status_code === 'FINISHED') ready = true;
+          else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
+        }
+        if (!ready) throw new Error('Video-verwerking duurt te lang');
       }
-      if (!ready) throw new Error('Video-verwerking duurt te lang');
+      return created.id;
+    };
+    // Reel met eigen omslag: eerst met de omslag (als JPEG). Weigert Instagram dat, dan
+    // meteen opnieuw zonder omslag, zodat de Reel er altijd op komt; de reden komt mee terug.
+    const withCover = !isStory && mediaType === 'video' && opts && opts.coverUrl;
+    let containerId; let coverWarning = null;
+    if (withCover) {
+      try { containerId = await createAndWait({ ...createParams, cover_url: coverJpegUrl(opts.coverUrl) }); }
+      catch (e) {
+        coverWarning = (e && e.message) ? e.message : 'onbekende reden';
+        containerId = await createAndWait(createParams);
+      }
+    } else {
+      containerId = await createAndWait(createParams);
     }
-    const pub = await R.post(`${igId}/media_publish`, { creation_id: created.id, access_token: tk });
-    return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook', story: isStory || undefined };
+    const pub = await R.post(`${igId}/media_publish`, { creation_id: containerId, access_token: tk });
+    return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook', story: isStory || undefined, cover_warning: coverWarning || undefined };
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
   const pageId = intg.meta_page_id;
@@ -4447,7 +4474,8 @@ async function publishBothNow(req, res, wsId, okClient) {
           ));
         } catch (_) { /* niet blokkerend */ }
       }
-      return res.json({ success: true, both: true, results, skipped,
+      const coverWarning = results.instagram && results.instagram.cover_warning ? results.instagram.cover_warning : null;
+      return res.json({ success: true, both: true, results, skipped, cover_warning: coverWarning || undefined,
         result: { id: Object.values(results).map((r) => r && r.id).filter(Boolean).join(', ') || '-' } });
     }
     const parts = [];
@@ -7200,7 +7228,7 @@ async function runScheduler() {
       const isBoth = both && post.publish_channel === 'both';
       const single = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
       const targets = isBoth ? ['instagram', 'facebook'] : [single];
-      const errors = [];
+      const errors = []; const warnings = [];
       for (const channel of targets) {
         // Al geplaatst op dit kanaal (eerdere poging of met de hand)? Dan niet nog eens.
         if (both && ((channel === 'instagram' && post.ig_published_at) || (channel === 'facebook' && post.fb_published_at))) continue;
@@ -7224,7 +7252,8 @@ async function runScheduler() {
             if (items.length < 2) throw new Error('Een carrousel heeft minimaal 2 publieke bestanden nodig (kies ze in de post).');
             await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, caption, igRoute);
           } else {
-            await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null, coverUrl: (channel === 'instagram' && post.reel_cover_url) ? post.reel_cover_url : null });
+            const pr = await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null, coverUrl: (channel === 'instagram' && post.reel_cover_url) ? post.reel_cover_url : null });
+            if (pr && pr.cover_warning) warnings.push('Geplaatst op Instagram, maar zonder eigen omslag (' + String(pr.cover_warning).slice(0, 200) + ').');
           }
           // Direct per kanaal vastleggen, vóór het volgende kanaal.
           await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
@@ -7235,12 +7264,13 @@ async function runScheduler() {
       }
       try {
         if (!errors.length) {
+          // Geplaatst. Een waarschuwing (bijv. omslag niet gelukt) blijft zichtbaar bij de post.
           await withWriteConnection(async (c) => c.query(
-            `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=NULL, updated_at=now() WHERE id=$1`, [post.id]
+            `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=$2, updated_at=now() WHERE id=$1`, [post.id, warnings.length ? warnings.join(' ').slice(0, 500) : null]
           ));
         } else {
           await withWriteConnection(async (c) => c.query(
-            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [errors.join(' ').slice(0, 500), post.id]
+            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [errors.concat(warnings).join(' ').slice(0, 500), post.id]
           ));
         }
       } catch (_) { /* volgende minuut opnieuw */ }
