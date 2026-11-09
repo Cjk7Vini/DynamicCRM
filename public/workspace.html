@@ -5226,7 +5226,39 @@ function renderContentView(){
   else body.innerHTML=renderList(_CONTENT_POSTS);
 }
 // ---- Bord (kanban) ----
-var _DRAG_POST=null;
+var _DRAG_POST=null, _DRAG_COL=null, _COL_BUSY=false;
+// Kolommen slepen: de kop van een kolom pakken en op een andere kolom loslaten.
+function colDragStart(e,id){
+  if(e.target&&e.target.closest&&e.target.closest('button'))return; // de knoppen in de kop blijven knoppen
+  _DRAG_COL=id; _DRAG_POST=null;
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','kolom-'+id);}catch(_){}
+  e.stopPropagation();
+}
+function colDragEnd(){_DRAG_COL=null;document.querySelectorAll('.kcol').forEach(function(c){c.style.boxShadow='';c.style.outline='';});}
+function colDropSide(e,el){var r=el.getBoundingClientRect();return (e.clientX<r.left+r.width/2)?'before':'after';}
+async function colDropOn(e,el){
+  var from=_DRAG_COL; _DRAG_COL=null;
+  document.querySelectorAll('.kcol').forEach(function(c){c.style.boxShadow='';c.style.outline='';});
+  var toId=el&&el.getAttribute('data-colid');
+  if(from==null||!toId||String(toId)===String(from)||_COL_BUSY||!BOARD_COLS)return;
+  var order=BOARD_COLS.map(function(c){return c.id;});
+  var fi=order.map(String).indexOf(String(from)); if(fi<0)return;
+  order.splice(fi,1);
+  var ti=order.map(String).indexOf(String(toId)); if(ti<0)return;
+  if(colDropSide(e,el)==='after')ti++;
+  order.splice(ti,0,from);
+  _COL_BUSY=true;
+  try{
+    // Nieuwe volgorde opslaan: alleen kolommen waarvan de plek verandert.
+    for(var i=0;i<order.length;i++){
+      var col=BOARD_COLS.filter(function(c){return String(c.id)===String(order[i]);})[0];
+      if(!col||Number(col.position)===i*10)continue;
+      var r=await fetch('/api/mkt/columns/'+col.id,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({position:i*10})});
+      if(!r.ok)throw new Error('opslaan');
+    }
+  }catch(err){alert('De nieuwe volgorde kon niet volledig worden opgeslagen. Ververs de pagina en probeer opnieuw.');}
+  finally{_COL_BUSY=false; await loadBoardColumns(); renderContentView();}
+}
 var CONTENT_COLS=[['idea','Ideeen'],['draft','Concept'],['scheduled','Ingepland'],['approved','Goedgekeurd']];
 // Eigen Planning-kolommen (migratie 015). null = nog niet geladen; dan vallen we
 // terug op de vaste standaardkolommen hierboven.
@@ -5449,10 +5481,14 @@ async function deleteCustomLabel(id){
     if(r.ok&&d.success){var k='c'+id;var i=PF_LABELS.indexOf(k);if(i>=0)PF_LABELS.splice(i,1);await loadCustomLabels();renderPfLabels();}else{alert(d.error||'Kon label niet verwijderen.');}
   }catch(e){alert('Netwerkfout.');}
 }
-function kanbanDrag(e,id){_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
-function kanbanOver(e){e.preventDefault();e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';}
-function kanbanLeave(e){e.currentTarget.style.outline='';}
-async function kanbanDrop(e,status){e.preventDefault();e.currentTarget.style.outline='';clearCardIndicators();var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await moveCardTo(id,status,null);}
+function kanbanDrag(e,id){_DRAG_COL=null;_DRAG_POST=id;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id));}catch(_){}}
+function kanbanOver(e){
+  e.preventDefault();
+  if(_DRAG_COL!=null){var el=e.currentTarget;if(!el.getAttribute('data-colid'))return;el.style.outline='';el.style.boxShadow=(colDropSide(e,el)==='before'?'inset 4px 0 0 var(--accent)':'inset -4px 0 0 var(--accent)');return;}
+  e.currentTarget.style.outline='2px dashed var(--accent)';e.currentTarget.style.outlineOffset='-2px';
+}
+function kanbanLeave(e){e.currentTarget.style.outline='';e.currentTarget.style.boxShadow='';}
+async function kanbanDrop(e,status){e.preventDefault();if(_DRAG_COL!=null){await colDropOn(e,e.currentTarget);return;}e.currentTarget.style.outline='';clearCardIndicators();var id=_DRAG_POST;_DRAG_POST=null;if(id==null)return;await moveCardTo(id,status,null);}
 // Sorteer kaarten in een kolom op handmatige volgorde (board_position); kaarten
 // zonder volgorde komen daarna, in hun bestaande volgorde (stabiele sortering).
 function boardSort(items){
@@ -5462,10 +5498,11 @@ function boardSort(items){
     return pa-pb;
   });
 }
-function kcardDragOver(e){e.preventDefault();e.stopPropagation();try{e.currentTarget.style.borderTop='3px solid var(--accent)';}catch(_){}}
+function kcardDragOver(e){if(_DRAG_COL!=null)return;e.preventDefault();e.stopPropagation();try{e.currentTarget.style.borderTop='3px solid var(--accent)';}catch(_){}}
 function kcardDragLeave(e){try{e.currentTarget.style.borderTop='';}catch(_){}}
 function clearCardIndicators(){try{document.querySelectorAll('.kcard').forEach(function(c){c.style.borderTop='';});}catch(_){}}
 function kcardDrop(e,targetId,targetStatus){
+  if(_DRAG_COL!=null)return; // kolom wordt gesleept: laat de kolom het afhandelen
   e.preventDefault();e.stopPropagation();clearCardIndicators();
   var id=_DRAG_POST;_DRAG_POST=null;
   if(id==null||String(id)===String(targetId))return;
@@ -5578,8 +5615,8 @@ function renderBoard(posts){
         '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
       '</span>';
     }
-    return '<div class="kcol" data-status="'+esc(key)+'" '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:rgba(16,52,61,.5);border:1px solid rgba(90,185,200,.18);border-radius:12px;padding:10px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
+    return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:rgba(16,52,61,.5);border:1px solid rgba(90,185,200,.18);border-radius:12px;padding:10px">'+
+      '<div'+((canEditCols&&c.id!=null)?(' draggable="true" ondragstart="colDragStart(event,'+c.id+')" ondragend="colDragEnd()" title="Sleep om de kolom te verplaatsen"'):'')+' style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px'+((canEditCols&&c.id!=null)?';cursor:grab':'')+'"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
   }).join('')+
   (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="openColumnEdit(null)">+ Kolom</button></div>'):'')+
   '</div>';
