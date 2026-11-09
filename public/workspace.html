@@ -1450,7 +1450,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div style="font-size:12px;color:var(--muted);margin-top:6px">Kies een afbeelding uit Content. Instagram toont die als omslag in het profiel. Geldt voor Instagram; Facebook kiest zelf een beeld uit de video.</div>
     </div>
     <div class="field" id="pfCarouselField" style="display:none"><label>Carrousel-bestanden <span style="color:var(--muted);font-weight:400;font-size:12px">(klik om toe te voegen; volgorde = nummer; 2 tot 10)</span></label>
-      <div id="pfCarousel" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <div id="pfCarousel" style="display:flex;gap:12px 10px;flex-wrap:wrap;padding-top:6px"></div>
       <div style="font-size:12px;color:var(--muted);margin-top:6px">Wordt als 1 carousel organisch op Instagram geplaatst.</div>
     </div>
     <div class="field" style="background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
@@ -1466,6 +1466,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePost()">Annuleren</button>
+      <button class="btn btn-ghost" id="pfPublishBtn" type="button" onclick="pfPublishNow()" style="display:none" title="Eerst opslaan, daarna publiceren">Opslaan en publiceren</button>
       <button class="btn btn-primary" id="pfSaveBtn" onclick="savePost()">Opslaan</button>
     </div>
     <div id="pfCommentsWrap" style="display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
@@ -5097,6 +5098,8 @@ async function openPublish(postId){
     var opts='<option value="">Geen bestand</option>';
     (ad.assets||[]).forEach(function(a){ if(a.provider==='cloudinary'&&a.url){ opts+='<option value="'+a.id+'">'+esc(a.filename)+' ('+(a.resource_type==='video'?'video':'foto')+')</option>'; } });
     sel.innerHTML=opts;
+    // Het beeld van de post alvast kiezen, zodat het niet opnieuw gekozen hoeft te worden.
+    if(post&&post.asset_id){for(var oi=0;oi<sel.options.length;oi++){if(String(sel.options[oi].value)===String(post.asset_id)){sel.value=String(post.asset_id);break;}}}
     // Carousel-post: alleen Instagram, geen los bestand kiezen.
     var isCar=!!(post&&post.post_type==='carrousel'&&Array.isArray(post.carousel_asset_ids)&&post.carousel_asset_ids.length>=2);
     document.getElementById('pubChannelField').style.display=isCar?'none':'';
@@ -5664,7 +5667,11 @@ function renderPfCarousel(){
     var sel=idx>=0;
     var thumb=(a.type==='video')?videoPoster(a.url):a.url;
     var badge=sel?('<span style="position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(idx+1)+'</span>'):'';
-    return '<div onclick="togglePfCarousel('+a.id+')" title="'+esc(a.name||'')+'" style="position:relative;width:64px;height:64px;border-radius:9px;overflow:hidden;cursor:pointer;border:2px solid '+(sel?'var(--accent)':'var(--line)')+'"><img src="'+esc(thumb)+'" alt="" style="width:100%;height:100%;object-fit:cover">'+badge+'</div>';
+    var vid=(a.type==='video')?'<span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.65);color:#fff;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px">VIDEO</span>':'';
+    return '<div onclick="togglePfCarousel('+a.id+')" title="'+esc(a.name||'')+'" style="position:relative;width:104px;cursor:pointer">'+
+      '<div style="position:relative;width:104px;height:104px;border-radius:9px;overflow:hidden;border:2px solid '+(sel?'var(--accent)':'var(--line)')+'"><img src="'+esc(thumb)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">'+vid+'</div>'+
+      badge+
+      '<div style="font-size:10.5px;color:'+(sel?'var(--ink)':'var(--muted)')+';margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(a.name||('Bestand '+a.id))+'</div></div>';
   }).join('');
 }
 function togglePfCarousel(id){var s=PF_CAROUSEL.map(String);var k=String(id);var i=s.indexOf(k);if(i>=0)PF_CAROUSEL.splice(i,1);else{if(PF_CAROUSEL.length>=10)return;PF_CAROUSEL.push(id);}renderPfCarousel();updatePfMedia();}
@@ -5719,7 +5726,7 @@ function pfbDrag(e,i){_PFB_DRAG=i;try{e.dataTransfer.effectAllowed='move';e.data
 function pfbOver(e){e.preventDefault();}
 function pfbDrop(e,i){e.preventDefault();var from=_PFB_DRAG;_PFB_DRAG=null;if(from==null||from===i)return;var item=PF_BLOCKS.splice(from,1)[0];var target=(from<i)?i-1:i;PF_BLOCKS.splice(target,0,item);renderPfBlocks();}
 function openNewPost(){
-  EDIT_POST=null; hideMsg('postMsg');
+  EDIT_POST=null; hideMsg('postMsg'); pfShowPublishBtn(false);
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
@@ -5740,7 +5747,7 @@ function openEditPost(id){
   fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d.success)return;
     var p=d.posts.filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
-    EDIT_POST=p; hideMsg('postMsg');
+    EDIT_POST=p; hideMsg('postMsg'); pfShowPublishBtn(true);
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
@@ -5761,8 +5768,18 @@ function openEditPost(id){
   });
 }
 function closePost(){document.getElementById('postModal').classList.remove('open');}
+// Opslaan en daarna het publiceervenster openen voor deze post.
+async function pfPublishNow(){
+  var id=EDIT_POST&&EDIT_POST.id; if(!id)return;
+  await savePost();
+  if(!document.getElementById('postModal').classList.contains('open'))openPublish(id); // alleen als opslaan gelukt is
+}
+function pfShowPublishBtn(show){var b=document.getElementById('pfPublishBtn');if(b)b.style.display=(show&&ME&&ME.role!=='client')?'':'none';}
+
 async function savePost(){
-  var btn=document.getElementById('pfSaveBtn'); hideMsg('postMsg');
+  var btn=document.getElementById('pfSaveBtn');
+  if(btn&&btn.disabled)return; // al bezig met opslaan: niet nog een keer (geen dubbele post)
+  hideMsg('postMsg');
   var title=document.getElementById('pfTitle').value.trim();
   if(!title){showMsg('postMsg',false,'Titel is verplicht.');return;}
   var when=document.getElementById('pfWhen').value;
