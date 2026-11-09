@@ -417,6 +417,22 @@ app.get('/health', (_req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
 );
 
+// Telefoonnummer gelijktrekken voordat het gecontroleerd en opgeslagen wordt:
+// alleen cijfers, en een Nederlandse landcode wordt een 0. Zo worden "06-12345678",
+// "06 1234 5678", "+31 6 12345678", "+31 (0)6 12345678" en "0031 6 ..." allemaal
+// 0612345678. Andere landen blijven als cijfers staan (minimaal 10, zoals voorheen).
+// Terugdraaien zonder codewijziging: env LEADS_PHONE_NORMALIZE=0.
+function normalizePhoneNL(raw) {
+  if (typeof raw !== 'string') return raw;
+  if (process.env.LEADS_PHONE_NORMALIZE === '0') return raw;
+  let d = raw.replace(/\D/g, '');
+  if (d.startsWith('0031')) d = d.slice(4);
+  else if (d.startsWith('31') && (d.length === 11 || (d.length === 12 && d[2] === '0'))) d = d.slice(2);
+  else return d;
+  if (!d.startsWith('0')) d = '0' + d;
+  return d;
+}
+
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().required().messages({
@@ -694,6 +710,7 @@ app.get('/api/practice/:code', async (req, res) => {
 
 app.post('/leads', async (req, res) => {
   try {
+    if (req.body && typeof req.body.telefoon === 'string') req.body.telefoon = normalizePhoneNL(req.body.telefoon);
     const { value, error } = leadSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: 'Validation failed', details: error.details.map(d => d.message) });
@@ -1565,7 +1582,7 @@ app.post('/api/leads/handmatig', requireAuth, async (req, res) => {
 
     const naam = (volledige_naam || '').trim();
     const email = (emailadres || '').trim();
-    const tel = (telefoon || '').replace(/\s/g, '');
+    const tel = process.env.LEADS_PHONE_NORMALIZE === '0' ? (telefoon || '').replace(/\s/g, '') : normalizePhoneNL(String(telefoon || ''));
     if (naam.length < 2) return res.status(400).json({ error: 'Naam is verplicht' });
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Geldig e-mailadres is verplicht' });
     if (!/^[0-9]{10,}$/.test(tel)) return res.status(400).json({ error: 'Geldig telefoonnummer is verplicht (min. 10 cijfers)' });

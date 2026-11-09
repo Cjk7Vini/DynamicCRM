@@ -97,3 +97,8 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Het label "Bron" (Facebook of Instagram-login) in de rapportage is alleen zichtbaar voor de superadmin in de workspace (`IS_SUPER`, vlag `superadmin` uit `/api/mkt/auth/me`). Andere gebruikers zien het niet.
 - Instellen via create-user, tab Marketing, knop "Werkplekken" bij het account. Alleen de superadmin (`admin@dynamic-health-consultancy.nl`) ziet die knop en mag dit wijzigen. De superadmin ziet zelf altijd alles.
 - Fleur heeft één e-mailadres met twee accounts: dashboard-admin (gebruiker 31) en owner van haar marketing-werkplek (account 2). Het wachtwoord bepaalt de route. Zijn beide wachtwoorden gelijk, dan wint het marketing-account en komt ze niet meer bij Dynamic.
+
+## Leadformulieren (portaal)
+- Alle formulieren posten naar `/leads` (server.js). De server trekt het telefoonnummer eerst gelijk (`normalizePhoneNL`): alleen cijfers, en +31 / 0031 / 31 wordt een 0. Daarna de controle `^[0-9]{10,}$`. Terugdraaien: env `LEADS_PHONE_NORMALIZE=0`.
+- Elk formulier moet zelf ook alleen de cijfers versturen en bij minder dan 10 cijfers een melding bij het veld geven, nooit alleen "Er ging iets mis". Tot november 2026 weigerden Serac, Fysio Faster, Krommenie en Vitaal Fysiotherapie (Katwijk) daardoor nummers als "06-12345678".
+- Een lead verwijderen in het dashboard verwijdert ook de `lead_events`. Er blijft dan geen spoor over; tellingen uit `lead_events` bewijzen dus niet dat er niets verwijderd is.
