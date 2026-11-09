@@ -1339,6 +1339,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
               ${hasExtras ? 'p.assignees, p.checklist,' : ''}
               ${hasBoardPos ? 'p.board_position,' : ''}
               ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
+              ${hasCarousel ? "(SELECT ca.url FROM marketing.assets ca WHERE ca.id = p.carousel_asset_ids[1] AND ca.workspace_id = p.workspace_id) AS carousel_url, (SELECT ca.resource_type FROM marketing.assets ca WHERE ca.id = p.carousel_asset_ids[1] AND ca.workspace_id = p.workspace_id) AS carousel_type," : ''}
               ${hasBoardWeek ? 'p.board_week,' : ''}
               ${hasCover ? 'p.cover_color,' : ''}
               ${hasComments ? '(SELECT COUNT(*)::int FROM marketing.content_comments cc WHERE cc.post_id=p.id) AS comment_count,' : ''}
