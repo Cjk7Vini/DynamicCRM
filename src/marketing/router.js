@@ -1356,6 +1356,109 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ---- Controle vooraf: staat een geplande post klaar om automatisch geplaatst te worden? ----
+// ALLEEN LEZEN. Controleert wat de planner (runScheduler) op het geplande moment nodig
+// heeft: koppeling, publiceerrecht, account of pagina, beeld en geldigheid van het token.
+// Verandert niets aan posts, koppelingen of de planner.
+// Rechten van een token worden 5 minuten onthouden (een aanvraag bij Meta per token).
+const _permCache = new Map();
+async function tokenPermissions(token) {
+  const key = crypto.createHash('sha256').update(String(token)).digest('hex').slice(0, 24);
+  const hit = _permCache.get(key);
+  if (hit && Date.now() - hit.at < 5 * 60 * 1000) return hit;
+  let out;
+  try {
+    const p = await graphGet('me/permissions', { access_token: token });
+    out = { at: Date.now(), granted: new Set((p.data || []).filter((x) => x.status === 'granted').map((x) => x.permission)), err: null };
+  } catch (e) { out = { at: Date.now(), granted: null, err: (e && e.message) ? e.message : 'onbekende fout' }; }
+  _permCache.set(key, out);
+  if (_permCache.size > 500) _permCache.clear();
+  return out;
+}
+router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req, res) => {
+  try {
+    if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten' });
+    const wsId = req.session.mkt.workspaceId;
+    const okClient = await clientInWorkspace(req.params.clientId, wsId);
+    if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
+    const hasCarousel = await postCarouselAvailable();
+    const hasType = await postTypeAvailable();
+    const hasBoth = await publishBothAvailable();
+    const rows = await withReadConnection(async (c) => (await c.query(
+      `SELECT p.id, p.publish_channel, p.scheduled_at, p.publish_attempts, p.publish_error,
+              ${hasType ? 'p.post_type,' : ''}
+              ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
+              ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
+              a.url AS asset_url, a.provider AS asset_provider
+         FROM marketing.content_posts p
+         LEFT JOIN marketing.assets a ON a.id = p.asset_id
+        WHERE p.workspace_id=$1 AND p.client_id=$2 AND p.auto_publish = true AND p.published_at IS NULL`,
+      [wsId, okClient]
+    )).rows);
+    const out = {};
+    if (!rows.length) return res.json({ success: true, posts: out });
+
+    const creds = await resolveClientMeta(wsId, okClient);
+    // Vervaldatum van het token dat echt gebruikt wordt (klant-token gaat voor werkplek-token).
+    let tokenExpires = null; let igLoginExpires = null;
+    try {
+      const ci = await withReadConnection(async (c) => (await c.query(
+        'SELECT (meta_access_token IS NOT NULL) AS has_tok, meta_token_expires_at, ig_login_expires_at FROM marketing.client_integrations WHERE client_id=$1 AND workspace_id=$2', [okClient, wsId]
+      )).rows[0]) || {};
+      igLoginExpires = ci.ig_login_expires_at || null;
+      if (ci.has_tok) tokenExpires = ci.meta_token_expires_at || null;
+      else {
+        const wi = await withReadConnection(async (c) => (await c.query(
+          'SELECT meta_token_expires_at FROM marketing.workspace_integrations WHERE workspace_id=$1', [wsId]
+        )).rows[0]) || {};
+        tokenExpires = wi.meta_token_expires_at || null;
+      }
+    } catch (_) { /* vervaldatum optioneel */ }
+    const now = Date.now();
+    const fbExpired = !!(creds.token && tokenExpires && new Date(tokenExpires).getTime() < now);
+    const perms = creds.token ? await tokenPermissions(creds.token) : null;
+    let igR = null; let igErr = null;
+    try { igR = await igPublishRoute(creds); } catch (e) { igErr = (e && e.message) ? e.message : 'Instagram-koppeling ontbreekt'; }
+    const fmt = (d) => { try { return new Date(d).toLocaleDateString('nl-NL', { timeZone: 'Europe/Amsterdam', day: 'numeric', month: 'short', year: 'numeric' }); } catch (_) { return String(d); } };
+
+    for (const p of rows) {
+      const issues = []; const unknown = [];
+      const isCarousel = hasType && p.post_type === 'carrousel';
+      let channels;
+      if (p.publish_channel === 'both') channels = hasBoth ? ['instagram', 'facebook'] : null;
+      else channels = [p.publish_channel === 'facebook' ? 'facebook' : 'instagram'];
+      if (channels === null) {
+        issues.push('"Instagram en Facebook" staat uit, de planner laat deze post liggen. Kies een kanaal in de post.');
+        channels = [];
+      }
+      for (const ch of channels) {
+        if (ch === 'instagram' && p.ig_published_at) continue;
+        if (ch === 'facebook' && p.fb_published_at) continue;
+        if (ch === 'instagram') {
+          if (igErr) issues.push('Instagram: ' + igErr);
+          else if (igR && igR.isIgLogin) {
+            if (igLoginExpires && new Date(igLoginExpires).getTime() < now) issues.push('Instagram: de Instagram-login is verlopen op ' + fmt(igLoginExpires) + '. Koppel opnieuw via Instagram.');
+          } else if (perms && perms.err) unknown.push('Instagram: rechten konden niet gecontroleerd worden (' + perms.err + ').');
+          else if (perms && !perms.granted.has('instagram_content_publish')) issues.push('Instagram: de koppeling mist het recht om te publiceren (instagram_content_publish). Klik op Werkplek-koppeling, Koppel met Facebook.');
+          if (isCarousel) issues.push('Instagram: een carrousel wordt nog niet automatisch geplaatst. Gebruik Nu publiceren.');
+          else if (!(p.asset_url && p.asset_provider === 'cloudinary')) issues.push('Instagram: er is geen beeld gekozen (Instagram vereist een afbeelding of video).');
+        } else {
+          if (!creds.token) issues.push('Facebook: er is geen Facebook-koppeling (Koppel met Facebook).');
+          else if (!creds.pageId) issues.push('Facebook: er is geen Facebook-pagina gekoppeld bij deze klant.');
+          else if (perms && perms.err) unknown.push('Facebook: rechten konden niet gecontroleerd worden (' + perms.err + ').');
+          else if (perms && !perms.granted.has('pages_manage_posts')) issues.push('Facebook: de koppeling mist het recht om op de pagina te posten (pages_manage_posts). Klik op Werkplek-koppeling, Koppel met Facebook.');
+          if (isCarousel) issues.push('Facebook: een carrousel kan niet naar Facebook.');
+        }
+      }
+      const needsFbToken = channels.includes('facebook') || (channels.includes('instagram') && !(igR && igR.isIgLogin));
+      if (needsFbToken && fbExpired) issues.push('De Meta-koppeling is verlopen op ' + fmt(tokenExpires) + '. Klik op Werkplek-koppeling, Koppel met Facebook.');
+      if ((p.publish_attempts || 0) >= 5) issues.push('De planner is gestopt na 5 mislukte pogingen' + (p.publish_error ? (' (' + String(p.publish_error).slice(0, 160) + ')') : '') + '. Open de post en sla op om opnieuw te proberen.');
+      out[p.id] = { status: issues.length ? 'niet_klaar' : (unknown.length ? 'onbekend' : 'klaar'), issues, unknown, scheduled_at: p.scheduled_at };
+    }
+    res.json({ success: true, posts: out });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Nieuwe post aanmaken voor een klant.
 router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
   try {
