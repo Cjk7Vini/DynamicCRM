@@ -1211,6 +1211,31 @@ async function postCoverAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
+// Eigen omslag bij een Reel (migratie 033)?
+let _hasReelCover = null;
+async function postReelCoverAvailable() {
+  if (_hasReelCover === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='reel_cover_asset_id'"
+    )).rows);
+    if (r.length > 0) _hasReelCover = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Publieke URL van de Reel-omslag van een post (alleen een afbeelding van dezelfde klant), of null.
+async function reelCoverUrlOf(postId, wsId, clientId) {
+  if (!postId || !(await postReelCoverAvailable())) return null;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      `SELECT a.url FROM marketing.content_posts p
+         JOIN marketing.assets a ON a.id = p.reel_cover_asset_id AND a.workspace_id = p.workspace_id AND a.client_id = p.client_id
+        WHERE p.id=$1 AND p.workspace_id=$2 AND p.client_id=$3 AND a.provider='cloudinary' AND a.resource_type='image'`,
+      [postId, wsId, clientId]
+    )).rows[0]);
+    return r ? r.url : null;
+  } catch (_) { return null; }
+}
 // Controleert dat een lijst asset-ids bij deze klant hoort en publiek (Cloudinary) is;
 // geeft ze terug in dezelfde volgorde als gevraagd, met url + type.
 async function resolveCarouselAssets(wsId, clientId, ids) {
@@ -1345,8 +1370,10 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasBoardWeek = await postBoardWeekAvailable();
     const hasCover = await postCoverAvailable();
     const hasBoth = await publishBothAvailable();
+    const hasReelCover = await postReelCoverAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
+              ${hasReelCover ? 'p.reel_cover_asset_id,' : ''}
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
@@ -1369,7 +1396,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
-    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable(), publish_both: hasBoth });
+    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable(), publish_both: hasBoth, reel_cover: hasReelCover });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1594,6 +1621,19 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.board_week !== undefined && await postBoardWeekAvailable()) {
       let wk = null; const n = parseInt(b.board_week, 10); if (Number.isInteger(n) && n >= 1 && n <= 5) wk = n;
       sets.push(`board_week=$${i++}`); vals.push(wk);
+    }
+    if (b.reel_cover_asset_id !== undefined && await postReelCoverAvailable()) {
+      if (!b.reel_cover_asset_id) { sets.push(`reel_cover_asset_id=$${i++}`); vals.push(null); }
+      else {
+        const okCover = await withReadConnection(async (c) => (await c.query(
+          `SELECT a.id FROM marketing.assets a
+             JOIN marketing.content_posts p ON p.client_id = a.client_id AND p.workspace_id = a.workspace_id
+            WHERE a.id=$1 AND p.id=$2 AND a.workspace_id=$3 AND a.resource_type='image' AND a.provider='cloudinary'`,
+          [parseInt(b.reel_cover_asset_id, 10) || 0, req.params.id, wsId]
+        )).rows[0]);
+        if (!okCover) return res.status(400).json({ error: 'De omslag moet een afbeelding uit Content van deze klant zijn.' });
+        sets.push(`reel_cover_asset_id=$${i++}`); vals.push(okCover.id);
+      }
     }
     if (b.cover_color !== undefined && await postCoverAvailable()) {
       const cc = validColHexColor(b.cover_color); if (cc === undefined) return res.status(400).json({ error: 'Ongeldige omslagkleur (gebruik #RRGGBB)' });
@@ -4166,7 +4206,7 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
         ? { media_type: 'STORIES', video_url: mediaUrl, access_token: tk }
         : { media_type: 'STORIES', image_url: mediaUrl, access_token: tk })
       : (mediaType === 'video'
-        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk }
+        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk, ...((opts && opts.coverUrl) ? { cover_url: opts.coverUrl } : {}) }
         : { image_url: mediaUrl, caption: cap, access_token: tk });
     const created = await R.post(`${igId}/media`, createParams);
     if (mediaType === 'video') {
@@ -4315,7 +4355,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
         mediaUrl = asset.url;
         mediaType = asset.resource_type === 'video' ? 'video' : 'image';
       }
-      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap, igRoute, { postType: await postTypeOf(postId, wsId, okClient) });
+      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap, igRoute, { postType: await postTypeOf(postId, wsId, okClient), coverUrl: await reelCoverUrlOf(postId, wsId, okClient) });
     }
 
     // Post markeren als gepubliceerd.
@@ -4375,6 +4415,7 @@ async function publishBothNow(req, res, wsId, okClient) {
     const cap = (caption != null) ? String(caption) : '';
     const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
     const pType = await postTypeOf(postId, wsId, okClient);
+    const coverUrl = await reelCoverUrlOf(postId, wsId, okClient);
     if (pType === 'story' && schedTypesOn()) return res.status(400).json({ error: 'Een story kan alleen naar Instagram. Kies het kanaal Instagram. Er is niets geplaatst.' });
 
     // Kanalen die voor deze post al geplaatst zijn, overslaan.
@@ -4390,7 +4431,7 @@ async function publishBothNow(req, res, wsId, okClient) {
     for (const ch of ['instagram', 'facebook']) {
       if (done[ch]) { skipped.push(ch); continue; }
       try {
-        results[ch] = await publishToMeta(intg, token, ch, mediaUrl, mediaType, cap, ch === 'instagram' ? igRoute : null, { postType: pType });
+        results[ch] = await publishToMeta(intg, token, ch, mediaUrl, mediaType, cap, ch === 'instagram' ? igRoute : null, { postType: pType, coverUrl: ch === 'instagram' ? coverUrl : null });
         await markChannelPublished(postId, wsId, okClient, ch);
       } catch (e) {
         errors.push(CH_LABEL[ch] + ' mislukt: ' + friendlyPublishError(e.message, ch));
@@ -7131,11 +7172,13 @@ async function runScheduler() {
     const typesOn = schedTypesOn();
     const hasType = typesOn && await postTypeAvailable();
     const hasCar = typesOn && await postCarouselAvailable();
+    const hasReelCover = await postReelCoverAvailable();
     const due = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel,
               ${both ? 'p.ig_published_at, p.fb_published_at,' : ''}
               ${hasType ? 'p.post_type,' : ''}
               ${hasCar ? 'p.carousel_asset_ids,' : ''}
+              ${hasReelCover ? "(SELECT rc.url FROM marketing.assets rc WHERE rc.id = p.reel_cover_asset_id AND rc.workspace_id = p.workspace_id AND rc.client_id = p.client_id AND rc.provider = 'cloudinary' AND rc.resource_type = 'image') AS reel_cover_url," : ''}
               a.url AS asset_url, a.resource_type AS asset_type, a.provider AS asset_provider,
               i.meta_access_token, i.meta_ig_user_id, i.meta_page_id
          FROM marketing.content_posts p
@@ -7181,7 +7224,7 @@ async function runScheduler() {
             if (items.length < 2) throw new Error('Een carrousel heeft minimaal 2 publieke bestanden nodig (kies ze in de post).');
             await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, caption, igRoute);
           } else {
-            await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null });
+            await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null, coverUrl: (channel === 'instagram' && post.reel_cover_url) ? post.reel_cover_url : null });
           }
           // Direct per kanaal vastleggen, vóór het volgende kanaal.
           await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
