@@ -1061,12 +1061,17 @@ async function clientItemsEnhancedAvailable() {
 }
 // Alleen een account uit deze workspace dat geen klant-login is kan een taak krijgen.
 // Ongeldige waarde valt terug op null (niet toegewezen).
-async function validateAssignee(wsId, val) {
+// Toewijzen mag aan teamleden en (sinds november 2026) ook aan klant-logins van DEZELFDE
+// werkplek. Nooit aan accounts van een andere werkplek. Terugval: MKT_ASSIGN_CLIENTS=0.
+function assignClientsOn() { return process.env.MKT_ASSIGN_CLIENTS !== '0'; }
+async function validateAssignee(wsId, val, allowClients = true) {
   if (val === undefined || val === null || val === '') return null;
   const id = parseInt(val, 10);
   if (!Number.isInteger(id)) return null;
   const ok = await withReadConnection(async (c) => (await c.query(
-    "SELECT 1 FROM marketing.accounts WHERE id=$1 AND workspace_id=$2 AND role <> 'client'", [id, wsId]
+    (assignClientsOn() && allowClients)
+      ? 'SELECT 1 FROM marketing.accounts WHERE id=$1 AND workspace_id=$2'
+      : "SELECT 1 FROM marketing.accounts WHERE id=$1 AND workspace_id=$2 AND role <> 'client'", [id, wsId]
   )).rows[0]);
   return ok ? id : null;
 }
@@ -1273,15 +1278,19 @@ function sanitizeChecklist(input) {
     done: !!(x && x.done),
   })).filter((x) => x.text);
 }
-// Alleen geldige workspace-leden (geen klant-login) als toegewezen personen.
+// Alleen accounts van deze workspace (team, en klant-logins tenzij MKT_ASSIGN_CLIENTS=0) als toegewezen personen.
 async function sanitizeAssignees(wsId, input) {
   if (!Array.isArray(input) || !input.length) return [];
   const ids = [...new Set(input.map((x) => parseInt(x, 10)).filter(Number.isInteger))];
   if (!ids.length) return [];
   const rows = await withReadConnection(async (c) => (await c.query(
-    "SELECT id FROM marketing.accounts WHERE workspace_id=$1 AND role <> 'client' AND id = ANY($2::int[])", [wsId, ids]
+    assignClientsOn()
+      ? 'SELECT id FROM marketing.accounts WHERE workspace_id=$1 AND id = ANY($2::int[])'
+      : "SELECT id FROM marketing.accounts WHERE workspace_id=$1 AND role <> 'client' AND id = ANY($2::int[])", [wsId, ids]
   )).rows);
-  return rows.map((r) => r.id);
+  // Volgorde van de invoer aanhouden.
+  const okSet = new Set(rows.map((r) => r.id));
+  return ids.filter((x) => okSet.has(x));
 }
 // Blokken opschonen: max 30 blokken, tekst max 4000 tekens, type text|media.
 function sanitizeBlocks(input) {
@@ -1389,7 +1398,7 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
               ${hasType ? 'p.post_type,' : ''}
               ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
               ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
-              a.url AS asset_url, a.provider AS asset_provider
+              a.url AS asset_url, a.provider AS asset_provider, a.resource_type AS asset_type
          FROM marketing.content_posts p
          LEFT JOIN marketing.assets a ON a.id = p.asset_id
         WHERE p.workspace_id=$1 AND p.client_id=$2 AND p.auto_publish = true AND p.published_at IS NULL`,
@@ -1440,14 +1449,19 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
             if (igLoginExpires && new Date(igLoginExpires).getTime() < now) issues.push('Instagram: de Instagram-login is verlopen op ' + fmt(igLoginExpires) + '. Koppel opnieuw via Instagram.');
           } else if (perms && perms.err) unknown.push('Instagram: rechten konden niet gecontroleerd worden (' + perms.err + ').');
           else if (perms && !perms.granted.has('instagram_content_publish')) issues.push('Instagram: de koppeling mist het recht om te publiceren (instagram_content_publish). Klik op Werkplek-koppeling, Koppel met Facebook.');
-          if (isCarousel) issues.push('Instagram: een carrousel wordt nog niet automatisch geplaatst. Gebruik Nu publiceren.');
-          else if (!(p.asset_url && p.asset_provider === 'cloudinary')) issues.push('Instagram: er is geen beeld gekozen (Instagram vereist een afbeelding of video).');
+          if (isCarousel && !schedTypesOn()) issues.push('Instagram: een carrousel wordt nog niet automatisch geplaatst. Gebruik Nu publiceren.');
+          else if (isCarousel) {
+            const items = hasCarousel ? await resolveCarouselAssets(wsId, okClient, p.carousel_asset_ids) : [];
+            if (items.length < 2) issues.push('Instagram: een carrousel heeft minimaal 2 bestanden nodig. Kies ze onderaan in de post.');
+          } else if (!(p.asset_url && p.asset_provider === 'cloudinary')) issues.push('Instagram: er is geen beeld gekozen (Instagram vereist een afbeelding of video).');
+          else if (hasType && p.post_type === 'reel' && p.asset_type !== 'video') issues.push('Instagram: een Reel vereist een video. Met dit beeld wordt het een gewone post.');
         } else {
           if (!creds.token) issues.push('Facebook: er is geen Facebook-koppeling (Koppel met Facebook).');
           else if (!creds.pageId) issues.push('Facebook: er is geen Facebook-pagina gekoppeld bij deze klant.');
           else if (perms && perms.err) unknown.push('Facebook: rechten konden niet gecontroleerd worden (' + perms.err + ').');
           else if (perms && !perms.granted.has('pages_manage_posts')) issues.push('Facebook: de koppeling mist het recht om op de pagina te posten (pages_manage_posts). Klik op Werkplek-koppeling, Koppel met Facebook.');
-          if (isCarousel) issues.push('Facebook: een carrousel kan niet naar Facebook.');
+          if (isCarousel) issues.push('Facebook: een carrousel kan niet naar Facebook. Kies het kanaal Instagram.');
+          if (hasType && p.post_type === 'story' && schedTypesOn()) issues.push('Facebook: een story kan alleen naar Instagram. Kies het kanaal Instagram.');
         }
       }
       const needsFbToken = channels.includes('facebook') || (channels.includes('instagram') && !(igR && igR.isIgLogin));
@@ -1846,7 +1860,7 @@ router.post('/api/mkt/clients/:clientId/items', requireMkt, async (req, res) => 
     let url = String((req.body && req.body.url) || '').trim().slice(0, 2000) || null;
     if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
     const enhanced = await clientItemsEnhancedAvailable();
-    const assignee = enhanced ? await validateAssignee(wsId, req.body && req.body.assignee_account_id) : null;
+    const assignee = enhanced ? await validateAssignee(wsId, req.body && req.body.assignee_account_id, mktCanManage(req)) : null;
     const due = enhanced ? validateDueDate(req.body && req.body.due_date) : null;
     const row = await withWriteConnection(async (c) => (await c.query(
       enhanced
@@ -1874,7 +1888,7 @@ router.patch('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, res
     if (b.title !== undefined) { if (!String(b.title).trim()) return res.status(400).json({ error: 'Titel mag niet leeg zijn' }); sets.push(`title=$${i++}`); vals.push(String(b.title).trim().slice(0, 500)); }
     if (b.url !== undefined) { let u = String(b.url || '').trim().slice(0, 2000); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; sets.push(`url=$${i++}`); vals.push(u || null); }
     if (b.done !== undefined) { sets.push(`done=$${i++}`); vals.push(b.done === true); }
-    if (enhanced && b.assignee_account_id !== undefined) { const a = await validateAssignee(wsId, b.assignee_account_id); sets.push(`assignee_account_id=$${i++}`); vals.push(a); }
+    if (enhanced && b.assignee_account_id !== undefined) { const a = await validateAssignee(wsId, b.assignee_account_id, mktCanManage(req)); sets.push(`assignee_account_id=$${i++}`); vals.push(a); }
     if (enhanced && b.due_date !== undefined) { const dd = validateDueDate(b.due_date); sets.push(`due_date=$${i++}`); vals.push(dd); }
     if (!sets.length) return res.status(400).json({ error: 'Niets om bij te werken' });
     vals.push(req.params.id, wsId, okClient);
@@ -1903,7 +1917,8 @@ router.delete('/api/mkt/clients/:clientId/items/:id', requireMkt, async (req, re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Teamleden van deze workspace (geen klant-logins). Voor het taggen van een to-do.
+// Teamleden van deze workspace, plus (alleen voor het team) de klant-logins van deze
+// workspace met de naam van hun klant. Voor het toewijzen van taken en posts.
 router.get('/api/mkt/members', requireMkt, async (req, res) => {
   try {
     const wsId = req.session.mkt.workspaceId;
@@ -1911,7 +1926,18 @@ router.get('/api/mkt/members', requireMkt, async (req, res) => {
       "SELECT id, COALESCE(full_name, email) AS name, email FROM marketing.accounts WHERE workspace_id=$1 AND role <> 'client' AND active=true ORDER BY COALESCE(full_name, email) ASC",
       [wsId]
     )).rows);
-    res.json({ success: true, members: rows });
+    let clientMembers = [];
+    if (assignClientsOn() && mktCanManage(req)) {
+      clientMembers = await withReadConnection(async (c) => (await c.query(
+        `SELECT a.id, COALESCE(a.full_name, a.email) AS name, a.email, cl.name AS client_name
+           FROM marketing.accounts a
+           LEFT JOIN marketing.clients cl ON cl.id = a.client_id AND cl.workspace_id = a.workspace_id
+          WHERE a.workspace_id=$1 AND a.role = 'client' AND a.active=true
+          ORDER BY cl.name ASC NULLS LAST, COALESCE(a.full_name, a.email) ASC`,
+        [wsId]
+      )).rows);
+    }
+    res.json({ success: true, members: rows, client_members: clientMembers });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4113,17 +4139,27 @@ async function igPublishRoute(creds) {
   return { igId: String(r.uid), token: r.tok, get: graphGet, post: graphPost, isIgLogin: false };
 }
 
-async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption, igRoute) {
+// Type post (bericht/reel/story/carrousel) telt mee bij het plaatsen, tenzij MKT_SCHED_TYPES=0
+// (dan de oude werking: alles als bericht of Reel, en de planner slaat carrousels niet over).
+function schedTypesOn() { return process.env.MKT_SCHED_TYPES !== '0'; }
+async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption, igRoute, opts) {
   const cap = (caption != null) ? String(caption) : '';
+  const isStory = !!(opts && opts.postType === 'story' && schedTypesOn());
+  if (isStory && channel !== 'instagram') throw new Error('Een story kan alleen naar Instagram, niet naar Facebook.');
   if (channel === 'instagram') {
     // igRoute (uit igPublishRoute) bepaalt account, token en API; zonder: Facebook-route.
     const R = igRoute || { igId: intg.meta_ig_user_id, token, get: graphGet, post: graphPost };
     if (!R.igId) throw new Error('Instagram user ID ontbreekt in de koppelingen');
     if (!mediaUrl) throw new Error('Instagram vereist een afbeelding of video');
     const igId = R.igId; const tk = R.token;
-    const createParams = mediaType === 'video'
-      ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk }
-      : { image_url: mediaUrl, caption: cap, access_token: tk };
+    // Story: media_type STORIES (een story heeft geen tekst). Anders: video = Reel, beeld = bericht.
+    const createParams = isStory
+      ? (mediaType === 'video'
+        ? { media_type: 'STORIES', video_url: mediaUrl, access_token: tk }
+        : { media_type: 'STORIES', image_url: mediaUrl, access_token: tk })
+      : (mediaType === 'video'
+        ? { media_type: 'REELS', video_url: mediaUrl, caption: cap, access_token: tk }
+        : { image_url: mediaUrl, caption: cap, access_token: tk });
     const created = await R.post(`${igId}/media`, createParams);
     if (mediaType === 'video') {
       let ready = false;
@@ -4136,7 +4172,7 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
       if (!ready) throw new Error('Video-verwerking duurt te lang');
     }
     const pub = await R.post(`${igId}/media_publish`, { creation_id: created.id, access_token: tk });
-    return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook' };
+    return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook', story: isStory || undefined };
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
   const pageId = intg.meta_page_id;
@@ -4271,7 +4307,7 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
         mediaUrl = asset.url;
         mediaType = asset.resource_type === 'video' ? 'video' : 'image';
       }
-      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap, igRoute);
+      result = await publishToMeta(intg, token, channel, mediaUrl, mediaType, cap, igRoute, { postType: await postTypeOf(postId, wsId, okClient) });
     }
 
     // Post markeren als gepubliceerd.
@@ -4297,6 +4333,16 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
 // een fout die vooraf te zien was. Een kanaal dat voor deze post al geplaatst is
 // (per-kanaal registratie, migratie 032) wordt overgeslagen: nooit dubbel.
 const CH_LABEL = { instagram: 'Instagram', facebook: 'Facebook' };
+// Type van een post (alleen met migratie 012); null als onbekend.
+async function postTypeOf(postId, wsId, clientId) {
+  if (!postId || !(await postTypeAvailable())) return null;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      'SELECT post_type FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2 AND client_id=$3', [postId, wsId, clientId]
+    )).rows[0]);
+    return r ? (r.post_type || null) : null;
+  } catch (_) { return null; }
+}
 async function publishBothNow(req, res, wsId, okClient) {
   const { caption, assetId, postId, carouselAssetIds } = req.body || {};
   try {
@@ -4320,6 +4366,8 @@ async function publishBothNow(req, res, wsId, okClient) {
     const mediaType = asset.resource_type === 'video' ? 'video' : 'image';
     const cap = (caption != null) ? String(caption) : '';
     const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
+    const pType = await postTypeOf(postId, wsId, okClient);
+    if (pType === 'story' && schedTypesOn()) return res.status(400).json({ error: 'Een story kan alleen naar Instagram. Kies het kanaal Instagram. Er is niets geplaatst.' });
 
     // Kanalen die voor deze post al geplaatst zijn, overslaan.
     let done = { instagram: false, facebook: false };
@@ -4334,7 +4382,7 @@ async function publishBothNow(req, res, wsId, okClient) {
     for (const ch of ['instagram', 'facebook']) {
       if (done[ch]) { skipped.push(ch); continue; }
       try {
-        results[ch] = await publishToMeta(intg, token, ch, mediaUrl, mediaType, cap, ch === 'instagram' ? igRoute : null);
+        results[ch] = await publishToMeta(intg, token, ch, mediaUrl, mediaType, cap, ch === 'instagram' ? igRoute : null, { postType: pType });
         await markChannelPublished(postId, wsId, okClient, ch);
       } catch (e) {
         errors.push(CH_LABEL[ch] + ' mislukt: ' + friendlyPublishError(e.message, ch));
@@ -7072,9 +7120,14 @@ async function runScheduler() {
     // Met migratie 032 (en zonder kill switch) ook de per-kanaal registratie; anders
     // precies de oude werking en blijven posts met 'both' liggen.
     const both = await publishBothAvailable();
+    const typesOn = schedTypesOn();
+    const hasType = typesOn && await postTypeAvailable();
+    const hasCar = typesOn && await postCarouselAvailable();
     const due = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel,
               ${both ? 'p.ig_published_at, p.fb_published_at,' : ''}
+              ${hasType ? 'p.post_type,' : ''}
+              ${hasCar ? 'p.carousel_asset_ids,' : ''}
               a.url AS asset_url, a.resource_type AS asset_type, a.provider AS asset_provider,
               i.meta_access_token, i.meta_ig_user_id, i.meta_page_id
          FROM marketing.content_posts p
@@ -7113,7 +7166,15 @@ async function runScheduler() {
             mediaType = post.asset_type === 'video' ? 'video' : 'image';
           }
           const caption = post.body || post.title || '';
-          await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute);
+          if (hasType && post.post_type === 'carrousel') {
+            // Carrousel: dezelfde route als "Nu publiceren". Alleen Instagram.
+            if (channel !== 'instagram') throw new Error('Een carrousel kan alleen naar Instagram, niet naar Facebook.');
+            const items = hasCar ? await resolveCarouselAssets(post.workspace_id, post.client_id, post.carousel_asset_ids) : [];
+            if (items.length < 2) throw new Error('Een carrousel heeft minimaal 2 publieke bestanden nodig (kies ze in de post).');
+            await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, caption, igRoute);
+          } else {
+            await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null });
+          }
           // Direct per kanaal vastleggen, vóór het volgende kanaal.
           await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
         } catch (e) {
