@@ -441,7 +441,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
                   <div>
                     <input type="file" id="brLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadBrandLogo(this)">
                     <button class="btn btn-ghost" type="button" id="brLogoBtn" onclick="document.getElementById('brLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Logo uploaden</button>
-                    <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Vierkant werkt het best.</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Aanbevolen: vierkant, minimaal 512 &times; 512 pixels, max 5 MB.</div>
                   </div>
                 </div>
                 <input id="brLogo" placeholder="of plak een logo-URL: https://..." oninput="previewBrandingLive()">
@@ -785,10 +785,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
                 <button class="btn btn-ghost" type="button" id="dfLogoBtn" onclick="document.getElementById('dfLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Logo uploaden</button>
                 <button class="btn btn-ghost" type="button" id="dfLogoDel" onclick="dfRemoveLogo()" style="padding:7px 12px;font-size:12.5px;color:#f87171;display:none">Verwijderen</button>
               </div>
-              <div style="font-size:11.5px;color:var(--muted);margin-top:4px">PNG, JPG of WebP, max 5 MB. Wordt direct opgeslagen en getoond in de klantenlijst.</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:4px">PNG, JPG of WebP. Aanbevolen: vierkant, minimaal 512 &times; 512 pixels, max 5 MB. Wordt direct opgeslagen en getoond in de klantenlijst.</div>
             </div>
             <div class="field"><label>Branche</label><input id="dfBranche" maxlength="120" placeholder="Bijv. fysiotherapie, fitness, beauty"></div>
-            <div class="field"><label>Gewenste doelgroep</label><textarea id="dfAudience" rows="2" maxlength="500" placeholder="Wie wil de klant bereiken? Bijv. vrouwen van 30 tot 50 jaar in de regio Utrecht"></textarea></div>
+            <div class="field"><label>Gewenste doelgroep</label> <textarea id="dfAudience" rows="4" maxlength="2000" oninput="audCount(this)" placeholder="Wie wil de klant bereiken? Bijv. vrouwen van 30 tot 50 jaar in de regio Utrecht"></textarea><div class="aud-count" style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">0 / 2000</div></div>
             <div class="field"><label>Belangrijkste doel(en)</label><div id="dfGoals"></div><div style="font-size:11.5px;color:var(--muted);margin-top:2px">De AI-analyses gebruiken deze doelgroep en doelen om de cijfers te beoordelen.</div></div>
             <div class="actions-split">
               <button class="btn btn-danger" id="dDeleteBtn" onclick="deleteClient()">Verwijderen</button>
@@ -1010,7 +1010,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
             <div>
               <input type="file" id="ncLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadClientLogo(this)">
               <button class="btn btn-ghost" type="button" id="ncLogoBtn" onclick="document.getElementById('ncLogoFile').click()" style="padding:7px 12px;font-size:12.5px">Afbeelding uploaden</button>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Zonder afbeelding tonen we de initialen van de klant.</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG of WebP. Aanbevolen: vierkant, minimaal 512 &times; 512 pixels, max 5 MB. Zonder afbeelding tonen we de initialen van de klant.</div>
             </div>
           </div>
           <input type="hidden" id="ncLogo">
@@ -1028,7 +1028,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div style="flex:1;min-width:280px">
         <div style="font-weight:700;font-size:13px;margin:4px 0 10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Social media strategie</div>
         <div class="field"><label>Belangrijkste doel(en)</label><div id="ncGoals"></div></div>
-        <div class="field"><label>Doelgroep</label><input id="ncAudience" placeholder="Wie wil de klant bereiken?"></div>
+        <div class="field"><label>Doelgroep</label><textarea id="ncAudience" rows="3" maxlength="2000" oninput="audCount(this)" placeholder="Wie wil de klant bereiken?"></textarea><div class="aud-count" style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">0 / 2000</div></div>
         <div class="field"><label>Social media kanalen</label><div id="ncChannels"></div></div>
         <div class="field"><label>Belangrijke afspraken & notities</label><textarea id="ncNotes" rows="3" placeholder="Bv. tone of voice, wensen of bijzonderheden"></textarea></div>
       </div>
@@ -1422,7 +1422,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <option value="other">Overig</option>
         </select>
       </div>
-      <div class="field"><label>Status</label>
+      <div class="field" style="display:none"><label>Status</label>
         <select id="pfStatus">
           <option value="idea">Idee</option>
           <option value="draft">Concept</option>
@@ -1535,7 +1535,7 @@ async function bootstrap(){
   // Bepaal ME (normaal account of platform-in-workspace).
   if(IS_PLATFORM){
     var w=d.workspace;
-    ME={ email:d.email, role:'platform_admin', full_name:'Platform-admin',
+    ME={ email:d.email, role:'platform_admin', full_name:(d.name&&String(d.name).trim())?String(d.name).trim():'Platform-admin',
          workspace_name:w.name, slug:w.slug, modules:w.modules,
          license_type:w.license_type, license_end:w.license_end, max_seats:w.max_seats, max_clients:w.max_clients };
   } else { ME=d.account; }
@@ -1886,7 +1886,7 @@ async function loadOverzicht(){
   var today=new Date().toISOString().slice(0,10);
   var nActiveClients=allClients.filter(function(c){return !c.archived && (c.status==null||c.status==='active');}).length || allClients.length;
   var nTasks=tasks.length, nClientsOpen=clients.length;
-  var firstName=(ME&&ME.full_name?String(ME.full_name).trim().split(/\s+/)[0]:'')||(ME&&ME.workspace_name)||'';
+  var firstName=(ME&&ME.full_name&&ME.full_name!=='Platform-admin'?String(ME.full_name).trim().split(/\s+/)[0]:'')||(ME&&ME.workspace_name)||'';
 
   function ovBadge(status){
     var label=POST_STATUS_LABEL[status]||status||'';
@@ -1911,7 +1911,8 @@ async function loadOverzicht(){
 
   // Posts voor deze week: geplande posts (komende 7 dagen).
   var wkEnd=new Date(); wkEnd.setDate(wkEnd.getDate()+7);
-  var weekPosts=posts.filter(function(p){var dt=new Date(p.scheduled_at);return !isNaN(dt)&&dt<=wkEnd;}).slice(0,6);
+  // Is er een klant vastgezet (Gegevens, "Op hoofd-overzicht tonen"), dan alleen die klant.
+  var weekPosts=posts.filter(function(p){var dt=new Date(p.scheduled_at);return !isNaN(dt)&&dt<=wkEnd&&(pinnedId==null||String(p.client_id)===String(pinnedId));}).slice(0,6);
   var postsHtml=weekPosts.map(function(p){
     return '<div class="pw-row" onclick="openClient('+p.client_id+')">'+
       '<span class="pw-title">'+esc(p.title||'(zonder titel)')+'<span style="color:var(--muted);font-weight:400"> &middot; '+esc(p.client_name||'')+'</span></span>'+
@@ -2335,7 +2336,9 @@ async function uploadClientLogo(input){
   }catch(e){ showMsg('newClientMsg',false,'Netwerkfout bij uploaden.'); }
   if(btn){btn.disabled=false;btn.textContent='Afbeelding uploaden';}
 }
-function openNewClient(){hideMsg('newClientMsg');['ncName','ncContact','ncEmail','ncWebsite','ncNotes','ncBranche','ncAudience','ncLogo'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});document.getElementById('ncColor').value='#6366f1';NC_GOALS=[];NC_CHANNELS=[];ncRenderGoals();ncRenderChannels();var lp=document.getElementById('ncLogoPreview');if(lp){lp.innerHTML='';lp.textContent='Geen';}document.getElementById('newClientModal').classList.add('open');document.getElementById('ncName').focus();}
+// Teller onder het doelgroepveld (maximaal 2000 tekens).
+function audCount(el){if(!el)return;var c=el.parentNode&&el.parentNode.querySelector('.aud-count');if(c)c.textContent=(el.value||'').length+' / 2000';}
+function openNewClient(){hideMsg('newClientMsg');['ncName','ncContact','ncEmail','ncWebsite','ncNotes','ncBranche','ncAudience','ncLogo'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});document.getElementById('ncColor').value='#6366f1';audCount(document.getElementById('ncAudience'));NC_GOALS=[];NC_CHANNELS=[];ncRenderGoals();ncRenderChannels();var lp=document.getElementById('ncLogoPreview');if(lp){lp.innerHTML='';lp.textContent='Geen';}document.getElementById('newClientModal').classList.add('open');document.getElementById('ncName').focus();}
 function closeNewClient(){document.getElementById('newClientModal').classList.remove('open');}
 async function createClient(){
   var btn=document.getElementById('ncCreateBtn'); hideMsg('newClientMsg');
@@ -2388,7 +2391,7 @@ function renderClientDetail(c){
   document.getElementById('dfStatus').value=c.status||'active';
   document.getElementById('dfNotes').value=c.notes||'';
   var _dfB=document.getElementById('dfBranche'); if(_dfB)_dfB.value=c.branche||'';
-  var _dfA=document.getElementById('dfAudience'); if(_dfA)_dfA.value=c.audience||'';
+  var _dfA=document.getElementById('dfAudience'); if(_dfA){_dfA.value=c.audience||'';audCount(_dfA);}
   DF_GOALS=Array.isArray(c.goals)?c.goals.slice():[]; dfRenderGoals();
   var isOwnerMgr=(ME.role==='owner'||ME.role==='manager'||ME.role==='platform_admin');
   document.getElementById('dDeleteBtn').style.display=isOwnerMgr?'':'none';
@@ -5295,14 +5298,52 @@ function checklistBadge(cl){
   var done=cl.filter(function(x){return x&&x.done;}).length;
   return '<span title="checklist" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line);padding:2px 7px;border-radius:20px">&#10003; '+done+'/'+cl.length+'</span>';
 }
-async function createCustomLabel(){
-  var name=prompt('Naam van het nieuwe label:'); if(name==null)return; name=name.trim(); if(!name)return;
-  var color=prompt('Kleur (hex, bv. #16a34a). Leeg = standaard paars:','#16a34a')||'';
+// Nieuw label: naam plus een kleur uit een raster (zoals in Trello), of een eigen kleur.
+var LABEL_PALETTE=['#216e4e','#7f5f01','#a54800','#ae2e24','#5e4db2','#0055cc','#206a83','#4c6b1f','#943d73','#596773',
+  '#1f845a','#946f00','#c25100','#c9372c','#6e5dc6','#0c66e4','#227d9b','#5b7f24','#ae4787','#626f86',
+  '#4bce97','#e2b203','#fea362','#f87168','#9f8fef','#579dff','#6cc3e0','#94c748','#e774bb','#8c9bab'];
+var _NL_COLOR='#1f845a';
+function createCustomLabel(){
+  var ov=document.getElementById('nlOverlay');
+  if(!ov){ov=document.createElement('div');ov.id='nlOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:420';ov.onclick=function(e){if(e.target===ov)nlClose();};document.body.appendChild(ov);}
+  _NL_COLOR='#1f845a';
+  ov.innerHTML='<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:340px;max-width:calc(100vw - 32px)">'+
+    '<div style="font-weight:700;font-size:15px;margin-bottom:10px">Nieuw label</div>'+
+    '<label style="font-size:12px;color:var(--muted)">Naam</label><input id="nlName" maxlength="40" style="width:100%;margin:4px 0 12px" placeholder="Bijv. Klaar voor controle" onkeydown="if(event.key===\'Enter\')nlSave()">'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Kies een kleur</div>'+
+    '<div id="nlGrid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:5px"></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)">Of een eigen kleur: <input type="color" id="nlCustom" value="#1f845a" oninput="nlPick(this.value)" style="width:42px;height:26px;padding:0;border:none;background:none;cursor:pointer"></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:12px"><span style="font-size:12px;color:var(--muted)">Voorbeeld:</span><span id="nlPreview" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;color:#fff">Label</span></div>'+
+    '<div id="nlMsg" style="font-size:12px;color:#f87171;margin-top:8px;display:none"></div>'+
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn btn-ghost" type="button" onclick="nlClose()">Annuleren</button><button class="btn btn-primary" type="button" id="nlSaveBtn" onclick="nlSave()">Aanmaken</button></div>'+
+  '</div>';
+  ov.style.display='flex';
+  nlRender();
+  var ni=document.getElementById('nlName'); if(ni){ni.oninput=nlRender;ni.focus();}
+}
+function nlRender(){
+  var g=document.getElementById('nlGrid'); if(!g)return;
+  g.innerHTML=LABEL_PALETTE.map(function(c){var on=c.toLowerCase()===_NL_COLOR.toLowerCase();return '<button type="button" title="'+c+'" onclick="nlPick(\''+c+'\')" style="height:24px;border-radius:5px;cursor:pointer;background:'+c+';border:2px solid '+(on?'#fff':'transparent')+';box-shadow:'+(on?'0 0 0 2px var(--accent)':'none')+'"></button>';}).join('');
+  var pv=document.getElementById('nlPreview'); var ni=document.getElementById('nlName');
+  if(pv){pv.style.background=_NL_COLOR;pv.textContent=(ni&&ni.value.trim())||'Label';}
+}
+function nlPick(c){if(/^#[0-9a-fA-F]{6}$/.test(c)){_NL_COLOR=c;var ci=document.getElementById('nlCustom');if(ci&&ci.value.toLowerCase()!==c.toLowerCase())ci.value=c;nlRender();}}
+function nlClose(){var ov=document.getElementById('nlOverlay');if(ov)ov.style.display='none';}
+async function nlSave(){
+  var ni=document.getElementById('nlName'); var name=(ni&&ni.value||'').trim();
+  var msg=document.getElementById('nlMsg');
+  if(!name){if(msg){msg.textContent='Vul een naam in.';msg.style.display='block';}return;}
+  var btn=document.getElementById('nlSaveBtn'); if(btn)btn.disabled=true;
+  var ok=await saveCustomLabel(name,_NL_COLOR);
+  if(btn)btn.disabled=false;
+  if(ok)nlClose(); else if(msg){msg.textContent='Kon label niet aanmaken.';msg.style.display='block';}
+}
+async function saveCustomLabel(name,color){
   try{
     var r=await fetch('/api/mkt/label-defs',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({label:name,color:color.trim()})});
     var d=await r.json();
-    if(r.ok&&d.success){await loadCustomLabels();renderPfLabels();}else{alert(d.error||'Kon label niet aanmaken.');}
-  }catch(e){alert('Netwerkfout.');}
+    if(r.ok&&d.success){await loadCustomLabels();renderPfLabels();return true;}else{alert(d.error||'Kon label niet aanmaken.');return false;}
+  }catch(e){alert('Netwerkfout.');return false;}
 }
 async function deleteCustomLabel(id){
   if(!confirm('Dit label verwijderen? Het verdwijnt van alle kaarten.'))return;
