@@ -1524,6 +1524,8 @@ async function doLogout(){
   loginView.classList.remove('hidden'); document.getElementById('password').value='';
 }
 async function bootstrap(){
+  // Lijsten die bij een werkplek horen leegmaken (wisselen van werkplek zonder herladen).
+  MKT_MEMBERS=[]; MKT_CLIENT_MEMBERS=[]; POST_READY={};
   var r=await fetch('/api/mkt/auth/me',{credentials:'include'}); if(!r.ok)return;
   var d=await r.json(); if(!d.success)return;
   IS_PLATFORM = !!d.platformAdmin;
@@ -2980,12 +2982,27 @@ async function ovToggleTask(id,done){
 
 // ---- Client-items: To do / Documenten ----
 function clientItemsCtx(kind){return kind==='document'?{body:'docsBody',msg:'docsMsg',ph:'Naam (bv. Contract, Bedrijfsinfo)',urlPh:'Link (Google Drive, bestand...)',empty:'Nog geen documenten.'}:{body:'todoBody',msg:'todoMsg',ph:'Wat moet er gebeuren?',urlPh:'Optionele link (bv. vragenlijst)',empty:'Nog geen to do-items.'};}
-var MKT_MEMBERS=[];
+var MKT_MEMBERS=[], MKT_CLIENT_MEMBERS=[];
 async function loadMembers(){
-  try{var r=await fetch('/api/mkt/members',{credentials:'include'});var d=await r.json();MKT_MEMBERS=(d&&d.success&&d.members)?d.members:[];}catch(e){MKT_MEMBERS=[];}
+  try{var r=await fetch('/api/mkt/members',{credentials:'include'});var d=await r.json();MKT_MEMBERS=(d&&d.success&&d.members)?d.members:[];MKT_CLIENT_MEMBERS=(d&&d.success&&Array.isArray(d.client_members))?d.client_members:[];}catch(e){MKT_MEMBERS=[];MKT_CLIENT_MEMBERS=[];}
+}
+// Naam van een teamlid of klant-login van deze werkplek ('' als onbekend).
+function memberLabel(m){return (m.name||m.email||'')+(m.client_name?(' ('+m.client_name+')'):'');}
+function memberById(id){
+  var all=MKT_MEMBERS.concat(MKT_CLIENT_MEMBERS);
+  for(var i=0;i<all.length;i++){if(String(all[i].id)===String(id))return all[i];}
+  return null;
 }
 function memberOptions(sel){
-  return '<option value="">Niemand</option>'+MKT_MEMBERS.map(function(m){return '<option value="'+m.id+'"'+((String(sel)===String(m.id))?' selected':'')+'>'+esc(m.name||m.email)+'</option>';}).join('');
+  var opt=function(m,lbl){return '<option value="'+m.id+'"'+((String(sel)===String(m.id))?' selected':'')+'>'+esc(lbl)+'</option>';};
+  var h='<option value="">Niemand</option>';
+  if(MKT_CLIENT_MEMBERS.length){
+    h+='<optgroup label="Team">'+MKT_MEMBERS.map(function(m){return opt(m,m.name||m.email);}).join('')+'</optgroup>';
+    h+='<optgroup label="Klant-logins">'+MKT_CLIENT_MEMBERS.map(function(m){return opt(m,memberLabel(m));}).join('')+'</optgroup>';
+  } else {
+    h+=MKT_MEMBERS.map(function(m){return opt(m,m.name||m.email);}).join('');
+  }
+  return h;
 }
 function setTodoBadge(myOpen){
   var tab=document.getElementById('tabTodo'); if(!tab)return;
@@ -5229,7 +5246,8 @@ function pfCoverClear(){PF_COVER='';renderPfCover();}
 var POST_EXTRAS=false, POST_ACTIVITY=false, PF_ASSIGNEES=[], PF_CHECKLIST=[];
 function renderPfAssignees(){
   var box=document.getElementById('pfAssignees'); if(!box)return;
-  box.innerHTML=MKT_MEMBERS.length?MKT_MEMBERS.map(function(m){var on=PF_ASSIGNEES.map(String).indexOf(String(m.id))>=0;return '<button type="button" onclick="togglePfAssignee('+m.id+')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--accent);background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--accent)')+'">'+esc(m.name||m.email)+'</button>';}).join(''):'<span style="font-size:12px;color:var(--muted)">Geen teamleden gevonden.</span>';
+  var _pfAll=MKT_MEMBERS.concat(MKT_CLIENT_MEMBERS);
+  box.innerHTML=_pfAll.length?_pfAll.map(function(m){var on=PF_ASSIGNEES.map(String).indexOf(String(m.id))>=0;return '<button type="button" onclick="togglePfAssignee('+m.id+')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--accent);background:'+(on?'var(--accent)':'transparent')+';color:'+(on?'#fff':'var(--accent)')+'">'+esc(memberLabel(m))+'</button>';}).join(''):'<span style="font-size:12px;color:var(--muted)">Geen teamleden gevonden.</span>';
 }
 function togglePfAssignee(id){var s=PF_ASSIGNEES.map(String);var k=String(id);var i=s.indexOf(k);if(i>=0)PF_ASSIGNEES.splice(i,1);else PF_ASSIGNEES.push(id);renderPfAssignees();}
 function renderPfChecklist(){
@@ -5244,7 +5262,7 @@ function pfToggleChecklist(idx,on){if(PF_CHECKLIST[idx]){PF_CHECKLIST[idx].done=
 function pfEditChecklist(idx,val){if(PF_CHECKLIST[idx]){PF_CHECKLIST[idx].text=String(val||'').trim();}}
 function pfRemoveChecklist(idx){PF_CHECKLIST.splice(idx,1);renderPfChecklist();}
 function actorLabel(a){
-  if(a.actor_account_id){for(var i=0;i<MKT_MEMBERS.length;i++){if(String(MKT_MEMBERS[i].id)===String(a.actor_account_id))return MKT_MEMBERS[i].name||MKT_MEMBERS[i].email;}}
+  if(a.actor_account_id){var _am=memberById(a.actor_account_id);if(_am)return _am.name||_am.email;}
   return a.actor_name||'Iemand';
 }
 function activityText(a){
@@ -5270,7 +5288,7 @@ function pfShowExtras(){
 }
 function assigneeAvatars(ids){
   if(!Array.isArray(ids)||!ids.length)return '';
-  return '<span style="display:inline-flex">'+ids.slice(0,4).map(function(id){var nm='';for(var i=0;i<MKT_MEMBERS.length;i++){if(String(MKT_MEMBERS[i].id)===String(id)){nm=MKT_MEMBERS[i].name||MKT_MEMBERS[i].email;break;}}var ini=nm?initials(nm):'?';return '<span title="'+esc(nm)+'" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:700;border:1px solid var(--panel);margin-left:-4px">'+esc(ini)+'</span>';}).join('')+'</span>';
+  return '<span style="display:inline-flex">'+ids.slice(0,4).map(function(id){var _mm=memberById(id);var nm=_mm?(_mm.name||_mm.email):'';var ini=nm?initials(nm):'?';return '<span title="'+esc(nm)+'" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:700;border:1px solid var(--panel);margin-left:-4px">'+esc(ini)+'</span>';}).join('')+'</span>';
 }
 function checklistBadge(cl){
   if(!Array.isArray(cl)||!cl.length)return '';
