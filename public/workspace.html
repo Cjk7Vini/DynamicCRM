@@ -3129,11 +3129,22 @@ async function loadReadiness(){
 // Voorbeeldbeeld van een post: het losse beeld, of bij een carrousel het eerste bestand.
 function isCarPost(p){return !!(p&&p.post_type==='carrousel'&&Array.isArray(p.carousel_asset_ids)&&p.carousel_asset_ids.length);}
 function postThumbSrc(p){
-  if(p&&p.asset_url)return p.asset_type==='video'?videoPoster(p.asset_url):p.asset_url;
-  if(isCarPost(p)&&p.carousel_url)return p.carousel_type==='video'?videoPoster(p.carousel_url):p.carousel_url;
+  if(p&&p.asset_url)return thumbUrl(p.asset_url,480);
+  if(isCarPost(p)&&p.carousel_url)return thumbUrl(p.carousel_url,480);
   return '';
 }
 function carBadge(p){return isCarPost(p)?('<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px">Carrousel &middot; '+p.carousel_asset_ids.length+'</span>'):'';}
+// Kleine versie van een beeld uit de beeldopslag (sneller laden): breedte w, automatisch
+// formaat en kwaliteit. Video: stilstaand beeld van het begin, ook verkleind. Andere links
+// blijven ongewijzigd. Het origineel blijft bewaard en wordt gebruikt bij openen en publiceren.
+function thumbUrl(url,w){
+  try{
+    var u=String(url||''); var W=Math.max(80,Math.min(2000,parseInt(w,10)||480));
+    if(/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(u))return u.replace('/image/upload/','/image/upload/c_limit,w_'+W+',q_auto,f_auto/');
+    if(/^https:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\//.test(u))return u.replace('/video/upload/','/video/upload/so_0,c_limit,w_'+W+',q_auto/').replace(/\.[a-z0-9]+$/i,'.jpg');
+    return u;
+  }catch(e){return url;}
+}
 function videoPoster(url){try{if(url.indexOf('/upload/')<0)return url;return url.replace('/upload/','/upload/so_0/').replace(/\.[a-z0-9]+$/i,'.jpg');}catch(e){return url;}}
 function openViewer(url,type){
   var box=document.getElementById('viewerBox');
@@ -3151,7 +3162,7 @@ async function loadAssets(){
     if(!r.ok||!d.success){body.innerHTML='';showMsg('assetsMsg',false,d.error||'Kon assets niet laden.');return;}
     document.getElementById('assetInfo').textContent=d.assets.length+' bestand'+(d.assets.length===1?'':'en');
     if(!d.assets.length){
-      var emptyTxt=(ME.role==='client')?'Deel hier beeld of documenten met je marketingteam.':'Upload afbeeldingen of video\'s voor deze klant.';
+      var emptyTxt=(ME.role==='client')?'Deel hier beeld of documenten met je marketingteam. Je kunt bestanden ook hierheen slepen.':'Upload afbeeldingen of video\'s voor deze klant, of sleep ze vanaf je computer hierheen.';
       body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><h4>Nog geen beeldmateriaal</h4><p>'+emptyTxt+'</p><button class="btn btn-primary" onclick="document.getElementById(\'assetInput\').click()">+ Uploaden</button></div>';
       return;
     }
@@ -3161,13 +3172,13 @@ async function loadAssets(){
       var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="delAsset('+a.id+')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>'):'';
       var thumb;
       if(a.resource_type==='video'){
-        var poster=videoPoster(url);
+        var poster=thumbUrl(url,480);
         thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'video\')">'+
           '<img class="asset-thumb" src="'+esc(poster)+'" alt="'+esc(a.filename)+'" loading="lazy" onerror="this.style.background=\'#0b0e16\'">'+
           '<div class="play"><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div></div>';
       } else {
         thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'image\')">'+
-          '<img class="asset-thumb" src="'+esc(url)+'" alt="'+esc(a.filename)+'" loading="lazy"></div>';
+          '<img class="asset-thumb" src="'+esc(thumbUrl(url,480))+'" alt="'+esc(a.filename)+'" loading="lazy"></div>';
       }
       return '<div class="asset-card">'+thumb+
         '<div class="asset-info"><div style="min-width:0"><div class="nm">'+esc(a.filename)+'</div><div class="sz">'+fmtSize(a.size_bytes)+'</div></div>'+del+'</div></div>';
@@ -3207,7 +3218,16 @@ async function uploadOneAsset(file, clientId){
 }
 async function uploadAsset(input){
   var files=input.files?Array.prototype.slice.call(input.files):[]; input.value='';
-  if(!files.length||!CURRENT_CLIENT)return;
+  await uploadFiles(files);
+}
+var _UPLOADING=false;
+async function uploadFiles(files){
+  if(!files||!files.length||!CURRENT_CLIENT)return;
+  if(_UPLOADING){showMsg('assetsMsg',false,'Er wordt al geupload. Wacht tot dat klaar is.');return;}
+  _UPLOADING=true;
+  try{ await uploadFilesRun(files); } finally { _UPLOADING=false; }
+}
+async function uploadFilesRun(files){
   hideMsg('assetsMsg');
   var clientId=CURRENT_CLIENT.id;
   var btn=document.getElementById('uploadBtn'); btn.disabled=true;
@@ -3226,6 +3246,43 @@ async function uploadAsset(input){
     showMsg('assetsMsg',true,'Alle '+files.length+' bestanden zijn geupload.');
   }
 }
+// Bestanden vanaf de computer naar het tabblad Content slepen.
+(function(){
+  function isFileDrag(e){try{return e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0;}catch(_){return false;}}
+  function zone(){return document.getElementById('dAssets');}
+  function visible(z){return z&&z.style.display!=='none'&&z.offsetParent!==null;}
+  var depth=0;
+  document.addEventListener('dragenter',function(e){var z=zone();if(!visible(z)||!isFileDrag(e))return;depth++;z.style.outline='2px dashed var(--accent)';z.style.outlineOffset='6px';});
+  document.addEventListener('dragleave',function(e){var z=zone();if(!z||!isFileDrag(e))return;depth=Math.max(0,depth-1);if(!depth){z.style.outline='';}});
+  document.addEventListener('dragover',function(e){var z=zone();if(visible(z)&&isFileDrag(e)){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
+  document.addEventListener('drop',function(e){
+    var z=zone(); if(!visible(z)||!isFileDrag(e))return;
+    e.preventDefault(); depth=0; z.style.outline='';
+    var files=Array.prototype.slice.call(e.dataTransfer.files||[]);
+    if(files.length)uploadFiles(files);
+  });
+})();
+// Bord opzij schuiven door met de muis op een lege plek te slepen (zoals Trello).
+// Alleen met de muis: op een telefoon of tablet veegt het bord al vanzelf.
+(function(){
+  var pan=null;
+  document.addEventListener('pointerdown',function(e){
+    if(e.pointerType!=='mouse'||e.button!==0)return;
+    var kb=e.target&&e.target.closest?e.target.closest('.kanban'):null; if(!kb)return;
+    if(e.target.closest('.kcard,button,input,textarea,select,a,label,.qa-wrap,[draggable="true"],[contenteditable="true"]'))return;
+    if(kb.scrollWidth<=kb.clientWidth)return;
+    pan={el:kb,x:e.clientX,left:kb.scrollLeft,moved:false};
+  });
+  document.addEventListener('pointermove',function(e){
+    if(!pan)return;
+    var dx=e.clientX-pan.x;
+    if(!pan.moved&&Math.abs(dx)<4)return;
+    pan.moved=true; pan.el.style.cursor='grabbing'; pan.el.style.userSelect='none';
+    pan.el.scrollLeft=pan.left-dx;
+  });
+  function end(){if(!pan)return;pan.el.style.cursor='';pan.el.style.userSelect='';pan=null;}
+  document.addEventListener('pointerup',end); document.addEventListener('pointercancel',end);
+})();
 async function delAsset(id){
   if(!confirm('Dit bestand verwijderen?'))return;
   try{
@@ -5427,7 +5484,7 @@ async function setPostStatus(id,status){
 }
 function boardCard(p,canManage){
   var _ts=postThumbSrc(p);
-  var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">'+carBadge(p)+'</div>'):(isCarPost(p)?'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">CARROUSEL &middot; '+p.carousel_asset_ids.length+'</div>':'');
+  var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">'+carBadge(p)+'</div>'):(isCarPost(p)?'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">CARROUSEL &middot; '+p.carousel_asset_ids.length+'</div>':'');
   var badge=approvalBadge(p.approval);
   var when=p.scheduled_at?('<div style="font-size:11px;color:var(--muted);margin-top:5px">'+esc(fmtWhen(p.scheduled_at))+'</div>'):'';
   var acts=canManage?('<div class="post-acts" style="margin-top:8px;display:flex;gap:4px" onclick="event.stopPropagation()">'+
@@ -5540,7 +5597,7 @@ function renderPublished(posts){
   if(!pub.length)return bar+'<div class="card" style="color:var(--muted);font-size:14px">Nog geen gepubliceerde content'+(_PUB_MONTH!==null?' in deze maand':'')+'.</div>';
   return bar+'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">'+pub.map(function(p){
     var _ts=postThumbSrc(p);
-    var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'+carBadge(p)+'</div>'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
+    var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'+carBadge(p)+'</div>'):'<div style="aspect-ratio:1;background:var(--line)"></div>';
     var when=p.published_at?fmtWhen(p.published_at):(p.scheduled_at?fmtWhen(p.scheduled_at):'');
     var del=canManage?('<button class="icon-btn del" title="Verwijderen" onclick="event.stopPropagation();delPost('+p.id+')" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5)"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>'):'';
     var clickAttr=canManage?(' onclick=\'openEditPost('+p.id+')\''):'';
@@ -5573,7 +5630,7 @@ function renderCalendar(posts){
       var col=p.approval==='approved'?'#16a34a':(p.approval==='changes'?'#dc2626':(p.status==='published'?'#6366f1':'var(--accent)'));
       var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Carrousel'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
       var _ts=postThumbSrc(p);
-      var thumb=_ts?('<img src="'+esc(_ts)+'" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:2px solid '+col+'">'):('<div style="width:44px;height:44px;border-radius:6px;background:'+col+';opacity:.4"></div>');
+      var thumb=_ts?('<img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:2px solid '+col+'">'):('<div style="width:44px;height:44px;border-radius:6px;background:'+col+';opacity:.4"></div>');
       return '<div onclick="openEditPost('+p.id+')" title="'+esc(p.title)+'" style="display:inline-flex;flex-direction:column;align-items:center;width:46px;margin:4px 4px 0 0;cursor:pointer;vertical-align:top"><div style="position:relative">'+thumb+rdyDot(p)+'</div>'+'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+typ+'</div></div>';
     }).join('');
     grid+='<div style="min-height:84px;border:1px solid var(--line);border-radius:8px;padding:5px;'+(isToday?'outline:2px solid var(--accent);outline-offset:-2px':'')+'"><div style="font-size:11px;color:var(--muted);font-weight:600">'+dnum+'</div><div style="display:flex;flex-wrap:wrap">'+chips+'</div></div>';
@@ -5615,8 +5672,8 @@ function renderList(posts){
       var thumb='';
       if(p.asset_url){
         thumb=(p.asset_type==='video')
-          ? '<img class="post-thumb" src="'+esc(videoPoster(p.asset_url))+'" alt="" title="Video">'
-          : '<img class="post-thumb" src="'+esc(p.asset_url)+'" alt="">';
+          ? '<img class="post-thumb" src="'+esc(thumbUrl(p.asset_url,240))+'" alt="" title="Video" loading="lazy">'
+          : '<img class="post-thumb" src="'+esc(thumbUrl(p.asset_url,240))+'" alt="" loading="lazy">';
       } else if(isCarPost(p)&&postThumbSrc(p)){
         thumb='<img class="post-thumb" src="'+esc(postThumbSrc(p))+'" alt="" title="Carrousel met '+p.carousel_asset_ids.length+' bestanden">';
       }
@@ -5665,7 +5722,7 @@ function renderPfCarousel(){
   box.innerHTML=PF_ASSET_LIST.map(function(a){
     var idx=PF_CAROUSEL.map(String).indexOf(String(a.id));
     var sel=idx>=0;
-    var thumb=(a.type==='video')?videoPoster(a.url):a.url;
+    var thumb=thumbUrl(a.url,240);
     var badge=sel?('<span style="position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(idx+1)+'</span>'):'';
     var vid=(a.type==='video')?'<span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.65);color:#fff;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px">VIDEO</span>':'';
     return '<div onclick="togglePfCarousel('+a.id+')" title="'+esc(a.name||'')+'" style="position:relative;width:104px;cursor:pointer">'+
@@ -5694,7 +5751,7 @@ function pfMediaInner(){
     var items=PF_CAROUSEL.map(function(cid){return PF_ASSETS[String(cid)];}).filter(Boolean);
     var strip=items.length
       ? '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+items.map(function(it,i){
-          var src=(it.type==='video')?videoPoster(it.url):it.url;
+          var src=thumbUrl(it.url,300);
           return '<div style="position:relative;flex:0 0 auto"><img src="'+esc(src)+'" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;display:block;background:var(--panel)"><span style="position:absolute;top:6px;left:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(i+1)+'</span></div>';
         }).join('')+'</div>'
       : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:8px">Carrousel (kies onderaan de bestanden, in de volgorde van plaatsen)</div>';
