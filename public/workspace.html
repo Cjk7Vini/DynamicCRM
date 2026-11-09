@@ -857,7 +857,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
           <div class="section-h">
             <span class="pill" id="assetInfo">Beeldmateriaal</span>
             <div>
-              <input type="file" id="assetInput" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="uploadAsset(this)">
+              <input type="file" id="assetInput" multiple accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="uploadAsset(this)">
               <button class="btn btn-primary" id="uploadBtn" onclick="document.getElementById('assetInput').click()">+ Uploaden</button>
             </div>
           </div>
@@ -3169,23 +3169,21 @@ async function loadAssets(){
     }).join('')+'</div>';
   }catch(e){body.innerHTML='';showMsg('assetsMsg',false,'Netwerkfout.');}
 }
-async function uploadAsset(input){
-  var file=input.files&&input.files[0]; input.value='';
-  if(!file)return;
-  hideMsg('assetsMsg');
+// Uploaden van een of meer bestanden (na elkaar, zodat de opslaglimiet per bestand klopt).
+// Per bestand: controleren, handtekening ophalen, naar de beeldopslag, registreren.
+async function uploadOneAsset(file, clientId){
   var okImg=['image/png','image/jpeg','image/webp','image/gif'];
   var okVid=['video/mp4','video/quicktime','video/webm'];
   var isVid=okVid.indexOf(file.type)>=0;
-  if(okImg.indexOf(file.type)<0 && !isVid){showMsg('assetsMsg',false,'Alleen afbeeldingen (PNG, JPG, WEBP, GIF) of video (MP4, MOV, WEBM).');return;}
+  if(okImg.indexOf(file.type)<0 && !isVid)return 'alleen afbeeldingen (PNG, JPG, WEBP, GIF) of video (MP4, MOV, WEBM)';
   var maxBytes=isVid?100*1024*1024:15*1024*1024;
-  if(file.size>maxBytes){showMsg('assetsMsg',false,'Bestand is te groot (max '+(isVid?'100 MB voor video':'15 MB voor afbeeldingen')+').');return;}
-  var btn=document.getElementById('uploadBtn'); btn.disabled=true; btn.textContent='Uploaden...';
+  if(file.size>maxBytes)return 'te groot (max '+(isVid?'100 MB voor video':'15 MB voor afbeeldingen')+')';
   try{
     // 1) handtekening ophalen bij onze backend
-    var sr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
+    var sr=await fetch('/api/mkt/clients/'+clientId+'/assets/sign',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({})});
     var sd=await sr.json();
-    if(!sr.ok||!sd.success){showMsg('assetsMsg',false,sd.error||'Kon upload niet voorbereiden.');btn.disabled=false;btn.textContent='+ Uploaden';return;}
-    // 2) rechtstreeks naar Cloudinary
+    if(!sr.ok||!sd.success)return sd.error||'kon upload niet voorbereiden';
+    // 2) rechtstreeks naar de beeldopslag
     var fd=new FormData();
     fd.append('file',file);
     fd.append('api_key',sd.apiKey);
@@ -3194,13 +3192,34 @@ async function uploadAsset(input){
     fd.append('folder',sd.folder);
     var cr=await fetch('https://api.cloudinary.com/v1_1/'+sd.cloudName+'/auto/upload',{method:'POST',body:fd});
     var cd=await cr.json();
-    if(!cr.ok||!cd.public_id){showMsg('assetsMsg',false,(cd.error&&cd.error.message)||'Upload naar Cloudinary mislukt.');btn.disabled=false;btn.textContent='+ Uploaden';return;}
+    if(!cr.ok||!cd.public_id)return (cd.error&&cd.error.message)||'upload naar de beeldopslag mislukt';
     // 3) registreren in onze database
-    var rr=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({public_id:cd.public_id,url:cd.secure_url,resource_type:cd.resource_type,format:cd.format,bytes:cd.bytes,filename:file.name,mime:file.type})});
+    var rr=await fetch('/api/mkt/clients/'+clientId+'/assets/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({public_id:cd.public_id,url:cd.secure_url,resource_type:cd.resource_type,format:cd.format,bytes:cd.bytes,filename:file.name,mime:file.type})});
     var rd=await rr.json();
-    if(rr.ok&&rd.success){loadAssets();} else {showMsg('assetsMsg',false,rd.error||'Opslaan mislukt.');}
-  }catch(e){showMsg('assetsMsg',false,'Netwerkfout bij uploaden.');}
+    if(rr.ok&&rd.success)return null;
+    return rd.error||'opslaan mislukt';
+  }catch(e){return 'netwerkfout bij uploaden';}
+}
+async function uploadAsset(input){
+  var files=input.files?Array.prototype.slice.call(input.files):[]; input.value='';
+  if(!files.length||!CURRENT_CLIENT)return;
+  hideMsg('assetsMsg');
+  var clientId=CURRENT_CLIENT.id;
+  var btn=document.getElementById('uploadBtn'); btn.disabled=true;
+  var fails=[], done=0;
+  for(var k=0;k<files.length;k++){
+    btn.textContent=files.length>1?('Uploaden '+(k+1)+' van '+files.length+'...'):'Uploaden...';
+    var err=await uploadOneAsset(files[k], clientId);
+    if(err)fails.push((files[k].name||'bestand')+': '+err); else done++;
+  }
   btn.disabled=false; btn.textContent='+ Uploaden';
+  // Eerst de lijst verversen (die wist de meldingen), daarna pas de samenvatting tonen.
+  if(CURRENT_CLIENT&&String(CURRENT_CLIENT.id)===String(clientId)){try{await loadAssets();}catch(_){}}
+  if(fails.length){
+    showMsg('assetsMsg',false,(files.length>1?(done+' van '+files.length+' geupload. '):'')+'Niet gelukt: '+fails.join('; ')+'.');
+  } else if(files.length>1){
+    showMsg('assetsMsg',true,'Alle '+files.length+' bestanden zijn geupload.');
+  }
 }
 async function delAsset(id){
   if(!confirm('Dit bestand verwijderen?'))return;
