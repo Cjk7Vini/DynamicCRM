@@ -3400,6 +3400,12 @@ async function delAsset(id){
   if(!confirm('Dit bestand verwijderen?'))return;
   try{
     var r=await fetch('/api/mkt/assets/'+id,{method:'DELETE',credentials:'include'}); var d=await r.json();
+    // Het bestand zit nog in een post die geplaatst moet worden: eerst vragen.
+    if(r.status===409&&d&&Array.isArray(d.in_use)&&d.in_use.length){
+      var lijst=d.in_use.slice(0,8).map(function(p){return '- '+(p.title||'(zonder titel)')+(p.scheduled_at?(' ('+fmtWhen(p.scheduled_at)+')'):'');}).join('\n');
+      if(!confirm(d.error+'\n\n'+lijst+(d.in_use.length>8?'\n- en nog '+(d.in_use.length-8)+' meer':'')+'\n\nVerwijder je het toch, dan verliezen deze posts hun beeld en kunnen ze niet automatisch geplaatst worden.\n\nToch verwijderen?'))return;
+      r=await fetch('/api/mkt/assets/'+id+'?force=1',{method:'DELETE',credentials:'include'}); d=await r.json();
+    }
     if(r.ok&&d.success){loadAssets();} else {showMsg('assetsMsg',false,d.error||'Verwijderen mislukt.');}
   }catch(e){showMsg('assetsMsg',false,'Netwerkfout.');}
 }

@@ -52,3 +52,9 @@ Laatst bijgewerkt: 10 november 2026.
 - **Stand:** niet na te doen; in de code is een beeld niet verplicht.
 - **Volgende stap:** een screenshot van de melding van Wendy.
 - **Opgelost als:** de oorzaak is gevonden en verholpen, of blijkt dat het werkt.
+
+## P9. De tests staan niet in de repository (10 november 2026)
+- **Gevolg:** de testreeksen (ruim 200 controles: publiceren, planner, types, omslag, controle vooraf, login, leads, Trello, bestanden) staan alleen in een tijdelijke map van een werksessie. Een volgende wijziging kan ongemerkt iets breken, en elke merge gaat direct naar productie.
+- **Volgende stap:** de tests met een klein databaseschema in de repository zetten (`npm test`) en ze automatisch laten draaien voor elke merge.
+- **Opgelost als:** `npm test` in de repository draait en groen is, en een merge zonder groene test niet kan.
+

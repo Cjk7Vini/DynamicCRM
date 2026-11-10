@@ -3012,6 +3012,32 @@ async function cloudinaryDestroy(publicId, resourceType) {
 router.delete('/api/mkt/assets/:id', requireMkt, async (req, res) => {
   try {
     if (!mktCanManage(req)) return res.status(403).json({ error: 'Geen rechten om assets te beheren' });
+    // Zit het bestand in een post die nog geplaatst moet worden (los beeld, carrousel of
+    // Reel-omslag)? Dan eerst waarschuwen; met ?force=1 wordt het toch verwijderd.
+    if (String(req.query.force || '') !== '1') {
+      const aid = parseInt(req.params.id, 10);
+      if (Number.isInteger(aid)) {
+        const conds = ['p.asset_id = $2'];
+        if (await postCarouselAvailable()) conds.push('$2 = ANY(p.carousel_asset_ids)');
+        if (await postReelCoverAvailable()) conds.push('p.reel_cover_asset_id = $2');
+        let inUse = [];
+        try {
+          inUse = await withReadConnection(async (c) => (await c.query(
+            `SELECT p.id, p.title, p.scheduled_at FROM marketing.content_posts p
+              WHERE p.workspace_id=$1 AND p.published_at IS NULL AND COALESCE(p.status,'') <> 'published'
+                AND (${conds.join(' OR ')})
+              ORDER BY p.scheduled_at ASC NULLS LAST LIMIT 20`,
+            [req.session.mkt.workspaceId, aid]
+          )).rows);
+        } catch (_) { inUse = []; /* controle is extra; bij een fout verwijderen zoals voorheen */ }
+        if (inUse.length) {
+          return res.status(409).json({
+            error: 'Dit bestand zit in ' + inUse.length + (inUse.length === 1 ? ' post die nog geplaatst moet worden.' : ' posts die nog geplaatst moeten worden.'),
+            in_use: inUse.map((r) => ({ id: r.id, title: r.title, scheduled_at: r.scheduled_at })),
+          });
+        }
+      }
+    }
     const done = await withWriteConnection(async (c) => (await c.query(
       `DELETE FROM marketing.assets WHERE id=$1 AND workspace_id=$2
        RETURNING id, provider, public_id, resource_type`,
