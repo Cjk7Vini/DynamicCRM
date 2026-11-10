@@ -433,6 +433,57 @@ function normalizePhoneNL(raw) {
   return d;
 }
 
+// ---- Leads koppelen aan Meta (klik-ID's en UTM) ----
+// Uitzetten (oude werking: niets extra meesturen of bewaren): LEADS_TRACKING=0.
+function leadsTrackingOn() { return process.env.LEADS_TRACKING !== '0'; }
+// Een cookie uit de aanvraag lezen (er is geen cookie-parser; req.cookies bestaat niet).
+function readCookie(req, name) {
+  const raw = String((req && req.headers && req.headers.cookie) || '');
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() === name) {
+      try { return decodeURIComponent(part.slice(i + 1).trim()); } catch (_) { return part.slice(i + 1).trim(); }
+    }
+  }
+  return null;
+}
+// Haalt uit de cookies, de link van het formulier en de ingestuurde velden wat nodig is om
+// een lead aan een advertentieklik te koppelen. Alles is optioneel; ontbreekt het, dan null.
+function leadTrackingInfo({ cookieFbc, cookieFbp, eventSourceUrl, body }) {
+  const clean = (v, max) => { const t = String(v == null ? '' : v).trim(); return t ? t.slice(0, max) : null; };
+  const okId = (v) => (v && /^[A-Za-z0-9._-]{6,400}$/.test(v)) ? v : null;
+  let url = null;
+  try { url = eventSourceUrl ? new URL(String(eventSourceUrl)) : null; } catch (_) { url = null; }
+  const qp = (k) => (url ? url.searchParams.get(k) : null);
+  const fbp = okId(clean(cookieFbp, 400));
+  let fbc = okId(clean(cookieFbc, 400));
+  let fbclid = okId(clean(qp('fbclid'), 400));
+  // Geen _fbc-cookie maar wel een fbclid in de link: de vorm die Meta voorschrijft.
+  if (!fbc && fbclid) fbc = 'fb.1.' + Date.now() + '.' + fbclid;
+  // Geen fbclid in de link maar wel een _fbc-cookie: het klik-ID is het laatste deel.
+  if (!fbclid && fbc) { const parts = fbc.split('.'); if (parts.length >= 4) fbclid = okId(parts.slice(3).join('.')); }
+  const b = body || {};
+  return {
+    fbc, fbp, fbclid,
+    utm_source: clean(b.utm_source, 150) || clean(qp('utm_source'), 150),
+    utm_medium: clean(b.utm_medium, 150) || clean(qp('utm_medium'), 150),
+    utm_campaign: clean(b.utm_campaign, 200) || clean(qp('utm_campaign'), 200),
+    // Alleen het adres van de pagina, zonder de rest van de link.
+    landing_url: url ? clean(url.origin + url.pathname, 300) : null,
+  };
+}
+// Telefoonnummer zoals Meta het verwacht voor de koppeling: cijfers met landcode.
+// Onze nummers staan als 06... / 010...; dat wordt 316... / 3110...
+function capiPhone(tel) {
+  const d = String(tel == null ? '' : tel).replace(/\D/g, '');
+  if (!d) return null;
+  if (!leadsTrackingOn()) return d;
+  if (d.startsWith('00')) return d.slice(2);
+  if (d.startsWith('0')) return '31' + d.slice(1);
+  return d;
+}
+
 const leadSchema = Joi.object({
   volledige_naam: Joi.string().min(2).max(200).required(),
   emailadres: Joi.string().email().required().messages({
@@ -518,7 +569,7 @@ async function sendMetaConversionEvent(leadData, practiceCode, requestInfo) {
       event_source_url: sourceUrl,
       user_data: {
         em: hashSHA256(leadData.emailadres),
-        ph: hashSHA256(leadData.telefoon),
+        ph: hashSHA256(capiPhone(leadData.telefoon)),
         client_ip_address: requestInfo.ip,
         client_user_agent: requestInfo.userAgent,
         fbc: requestInfo.fbc || null,
@@ -749,6 +800,18 @@ app.post('/leads', async (req, res) => {
       return r.rows[0];
     });
 
+    // Gegevens om de lead aan Meta te koppelen. Apart en best-effort opgeslagen
+    // (migratie 035): mislukt het of ontbreken de kolommen, dan is de lead al veilig binnen.
+    const tracking = leadsTrackingOn()
+      ? leadTrackingInfo({ cookieFbc: readCookie(req, '_fbc'), cookieFbp: readCookie(req, '_fbp'), eventSourceUrl: event_source_url, body: value })
+      : { fbc: null, fbp: null };
+    if (leadsTrackingOn()) {
+      withWriteConnection(async (client) => client.query(
+        `UPDATE public.leads SET meta_event_id=$2, fbclid=$3, utm_source=$4, utm_medium=$5, utm_campaign=$6, landing_url=$7 WHERE id=$1`,
+        [inserted.id, meta_event_id || null, tracking.fbclid, tracking.utm_source, tracking.utm_medium, tracking.utm_campaign, tracking.landing_url]
+      )).catch(() => { /* kolommen nog niet aanwezig: geen probleem */ });
+    }
+
     recordEvent({
       lead_id: inserted.id,
       practice_code: praktijk_code || 'UNKNOWN',
@@ -863,8 +926,8 @@ ${baseUrl}/lead-action?action=afspraak_gemaakt&lead_id=${inserted.id}&practice_c
         {
           ip: req.ip,
           userAgent: req.get('user-agent'),
-          fbc: req.cookies?._fbc || null,
-          fbp: req.cookies?._fbp || null,
+          fbc: tracking.fbc || null,
+          fbp: tracking.fbp || null,
           eventId: meta_event_id || null,
           eventSourceUrl: event_source_url || null
         }
@@ -6285,6 +6348,14 @@ app.delete('/api/leads/:id', requireAuth, async (req, res) => {
       const lead = (await client.query('SELECT praktijk_code FROM public.leads WHERE id=$1', [id])).rows[0];
       if (!lead) return;
       if (!mayManagePractice(req, lead.praktijk_code)) throw Object.assign(new Error('Geen toegang'), { status: 403 });
+      // Spoor bewaren ZONDER persoonsgegevens (migratie 035), zodat een verschil met Meta
+      // achteraf te verklaren is. Best-effort: ontbreekt de tabel, dan gaat het verwijderen gewoon door.
+      await client.query(
+        `INSERT INTO public.leads_verwijderd (lead_id, praktijk_code, aangemaakt_op, bron, funnel_stage, meta_event_id, fbclid, utm_campaign, verwijderd_door)
+         SELECT l.id, l.praktijk_code, l.aangemaakt_op, l.bron, to_jsonb(l)->>'funnel_stage', to_jsonb(l)->>'meta_event_id', to_jsonb(l)->>'fbclid', to_jsonb(l)->>'utm_campaign', $2
+           FROM public.leads l WHERE l.id=$1`,
+        [id, String(req.session?.email || req.session?.userId || 'onbekend').slice(0, 200)]
+      ).catch(() => {});
       // Kinderen opruimen (best-effort; tabel kan ontbreken vóór migratie).
       await client.query('DELETE FROM belpogingen WHERE lead_id=$1', [id]).catch(() => {});
       await client.query('DELETE FROM lead_events WHERE lead_id=$1', [id]).catch(() => {});
