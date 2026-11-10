@@ -1494,7 +1494,10 @@ var loginView=document.getElementById('loginView'), appView=document.getElementB
 var ME=null, CURRENT_CLIENT=null, IS_PLATFORM=false, IS_SUPER=false; // IS_SUPER: alleen het superadmin-account (ziet o.a. de Bron)
 var TITLES={overzicht:'Overzicht',agenda:'Agenda',clients:'Klanten',clientDetail:'Klant-space',wssettings:'Instellingen',reporting:'Rapportage',koppelingen:'Koppelingen',handleiding:'Handleiding',beheer:'Beheer'};
 
-function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
+// Tekst veilig in HTML zetten, ook binnen attributen (aanhalingstekens worden omgezet).
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// Tekst veilig in een JavaScript-string binnen een attribuut zetten (onclick="f('...')").
+function escJs(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'));}
 function initials(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase()||'?';}
 function showMsg(id,ok,txt){var el=document.getElementById(id);if(!el)return;el.style.display='block';el.style.background=ok?'var(--ok-soft)':'var(--err-soft)';el.style.color=ok?'var(--ok)':'var(--err)';el.textContent=txt;}
 function hideMsg(id){var el=document.getElementById(id);if(el)el.style.display='none';}
@@ -1956,7 +1959,7 @@ async function loadBeheer(){
         var st=(u.active===false)?'<span class="status scheduled" style="font-size:10px">Inactief</span>':'';
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><div><div style="font-size:13.5px;font-weight:600">'+esc(u.name||u.email)+' '+st+'</div><div style="font-size:12px;color:var(--muted)">'+esc(u.email)+' &middot; '+last+'</div></div></div>';
       }).join(''):'<div style="font-size:13px;color:var(--muted);padding:8px 0;border-top:1px solid var(--line)">Nog geen client-login voor deze klant.</div>';
-      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-weight:700;font-size:15px">'+esc(cl.name)+'</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);padding:2px 10px;border-radius:20px">'+users.length+' client'+(users.length===1?'':'en')+'</span><button class="btn btn-ghost" style="padding:5px 11px;font-size:12.5px" onclick="openClientUserModal('+cl.id+',\''+esc(String(cl.name).replace(/[\x27"]/g,""))+'\')">+ Client toevoegen</button></div></div>'+rows+'</div>';
+      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-weight:700;font-size:15px">'+esc(cl.name)+'</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);padding:2px 10px;border-radius:20px">'+users.length+' client'+(users.length===1?'':'en')+'</span><button class="btn btn-ghost" style="padding:5px 11px;font-size:12.5px" onclick="openClientUserModal('+cl.id+',\''+escJs(String(cl.name).replace(/[\x27"]/g,""))+'\')">+ Client toevoegen</button></div></div>'+rows+'</div>';
     }).join('');
   }catch(e){box.innerHTML='';showMsg('beheerMsg',false,'Netwerkfout.');}
 }
@@ -2641,7 +2644,7 @@ async function loadClientOverviewCijfers(cid){
       if(!p)return '';
       var eng=(p.engagement!=null)?(String(p.engagement).replace('.',',')+'%'):'-';
       var thumb=p.thumb?'<img src="'+esc(p.thumb)+'" style="width:54px;height:54px;border-radius:8px;object-fit:cover;flex:none" onerror="this.style.display=\'none\'">':'';
-      var clk=p.permalink?(' onclick="window.open(\''+esc(p.permalink)+'\',\'_blank\')" style="cursor:pointer;display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"'):(' style="display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"');
+      var clk=p.permalink?(' onclick="window.open(\''+escJs(p.permalink)+'\',\'_blank\')" style="cursor:pointer;display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"'):(' style="display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)"');
       return '<div'+clk+'>'+thumb+
         '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.3px">'+esc(label)+'</div>'+
         '<div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.caption||'(zonder tekst)')+'</div>'+
@@ -3283,11 +3286,11 @@ async function loadAssets(){
       var thumb;
       if(a.resource_type==='video'){
         var poster=thumbUrl(url,480);
-        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'video\')">'+
+        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+escJs(url)+'\',\'video\')">'+
           '<img class="asset-thumb" src="'+esc(poster)+'" alt="'+esc(a.filename)+'" loading="lazy" onerror="this.style.background=\'#0b0e16\'">'+
           '<div class="play"><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div></div>';
       } else {
-        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+esc(url)+'\',\'image\')">'+
+        thumb='<div class="asset-thumbwrap" onclick="openViewer(\''+escJs(url)+'\',\'image\')">'+
           '<img class="asset-thumb" src="'+esc(thumbUrl(url,480))+'" alt="'+esc(a.filename)+'" loading="lazy"></div>';
       }
       return '<div class="asset-card">'+thumb+
@@ -3678,7 +3681,7 @@ async function loadAdMachine(){
 function admRenderList(){
   var body=document.getElementById('admBody'); if(!body)return;
   var cards=(ADM_CONFIG||[]).map(function(s){
-    return '<div class="card" style="cursor:pointer;margin:0" onclick="admOpen(\''+esc(s.key)+'\')">'
+    return '<div class="card" style="cursor:pointer;margin:0" onclick="admOpen(\''+escJs(s.key)+'\')">'
       +'<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+esc(s.title)+'</div>'
       +'<div style="font-size:13px;color:var(--muted);line-height:1.5">'+esc(s.desc)+'</div></div>';
   }).join('');
@@ -3715,7 +3718,7 @@ function admOpen(key){
     +'<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px">'+esc(s.desc)+'</div>'
     +note+adLib+fields
     +'<div id="admMsg" style="font-size:12.5px;color:#dc2626;margin-bottom:8px"></div>'
-    +'<button class="btn btn-primary" id="admRunBtn" onclick="admRun(\''+esc(key)+'\',\'\')">Genereren</button>'
+    +'<button class="btn btn-primary" id="admRunBtn" onclick="admRun(\''+escJs(key)+'\',\'\')">Genereren</button>'
     +'</div>'
     +'<div id="admOutput" style="margin-top:16px"></div>';
 }
@@ -3741,7 +3744,7 @@ async function admRun(key,fase){
     ADM_LAST_OUTPUT=d.output||'';
     var extra='';
     if(s.phased && fase!=='varianten'){
-      extra='<div style="margin-top:14px"><button class="btn btn-ghost" onclick="admRun(\''+esc(key)+'\',\'varianten\')">Genereer 4 extra varianten</button></div>';
+      extra='<div style="margin-top:14px"><button class="btn btn-ghost" onclick="admRun(\''+escJs(key)+'\',\'varianten\')">Genereer 4 extra varianten</button></div>';
     }
     if(out)out.innerHTML='<div class="card">'+admMd(d.output||'')+extra+'</div>';
   }catch(e){
@@ -3890,11 +3893,11 @@ function renderFeedback(campId,list,me){
     var who=(f.author_role==='client')?'Klant':'Team';
     var mine=(me!=null&&String(f.author_account_id)===String(me));
     var edited=f.updated_at?' (bewerkt)':'';
-    var acts=mine?('<div style="margin-top:4px"><a href="#" onclick="editCampFeedback(\''+esc(String(campId))+'\','+f.id+',this);return false;" style="font-size:12px;color:var(--accent-2,#6366f1);margin-right:12px">Bewerken</a><a href="#" onclick="deleteCampFeedback(\''+esc(String(campId))+'\','+f.id+');return false;" style="font-size:12px;color:#dc2626">Verwijderen</a></div>'):'';
+    var acts=mine?('<div style="margin-top:4px"><a href="#" onclick="editCampFeedback(\''+escJs(String(campId))+'\','+f.id+',this);return false;" style="font-size:12px;color:var(--accent-2,#6366f1);margin-right:12px">Bewerken</a><a href="#" onclick="deleteCampFeedback(\''+escJs(String(campId))+'\','+f.id+');return false;" style="font-size:12px;color:#dc2626">Verwijderen</a></div>'):'';
     return '<div data-fb="'+f.id+'" style="border-top:1px solid var(--line);padding:8px 0"><div style="font-size:12px;color:var(--muted)">'+esc(who)+(f.author_name?(' &middot; '+esc(f.author_name)):'')+' &middot; '+esc(fmtWhen(f.created_at))+edited+'</div><div class="fb-body" style="font-size:14px;white-space:pre-wrap;margin-top:2px">'+esc(f.body)+'</div>'+acts+'</div>';
   }).join('')||'<div style="font-size:13px;color:var(--muted)">Nog geen opmerkingen. Plaats hieronder je feedback of tekstsuggestie.</div>';
   return '<div style="font-weight:700;font-size:13px;margin-bottom:4px">Opmerkingen</div>'+items+
-    '<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start"><textarea id="fbtext_'+esc(String(campId))+'" rows="2" placeholder="Plaats een opmerking of tekstsuggestie..." style="flex:1;min-height:44px"></textarea><button class="btn btn-primary" onclick="postCampFeedback(\''+esc(String(campId))+'\')">Plaats</button></div>';
+    '<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start"><textarea id="fbtext_'+esc(String(campId))+'" rows="2" placeholder="Plaats een opmerking of tekstsuggestie..." style="flex:1;min-height:44px"></textarea><button class="btn btn-primary" onclick="postCampFeedback(\''+escJs(String(campId))+'\')">Plaats</button></div>';
 }
 async function postCampFeedback(campId){
   var ta=document.getElementById('fbtext_'+campId); if(!ta)return; var body=ta.value.trim(); if(!body)return;
@@ -4188,7 +4191,7 @@ async function loadMetaInsightsInner(box){
       html+=d.topPosts.map(function(p){
         var img=p.thumb?('<img src="'+esc(p.thumb)+'" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:cover;display:block">'):'<div style="width:40px;height:40px;border-radius:7px;background:var(--line)"></div>';
         var link=p.permalink?(' <a href="'+esc(p.permalink)+'" target="_blank" style="color:var(--accent-2);font-size:11px">bekijk</a>'):'';
-        return '<tr style="text-align:right;border-top:1px solid var(--line);cursor:pointer" onclick="openPostDetail(\''+esc(p.id)+'\')">'+
+        return '<tr style="text-align:right;border-top:1px solid var(--line);cursor:pointer" onclick="openPostDetail(\''+escJs(p.id)+'\')">'+
           '<td style="text-align:left;padding:8px 6px;white-space:nowrap;color:var(--muted)">'+esc(fmtDayShort(p.timestamp))+link+'</td>'+
           '<td style="text-align:left;padding:8px 6px">'+img+'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+esc(RTL[p.media_type]||p.media_type||'')+'</div></td>'+
           '<td style="text-align:left;padding:8px 6px;max-width:220px;font-size:12.5px;line-height:1.4">'+esc(p.caption||'(geen tekst)')+'</td>'+
@@ -4730,8 +4733,8 @@ async function renderCampDetail(){
           '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetStatus(\''+s.id+'\',\''+(sActive?'PAUSED':'ACTIVE')+'\')">'+(sActive?'Pauzeren':'Activeren')+'</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="adsetBudget(\''+s.id+'\')">Budget</button>'+
-            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openEtModal(\''+s.id+'\',\''+esc(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Targeting</button>'+
-            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openAddAd(\''+s.id+'\',\''+esc(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Advertentie toevoegen</button>'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openEtModal(\''+s.id+'\',\''+escJs(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Targeting</button>'+
+            '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openAddAd(\''+s.id+'\',\''+escJs(String(s.name||"").replace(/"/g,"").replace(/\x27/g,""))+'\')">Advertentie toevoegen</button>'+
             '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;color:#dc2626" onclick="adsetDelete(\''+s.id+'\')">Verwijderen</button>'+
           '</div>'+
         '</div>'+
@@ -4779,7 +4782,7 @@ function intSearch(key){
 }
 function intAdd(key,id,name){ if(!MKT_INT[key].some(function(x){return x.id===id;}))MKT_INT[key].push({id:id,name:name}); document.getElementById(key+'IntResults').style.display='none'; document.getElementById(key+'IntSearch').value=''; intChips(key); }
 function intRemove(key,id){ MKT_INT[key]=MKT_INT[key].filter(function(x){return x.id!==id;}); intChips(key); }
-function intChips(key){ document.getElementById(key+'IntChips').innerHTML=MKT_INT[key].map(function(i){return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="intRemove(\''+key+'\',\''+esc(i.id)+'\')">×</span></span>';}).join(''); }
+function intChips(key){ document.getElementById(key+'IntChips').innerHTML=MKT_INT[key].map(function(i){return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="intRemove(\''+key+'\',\''+escJs(i.id)+'\')">×</span></span>';}).join(''); }
 // ---- Nieuwe ad set toevoegen ----
 async function openAsModal(){
   hideMsg('asMsg');
@@ -5076,7 +5079,7 @@ async function loadMetaCampaigns(){
       if(canManage){
         var isActive=(c.status==='ACTIVE');
         ctrls='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
-          '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="openCampDetail(\''+c.id+'\',\''+esc(String(c.name).replace(/"/g,"").replace(/\x27/g,""))+'\')">Details / ad sets</button>'+
+          '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="openCampDetail(\''+c.id+'\',\''+escJs(String(c.name).replace(/"/g,"").replace(/\x27/g,""))+'\')">Details / ad sets</button>'+
           '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campStatus(\''+c.id+'\',\''+(isActive?'PAUSED':'ACTIVE')+'\')">'+(isActive?'Pauzeren':'Activeren')+'</button>'+
           '<button class="btn btn-ghost" style="padding:6px 11px;font-size:12px" onclick="campBudget(\''+c.id+'\')">Budget aanpassen</button></div>';
       }
@@ -5144,7 +5147,7 @@ function addInterest(id,name){
 function removeInterest(id){CP_INTERESTS=CP_INTERESTS.filter(function(x){return x.id!==id;});renderInterestChips();}
 function renderInterestChips(){
   document.getElementById('cpInterestChips').innerHTML=CP_INTERESTS.map(function(i){
-    return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="removeInterest(\''+esc(i.id)+'\')">×</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent-2);border-radius:20px;padding:4px 10px;font-size:12.5px">'+esc(i.name)+' <span style="cursor:pointer;font-weight:700" onclick="removeInterest(\''+escJs(i.id)+'\')">×</span></span>';
   }).join('');
 }
 // Geo-zoeken per formulier (key = cp/as/et). Elementen heten {key}GeoSearch, {key}GeoRadius,
@@ -5642,7 +5645,7 @@ function boardCard(p,canManage){
     '</div>'):'';
   var chan='<span class="status '+esc(p.status)+'" style="font-size:10px">'+esc(POST_CHAN_LABEL[p.channel]||p.channel)+'</span>';
   var cover=(p.cover_color?('<div style="height:26px;background:'+esc(p.cover_color)+';margin:-10px -10px 10px -10px;border-top-left-radius:9px;border-top-right-radius:9px"></div>'):'');
-  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+esc(p.status)+'\')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
+  return '<div class="kcard" draggable="'+(canManage?'true':'false')+'" ondragstart="kanbanDrag(event,'+p.id+')"'+(canManage?(' ondragover="kcardDragOver(event)" ondragleave="kcardDragLeave(event)" ondrop="kcardDrop(event,'+p.id+',\''+escJs(p.status)+'\')"'):'')+' '+(canManage?'onclick=\'openEditPost('+p.id+')\'':'')+' style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;'+(canManage?'cursor:pointer':'')+'">'+
     cover+thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
@@ -5668,7 +5671,7 @@ function quickAddHtml(key){
     '<button type="button" class="qa-btn" onclick="boardQuickShow(this)" style="width:100%;text-align:left;background:transparent;border:1px dashed var(--line);color:var(--muted);padding:7px 9px;border-radius:8px;cursor:pointer;font-size:12.5px">+ Kaart toevoegen</button>'+
     '<div class="qa-form" style="display:none">'+
       '<textarea class="qa-input" rows="2" placeholder="Titel van de kaart" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font-size:13px;font-family:inherit;resize:vertical"></textarea>'+
-      '<div style="display:flex;gap:6px;margin-top:5px"><button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="boardQuickAdd(\''+esc(key)+'\',this)">Toevoegen</button><button type="button" class="icon-btn" onclick="boardQuickCancel(this)" title="Annuleren">&times;</button></div>'+
+      '<div style="display:flex;gap:6px;margin-top:5px"><button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12.5px" onclick="boardQuickAdd(\''+escJs(key)+'\',this)">Toevoegen</button><button type="button" class="icon-btn" onclick="boardQuickCancel(this)" title="Annuleren">&times;</button></div>'+
     '</div></div>';
 }
 function boardQuickShow(btn){var w=btn.closest('.qa-wrap');btn.style.display='none';var f=w.querySelector('.qa-form');f.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.focus();}
@@ -5715,7 +5718,7 @@ function renderBoard(posts){
         '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
       '</span>';
     }
-    return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+esc(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:rgba(16,52,61,.5);border:1px solid rgba(90,185,200,.18);border-radius:12px;padding:10px">'+
+    return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+escJs(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:rgba(16,52,61,.5);border:1px solid rgba(90,185,200,.18);border-radius:12px;padding:10px">'+
       '<div'+((canEditCols&&c.id!=null)?(' draggable="true" ondragstart="colDragStart(event,'+c.id+')" ondragend="colDragEnd()" title="Sleep om de kolom te verplaatsen"'):'')+' style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px'+((canEditCols&&c.id!=null)?';cursor:grab':'')+'"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
   }).join('')+
   (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="openColumnEdit(null)">+ Kolom</button></div>'):'')+

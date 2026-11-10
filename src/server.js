@@ -2461,8 +2461,13 @@ app.get('/api/practice-performance', async (req, res) => {
 });
 
 // GET /api/churn-forecast - Mock forecast data (replace with real ML model later)
-app.get('/api/churn-forecast', async (_req, res) => {
+app.get('/api/churn-forecast', async (req, res) => {
   try {
+    if (!req.session?.userId) return res.status(401).json({ success: false, error: 'Niet ingelogd' });
+    // Er is nog geen echte voorspelling. Tot die er is geven we NIETS terug in plaats van
+    // de vaste voorbeeldcijfers hieronder: die kwamen als tabblad in de Excel-export terecht.
+    // Voorbeeldcijfers terugzetten (alleen voor een demo): CHURN_FORECAST_DEMO=1.
+    if (process.env.CHURN_FORECAST_DEMO !== '1') return res.json({ success: true, historical: [], forecast: [] });
     // Mock historical data (last 6 months)
     const historical = [
       { month: 'Jul 2024', total_members: 450, churned_members: 15, is_forecast: false },
@@ -5054,6 +5059,7 @@ app.get('/api/eclub/summary/:practiceCode', requireAuth, blockRoles('Medewerker'
 // GET /api/eclub/test-auth - Test authenticatie
 app.get('/api/eclub/test-auth', async (req, res) => {
   try {
+    if (req.session?.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin toegang vereist' });
     const result = await eclubService.testAuthentication();
     res.json(result);
   } catch (error) {
