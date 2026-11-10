@@ -1298,13 +1298,38 @@ async function normalizePublishChannel(v) {
 }
 // Na een geslaagde plaatsing: per kanaal vastleggen (best-effort, alleen met migratie 032).
 async function markChannelPublished(postId, wsId, clientId, channel) {
-  if (!postId || !(await publishBothAvailable())) return;
+  if (!postId || !(await publishBothAvailable())) return false;
   const col = channel === 'facebook' ? 'fb_published_at' : 'ig_published_at';
   try {
     await withWriteConnection(async (c) => c.query(
       `UPDATE marketing.content_posts SET ${col}=now(), updated_at=now() WHERE id=$1 AND workspace_id=$2 AND client_id=$3`, [postId, wsId, clientId]
     ));
-  } catch (_) { /* registratie niet blokkerend */ }
+    return true;
+  } catch (_) { return false; /* registratie niet blokkerend */ }
+}
+// Beveiliging tegen dubbel plaatsen door de planner (migratie 034, kolom publish_state).
+// Uitzetten (oude werking): MKT_PUBLISH_GUARD=0.
+let _hasPublishGuard = null;
+async function publishGuardAvailable() {
+  if (process.env.MKT_PUBLISH_GUARD === '0') return false;
+  if (_hasPublishGuard === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name='publish_state'"
+    )).rows);
+    if (r.length > 0) _hasPublishGuard = true;
+    return r.length > 0;
+  } catch (_) { return false; }
+}
+// Zolang een post korter dan dit "bezig" staat, blijft de planner eraf (een andere server
+// kan ermee bezig zijn, of de server is net herstart). Daarna zoekt hij uit wat er gebeurd is.
+const PUBLISH_LEASE_MS = 10 * 60 * 1000;
+// Instagram: is deze container al gepubliceerd? Gebruikt na een fout of herstart rond het
+// plaatsen, zodat een post die er al staat niet nog eens wordt geplaatst.
+async function igContainerPublished(R, containerId) {
+  if (!containerId || !/^[0-9]+$/.test(String(containerId))) return false;
+  const st = await R.get(String(containerId), { fields: 'status_code', access_token: R.token });
+  return !!(st && st.status_code === 'PUBLISHED');
 }
 // Een activiteit vastleggen (best-effort; nooit de hoofdactie laten mislukken).
 async function logPostActivity(wsId, postId, actorId, actorName, action, detail) {
@@ -4291,7 +4316,8 @@ async function createAdSetWithAttribution(adAccount, token, params) {
 // code 10 (ontbrekende permissie) laten we uitleggen wat er moet gebeuren.
 function friendlyPublishError(msg, channel) {
   const m = String(msg || '');
-  if (/\(#?10\)|code\s*10|does not have permission|permission for this action/i.test(m)) {
+  // Alleen code 10 zelf (niet 100, 102, 190 ...): andere codes hebben een andere oorzaak.
+  if (/\(#?10\)|code\s*10(?!\d)|does not have permission|permission for this action/i.test(m)) {
     if (channel === 'instagram') {
       return 'Instagram weigert het publiceren (rechtenfout, code 10). De koppeling mist het recht om te publiceren (instagram_content_publish bij Koppel met Facebook, instagram_business_content_publish bij Koppel via Instagram). Koppel opnieuw en geef dat recht. Voor echte klantaccounts is daarnaast Meta App Review nodig.';
     }
@@ -4375,7 +4401,16 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
     } else {
       containerId = await createAndWait(createParams);
     }
-    const pub = await R.post(`${igId}/media_publish`, { creation_id: containerId, access_token: tk });
+    if (opts && opts.beforeCommit) await opts.beforeCommit({ container: containerId });
+    let pub;
+    try { pub = await R.post(`${igId}/media_publish`, { creation_id: containerId, access_token: tk }); }
+    catch (e) {
+      // Fout bij het plaatsen zelf (bijv. verbinding weg): staat hij er toch op, dan is het gelukt.
+      let live = false;
+      try { live = await igContainerPublished({ get: R.get, token: tk }, containerId); } catch (_) { live = false; }
+      if (!live) throw e;
+      pub = { id: null };
+    }
     return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook', story: isStory || undefined, cover_warning: coverWarning || undefined };
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
@@ -4394,6 +4429,7 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
     return new Error(pageTokErr ? (m + ' [pagina-token: ' + pageTokErr + ']') : m);
   };
   try {
+    if (opts && opts.beforeCommit) await opts.beforeCommit({ container: null });
     if (mediaUrl && mediaType === 'image') {
       const pub = await graphPost(`${pageId}/photos`, { url: mediaUrl, caption: cap, access_token: pageToken });
       return { id: pub.post_id || pub.id, channel: 'facebook' };
@@ -4420,7 +4456,7 @@ async function graphVideoPost(pathAndId, params) {
 // Publiceert een carousel (meerdere foto's/video's) als organische Instagram-post.
 // Elk item wordt eerst een container; video's worden verwerkt; daarna een carousel-
 // container en dan publiceren. items = [{ url, mediaType }]. Alleen Instagram.
-async function publishCarouselToInstagram(igId, token, items, caption, api) {
+async function publishCarouselToInstagram(igId, token, items, caption, api, opts) {
   const gGet = (api && api.get) || graphGet; const gPost = (api && api.post) || graphPost;
   if (!igId) throw new Error('Instagram user ID ontbreekt in de koppelingen');
   const list = (Array.isArray(items) ? items : []).slice(0, 10);
@@ -4462,7 +4498,16 @@ async function publishCarouselToInstagram(igId, token, items, caption, api) {
     await new Promise((r) => setTimeout(r, 2500));
   }
   // 5) Publiceren.
-  const pub = await gPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token });
+  if (opts && opts.beforeCommit) await opts.beforeCommit({ container: carousel.id });
+  let pub;
+  try { pub = await gPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token }); }
+  catch (e) {
+    // Fout bij het plaatsen zelf: staat de carrousel er toch op, dan is het gelukt.
+    let live = false;
+    try { live = await igContainerPublished({ get: gGet, token }, carousel.id); } catch (_) { live = false; }
+    if (!live) throw e;
+    pub = { id: null };
+  }
   return { id: pub.id, channel: 'instagram', carousel: true, items: list.length };
 }
 
@@ -7426,8 +7471,10 @@ async function runScheduler() {
     const hasType = typesOn && await postTypeAvailable();
     const hasCar = typesOn && await postCarouselAvailable();
     const hasReelCover = await postReelCoverAvailable();
+    const guard = await publishGuardAvailable();
     const due = await withReadConnection(async (c) => (await c.query(
-      `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel,
+      `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel, p.publish_attempts,
+              ${guard ? 'p.publish_state,' : ''}
               ${both ? 'p.ig_published_at, p.fb_published_at,' : ''}
               ${hasType ? 'p.post_type,' : ''}
               ${hasCar ? 'p.carousel_asset_ids,' : ''}
@@ -7446,17 +7493,79 @@ async function runScheduler() {
     )).rows);
 
     for (const post of due) {
-      // Direct de poging tellen zodat een mislukking niet oneindig herhaalt.
-      await withWriteConnection(async (c) => c.query(
-        'UPDATE marketing.content_posts SET publish_attempts = publish_attempts + 1 WHERE id=$1', [post.id]
+      const doneNow = { instagram: false, facebook: false };
+      const setState = async (st) => withWriteConnection(async (c) => c.query(
+        'UPDATE marketing.content_posts SET publish_state=$2::jsonb WHERE id=$1', [post.id, st ? JSON.stringify(st) : null]
       ));
+      if (!guard) {
+        // Direct de poging tellen zodat een mislukking niet oneindig herhaalt.
+        await withWriteConnection(async (c) => c.query(
+          'UPDATE marketing.content_posts SET publish_attempts = publish_attempts + 1 WHERE id=$1', [post.id]
+        ));
+      } else {
+        const prev = post.publish_state || null;
+        // Staat de post nog kort "bezig" (andere server, of net herstart)? Dan eraf blijven.
+        if (prev) {
+          const age = Date.now() - new Date(prev.at || 0).getTime();
+          if (!(age >= PUBLISH_LEASE_MS)) continue;
+        }
+        // De post opeisen: alleen als niemand anders hem intussen heeft opgepakt. Telt meteen de poging.
+        const claimed = await withWriteConnection(async (c) => (await c.query(
+          `UPDATE marketing.content_posts
+              SET publish_attempts = COALESCE(publish_attempts,0) + 1, publish_state = $3::jsonb
+            WHERE id=$1 AND COALESCE(publish_attempts,0) = $2 AND published_at IS NULL
+              AND publish_state IS NOT DISTINCT FROM $4::jsonb
+            RETURNING id`,
+          [post.id, Number(post.publish_attempts) || 0, JSON.stringify({ phase: 'start', at: new Date().toISOString() }), prev ? JSON.stringify(prev) : null]
+        )).rows.length);
+        if (!claimed) continue;
+        // Een vorige poging is afgebroken VLAK VOOR of TIJDENS het echte plaatsen: uitzoeken
+        // of de post er al staat, in plaats van hem blind opnieuw te plaatsen.
+        if (prev && prev.phase === 'commit') {
+          const pch = prev.channel === 'facebook' ? 'facebook' : 'instagram';
+          if (pch === 'instagram' && prev.container) {
+            try {
+              const pc = await resolveClientMeta(post.workspace_id, post.client_id);
+              const pr0 = await igPublishRoute(pc);
+              if (await igContainerPublished({ get: pr0.get, token: pr0.token }, prev.container)) {
+                doneNow.instagram = true;
+                await markChannelPublished(post.id, post.workspace_id, post.client_id, 'instagram');
+              }
+            } catch (e) {
+              // Niet te controleren (bijv. Meta onbereikbaar): niets plaatsen, later opnieuw kijken.
+              try {
+                await setState({ ...prev, at: new Date().toISOString() });
+                await withWriteConnection(async (c) => c.query(
+                  'UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2',
+                  [('Een eerdere poging is afgebroken tijdens het plaatsen. Kon niet controleren of de post al op Instagram staat (' + String((e && e.message) || 'onbekende fout').slice(0, 200) + '). Er is niets opnieuw geplaatst; over 10 minuten volgt een nieuwe controle.').slice(0, 500), post.id]
+                ));
+              } catch (_) { /* volgende ronde */ }
+              continue;
+            }
+          } else {
+            // Facebook kan dit niet terugmelden: nooit blind opnieuw plaatsen, maar stoppen en melden.
+            try {
+              await withWriteConnection(async (c) => c.query(
+                'UPDATE marketing.content_posts SET publish_attempts=5, publish_state=NULL, publish_error=$1, updated_at=now() WHERE id=$2',
+                ['De server is herstart precies tijdens het plaatsen op ' + CH_LABEL[pch] + '. Controleer of de post er staat. Staat hij er niet: open de post en sla op, dan wordt hij opnieuw geplaatst. Staat hij er wel: zet Automatisch publiceren uit.', post.id]
+              ));
+            } catch (_) { /* volgende ronde */ }
+            continue;
+          }
+        }
+      }
       const isBoth = both && post.publish_channel === 'both';
       const single = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
       const targets = isBoth ? ['instagram', 'facebook'] : [single];
       const errors = []; const warnings = [];
       for (const channel of targets) {
         // Al geplaatst op dit kanaal (eerdere poging of met de hand)? Dan niet nog eens.
+        if (doneNow[channel]) continue;
         if (both && ((channel === 'instagram' && post.ig_published_at) || (channel === 'facebook' && post.fb_published_at))) continue;
+        // Vlak voor het echte plaatsen vastleggen op welk kanaal (en met welke Instagram-container).
+        const beforeCommit = guard ? (async (info) => {
+          await setState({ phase: 'commit', channel, container: (info && info.container) ? String(info.container) : null, at: new Date().toISOString() });
+        }) : null;
         try {
           // Client-koppeling met terugval op de workspace-koppeling.
           const creds = await resolveClientMeta(post.workspace_id, post.client_id);
@@ -7475,13 +7584,16 @@ async function runScheduler() {
             if (channel !== 'instagram') throw new Error('Een carrousel kan alleen naar Instagram, niet naar Facebook.');
             const items = hasCar ? await resolveCarouselAssets(post.workspace_id, post.client_id, post.carousel_asset_ids) : [];
             if (items.length < 2) throw new Error('Een carrousel heeft minimaal 2 publieke bestanden nodig (kies ze in de post).');
-            await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, caption, igRoute);
+            await publishCarouselToInstagram(igRoute.igId, igRoute.token, items, caption, igRoute, { beforeCommit });
           } else {
-            const pr = await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null, coverUrl: (channel === 'instagram' && post.reel_cover_url) ? post.reel_cover_url : null });
+            const pr = await publishToMeta({ meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId }, token, channel, mediaUrl, mediaType, caption, igRoute, { postType: hasType ? post.post_type : null, coverUrl: (channel === 'instagram' && post.reel_cover_url) ? post.reel_cover_url : null, beforeCommit });
             if (pr && pr.cover_warning) warnings.push('Geplaatst op Instagram, maar zonder eigen omslag (' + String(pr.cover_warning).slice(0, 200) + ').');
           }
           // Direct per kanaal vastleggen, vóór het volgende kanaal.
-          await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
+          const marked = await markChannelPublished(post.id, post.workspace_id, post.client_id, channel);
+          doneNow[channel] = true;
+          // Kanaal is vastgelegd: de "bezig met plaatsen"-markering mag terug naar "gestart".
+          if (guard && marked) { try { await setState({ phase: 'start', at: new Date().toISOString() }); } catch (_) { /* blijft op commit: veilig */ } }
         } catch (e) {
           const msg = friendlyPublishError(e.message, channel);
           errors.push(isBoth ? (CH_LABEL[channel] + ' mislukt: ' + msg) : msg);
@@ -7491,11 +7603,11 @@ async function runScheduler() {
         if (!errors.length) {
           // Geplaatst. Een waarschuwing (bijv. omslag niet gelukt) blijft zichtbaar bij de post.
           await withWriteConnection(async (c) => c.query(
-            `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=$2, updated_at=now() WHERE id=$1`, [post.id, warnings.length ? warnings.join(' ').slice(0, 500) : null]
+            `UPDATE marketing.content_posts SET published_at=now(), status='published', publish_error=$2, updated_at=now()${guard ? ', publish_state=NULL' : ''} WHERE id=$1`, [post.id, warnings.length ? warnings.join(' ').slice(0, 500) : null]
           ));
         } else {
           await withWriteConnection(async (c) => c.query(
-            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now() WHERE id=$2`, [errors.concat(warnings).join(' ').slice(0, 500), post.id]
+            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now()${guard ? ', publish_state=NULL' : ''} WHERE id=$2`, [errors.concat(warnings).join(' ').slice(0, 500), post.id]
           ));
         }
       } catch (_) { /* volgende minuut opnieuw */ }
