@@ -98,6 +98,9 @@ De keuze zit op één plek: `pickIgRoute(creds)` in `router.js`. Die wordt gebru
 - Later: een abonnementslink (iCal) zodat Google- en Apple-agenda de taken kunnen tonen (eenrichting).
 
 ## Beveiligingsheaders
+- Tekst in de pagina's altijd via `esc()` (zet ook aanhalingstekens om, dus veilig binnen attributen). Tekst in een JavaScript-string binnen een attribuut (`onclick="f('...')"`) via `escJs()`. Nooit ruwe tekst van gebruikers in HTML plakken.
+- De workspace-login heeft een rem: 10 mislukte pogingen per 15 minuten per IP-adres (geslaagde logins tellen niet). Uitzetten: `MKT_LOGIN_LIMIT=0`.
+- `/api/churn-forecast` geeft geen voorbeeldcijfers meer terug (die kwamen in de Excel-export); er is nog geen echte voorspelling. Demo-cijfers: `CHURN_FORECAST_DEMO=1`.
 - `helmet` in `src/server.js` zet HSTS, X-Frame-Options, nosniff en Referrer-Policy. De volledige CSP van helmet staat bewust uit, omdat de pagina's veel inline scripts gebruiken.
 - Daarnaast: Permissions-Policy (camera, microfoon, locatie, betalingen en USB uit) en een basis-CSP (`base-uri 'self'; object-src 'none'; frame-ancestors 'self'; upgrade-insecure-requests`). Terugdraaien: env `SECURITY_HEADERS_EXTRA=0`.
 - Volgende stap (apart en per pagina getest): een strengere CSP met `script-src`, eerst als Report-Only.

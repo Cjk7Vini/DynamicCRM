@@ -7,6 +7,7 @@
 // Deze module raakt GEEN bestaande tabellen of endpoints aan.
 
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import path from 'path';
@@ -649,7 +650,19 @@ router.delete('/api/mkt/admin/workspaces/:id', requireDhcAdmin, adminWsGuard, as
 // =======================================================================
 // MARKETING AUTH (eigen accounts, eigen sessie-namespace)
 // =======================================================================
-router.post('/api/mkt/auth/login', async (req, res) => {
+// Rem op wachtwoord raden: maximaal 10 MISLUKTE pogingen per 15 minuten per IP-adres.
+// Geslaagde logins tellen niet mee, zodat een kantoor met een gedeeld IP-adres er geen
+// last van heeft. Zelfde grens als de dashboard-login. Uitzetten: MKT_LOGIN_LIMIT=0.
+const mktLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  skip: () => process.env.MKT_LOGIN_LIMIT === '0',
+  message: { error: 'Te veel mislukte pogingen. Probeer het over 15 minuten opnieuw.' },
+});
+router.post('/api/mkt/auth/login', mktLoginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'E-mail en wachtwoord verplicht' });
