@@ -62,6 +62,17 @@ Blijvende kennis uit opgeloste problemen: wat de oorzaak was, hoe het is opgelos
 - **Het Lead-event** gaat alleen af na een echte inzending: op de bedankpagina met een echt lead-ID, en via de server (Conversions API) met hetzelfde event-ID, zodat Meta het samenvoegt tot één lead. Een formulier openen telt niet.
 - **Advies:** reken de kosten per lead op de echte leads uit de database.
 
+### Leads meetbaar maken tegenover Meta (november 2026)
+- **Wat er mis was:** de server probeerde de klik-ID's van Facebook (`_fbc`, `_fbp`) mee te sturen naar Meta, maar las ze uit `req.cookies`, dat zonder cookie-parser altijd leeg is. Meta kreeg van de server dus nooit een klik-ID en moest meer schatten. Per lead werd ook niets bewaard om hem met Meta te vergelijken, en een verwijderde lead liet geen spoor na.
+- **Opgelost met (migratie 035):** de cookies worden nu echt gelezen en meegestuurd; het telefoonnummer gaat met landcode naar Meta; per lead worden event-ID, fbclid en UTM bewaard; verwijderen laat een spoor na zonder persoonsgegevens.
+- **Controleren:** in Events Manager stijgt de "Event Match Quality" van het Lead-event. Vergelijken per praktijk:
+  ```sql
+  SELECT 'binnen' AS soort, count(*) FROM public.leads WHERE praktijk_code = '<CODE>' AND aangemaakt_op >= '<DATUM>'
+  UNION ALL
+  SELECT 'verwijderd', count(*) FROM public.leads_verwijderd WHERE praktijk_code = '<CODE>' AND aangemaakt_op >= '<DATUM>';
+  ```
+  Binnen plus verwijderd is het aantal echte inzendingen; dat hoort dicht bij het aantal ontvangen Lead-events in Events Manager te liggen.
+
 ---
 
 ## Leadformulieren

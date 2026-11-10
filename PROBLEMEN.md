@@ -5,7 +5,7 @@ Alleen wat nog **niet** is opgelost. Werkwijze:
 2. Is de controle goed, haal het probleem dan hier weg en zet de les (oorzaak, oplossing, hoe herkennen) in `KENNISBANK.md`.
 3. Nieuwe problemen komen onderaan, met datum.
 
-Laatst bijgewerkt: 9 november 2026.
+Laatst bijgewerkt: 10 november 2026.
 
 ---
 
@@ -39,9 +39,9 @@ Laatst bijgewerkt: 9 november 2026.
 - **Volgende stap:** een week de leads volgen, en in de logs van de webservice zoeken op `POST /leads 400`.
 - **Opgelost als:** er weer leads binnenkomen bij dezelfde advertenties en er (bijna) geen `POST /leads 400` meer is. Blijft het stil bij Serac, dan ligt het aan het aanbod of de advertenties, niet aan het formulier.
 
-## P6. Verschil tussen leads in Meta en in de database is niet te verklaren als er leads verwijderd worden
-- **Gevolg:** een verwijderde lead laat geen spoor na, terwijl Meta hem blijft tellen.
-- **Voorstel:** leads archiveren in plaats van verwijderen (met wie en wanneer), en in de workspace naast de leads van Meta ook de echte leads uit de database tonen, met de kosten per echte lead.
+## P6. Echte leads naast de leads van Meta tonen
+- **Stand (10 november 2026):** het spoor bij verwijderen en het bewaren van event-ID, fbclid en UTM per lead zijn gebouwd (migratie 035, zie `KENNISBANK.md`). Het vergelijken moet nu nog met een query.
+- **Volgende stap:** een klant in de workspace aan een praktijkcode koppelen en in het campagnescherm drie getallen tonen: leads volgens Meta, leads volgens Meta op de dag van de inzending en alleen na een klik, en echte leads uit de database met de kosten per echte lead.
 - **Opgelost als:** de eigenaar heeft gekozen en het is gebouwd, of besloten dat het niet nodig is.
 
 ## P7. Voorwaarden van Meta nalopen vóór het live gaan
