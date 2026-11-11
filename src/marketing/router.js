@@ -1331,6 +1331,40 @@ async function igContainerPublished(R, containerId) {
   const st = await R.get(String(containerId), { fields: 'status_code', access_token: R.token });
   return !!(st && st.status_code === 'PUBLISHED');
 }
+// Instagram meldt "nog niet klaar" (code 9007, subcode 2207027) als een container nog
+// verwerkt wordt. Dat gebeurde bij foto's: die werden direct na het klaarzetten geplaatst.
+// Uitzetten (oude werking: niet wachten, niet opnieuw proberen): MKT_IG_WAIT_READY=0.
+function igWaitOn() { return process.env.MKT_IG_WAIT_READY !== '0'; }
+function igNotReadyError(msg) { return /2207027|code\s*9007(?!\d)|\(#?9007\)/i.test(String(msg || '')); }
+// Wachten tot een container klaar is (standaard max ~30 s). Is de status niet op te vragen,
+// dan niet blokkeren: het plaatsen zelf vangt "nog niet klaar" nog op.
+async function igWaitContainer(R, containerId, maxTries = 15) {
+  if (!igWaitOn()) return;
+  for (let k = 0; k < maxTries; k++) {
+    let sc = null;
+    try { const st = await R.get(String(containerId), { fields: 'status_code', access_token: R.token }); sc = st && st.status_code; }
+    catch (_) { return; }
+    if (!sc || sc === 'FINISHED' || sc === 'PUBLISHED') return;
+    if (sc === 'ERROR' || sc === 'EXPIRED') throw new Error('Instagram kon het beeld niet verwerken (status ' + sc + '). Probeer een ander bestand.');
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+// Plaatsen van een container. Na een fout eerst kijken of hij er toch staat (dan gelukt).
+// Meldt Instagram "nog niet klaar", dan 5 seconden wachten en opnieuw (max 4 pogingen).
+// Nooit dubbel: vóór elke nieuwe poging is gecontroleerd dat de container niet geplaatst is,
+// en een container kan maar één keer geplaatst worden.
+async function igMediaPublish(R, containerId) {
+  for (let attempt = 1; ; attempt++) {
+    try { return await R.post(`${R.igId}/media_publish`, { creation_id: containerId, access_token: R.token }); }
+    catch (e) {
+      let live = false;
+      try { live = await igContainerPublished({ get: R.get, token: R.token }, containerId); } catch (_) { live = false; }
+      if (live) return { id: null };
+      if (igWaitOn() && attempt < 4 && igNotReadyError(e && e.message)) { await new Promise((r) => setTimeout(r, 5000)); continue; }
+      throw e;
+    }
+  }
+}
 
 // ---- Story-reeks: meerdere stories na elkaar vanuit één post (migratie 036) ----
 // De bestanden staan in carousel_asset_ids (in volgorde), de voortgang in story_done.
@@ -1386,16 +1420,16 @@ async function publishStorySeries(R, items, done, hooks) {
         else if (st.status_code === 'ERROR') { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': de video kon niet door Instagram verwerkt worden'); err.storyIndex = i; throw err; }
       }
       if (!ready) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': de video-verwerking bij Instagram duurt te lang'); err.storyIndex = i; throw err; }
+    } else {
+      try { await igWaitContainer({ get: R.get, token: tk }, created.id); }
+      catch (e) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': ' + e.message); err.storyIndex = i; throw err; }
     }
     if (hooks && hooks.beforeCommit) await hooks.beforeCommit({ container: created.id, index: i });
     try {
-      const pub = await R.post(`${R.igId}/media_publish`, { creation_id: created.id, access_token: tk });
+      const pub = await igMediaPublish({ igId: R.igId, token: tk, get: R.get, post: R.post }, created.id);
       ids.push(pub && pub.id);
     } catch (e) {
-      let live = false;
-      try { live = await igContainerPublished({ get: R.get, token: tk }, created.id); } catch (_) { live = false; }
-      if (!live) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': ' + e.message); err.storyIndex = i; throw err; }
-      ids.push(null);
+      const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': ' + e.message); err.storyIndex = i; throw err;
     }
     if (hooks && hooks.afterItem) {
       try { await hooks.afterItem(i + 1); }
@@ -4516,6 +4550,9 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
           else if (st.status_code === 'ERROR') throw new Error('Video-verwerking bij Instagram is mislukt');
         }
         if (!ready) throw new Error('Video-verwerking duurt te lang');
+      } else {
+        // Foto: ook wachten tot Instagram klaar is (anders "nog niet klaar", code 9007).
+        await igWaitContainer({ get: R.get, token: tk }, created.id);
       }
       return created.id;
     };
@@ -4533,15 +4570,8 @@ async function publishToMeta(intg, token, channel, mediaUrl, mediaType, caption,
       containerId = await createAndWait(createParams);
     }
     if (opts && opts.beforeCommit) await opts.beforeCommit({ container: containerId });
-    let pub;
-    try { pub = await R.post(`${igId}/media_publish`, { creation_id: containerId, access_token: tk }); }
-    catch (e) {
-      // Fout bij het plaatsen zelf (bijv. verbinding weg): staat hij er toch op, dan is het gelukt.
-      let live = false;
-      try { live = await igContainerPublished({ get: R.get, token: tk }, containerId); } catch (_) { live = false; }
-      if (!live) throw e;
-      pub = { id: null };
-    }
+    // Plaatsen; staat hij er na een fout toch op, dan is het gelukt; "nog niet klaar": opnieuw.
+    const pub = await igMediaPublish({ igId, token: tk, get: R.get, post: R.post }, containerId);
     return { id: pub.id, channel: 'instagram', via: R.isIgLogin ? 'instagram-login' : 'facebook', story: isStory || undefined, cover_warning: coverWarning || undefined };
   }
   if (!intg.meta_page_id) throw new Error('Facebook Page ID ontbreekt in de koppelingen');
@@ -4630,15 +4660,8 @@ async function publishCarouselToInstagram(igId, token, items, caption, api, opts
   }
   // 5) Publiceren.
   if (opts && opts.beforeCommit) await opts.beforeCommit({ container: carousel.id });
-  let pub;
-  try { pub = await gPost(`${igId}/media_publish`, { creation_id: carousel.id, access_token: token }); }
-  catch (e) {
-    // Fout bij het plaatsen zelf: staat de carrousel er toch op, dan is het gelukt.
-    let live = false;
-    try { live = await igContainerPublished({ get: gGet, token }, carousel.id); } catch (_) { live = false; }
-    if (!live) throw e;
-    pub = { id: null };
-  }
+  // Plaatsen; staat de carrousel er na een fout toch op, dan is het gelukt; "nog niet klaar": opnieuw.
+  const pub = await igMediaPublish({ igId, token, get: gGet, post: gPost }, carousel.id);
   return { id: pub.id, channel: 'instagram', carousel: true, items: list.length };
 }
 
