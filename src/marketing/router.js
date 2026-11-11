@@ -4681,6 +4681,19 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     }
     if (channel === 'both') return publishBothNow(req, res, wsId, okClient);
     if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
+    // Staat deze post al op dit kanaal (migratie 032)? Dan niet nog eens plaatsen.
+    if (postId && await publishBothAvailable()) {
+      const prow = await withReadConnection(async (c) => (await c.query(
+        'SELECT ig_published_at, fb_published_at FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2 AND client_id=$3',
+        [postId, wsId, okClient]
+      )).rows[0]);
+      const at = prow ? (channel === 'facebook' ? prow.fb_published_at : prow.ig_published_at) : null;
+      if (at) {
+        let when = '';
+        try { when = new Date(at).toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { when = ''; }
+        return res.status(400).json({ error: 'Deze post staat al op ' + CH_LABEL[channel] + (when ? (' (geplaatst ' + when + ')') : '') + '. Er is niets opnieuw geplaatst.', already: true });
+      }
+    }
 
     // Client-koppeling met terugval op de workspace-koppeling.
     const creds = await resolveClientMeta(wsId, okClient);

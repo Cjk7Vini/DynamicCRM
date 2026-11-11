@@ -5270,7 +5270,11 @@ async function openPublish(postId){
     var post=(pd.posts||[]).filter(function(x){return String(x.id)===String(postId);})[0];
     PUBLISH_POST=post||{id:postId}; PUBLISH_BOTH=!!pd.publish_both; syncBothOption(document.getElementById('pubChannel'));
     document.getElementById('pubCaption').value=post?((post.body||post.title)||''):'';
-    document.getElementById('pubChannel').value='instagram';
+    // Het kanaal van de post overnemen (vroeger altijd Instagram, waardoor een post op
+    // "Instagram en Facebook" alleen op Instagram kwam).
+    // Een story kan alleen naar Instagram.
+    var _pch=(post&&post.post_type==='story')?'instagram':((post&&post.publish_channel==='both'&&PUBLISH_BOTH)?'both':((post&&post.publish_channel==='facebook')?'facebook':'instagram'));
+    document.getElementById('pubChannel').value=_pch;
     // assets ophalen voor de keuzelijst
     var ar=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/assets',{credentials:'include'}); var ad=await ar.json();
     var sel=document.getElementById('pubAsset');
