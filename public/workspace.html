@@ -1460,9 +1460,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <select id="pfReelCover"><option value="">Automatisch (beeld uit de video)</option></select>
       <div style="font-size:12px;color:var(--muted);margin-top:6px">Kies een afbeelding uit Content. Instagram toont die als omslag in het profiel. Geldt voor Instagram; Facebook kiest zelf een beeld uit de video.</div>
     </div>
-    <div class="field" id="pfCarouselField" style="display:none"><label>Carrousel-bestanden <span style="color:var(--muted);font-weight:400;font-size:12px">(klik om toe te voegen; volgorde = nummer; 2 tot 10)</span></label>
+    <div class="field" id="pfCarouselField" style="display:none"><label><span id="pfCarouselLabel">Carrousel-bestanden</span> <span style="color:var(--muted);font-weight:400;font-size:12px">(klik om toe te voegen; volgorde = nummer; 2 tot 10)</span></label>
       <div id="pfCarousel" style="display:flex;gap:12px 10px;flex-wrap:wrap;padding-top:6px"></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">Wordt als 1 carousel organisch op Instagram geplaatst.</div>
+      <div id="pfCarouselHint" style="font-size:12px;color:var(--muted);margin-top:6px">Wordt als 1 carousel organisch op Instagram geplaatst.</div>
     </div>
     <div class="field" style="background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
       <label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin:0">
@@ -1472,6 +1472,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       <div id="pfAutoCh" style="display:none;margin-top:10px">
         <label style="margin-bottom:6px">Naar welk kanaal?</label>
         <select id="pfPublishChannel"><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select>
+        <div id="pfSeriesChHint" style="display:none;font-size:12px;color:var(--muted);margin-top:6px">Een story-reeks gaat alleen naar Instagram.</div>
         <div style="font-size:12px;color:var(--muted);margin-top:6px">Vereist een gekoppeld account en een beeld (voor Instagram). Post gaat automatisch de deur uit.</div>
       </div>
     </div>
@@ -3240,13 +3241,14 @@ async function loadReadiness(){
   }catch(_){/* controle is optioneel */}
 }
 // Voorbeeldbeeld van een post: het losse beeld, of bij een carrousel het eerste bestand.
-function isCarPost(p){return !!(p&&p.post_type==='carrousel'&&Array.isArray(p.carousel_asset_ids)&&p.carousel_asset_ids.length);}
+function isCarPost(p){return !!(p&&(p.post_type==='carrousel'||p.post_type==='storyreeks')&&Array.isArray(p.carousel_asset_ids)&&p.carousel_asset_ids.length);}
+function multiLabel(p){return (p&&p.post_type==='storyreeks')?'Story-reeks':'Carrousel';}
 function postThumbSrc(p){
   if(p&&p.asset_url)return thumbUrl(p.asset_url,480);
   if(isCarPost(p)&&p.carousel_url)return thumbUrl(p.carousel_url,480);
   return '';
 }
-function carBadge(p){return isCarPost(p)?('<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px">Carrousel &middot; '+p.carousel_asset_ids.length+'</span>'):'';}
+function carBadge(p){return isCarPost(p)?('<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px">'+multiLabel(p)+' &middot; '+p.carousel_asset_ids.length+'</span>'):'';}
 // Kleine versie van een beeld uit de beeldopslag (sneller laden): breedte w, automatisch
 // formaat en kwaliteit. Video: stilstaand beeld van het begin, ook verkleind. Andere links
 // blijven ongewijzigd. Het origineel blijft bewaard en wordt gebruikt bij openen en publiceren.
@@ -5277,11 +5279,18 @@ async function openPublish(postId){
     // Het beeld van de post alvast kiezen, zodat het niet opnieuw gekozen hoeft te worden.
     if(post&&post.asset_id){for(var oi=0;oi<sel.options.length;oi++){if(String(sel.options[oi].value)===String(post.asset_id)){sel.value=String(post.asset_id);break;}}}
     // Carousel-post: alleen Instagram, geen los bestand kiezen.
-    var isCar=!!(post&&post.post_type==='carrousel'&&Array.isArray(post.carousel_asset_ids)&&post.carousel_asset_ids.length>=2);
-    document.getElementById('pubChannelField').style.display=isCar?'none':'';
-    document.getElementById('pubAssetField').style.display=isCar?'none':'';
+    var isSer=!!(post&&post.post_type==='storyreeks');
+    var isCar=!!(post&&(post.post_type==='carrousel'||isSer)&&Array.isArray(post.carousel_asset_ids)&&post.carousel_asset_ids.length>=2);
+    document.getElementById('pubChannelField').style.display=(isCar||isSer)?'none':'';
+    document.getElementById('pubAssetField').style.display=(isCar||isSer)?'none':'';
+    var capF=document.getElementById('pubCaption'); if(capF&&capF.parentNode)capF.parentNode.style.display=isSer?'none':'';
     var note=document.getElementById('pubCarouselNote');
-    if(isCar){document.getElementById('pubChannel').value='instagram';note.style.display='';note.textContent='Carousel met '+post.carousel_asset_ids.length+' bestanden. Wordt als 1 organische post op Instagram geplaatst. Video\'s kunnen even verwerkt worden.';}
+    if(isSer){
+      document.getElementById('pubChannel').value='instagram';note.style.display='';
+      var nS=Array.isArray(post.carousel_asset_ids)?post.carousel_asset_ids.length:0; var dS=Math.min(Number(post.story_done)||0,nS);
+      note.textContent=nS<2?'Deze story-reeks heeft nog geen 2 bestanden. Kies ze eerst in de post.':('Story-reeks met '+nS+' stories. Ze worden een voor een op Instagram geplaatst, zonder tekst. Video\'s kunnen even verwerkt worden; dit kan een paar minuten duren.'+(dS>0?(' Al geplaatst: '+dS+' van '+nS+'. Alleen de rest wordt geplaatst.'):''));
+    }
+    else if(isCar){document.getElementById('pubChannel').value='instagram';note.style.display='';note.textContent='Carousel met '+post.carousel_asset_ids.length+' bestanden. Wordt als 1 organische post op Instagram geplaatst. Video\'s kunnen even verwerkt worden.';}
     else{note.style.display='none';}
     pubChannelChanged();
     document.getElementById('publishModal').classList.add('open');
@@ -5291,9 +5300,13 @@ function closePublish(){document.getElementById('publishModal').classList.remove
 async function publishNow(){
   var btn=document.getElementById('pubBtn'); hideMsg('publishMsg');
   var caption=document.getElementById('pubCaption').value;
-  var isCar=!!(PUBLISH_POST&&PUBLISH_POST.post_type==='carrousel'&&Array.isArray(PUBLISH_POST.carousel_asset_ids)&&PUBLISH_POST.carousel_asset_ids.length>=2);
+  var isSer=!!(PUBLISH_POST&&PUBLISH_POST.post_type==='storyreeks');
+  var isCar=!isSer&&!!(PUBLISH_POST&&PUBLISH_POST.post_type==='carrousel'&&Array.isArray(PUBLISH_POST.carousel_asset_ids)&&PUBLISH_POST.carousel_asset_ids.length>=2);
   var body;
-  if(isCar){
+  if(isSer){
+    if(!(Array.isArray(PUBLISH_POST.carousel_asset_ids)&&PUBLISH_POST.carousel_asset_ids.length>=2)){showMsg('publishMsg',false,'Een story-reeks heeft minimaal 2 bestanden nodig. Kies ze eerst in de post.');return;}
+    body={channel:'instagram',caption:'',postId:PUBLISH_POST.id};
+  } else if(isCar){
     body={channel:'instagram',caption:caption,carouselAssetIds:PUBLISH_POST.carousel_asset_ids,postId:PUBLISH_POST.id};
   } else {
     var channel=document.getElementById('pubChannel').value;
@@ -5301,12 +5314,13 @@ async function publishNow(){
     if((channel==='instagram'||channel==='both')&&!assetId){showMsg('publishMsg',false,'Instagram vereist een bestand. Kies er een.');return;}
     body={channel:channel,caption:caption,assetId:assetId||null,postId:PUBLISH_POST?PUBLISH_POST.id:null};
   }
-  btn.disabled=true; btn.textContent=isCar?'Carousel plaatsen (kan even duren)...':'Publiceren...';
+  btn.disabled=true; btn.textContent=isSer?'Stories plaatsen (kan even duren)...':(isCar?'Carousel plaatsen (kan even duren)...':'Publiceren...');
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
     var d=await r.json();
     if(r.ok&&d.success){
       var cw=d.cover_warning||(d.result&&d.result.cover_warning)||null;
+      if(isSer){showMsg('publishMsg',true,(d.already?'Alle stories van deze reeks stonden al op Instagram.':('Story-reeks geplaatst op Instagram ('+((d.result&&d.result.count)||'')+' stories).')));setTimeout(function(){closePublish();loadPosts();},1800);btn.disabled=false;btn.textContent='Nu publiceren';return;}
       showMsg('publishMsg',true,(isCar?'Carousel geplaatst op Instagram.':(d.both?'Gepubliceerd op Instagram en Facebook.':'Gepubliceerd.'))+' Post-ID: '+(d.result&&d.result.id||'-')+(cw?(' Let op: geplaatst op Instagram, maar zonder eigen omslag ('+cw+').'):''));
       // Met een waarschuwing blijft het venster open, zodat de melding gelezen kan worden.
       if(!cw)setTimeout(function(){closePublish();loadPosts();},1500); else loadPosts();
@@ -5640,7 +5654,7 @@ async function setPostStatus(id,status){
 }
 function boardCard(p,canManage){
   var _ts=postThumbSrc(p);
-  var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">'+carBadge(p)+'</div>'):(isCarPost(p)?'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">CARROUSEL &middot; '+p.carousel_asset_ids.length+'</div>':'');
+  var thumb=_ts?('<div style="position:relative"><img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">'+carBadge(p)+'</div>'):(isCarPost(p)?'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">'+multiLabel(p).toUpperCase()+' &middot; '+p.carousel_asset_ids.length+'</div>':'');
   var badge=approvalBadge(p.approval);
   var when=p.scheduled_at?('<div style="font-size:11px;color:var(--muted);margin-top:5px">'+esc(fmtWhen(p.scheduled_at))+'</div>'):'';
   var acts=canManage?('<div class="post-acts" style="margin-top:8px;display:flex;gap:4px" onclick="event.stopPropagation()">'+
@@ -5784,7 +5798,7 @@ function renderCalendar(posts){
     var isToday=(iso===todayStr);
     var chips=(byDay[dnum]||[]).map(function(p){
       var col=p.approval==='approved'?'#16a34a':(p.approval==='changes'?'#dc2626':(p.status==='published'?'#6366f1':'var(--accent)'));
-      var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Carrousel'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
+      var typ=p.post_type?({bericht:'Bericht',reel:'Reel',story:'Story',carrousel:'Carrousel',storyreeks:'Reeks'}[p.post_type]||p.post_type):((p.asset_type==='video')?'Reel':'Bericht');
       var _ts=postThumbSrc(p);
       var thumb=_ts?('<img src="'+esc(_ts)+'" alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block;border:2px solid '+col+'">'):('<div style="width:44px;height:44px;border-radius:6px;background:'+col+';opacity:.4"></div>');
       return '<div onclick="openEditPost('+p.id+')" title="'+esc(p.title)+'" style="display:inline-flex;flex-direction:column;align-items:center;width:46px;margin:4px 4px 0 0;cursor:pointer;vertical-align:top"><div style="position:relative">'+thumb+rdyDot(p)+'</div>'+'<div style="font-size:9px;color:var(--muted);margin-top:2px">'+typ+'</div></div>';
@@ -5831,7 +5845,7 @@ function renderList(posts){
           ? '<img class="post-thumb" src="'+esc(thumbUrl(p.asset_url,240))+'" alt="" title="Video" loading="lazy">'
           : '<img class="post-thumb" src="'+esc(thumbUrl(p.asset_url,240))+'" alt="" loading="lazy">';
       } else if(isCarPost(p)&&postThumbSrc(p)){
-        thumb='<img class="post-thumb" src="'+esc(postThumbSrc(p))+'" alt="" title="Carrousel met '+p.carousel_asset_ids.length+' bestanden">';
+        thumb='<img class="post-thumb" src="'+esc(postThumbSrc(p))+'" alt="" title="'+multiLabel(p)+' met '+p.carousel_asset_ids.length+' bestanden">';
       }
       return '<div class="post-row">'+thumb+'<div class="post-main"><h5>'+esc(p.title)+'</h5>'+
         (p.body?('<div class="cap">'+esc(p.body)+'</div>'):'')+
@@ -5848,7 +5862,7 @@ async function loadPosts(){
     var d=await r.json();
     if(!r.ok||!d.success){body.innerHTML='';showMsg('postsMsg',false,d.error||'Kon posts niet laden.');return;}
     _CONTENT_POSTS=d.posts||[];
-    POST_EXTRAS=!!d.extras; POST_ACTIVITY=!!d.activity; PUBLISH_BOTH=!!d.publish_both; POST_REEL_COVER=!!d.reel_cover;
+    POST_EXTRAS=!!d.extras; POST_ACTIVITY=!!d.activity; PUBLISH_BOTH=!!d.publish_both; POST_REEL_COVER=!!d.reel_cover; STORY_SERIES=!!d.story_series;
     await loadCustomLabels();
     await loadBoardColumns();
     if(POST_EXTRAS&&!MKT_MEMBERS.length)await loadMembers();
@@ -5856,7 +5870,17 @@ async function loadPosts(){
     loadReadiness();
   }catch(e){body.innerHTML='';showMsg('postsMsg',false,'Netwerkfout.');}
 }
-var PF_ASSETS={}, POST_REEL_COVER=false, PF_REEL_COVER='';
+var PF_ASSETS={}, POST_REEL_COVER=false, PF_REEL_COVER='', STORY_SERIES=false;
+// Keuze "Story-reeks" alleen tonen als de server het ondersteunt (migratie 036). Een post
+// die al een reeks is, houdt de keuze (anders verandert het type stil bij opslaan).
+function syncSeriesOption(curType){
+  var sel=document.getElementById('pfType'); if(!sel)return; var has=null;
+  for(var i=0;i<sel.options.length;i++){if(sel.options[i].value==='storyreeks'){has=sel.options[i];break;}}
+  var want=STORY_SERIES||curType==='storyreeks';
+  if(want&&!has){has=document.createElement('option');has.value='storyreeks';sel.appendChild(has);}
+  else if(!want&&has){sel.removeChild(has);has=null;}
+  if(has)has.textContent=STORY_SERIES?'Story-reeks (meerdere stories na elkaar)':'Story-reeks (staat uit)';
+}
 var PF_CAROUSEL=[], PF_ASSET_LIST=[];
 async function fillPostAssetSelect(selectedId){
   var sel=document.getElementById('pfAsset'); sel.innerHTML='<option value="">Geen beeld</option>'; PF_ASSETS={}; PF_ASSET_LIST=[];
@@ -5889,9 +5913,14 @@ function renderPfCarousel(){
 }
 function togglePfCarousel(id){var s=PF_CAROUSEL.map(String);var k=String(id);var i=s.indexOf(k);if(i>=0)PF_CAROUSEL.splice(i,1);else{if(PF_CAROUSEL.length>=10)return;PF_CAROUSEL.push(id);}renderPfCarousel();updatePfMedia();}
 function pfTypeChanged(){
-  var tv=document.getElementById('pfType'); var isCar=(tv&&tv.value==='carrousel');
+  var tv=document.getElementById('pfType'); var isSeries=(tv&&tv.value==='storyreeks'); var isCar=(tv&&(tv.value==='carrousel'||isSeries));
   var af=document.getElementById('pfAssetField'); if(af)af.style.display=isCar?'none':'';
   var cf=document.getElementById('pfCarouselField'); if(cf)cf.style.display=isCar?'':'none';
+  var cl=document.getElementById('pfCarouselLabel'); if(cl)cl.textContent=isSeries?'Stories in de reeks':'Carrousel-bestanden';
+  var ch=document.getElementById('pfCarouselHint'); if(ch)ch.textContent=isSeries?'Elk bestand wordt een losse story op Instagram, in deze volgorde, kort na elkaar. Stories hebben geen tekst. Elke story telt mee in de dagelijkse grens van Instagram.':'Wordt als 1 carousel organisch op Instagram geplaatst.';
+  // Een story-reeks gaat alleen naar Instagram: de kanaalkeuze staat dan vast.
+  var pc=document.getElementById('pfPublishChannel'); if(pc){ if(isSeries)pc.value='instagram'; pc.disabled=!!isSeries; }
+  var sh=document.getElementById('pfSeriesChHint'); if(sh)sh.style.display=isSeries?'':'none';
   if(isCar)renderPfCarousel();
   // Omslag alleen bij een Reel (en alleen met migratie 033).
   var rcf=document.getElementById('pfReelCoverField'); if(rcf)rcf.style.display=(POST_REEL_COVER&&tv&&tv.value==='reel')?'':'none';
@@ -5903,15 +5932,16 @@ var PF_BLOCKS=[], _PFB_DRAG=null;
 function pfMediaInner(){
   // Carrousel: de gekozen bestanden in volgorde, met hun nummer.
   var tv=document.getElementById('pfType');
-  if(tv&&tv.value==='carrousel'){
+  if(tv&&(tv.value==='carrousel'||tv.value==='storyreeks')){
+    var isSer=(tv.value==='storyreeks');
     var items=PF_CAROUSEL.map(function(cid){return PF_ASSETS[String(cid)];}).filter(Boolean);
     var strip=items.length
       ? '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+items.map(function(it,i){
           var src=thumbUrl(it.url,300);
           return '<div style="position:relative;flex:0 0 auto"><img src="'+esc(src)+'" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;display:block;background:var(--panel)"><span style="position:absolute;top:6px;left:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(i+1)+'</span></div>';
         }).join('')+'</div>'
-      : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:8px">Carrousel (kies onderaan de bestanden, in de volgorde van plaatsen)</div>';
-    return '<div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.4px;margin-bottom:4px">CARROUSEL'+(items.length?(' &middot; '+items.length+' BESTANDEN'):'')+'</div>'+strip;
+      : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:8px">'+(isSer?'Story-reeks':'Carrousel')+' (kies onderaan de bestanden, in de volgorde van plaatsen)</div>';
+    return '<div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.4px;margin-bottom:4px">'+(isSer?'STORY-REEKS':'CARROUSEL')+(items.length?(' &middot; '+items.length+(isSer?' STORIES':' BESTANDEN')):'')+'</div>'+strip;
   }
   var sel=document.getElementById('pfAsset'); var id=sel?sel.value:''; var a=PF_ASSETS[String(id)];
   var media=a?((a.type==='video')
@@ -5990,7 +6020,7 @@ function openNewPost(){
   document.getElementById('postModalTitle').textContent='Nieuwe post';
   document.getElementById('pfTitle').value='';
   document.getElementById('pfChannel').value='instagram';fillStatusOptions((boardCols()[0]||{key:'idea'}).key);
-  document.getElementById('pfType').value='bericht';PF_CAROUSEL=[];
+  syncSeriesOption('bericht');document.getElementById('pfType').value='bericht';PF_CAROUSEL=[];
   document.getElementById('pfWhen').value='';
   document.getElementById('pfAuto').checked=false;document.getElementById('pfAutoCh').style.display='none';syncBothOption(document.getElementById('pfPublishChannel'));document.getElementById('pfPublishChannel').value='instagram';
   PF_LABELS=[];renderPfLabels();
@@ -6007,7 +6037,7 @@ function openEditPost(id){
   fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d.success)return;
     var p=d.posts.filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
-    EDIT_POST=p; hideMsg('postMsg'); pfShowPublishBtn(true); pfAiReset();
+    EDIT_POST=p; hideMsg('postMsg'); pfShowPublishBtn(true); pfAiReset(); STORY_SERIES=!!d.story_series; syncSeriesOption(p.post_type);
     document.getElementById('postModalTitle').textContent='Post bewerken';
     document.getElementById('pfTitle').value=p.title||'';
     document.getElementById('pfChannel').value=p.channel||'other';fillStatusOptions(p.status||(boardCols()[0]||{key:'idea'}).key);
@@ -6045,7 +6075,12 @@ async function savePost(){
   var when=document.getElementById('pfWhen').value;
   var auto=document.getElementById('pfAuto').checked;
   var bodyText=PF_BLOCKS.filter(function(b){return b.type==='text'&&b.text&&b.text.trim();}).map(function(b){return b.text.trim();}).join('\n\n');
-  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:(document.getElementById('pfType').value==='carrousel'?PF_CAROUSEL:[]),cover_color:PF_COVER};
+  var payload={title:title,body:bodyText,blocks:PF_BLOCKS,channel:document.getElementById('pfChannel').value,status:document.getElementById('pfStatus').value,post_type:document.getElementById('pfType').value,scheduled_at:when?new Date(when).toISOString():'',asset_id:document.getElementById('pfAsset').value||'',auto_publish:auto,publish_channel:document.getElementById('pfPublishChannel').value,labels:PF_LABELS,assignees:PF_ASSIGNEES,checklist:PF_CHECKLIST,carousel_asset_ids:((document.getElementById('pfType').value==='carrousel'||document.getElementById('pfType').value==='storyreeks')?PF_CAROUSEL:[]),cover_color:PF_COVER};
+  // Story-reeks: altijd Instagram; automatisch plaatsen vraagt minimaal 2 bestanden.
+  if(payload.post_type==='storyreeks'){
+    payload.publish_channel='instagram';
+    if(auto&&PF_CAROUSEL.length<2){showMsg('postMsg',false,'Een story-reeks heeft minimaal 2 bestanden nodig om automatisch te plaatsen. Kies ze bij Stories in de reeks.');return;}
+  }
   // Staat "beide" (tijdelijk) uit, dan het opgeslagen kanaal van een bestaande post niet wijzigen.
   if(EDIT_POST&&EDIT_POST.publish_channel==='both'&&!PUBLISH_BOTH)delete payload.publish_channel;
   // Omslag van een Reel (migratie 033): alleen bij type Reel; bij een ander type leeg.
