@@ -1407,9 +1407,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
     <div class="field" id="pfChecklistField" style="display:none"><label>Checklist</label><div id="pfChecklist"></div>
       <div style="display:flex;gap:6px;margin-top:6px"><input id="pfChkNew" placeholder="Nieuw checklist-item" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();pfAddChecklistItem();}"><button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;white-space:nowrap" onclick="pfAddChecklistItem()">+ Item</button></div>
     </div>
-    <div class="field"><label>Inhoud <span style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
+    <div class="field"><label>Inhoud <span id="pfBlocksHint" style="color:var(--muted);font-weight:400;font-size:12px">(sleep de blokken met het greepje om de volgorde te wijzigen)</span></label>
       <div id="pfBlocks"></div>
-      <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
+      <div id="pfSeriesNote" style="display:none;font-size:12px;color:var(--muted);margin-top:6px">Een story-reeks heeft geen tekst: Instagram plaatst alleen de beelden. Kies hieronder de stories en de volgorde.</div>
+      <button type="button" class="btn btn-ghost" id="pfAddTextBtn" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAddText()">+ Tekstblok</button>
       <button type="button" class="btn btn-ghost" id="pfAiBtn" style="padding:6px 12px;font-size:12.5px;margin-top:8px" onclick="pfAiToggle()">Schrijf met AI</button>
       <div id="pfAiBox" style="display:none;margin-top:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px">
         <label style="font-size:12.5px;color:var(--muted)">Waar gaat de post over? <span style="font-weight:400">(onderwerp, aanbod, doel)</span></label>
@@ -1422,7 +1423,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Kanaal</label>
+      <div class="field" id="pfChannelField"><label>Kanaal</label>
         <select id="pfChannel">
           <option value="instagram">Instagram</option>
           <option value="facebook">Facebook</option>
@@ -5921,6 +5922,14 @@ function pfTypeChanged(){
   // Een story-reeks gaat alleen naar Instagram: de kanaalkeuze staat dan vast.
   var pc=document.getElementById('pfPublishChannel'); if(pc){ if(isSeries)pc.value='instagram'; pc.disabled=!!isSeries; }
   var sh=document.getElementById('pfSeriesChHint'); if(sh)sh.style.display=isSeries?'':'none';
+  // Story-reeks: geen tekst. Tekstblokken en "Schrijf met AI" verdwijnen; het kanaal staat
+  // vast op Instagram. Al ingetypte tekst blijft bewaard en komt terug bij een ander type.
+  var atb=document.getElementById('pfAddTextBtn'); if(atb)atb.style.display=isSeries?'none':'';
+  var aib=document.getElementById('pfAiBtn'); if(aib)aib.style.display=isSeries?'none':((ME&&ME.role!=='client')?'':'none');
+  var aibox=document.getElementById('pfAiBox'); if(aibox&&isSeries)aibox.style.display='none';
+  var sn=document.getElementById('pfSeriesNote'); if(sn)sn.style.display=isSeries?'':'none';
+  var bh=document.getElementById('pfBlocksHint'); if(bh)bh.style.display=isSeries?'none':'';
+  var pch=document.getElementById('pfChannel'); if(pch){ if(isSeries)pch.value='instagram'; pch.disabled=!!isSeries; pch.title=isSeries?'Een story-reeks gaat alleen naar Instagram':''; }
   if(isCar)renderPfCarousel();
   // Omslag alleen bij een Reel (en alleen met migratie 033).
   var rcf=document.getElementById('pfReelCoverField'); if(rcf)rcf.style.display=(POST_REEL_COVER&&tv&&tv.value==='reel')?'':'none';
@@ -5953,6 +5962,12 @@ function pfMediaInner(){
 function renderPfBlocks(){
   var box=document.getElementById('pfBlocks'); if(!box)return;
   if(!PF_BLOCKS.length)PF_BLOCKS=[{type:'text',text:''}];
+  var _tvb=document.getElementById('pfType'); var serOnly=!!(_tvb&&_tvb.value==='storyreeks');
+  if(serOnly){
+    // Story-reeks: alleen het beeldblok tonen (de tekstblokken blijven bewaard, maar verborgen).
+    box.innerHTML='<div class="pfblock" style="border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--panel-2,rgba(255,255,255,.02))">'+pfMediaInner()+'</div>';
+    return;
+  }
   box.innerHTML=PF_BLOCKS.map(function(b,idx){
     var handle='<span draggable="true" ondragstart="pfbDrag(event,'+idx+')" title="Sleep om te ordenen" style="cursor:grab;color:var(--muted);padding:2px 4px;user-select:none;font-size:16px;line-height:1">&#9776;</span>';
     var inner,del='';
