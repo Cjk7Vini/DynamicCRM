@@ -40,7 +40,8 @@ Blijvende kennis uit opgeloste problemen: wat de oorzaak was, hoe het is opgelos
 
 ## Meta: publiceren, wat er technisch kan
 
-- **Instagram:** bericht (beeld), Reel (video), story (`media_type=STORIES`, zonder tekst) en carrousel (2 tot 10 bestanden). Allemaal ook automatisch via de planner.
+- **Instagram:** bericht (beeld), Reel (video), story (`media_type=STORIES`, zonder tekst), carrousel (2 tot 10 bestanden) en story-reeks (2 tot 10 losse stories na elkaar). Allemaal ook automatisch via de planner.
+- **Een story-reeks bestaat via de API altijd uit losse stories:** er is geen "reeks" bij Meta. Elke story telt mee in het maximum van 50 per 24 uur.
 - **Facebook-pagina:** foto (`/photos`), video (`/videos` met `file_url`) en tekst (`/feed`). Een story of carrousel kan niet naar Facebook.
 - **Reel-omslag:** `cover_url`, altijd als JPEG van max 1080 breed aangeleverd; weigert Instagram de omslag, dan wordt de Reel zonder omslag geplaatst, met een waarschuwing. Facebook kiest zelf het voorbeeldbeeld van een video.
 - **Muziek uit de Instagram-bibliotheek kan niet via de API**, bij geen enkele tool. Zet de muziek vóór het uploaden in de video.

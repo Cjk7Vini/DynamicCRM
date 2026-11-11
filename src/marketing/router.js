@@ -1033,7 +1033,7 @@ async function contentBlocksAvailable() {
     return r.length > 0;
   } catch (_) { return false; }
 }
-const POST_TYPES = ['bericht', 'reel', 'story', 'carrousel'];
+const POST_TYPES = ['bericht', 'reel', 'story', 'carrousel', 'storyreeks'];
 let _hasPostType = null;
 async function postTypeAvailable() {
   if (_hasPostType === true) return true;
@@ -1331,6 +1331,86 @@ async function igContainerPublished(R, containerId) {
   const st = await R.get(String(containerId), { fields: 'status_code', access_token: R.token });
   return !!(st && st.status_code === 'PUBLISHED');
 }
+
+// ---- Story-reeks: meerdere stories na elkaar vanuit één post (migratie 036) ----
+// De bestanden staan in carousel_asset_ids (in volgorde), de voortgang in story_done.
+// Alleen Instagram. Uitzetten (de keuze verdwijnt, de planner laat reeksen liggen):
+// MKT_STORY_SERIES=0.
+const STORY_SERIES_MAX = 10;
+let _hasStorySeries = null;
+async function storySeriesAvailable() {
+  if (process.env.MKT_STORY_SERIES === '0' || !schedTypesOn()) return false;
+  // Zonder de beveiliging tegen dubbel plaatsen (migratie 034) geen reeksen: een reeks
+  // bestaat uit meerdere plaatsingen en moet na een fout veilig verder kunnen.
+  if (!(await publishGuardAvailable())) return false;
+  if (_hasStorySeries === true) return true;
+  try {
+    const r = await withReadConnection(async (c) => (await c.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='marketing' AND table_name='content_posts' AND column_name IN ('story_done','post_type','carousel_asset_ids','ig_published_at')"
+    )).rows);
+    if (r.length === 4) _hasStorySeries = true;
+    return r.length === 4;
+  } catch (_) { return false; }
+}
+// Hoeveel plaatsingen via apps dit Instagram-account de afgelopen 24 uur heeft gebruikt,
+// en het maximum. null als Meta het niet kan vertellen (dan wordt niet geblokkeerd).
+async function igPublishingQuota(R) {
+  try {
+    const r = await R.get(`${R.igId}/content_publishing_limit`, { fields: 'quota_usage,config', access_token: R.token });
+    const d = (r && Array.isArray(r.data) && r.data[0]) || {};
+    const usage = Number(d.quota_usage); const total = Number(d.config && d.config.quota_total);
+    if (!Number.isFinite(usage) || !Number.isFinite(total) || total <= 0) return null;
+    return { usage, total };
+  } catch (_) { return null; }
+}
+// Plaatst de stories vanaf nummer `done` (0 = vanaf het begin), strikt na elkaar.
+// hooks.beforeCommit({container, index}) vlak voor het echte plaatsen van een story,
+// hooks.afterItem(n) direct nadat story n (1-based) op Instagram staat. Mislukt
+// afterItem, dan stopt de reeks (anders kan een volgende poging een story dubbel plaatsen).
+async function publishStorySeries(R, items, done, hooks) {
+  const tk = R.token; const ids = [];
+  for (let i = done; i < items.length; i++) {
+    const it = items[i];
+    const params = it.mediaType === 'video'
+      ? { media_type: 'STORIES', video_url: it.url, access_token: tk }
+      : { media_type: 'STORIES', image_url: it.url, access_token: tk };
+    let created;
+    try { created = await R.post(`${R.igId}/media`, params); }
+    catch (e) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': ' + e.message); err.storyIndex = i; throw err; }
+    if (it.mediaType === 'video') {
+      let ready = false;
+      for (let k = 0; k < 40 && !ready; k++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const st = await R.get(`${created.id}`, { fields: 'status_code', access_token: tk });
+        if (st.status_code === 'FINISHED') ready = true;
+        else if (st.status_code === 'ERROR') { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': de video kon niet door Instagram verwerkt worden'); err.storyIndex = i; throw err; }
+      }
+      if (!ready) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': de video-verwerking bij Instagram duurt te lang'); err.storyIndex = i; throw err; }
+    }
+    if (hooks && hooks.beforeCommit) await hooks.beforeCommit({ container: created.id, index: i });
+    try {
+      const pub = await R.post(`${R.igId}/media_publish`, { creation_id: created.id, access_token: tk });
+      ids.push(pub && pub.id);
+    } catch (e) {
+      let live = false;
+      try { live = await igContainerPublished({ get: R.get, token: tk }, created.id); } catch (_) { live = false; }
+      if (!live) { const err = new Error('Story ' + (i + 1) + ' van ' + items.length + ': ' + e.message); err.storyIndex = i; throw err; }
+      ids.push(null);
+    }
+    if (hooks && hooks.afterItem) {
+      try { await hooks.afterItem(i + 1); }
+      catch (e) { const err = new Error('Story ' + (i + 1) + ' staat op Instagram, maar de voortgang kon niet worden opgeslagen. De reeks is gestopt om dubbel plaatsen te voorkomen.'); err.persistFailed = true; err.storyIndex = i; throw err; }
+    }
+    if (i < items.length - 1) await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { count: items.length - done, ids };
+}
+// Voortgang van een reeks vastleggen (alleen omhoog, nooit terug).
+async function saveStoryDone(postId, n) {
+  await withWriteConnection(async (c) => c.query(
+    'UPDATE marketing.content_posts SET story_done = GREATEST(COALESCE(story_done,0), $2) WHERE id=$1', [postId, n]
+  ));
+}
 // Een activiteit vastleggen (best-effort; nooit de hoofdactie laten mislukken).
 async function logPostActivity(wsId, postId, actorId, actorName, action, detail) {
   try {
@@ -1409,9 +1489,11 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
     const hasCover = await postCoverAvailable();
     const hasBoth = await publishBothAvailable();
     const hasReelCover = await postReelCoverAvailable();
+    const hasSeries = await storySeriesAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.client_id, p.title, p.body, p.channel, p.status, p.scheduled_at,
               ${hasReelCover ? 'p.reel_cover_asset_id,' : ''}
+              ${hasSeries ? 'p.story_done,' : ''}
               p.approval, p.approval_note, p.approval_at, p.client_note, p.created_at, p.updated_at,
               p.auto_publish, p.publish_channel, p.published_at, p.publish_error,
               ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
@@ -1434,7 +1516,7 @@ router.get('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => {
         ORDER BY p.scheduled_at ASC NULLS LAST, p.created_at DESC`,
       filterStatus ? [wsId, okClient, filterStatus] : [wsId, okClient]
     )).rows);
-    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable(), publish_both: hasBoth, reel_cover: hasReelCover });
+    res.json({ success: true, posts: rows, extras: hasExtras, activity: await postActivityAvailable(), publish_both: hasBoth, reel_cover: hasReelCover, story_series: hasSeries, story_series_max: STORY_SERIES_MAX });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1466,8 +1548,10 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
     const hasCarousel = await postCarouselAvailable();
     const hasType = await postTypeAvailable();
     const hasBoth = await publishBothAvailable();
+    const hasSeries = hasType && hasCarousel && await storySeriesAvailable();
     const rows = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.publish_channel, p.scheduled_at, p.publish_attempts, p.publish_error,
+              ${hasSeries ? 'p.story_done,' : ''}
               ${hasType ? 'p.post_type,' : ''}
               ${hasCarousel ? 'p.carousel_asset_ids,' : ''}
               ${hasBoth ? 'p.ig_published_at, p.fb_published_at,' : ''}
@@ -1506,10 +1590,16 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
     for (const p of rows) {
       const issues = []; const unknown = [];
       const isCarousel = hasType && p.post_type === 'carrousel';
+      const isSeries = hasType && p.post_type === 'storyreeks';
       let channels;
-      if (p.publish_channel === 'both') channels = hasBoth ? ['instagram', 'facebook'] : null;
+      // Een story-reeks gaat altijd alleen naar Instagram (zoals de planner).
+      if (isSeries && hasSeries && p.publish_channel === 'both' && hasBoth) channels = ['instagram'];
+      else if (p.publish_channel === 'both') channels = hasBoth ? ['instagram', 'facebook'] : null;
       else channels = [p.publish_channel === 'facebook' ? 'facebook' : 'instagram'];
-      if (channels === null) {
+      if (isSeries && !hasSeries) {
+        issues.push('De story-reeks staat uit (migratie 036 ontbreekt of de reeks is uitgezet). De planner laat deze post liggen.');
+        channels = [];
+      } else if (channels === null) {
         issues.push('"Instagram en Facebook" staat uit, de planner laat deze post liggen. Kies een kanaal in de post.');
         channels = [];
       }
@@ -1523,7 +1613,18 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
           } else if (perms && perms.err) unknown.push('Instagram: rechten konden niet gecontroleerd worden (' + perms.err + ').');
           else if (perms && !perms.granted.has('instagram_content_publish')) issues.push('Instagram: de koppeling mist het recht om te publiceren (instagram_content_publish). Klik op Werkplek-koppeling, Koppel met Facebook.');
           if (isCarousel && !schedTypesOn()) issues.push('Instagram: een carrousel wordt nog niet automatisch geplaatst. Gebruik Nu publiceren.');
-          else if (isCarousel) {
+          else if (isSeries) {
+            const all = await resolveCarouselAssets(wsId, okClient, p.carousel_asset_ids);
+            const items = all.slice(0, STORY_SERIES_MAX);
+            if (items.length < 2) issues.push('Instagram: een story-reeks heeft minimaal 2 bestanden nodig. Kies ze onderaan in de post.');
+            else {
+              const left = items.length - Math.min(Number(p.story_done) || 0, items.length);
+              if (igR && left > 0) {
+                const q = await igPublishingQuota(igR);
+                if (q && q.usage + left > q.total) issues.push('Instagram: de reeks past nu niet binnen de dagelijkse grens (' + q.usage + ' van ' + q.total + ' plaatsingen via apps gebruikt in de afgelopen 24 uur, de reeks heeft er nog ' + left + ' nodig).');
+              }
+            }
+          } else if (isCarousel) {
             const items = hasCarousel ? await resolveCarouselAssets(wsId, okClient, p.carousel_asset_ids) : [];
             if (items.length < 2) issues.push('Instagram: een carrousel heeft minimaal 2 bestanden nodig. Kies ze onderaan in de post.');
           } else if (!(p.asset_url && p.asset_provider === 'cloudinary')) issues.push('Instagram: er is geen beeld gekozen (Instagram vereist een afbeelding of video).');
@@ -1534,7 +1635,7 @@ router.get('/api/mkt/clients/:clientId/posts/readiness', requireMkt, async (req,
           else if (perms && perms.err) unknown.push('Facebook: rechten konden niet gecontroleerd worden (' + perms.err + ').');
           else if (perms && !perms.granted.has('pages_manage_posts')) issues.push('Facebook: de koppeling mist het recht om op de pagina te posten (pages_manage_posts). Klik op Werkplek-koppeling, Koppel met Facebook.');
           if (isCarousel) issues.push('Facebook: een carrousel kan niet naar Facebook. Kies het kanaal Instagram.');
-          if (hasType && p.post_type === 'story' && schedTypesOn()) issues.push('Facebook: een story kan alleen naar Instagram. Kies het kanaal Instagram.');
+          if (hasType && (p.post_type === 'story' || p.post_type === 'storyreeks') && schedTypesOn()) issues.push('Facebook: een story kan alleen naar Instagram. Kies het kanaal Instagram.');
         }
       }
       const needsFbToken = channels.includes('facebook') || (channels.includes('instagram') && !(igR && igR.isIgLogin));
@@ -1592,7 +1693,8 @@ router.post('/api/mkt/clients/:clientId/posts', requireMkt, async (req, res) => 
     // Type (bericht/reel/story/carrousel) direct serverzijdig opslaan, los van de
     // vervolg-PATCH vanuit de browser. Anders kan een carrousel terugkomen als gewoon
     // bericht als die tweede call niet aankomt, en blijft de carrousel verborgen.
-    if (req.body && req.body.post_type !== undefined && POST_TYPES.includes(req.body.post_type) && await postTypeAvailable()) {
+    if (req.body && req.body.post_type !== undefined && POST_TYPES.includes(req.body.post_type) && await postTypeAvailable()
+        && (req.body.post_type !== 'storyreeks' || await storySeriesAvailable())) {
       try { await withWriteConnection(async (c) => c.query('UPDATE marketing.content_posts SET post_type=$1 WHERE id=$2 AND workspace_id=$3', [req.body.post_type, row.id, wsId])); row.post_type = req.body.post_type; } catch (_) { /* niet blokkerend */ }
     }
     // Carousel-bestanden opslaan (als meegegeven en de kolom beschikbaar is).
@@ -1641,7 +1743,8 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
     if (b.body !== undefined) { sets.push(`body=$${i++}`); vals.push(b.body === '' ? null : b.body); }
     if (b.channel !== undefined && POST_CHANNELS.includes(b.channel)) { sets.push(`channel=$${i++}`); vals.push(b.channel); }
     if (b.status !== undefined && await isValidPostStatus(wsId, b.status)) { sets.push(`status=$${i++}`); vals.push(b.status); }
-    if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
+    if (b.post_type !== undefined && POST_TYPES.includes(b.post_type) && await postTypeAvailable()
+        && (b.post_type !== 'storyreeks' || await storySeriesAvailable())) { sets.push(`post_type=$${i++}`); vals.push(b.post_type); }
     let carouselWarn = null;
     if (b.carousel_asset_ids !== undefined) {
       if (await postCarouselAvailable()) {
@@ -1748,6 +1851,8 @@ router.patch('/api/mkt/posts/:id', requireMkt, async (req, res) => {
           if (replanned) {
             sets.push(`publish_attempts=0`); sets.push(`published_at=NULL`); sets.push(`publish_error=NULL`);
             if (await publishBothAvailable()) { sets.push(`ig_published_at=NULL`); sets.push(`fb_published_at=NULL`); }
+            // Story-reeks opnieuw ingepland: weer vanaf de eerste story.
+            if (await storySeriesAvailable()) sets.push(`story_done=0`);
           }
         }
       }
@@ -4545,6 +4650,12 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
     if (!okClient) return res.status(404).json({ error: 'Klant niet gevonden' });
 
     const { channel, caption, assetId, postId, carouselAssetIds } = req.body || {};
+    // Story-reeks: eigen route (alleen Instagram, de stories na elkaar, met voortgang).
+    if (postId && (await postTypeOf(postId, wsId, okClient)) === 'storyreeks') {
+      if (!(await storySeriesAvailable())) return res.status(400).json({ error: 'De story-reeks staat uit. Er is niets geplaatst.' });
+      if (channel !== 'instagram') return res.status(400).json({ error: 'Een story-reeks kan alleen naar Instagram. Er is niets geplaatst.' });
+      return publishStorySeriesNow(req, res, wsId, okClient, postId);
+    }
     if (channel === 'both') return publishBothNow(req, res, wsId, okClient);
     if (channel !== 'instagram' && channel !== 'facebook') return res.status(400).json({ error: 'Kies Instagram of Facebook' });
 
@@ -4603,6 +4714,92 @@ router.post('/api/mkt/clients/:clientId/publish', requireMkt, async (req, res) =
   }
 });
 
+// "Nu publiceren" voor een story-reeks. Zelfde bescherming als de planner: de post wordt
+// eerst opgeeist (planner en een tweede klik kunnen niet tegelijk plaatsen), vóór elke
+// story wordt vastgelegd welke het is, en de voortgang (story_done) wordt per story
+// opgeslagen. Een nieuwe klik plaatst alleen wat nog ontbreekt.
+async function publishStorySeriesNow(req, res, wsId, okClient, postId) {
+  const guard = await publishGuardAvailable();
+  let claimedState = null;
+  const setState = async (st) => withWriteConnection(async (c) => c.query(
+    'UPDATE marketing.content_posts SET publish_state=$2::jsonb WHERE id=$1', [postId, st ? JSON.stringify(st) : null]
+  ));
+  try {
+    const post = await withReadConnection(async (c) => (await c.query(
+      `SELECT id, carousel_asset_ids, COALESCE(story_done,0) AS story_done${guard ? ', publish_state' : ''}
+         FROM marketing.content_posts WHERE id=$1 AND workspace_id=$2 AND client_id=$3`,
+      [postId, wsId, okClient]
+    )).rows[0]);
+    if (!post) return res.status(404).json({ error: 'Post niet gevonden' });
+    const items = (await resolveCarouselAssets(wsId, okClient, post.carousel_asset_ids)).slice(0, STORY_SERIES_MAX);
+    if (items.length < 2) return res.status(400).json({ error: 'Een story-reeks heeft minimaal 2 publieke bestanden nodig. Kies ze in de post. Er is niets geplaatst.' });
+    const creds = await resolveClientMeta(wsId, okClient);
+    let R;
+    try { R = await igPublishRoute(creds); } catch (e) { return res.status(400).json({ error: 'Instagram: ' + e.message + ' Er is niets geplaatst.' }); }
+    let done = Math.min(Number(post.story_done) || 0, items.length);
+
+    if (guard) {
+      const prev = post.publish_state || null;
+      if (prev && !(Date.now() - new Date(prev.at || 0).getTime() >= PUBLISH_LEASE_MS)) {
+        return res.status(409).json({ error: 'Deze reeks wordt op dit moment al geplaatst. Wacht een paar minuten en kijk dan of alles op Instagram staat.' });
+      }
+      claimedState = { phase: 'manual', at: new Date().toISOString() };
+      const claimed = await withWriteConnection(async (c) => (await c.query(
+        `UPDATE marketing.content_posts SET publish_state=$2::jsonb
+          WHERE id=$1 AND publish_state IS NOT DISTINCT FROM $3::jsonb RETURNING id`,
+        [postId, JSON.stringify(claimedState), prev ? JSON.stringify(prev) : null]
+      )).rows.length);
+      if (!claimed) return res.status(409).json({ error: 'Deze reeks wordt op dit moment al geplaatst. Wacht een paar minuten en kijk dan of alles op Instagram staat.' });
+      // Een eerdere poging is afgebroken tijdens het plaatsen van een story: eerst kijken of die er staat.
+      if (prev && prev.phase === 'commit' && prev.container && prev.series_index != null) {
+        let live;
+        try { live = await igContainerPublished({ get: R.get, token: R.token }, prev.container); }
+        catch (e) {
+          await setState(null);
+          return res.status(409).json({ error: 'Een eerdere poging is afgebroken tijdens het plaatsen. Kon niet controleren of story ' + (Number(prev.series_index) + 1) + ' al op Instagram staat. Er is niets geplaatst; probeer het over een paar minuten opnieuw.' });
+        }
+        if (live) { const n = Number(prev.series_index) + 1; await saveStoryDone(postId, n); done = Math.max(done, n); }
+      }
+    }
+
+    let placedNow = 0;
+    if (done < items.length) {
+      const quota = await igPublishingQuota(R);
+      if (quota && quota.usage + (items.length - done) > quota.total) {
+        if (guard) await setState(null);
+        return res.status(400).json({ error: 'Deze reeks past niet meer binnen de dagelijkse grens van Instagram (' + quota.usage + ' van ' + quota.total + ' plaatsingen via apps gebruikt in de afgelopen 24 uur, de reeks heeft er nog ' + (items.length - done) + ' nodig). Er is niets geplaatst. Probeer het later opnieuw.' });
+      }
+      try {
+        const r = await publishStorySeries(R, items, done, {
+          beforeCommit: guard ? (async (info) => setState({ phase: 'commit', channel: 'instagram', container: String(info.container), series_index: info.index, at: new Date().toISOString() })) : null,
+          afterItem: async (n) => { await saveStoryDone(postId, n); placedNow = n - done; },
+        });
+        placedNow = r.count;
+      } catch (e) {
+        // Lukt het opslaan van de voortgang niet, dan blijft de markering staan (veilig voor het herstel).
+        if (guard && !e.persistFailed) { try { await setState(null); } catch (_) { /* verlopen markering ruimt de planner op */ } }
+        const nowDone = Math.min(items.length, done + placedNow);
+        return res.status(400).json({
+          error: (nowDone ? ('Geplaatst: ' + nowDone + ' van ' + items.length + ' stories. ') : '') + friendlyPublishError(e.message, 'instagram') +
+            (e.persistFailed ? '' : (' Klik nog eens op Nu publiceren om de rest te plaatsen; wat al staat, wordt niet opnieuw geplaatst.')),
+          partial: nowDone > 0, done: nowDone, total: items.length,
+        });
+      }
+    }
+    await markChannelPublished(postId, wsId, okClient, 'instagram');
+    try {
+      await withWriteConnection(async (c) => c.query(
+        `UPDATE marketing.content_posts SET status='published', updated_at=now()${guard ? ', publish_state=NULL' : ''} WHERE id=$1 AND workspace_id=$2 AND client_id=$3`,
+        [postId, wsId, okClient]
+      ));
+    } catch (_) { /* niet blokkerend */ }
+    return res.json({ success: true, series: true, already: placedNow === 0, result: { id: '-', count: items.length, placed_now: placedNow } });
+  } catch (e) {
+    if (guard && claimedState) { try { await setState(null); } catch (_) { /* later opgeruimd */ } }
+    return res.status(400).json({ error: e.message });
+  }
+}
+
 // "Nu publiceren" naar Instagram EN Facebook. Eerst alles controleren (koppeling,
 // bestand, pagina), pas daarna plaatsen, zodat er niet half gepubliceerd wordt door
 // een fout die vooraf te zien was. Een kanaal dat voor deze post al geplaatst is
@@ -4643,7 +4840,7 @@ async function publishBothNow(req, res, wsId, okClient) {
     const intg = { meta_ig_user_id: creds.igUserId, meta_page_id: creds.pageId };
     const pType = await postTypeOf(postId, wsId, okClient);
     const coverUrl = await reelCoverUrlOf(postId, wsId, okClient);
-    if (pType === 'story' && schedTypesOn()) return res.status(400).json({ error: 'Een story kan alleen naar Instagram. Kies het kanaal Instagram. Er is niets geplaatst.' });
+    if ((pType === 'story' || pType === 'storyreeks') && schedTypesOn()) return res.status(400).json({ error: 'Een story kan alleen naar Instagram. Kies het kanaal Instagram. Er is niets geplaatst.' });
 
     // Kanalen die voor deze post al geplaatst zijn, overslaan.
     let done = { instagram: false, facebook: false };
@@ -7498,9 +7695,12 @@ async function runScheduler() {
     const hasCar = typesOn && await postCarouselAvailable();
     const hasReelCover = await postReelCoverAvailable();
     const guard = await publishGuardAvailable();
+    const series = hasType && hasCar && await storySeriesAvailable();
+    const hasTypeCol = await postTypeAvailable();
     const due = await withReadConnection(async (c) => (await c.query(
       `SELECT p.id, p.workspace_id, p.client_id, p.title, p.body, p.publish_channel, p.publish_attempts,
               ${guard ? 'p.publish_state,' : ''}
+              ${series ? 'p.story_done,' : ''}
               ${both ? 'p.ig_published_at, p.fb_published_at,' : ''}
               ${hasType ? 'p.post_type,' : ''}
               ${hasCar ? 'p.carousel_asset_ids,' : ''}
@@ -7514,6 +7714,7 @@ async function runScheduler() {
           AND p.scheduled_at IS NOT NULL AND p.scheduled_at <= now()
           AND p.publish_attempts < 5
           ${both ? '' : "AND COALESCE(p.publish_channel,'') <> 'both'"}
+          ${(hasTypeCol && !series) ? "AND COALESCE(p.post_type,'') <> 'storyreeks'" : ''}
         ORDER BY p.scheduled_at ASC
         LIMIT 5`
     )).rows);
@@ -7554,8 +7755,15 @@ async function runScheduler() {
               const pc = await resolveClientMeta(post.workspace_id, post.client_id);
               const pr0 = await igPublishRoute(pc);
               if (await igContainerPublished({ get: pr0.get, token: pr0.token }, prev.container)) {
-                doneNow.instagram = true;
-                await markChannelPublished(post.id, post.workspace_id, post.client_id, 'instagram');
+                if (prev.series_index != null) {
+                  // Story-reeks: alleen die ene story staat er; de rest volgt hieronder.
+                  const n = Number(prev.series_index) + 1;
+                  await saveStoryDone(post.id, n);
+                  post.story_done = Math.max(Number(post.story_done) || 0, n);
+                } else {
+                  doneNow.instagram = true;
+                  await markChannelPublished(post.id, post.workspace_id, post.client_id, 'instagram');
+                }
               }
             } catch (e) {
               // Niet te controleren (bijv. Meta onbereikbaar): niets plaatsen, later opnieuw kijken.
@@ -7582,15 +7790,17 @@ async function runScheduler() {
       }
       const isBoth = both && post.publish_channel === 'both';
       const single = (post.publish_channel === 'facebook') ? 'facebook' : 'instagram';
-      const targets = isBoth ? ['instagram', 'facebook'] : [single];
-      const errors = []; const warnings = [];
+      // Een story-reeks gaat alleen naar Instagram (ook als er 'beide' is gekozen).
+      const isSeries = series && post.post_type === 'storyreeks';
+      const targets = (isSeries && isBoth) ? ['instagram'] : (isBoth ? ['instagram', 'facebook'] : [single]);
+      const errors = []; const warnings = []; let keepGuard = false;
       for (const channel of targets) {
         // Al geplaatst op dit kanaal (eerdere poging of met de hand)? Dan niet nog eens.
         if (doneNow[channel]) continue;
         if (both && ((channel === 'instagram' && post.ig_published_at) || (channel === 'facebook' && post.fb_published_at))) continue;
         // Vlak voor het echte plaatsen vastleggen op welk kanaal (en met welke Instagram-container).
         const beforeCommit = guard ? (async (info) => {
-          await setState({ phase: 'commit', channel, container: (info && info.container) ? String(info.container) : null, at: new Date().toISOString() });
+          await setState({ phase: 'commit', channel, container: (info && info.container) ? String(info.container) : null, series_index: (info && info.index != null) ? info.index : null, at: new Date().toISOString() });
         }) : null;
         try {
           // Client-koppeling met terugval op de workspace-koppeling.
@@ -7605,7 +7815,23 @@ async function runScheduler() {
             mediaType = post.asset_type === 'video' ? 'video' : 'image';
           }
           const caption = post.body || post.title || '';
-          if (hasType && post.post_type === 'carrousel') {
+          if (isSeries) {
+            // Story-reeks: alleen Instagram, de stories na elkaar, vanaf waar het gebleven was.
+            if (channel !== 'instagram') throw new Error('Een story-reeks kan alleen naar Instagram, niet naar Facebook.');
+            const items = (await resolveCarouselAssets(post.workspace_id, post.client_id, post.carousel_asset_ids)).slice(0, STORY_SERIES_MAX);
+            if (items.length < 2) throw new Error('Een story-reeks heeft minimaal 2 publieke bestanden nodig (kies ze in de post).');
+            const done0 = Math.min(Number(post.story_done) || 0, items.length);
+            if (done0 < items.length) {
+              const quota = await igPublishingQuota(igRoute);
+              if (quota && quota.usage + (items.length - done0) > quota.total) {
+                throw new Error('Deze reeks past niet meer binnen de dagelijkse grens van Instagram (' + quota.usage + ' van ' + quota.total + ' plaatsingen via apps gebruikt in de afgelopen 24 uur, de reeks heeft er nog ' + (items.length - done0) + ' nodig). Er is niets geplaatst. Plan de reeks later opnieuw in.');
+              }
+              await publishStorySeries(igRoute, items, done0, {
+                beforeCommit,
+                afterItem: async (n) => { await saveStoryDone(post.id, n); post.story_done = n; },
+              });
+            }
+          } else if (hasType && post.post_type === 'carrousel') {
             // Carrousel: dezelfde route als "Nu publiceren". Alleen Instagram.
             if (channel !== 'instagram') throw new Error('Een carrousel kan alleen naar Instagram, niet naar Facebook.');
             const items = hasCar ? await resolveCarouselAssets(post.workspace_id, post.client_id, post.carousel_asset_ids) : [];
@@ -7621,6 +7847,7 @@ async function runScheduler() {
           // Kanaal is vastgelegd: de "bezig met plaatsen"-markering mag terug naar "gestart".
           if (guard && marked) { try { await setState({ phase: 'start', at: new Date().toISOString() }); } catch (_) { /* blijft op commit: veilig */ } }
         } catch (e) {
+          if (e && e.persistFailed) keepGuard = true;
           const msg = friendlyPublishError(e.message, channel);
           errors.push(isBoth ? (CH_LABEL[channel] + ' mislukt: ' + msg) : msg);
         }
@@ -7633,7 +7860,7 @@ async function runScheduler() {
           ));
         } else {
           await withWriteConnection(async (c) => c.query(
-            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now()${guard ? ', publish_state=NULL' : ''} WHERE id=$2`, [errors.concat(warnings).join(' ').slice(0, 500), post.id]
+            `UPDATE marketing.content_posts SET publish_error=$1, updated_at=now()${(guard && !keepGuard) ? ', publish_state=NULL' : ''} WHERE id=$2`, [errors.concat(warnings).join(' ').slice(0, 500), post.id]
           ));
         }
       } catch (_) { /* volgende minuut opnieuw */ }

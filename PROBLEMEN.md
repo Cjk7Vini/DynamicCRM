@@ -5,7 +5,7 @@ Alleen wat nog **niet** is opgelost. Werkwijze:
 2. Is de controle goed, haal het probleem dan hier weg en zet de les (oorzaak, oplossing, hoe herkennen) in `KENNISBANK.md`.
 3. Nieuwe problemen komen onderaan, met datum.
 
-Laatst bijgewerkt: 10 november 2026.
+Laatst bijgewerkt: 11 november 2026.
 
 ---
 
@@ -31,7 +31,8 @@ Laatst bijgewerkt: 10 november 2026.
 ## P4. Nog niet echt getest bij Meta
 - **Video naar een Facebook-pagina** (`/videos` met `file_url`): alleen getest met nagebootste antwoorden.
 - **Omslag bij een Reel** (`cover_url`): alleen getest met nagebootste antwoorden.
-- **Volgende stap:** op een testaccount één video naar Facebook en één Reel met omslag plaatsen.
+- **Story-reeks** (11 november 2026): alleen getest met nagebootste antwoorden, inclusief de dagelijkse grens (`content_publishing_limit`).
+- **Volgende stap:** op een testaccount één video naar Facebook, één Reel met omslag en één story-reeks van 3 (met een video erin) plaatsen.
 - **Opgelost als:** beide staan goed online (video speelt af op de pagina; de omslag is zichtbaar in het profiel), of de melding is bekend en verwerkt.
 
 ## P5. Leads van Serac en Vitaal Fysiotherapie: komen ze weer binnen?
