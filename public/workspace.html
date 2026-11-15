@@ -5703,8 +5703,10 @@ function boardQuickShow(btn){var w=btn.closest('.qa-wrap');btn.style.display='no
 function boardQuickCancel(btn){var w=btn.closest('.qa-wrap');var f=w.querySelector('.qa-form');if(f)f.style.display='none';var b=w.querySelector('.qa-btn');if(b)b.style.display='block';var ta=w.querySelector('.qa-input');if(ta)ta.value='';}
 async function boardQuickAdd(key,btn){
   var w=btn.closest('.qa-wrap');var ta=w.querySelector('.qa-input');var title=(ta&&ta.value||'').trim();if(!title)return;
+  // Geen datum: een snelle kaart is "nog te plannen" en staat op het bord in elke maand.
+  // Vroeger kreeg hij de 1e van de bekeken maand om 12:00, een datum die niemand koos
+  // (alle snelle kaarten kwamen zo op de 1e van de maand in de kalender).
   var when='';
-  if(_BOARD_MONTH){var m=_BOARD_MONTH;when=new Date(m.getFullYear(),m.getMonth(),1,12,0,0).toISOString();}
   btn.disabled=true;
   try{
     var r=await fetch('/api/mkt/clients/'+CURRENT_CLIENT.id+'/posts',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:title,status:key,scheduled_at:when,channel:'instagram'})});
