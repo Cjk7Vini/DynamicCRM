@@ -76,6 +76,34 @@ Blijvende kennis uit opgeloste problemen: wat de oorzaak was, hoe het is opgelos
 
 ---
 
+## Contentplanning: het scherm deed iets anders dan gekozen (november 2026)
+
+### "+ Kaart toevoegen" verzon een datum
+- **Wat je zag:** de kalender stond op de 1e van de maand helemaal vol met kaarten zonder beeld (bij Wendy 18 op 1 november), ook kaarten die voor december bedoeld waren.
+- **Oorzaak:** de knop gaf elke snelle kaart de 1e van de maand die op het bord bekeken werd, om 12:00. Die datum koos niemand.
+- **Opgelost met:** een snelle kaart heeft geen datum meer ("nog te plannen"); hij staat op het bord in elke maand en pas in de kalender als er een datum gekozen is.
+- **Herkennen:** een post die ná zijn eigen datum is aangemaakt (`created_at` later dan `scheduled_at`); niemand plant iets in het verleden. Vaak ook: geen tekst, geen beeld, 12:00 op de 1e van een maand. Query voor alle werkplekken:
+  ```sql
+  SELECT p.workspace_id, p.id, p.title, p.created_at, p.scheduled_at
+  FROM marketing.content_posts p
+  WHERE p.auto_publish = false AND p.created_at > p.scheduled_at
+    AND extract(day FROM p.scheduled_at AT TIME ZONE 'Europe/Amsterdam') = 1
+    AND to_char(p.scheduled_at AT TIME ZONE 'Europe/Amsterdam','HH24:MI') = '12:00'
+  ORDER BY p.workspace_id, p.id;
+  ```
+- **Opgeruimd op 15 november 2026:** Wendy 18 posts, Fleur 1, Dynamic 5 (datum leeggemaakt). Dynamic 21, 22 en 23 bewust laten staan (gemaakt vóór 1 november, met inhoud).
+
+### Het publiceervenster stond altijd op Instagram
+- **Wat je zag:** een post op "Instagram en Facebook" kwam alleen op Instagram; Facebook met de hand werkte wel.
+- **Oorzaak:** "Opslaan en publiceren" en "Nu publiceren" openden het venster altijd met Instagram, wat er ook in de post gekozen was.
+- **Opgelost met:** het venster neemt het kanaal van de post over; een post die al op een kanaal staat, wordt daar nooit nog eens geplaatst.
+
+### Les
+- Tests moeten de knoppen en vensters zelf gebruiken, niet alleen de server aanroepen: beide fouten zaten tussen het scherm en de server en kwamen daardoor in de tests niet naar boven.
+- Een knop mag nooit zelf een waarde verzinnen (datum, kanaal) die de gebruiker niet gekozen heeft.
+
+---
+
 ## Leadformulieren
 
 ### Telefoonnummers werden geweigerd (tot november 2026)
