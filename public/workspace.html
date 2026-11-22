@@ -6223,7 +6223,7 @@ async function createClientLogin(){
 }
 function dfShowLogo(url){
   var lp=document.getElementById('dfLogoPreview'), del=document.getElementById('dfLogoDel'); if(!lp)return;
-  if(url){lp.innerHTML='<img src="'+esc(url)+'" alt="" style="width:100%;height:100%;object-fit:contain;background:#fff">';}
+  if(url){lp.innerHTML='<img src="'+esc(url)+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block">';}
   else{lp.innerHTML='';lp.textContent='Geen';}
   if(del)del.style.display=url?'':'none';
   var canEdit=!(ME&&ME.role==='client'), ub=document.getElementById('dfLogoBtn');
