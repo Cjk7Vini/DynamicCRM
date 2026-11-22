@@ -2492,16 +2492,16 @@ async function openClient(id){
 function avaInner(name,logo){
   var ini=esc(initials(name||''));
   if(!logo||!/^https?:\/\//i.test(String(logo)))return ini;
-  return '<img src="'+esc(logo)+'" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit" onerror="var p=this.parentNode;p.style.background=p.getAttribute(\'data-bg\')||\'\';p.textContent=p.getAttribute(\'data-ini\')||\'\'">';
+  return '<img src="'+esc(logo)+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" onerror="var p=this.parentNode;p.style.background=p.getAttribute(\'data-bg\')||\'\';p.textContent=p.getAttribute(\'data-ini\')||\'\'">';
 }
-function avaAttrs(name,logo,bg){return ' data-ini="'+esc(initials(name||''))+'" data-bg="'+esc(bg||'')+'"'+(logo?' style="background:#fff;padding:3px"':'');}
+function avaAttrs(name,logo,bg){return ' data-ini="'+esc(initials(name||''))+'" data-bg="'+esc(bg||'')+'"'+(logo?' style="background:transparent;padding:0;overflow:hidden;box-shadow:none"':'');}
 function renderClientDetail(c){
   hideMsg('dEditMsg');
   document.getElementById('dName').textContent=c.name;
   var b=document.getElementById('dBadge');
   b.setAttribute('data-ini',initials(c.name)); b.setAttribute('data-bg',c.brand_color||'#6366f1');
-  if(c.logo_url){ b.innerHTML=avaInner(c.name,c.logo_url); b.style.background='#fff'; b.style.padding='3px'; }
-  else { b.textContent=initials(c.name); b.style.background=c.brand_color||'#6366f1'; b.style.padding=''; }
+  if(c.logo_url){ b.innerHTML=avaInner(c.name,c.logo_url); b.style.background='transparent'; b.style.padding='0'; b.style.overflow='hidden'; b.style.boxShadow='none'; }
+  else { b.textContent=initials(c.name); b.style.background=c.brand_color||'#6366f1'; b.style.padding=''; b.style.overflow=''; b.style.boxShadow=''; }
   dfShowLogo(c.logo_url||'');
   document.getElementById('dfName').value=c.name||'';
   document.getElementById('dfContact').value=c.contact_name||'';
@@ -3211,7 +3211,7 @@ function rdyInner(p){
   var r=POST_READY[p.id];
   var base='display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.5;';
   if(!r)return '<span style="'+base+'background:var(--panel-2);color:var(--muted)">Auto: '+esc(rdyChan(p))+'</span>';
-  if(r.status==='klaar')return '<span style="'+base+'background:#dcfce7;color:#166534">Klaar: '+esc(rdyChan(p))+(p.scheduled_at?(' &middot; '+esc(fmtWhen(p.scheduled_at))):'')+'</span>';
+  if(r.status==='klaar')return '<span style="'+base+'background:#dcfce7;color:#166534">Ingepland: '+esc(rdyChan(p))+(p.scheduled_at?(' &middot; '+esc(fmtWhen(p.scheduled_at))):'')+'</span>';
   if(r.status==='niet_klaar')return '<span style="'+base+'background:#fef3c7;color:#92400e;cursor:pointer">Niet klaar: '+esc(rdyChan(p))+' &#9432;</span>';
   return '<span style="'+base+'background:var(--panel-2);color:var(--muted);cursor:pointer">Auto: '+esc(rdyChan(p))+' (niet te controleren) &#9432;</span>';
 }
@@ -3221,7 +3221,7 @@ function rdyDot(p){if(!rdyNeeded(p))return '';var r=POST_READY[p.id];var c=!r?'#
 function rdyShow(id){
   var p=(_CONTENT_POSTS||[]).filter(function(x){return String(x.id)===String(id);})[0]; if(!p)return;
   var r=POST_READY[id]; if(!r){alert('Wordt nog gecontroleerd...');return;}
-  if(r.status==='klaar'){alert('Klaar: deze post wordt automatisch geplaatst op '+(p.scheduled_at?fmtWhen(p.scheduled_at):'het geplande tijdstip')+' ('+rdyChan(p)+').');return;}
+  if(r.status==='klaar'){alert('Ingepland: deze post wordt automatisch geplaatst op '+(p.scheduled_at?fmtWhen(p.scheduled_at):'het geplande tijdstip')+' ('+rdyChan(p)+').');return;}
   alert((r.status==='niet_klaar'?'Deze post wordt NIET goed geplaatst als er niets verandert:\n\n':'Niet alles kon vooraf gecontroleerd worden:\n\n')+(r.issues||[]).concat(r.unknown||[]).map(function(x){return '- '+x;}).join('\n'));
 }
 function rdyPaint(){
@@ -5678,7 +5678,8 @@ function boardCard(p,canManage){
 }
 // Planning per maand. Standaard de huidige maand, zodat niet alles op 1 hoop staat.
 // Posts zonder datum horen bij de nog-in-te-plannen backlog en zijn altijd zichtbaar.
-var _BOARD_MONTH=(function(){var n=new Date();return new Date(n.getFullYear(),n.getMonth(),1);})();
+// Standaard alle maanden (anders leek een ingepland idee verdwenen); "Plan per maand" kiest een maand.
+var _BOARD_MONTH=null;
 function boardShift(delta){
   if(_BOARD_MONTH===null){var n=new Date();_BOARD_MONTH=new Date(n.getFullYear(),n.getMonth(),1);}
   _BOARD_MONTH=new Date(_BOARD_MONTH.getFullYear(),_BOARD_MONTH.getMonth()+delta,1);renderContentView();
@@ -5714,6 +5715,8 @@ async function boardQuickAdd(key,btn){
     if(r.ok&&d.success){loadPosts();}else{btn.disabled=false;showMsg('postsMsg',false,(d&&d.error)||'Kon kaart niet toevoegen.');}
   }catch(e){btn.disabled=false;showMsg('postsMsg',false,'Netwerkfout.');}
 }
+// Kolomkleur als lichte tint over de hele kolom (#RRGGBB, anders de standaard).
+function colTint(hex,a,fallback){var m=/^#([0-9a-fA-F]{6})$/.exec(String(hex||''));if(!m)return fallback;var n=parseInt(m[1],16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
 function renderBoard(posts){
   var canManage=ME.role!=='client';
   var bar;
@@ -5745,7 +5748,7 @@ function renderBoard(posts){
         '<button class="icon-btn del" title="Verwijderen" onclick="deleteBoardColumn('+c.id+')" style="width:22px;height:22px;font-size:12px">&times;</button>'+
       '</span>';
     }
-    return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+escJs(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:rgba(16,52,61,.5);border:1px solid rgba(90,185,200,.18);border-radius:12px;padding:10px">'+
+    return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+escJs(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:'+colTint(c.color,.16,'rgba(16,52,61,.5)')+';border:1px solid '+colTint(c.color,.55,'rgba(90,185,200,.18)')+';border-radius:12px;padding:10px">'+
       '<div'+((canEditCols&&c.id!=null)?(' draggable="true" ondragstart="colDragStart(event,'+c.id+')" ondragend="colDragEnd()" title="Sleep om de kolom te verplaatsen"'):'')+' style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px'+((canEditCols&&c.id!=null)?';cursor:grab':'')+'"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
   }).join('')+
   (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="openColumnEdit(null)">+ Kolom</button></div>'):'')+
