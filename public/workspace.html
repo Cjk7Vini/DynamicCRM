@@ -5678,7 +5678,8 @@ function boardCard(p,canManage){
 }
 // Planning per maand. Standaard de huidige maand, zodat niet alles op 1 hoop staat.
 // Posts zonder datum horen bij de nog-in-te-plannen backlog en zijn altijd zichtbaar.
-var _BOARD_MONTH=(function(){var n=new Date();return new Date(n.getFullYear(),n.getMonth(),1);})();
+// Standaard alle maanden (anders leek een ingepland idee verdwenen); "Plan per maand" kiest een maand.
+var _BOARD_MONTH=null;
 function boardShift(delta){
   if(_BOARD_MONTH===null){var n=new Date();_BOARD_MONTH=new Date(n.getFullYear(),n.getMonth(),1);}
   _BOARD_MONTH=new Date(_BOARD_MONTH.getFullYear(),_BOARD_MONTH.getMonth()+delta,1);renderContentView();
