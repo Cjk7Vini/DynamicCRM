@@ -5726,6 +5726,9 @@ async function boardQuickAdd(key,btn){
     if(r.ok&&d.success){loadPosts();}else{btn.disabled=false;showMsg('postsMsg',false,(d&&d.error)||'Kon kaart niet toevoegen.');}
   }catch(e){btn.disabled=false;showMsg('postsMsg',false,'Netwerkfout.');}
 }
+// Weeknummer (ISO 8601, zoals in de agenda) en de datum die bij een post hoort.
+function isoWeekNr(d){var t=new Date(d.getFullYear(),d.getMonth(),d.getDate());var dag=(t.getDay()+6)%7;t.setDate(t.getDate()-dag+3);var j=new Date(t.getFullYear(),0,4);return 1+Math.round(((t-j)/864e5-3+((j.getDay()+6)%7))/7);}
+function postWeekDate(p){var v=p.scheduled_at||p.published_at||p.ig_published_at||p.fb_published_at;if(!v)return null;var d=new Date(v);return isNaN(d.getTime())?null:d;}
 // Kolomkleur als lichte tint over de hele kolom (#RRGGBB, anders de standaard).
 function colTint(hex,a,fallback){var m=/^#([0-9a-fA-F]{6})$/.exec(String(hex||''));if(!m)return fallback;var n=parseInt(m[1],16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
 function renderBoard(posts){
@@ -5742,7 +5745,13 @@ function renderBoard(posts){
   // Geplaatste posts (status 'published') blijven op het bord: in de kolom die Geplaatst,
   // Gepubliceerd of Gepost heet, of anders in een vaste kolom "Gepost" achteraan.
   var pubCol=cols.filter(function(c){return c.key==='published'||/^(geplaatst|gepubliceerd|gepost)\b/i.test(String(c.label||'').trim());})[0]||null;
-  if(!pubCol&&shown.some(function(p){return p.status==='published';})){pubCol={id:null,key:'published',label:'Gepost',color:'#16a34a',virtual:true};cols=cols.concat([pubCol]);}
+  // Een geplaatste post terug in de weekkolom van zijn datum (kolom met "Week 48" enz.),
+  // zodat hij blijft staan waar hij hoorde. Geen passende week: in Geplaatst / Gepost.
+  var weekCols={}; cols.forEach(function(c){var m=/\bweek\s*0?(\d{1,2})\b/i.exec(String(c.label||''));if(m&&!weekCols[+m[1]])weekCols[+m[1]]=c.key;});
+  var pubWeekKey={};
+  shown.forEach(function(p){if(p.status!=='published')return;var d=postWeekDate(p);if(!d)return;if(Date.now()-d.getTime()>183*864e5)return;var k=weekCols[isoWeekNr(d)];if(k)pubWeekKey[p.id]=k;});
+  var restPub=shown.some(function(p){return p.status==='published'&&!pubWeekKey[p.id];});
+  if(!pubCol&&restPub){pubCol={id:null,key:'published',label:'Gepost',color:'#16a34a',virtual:true};cols=cols.concat([pubCol]);}
   var keys={}; cols.forEach(function(c){keys[c.key]=true;});
   // Posts waarvan de kolom is verwijderd (status hoort bij geen enkele kolom en is
   // niet 'published') tonen we in de eerste kolom, zodat ze nooit verdwijnen.
@@ -5750,7 +5759,10 @@ function renderBoard(posts){
   var canEditCols=canManage&&BOARD_COLS_CUSTOM;
   var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+cols.map(function(c,ci){
     var key=c.key,label=c.label;
-    var items=shown.filter(function(p){return p.status===key||(pubCol&&c===pubCol&&p.status==='published');});
+    var items=shown.filter(function(p){
+      if(p.status==='published'){var wk=pubWeekKey[p.id];return wk?(wk===key):(!!pubCol&&c===pubCol);}
+      return p.status===key;
+    });
     if(ci===0)items=orphans.concat(items);
     items=boardSort(items);
     var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
