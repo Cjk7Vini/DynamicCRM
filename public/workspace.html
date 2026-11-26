@@ -818,7 +818,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
               <div id="contentViewSwitch" style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden">
                 <button id="cvBoard" class="cvbtn" onclick="setContentView('board')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:var(--accent);color:#fff">Planning</button>
                 <button id="cvCal" class="cvbtn" onclick="setContentView('calendar')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Kalender</button>
-                <button id="cvPub" class="cvbtn" onclick="setContentView('published')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Gepubliceerd</button>
                 <button id="cvList" class="cvbtn" onclick="setContentView('list')" style="padding:7px 14px;font-size:12.5px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Lijst</button>
               </div>
               <select id="postFilter" onchange="loadPosts()" style="width:auto;padding:8px 12px;display:none">
@@ -3205,8 +3204,19 @@ function fmtSize(b){b=Number(b)||0;if(b<1024)return b+' B';if(b<1048576)return (
 // Alleen weergave. De labels worden achteraf ingevuld (data-rdy), zonder het bord opnieuw
 // op te bouwen, zodat een open snelle kaart of een sleepactie niet verloren gaat.
 var POST_READY={}, _READY_REQ=0;
-function rdyChan(p){return p.publish_channel==='facebook'?'Facebook':(p.publish_channel==='both'?'Instagram + Facebook':'Instagram');}
-function rdyNeeded(p){return !!(p&&p.auto_publish&&!p.published_at&&typeof ME!=='undefined'&&ME&&ME.role!=='client');}
+function rdyChan(p){if(p.publish_channel==='both'){if(p.ig_published_at&&!p.fb_published_at)return 'Facebook';if(p.fb_published_at&&!p.ig_published_at)return 'Instagram';return 'Instagram + Facebook';}return p.publish_channel==='facebook'?'Facebook':'Instagram';}
+function rdyNeeded(p){return !!(p&&p.auto_publish&&!p.published_at&&p.status!=='published'&&typeof ME!=='undefined'&&ME&&ME.role!=='client');}
+// Label voor een geplaatste post: automatisch (planner) of met de hand, met kanaal en tijd.
+function postedHtml(p){
+  if(!p)return '';
+  var chans=[];if(p.ig_published_at)chans.push('Instagram');if(p.fb_published_at)chans.push('Facebook');
+  var posted=p.status==='published'||!!p.published_at||chans.length>0; if(!posted)return '';
+  if(!chans.length&&(p.status==='published'||p.published_at))chans=[p.publish_channel==='facebook'?'Facebook':(p.publish_channel==='both'?'Instagram + Facebook':'Instagram')];
+  var ts=[p.published_at,p.ig_published_at,p.fb_published_at].filter(Boolean).map(function(x){return new Date(x).getTime();}).filter(function(x){return !isNaN(x);});
+  var when=ts.length?fmtWhen(new Date(Math.max.apply(null,ts)).toISOString()):'';
+  var auto=!!(p.published_at&&p.auto_publish);
+  return '<span title="Deze post staat online" style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.5;background:#dcfce7;color:#166534">'+(auto?'Automatisch gepost: ':'Gepost: ')+esc(chans.join(' + '))+(when?(' &middot; '+esc(when)):'')+'</span>';
+}
 function rdyInner(p){
   var r=POST_READY[p.id];
   var base='display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.5;';
@@ -5348,6 +5358,7 @@ function renderContentView(){
     body.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><h4>Nog geen content</h4><p>Plan je eerste post voor deze klant.</p>'+(ME.role!=='client'?'<button class="btn btn-primary" onclick="openNewPost()">+ Nieuwe post</button>':'')+'</div>';
     return;
   }
+  if(CONTENT_VIEW==='published')CONTENT_VIEW='board'; // de tab Gepubliceerd bestaat niet meer: geplaatste posts staan op het bord
   if(CONTENT_VIEW==='board')body.innerHTML=renderBoard(_CONTENT_POSTS);
   else if(CONTENT_VIEW==='calendar')body.innerHTML=renderCalendar(_CONTENT_POSTS);
   else if(CONTENT_VIEW==='published')body.innerHTML=renderPublished(_CONTENT_POSTS);
@@ -5674,7 +5685,7 @@ function boardCard(p,canManage){
     cover+thumb+'<div style="font-weight:600;font-size:13px;line-height:1.3">'+esc(p.title)+'</div>'+
     (p.body?('<div style="font-size:12px;color:var(--muted);margin-top:3px;max-height:46px;overflow:hidden">'+esc(p.body)+'</div>'):'')+
     labelChips(p.labels)+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+rdyHtml(p)+commentChip(p)+checklistBadge(p.checklist)+assigneeAvatars(p.assignees)+'</div>'+when+acts+'</div>';
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">'+chan+badge+postedHtml(p)+rdyHtml(p)+commentChip(p)+checklistBadge(p.checklist)+assigneeAvatars(p.assignees)+'</div>'+when+acts+'</div>';
 }
 // Planning per maand. Standaard de huidige maand, zodat niet alles op 1 hoop staat.
 // Posts zonder datum horen bij de nog-in-te-plannen backlog en zijn altijd zichtbaar.
@@ -5728,6 +5739,10 @@ function renderBoard(posts){
   }
   var shown=posts.filter(boardInMonth);
   var cols=boardCols();
+  // Geplaatste posts (status 'published') blijven op het bord: in de kolom die Geplaatst,
+  // Gepubliceerd of Gepost heet, of anders in een vaste kolom "Gepost" achteraan.
+  var pubCol=cols.filter(function(c){return c.key==='published'||/^(geplaatst|gepubliceerd|gepost)\b/i.test(String(c.label||'').trim());})[0]||null;
+  if(!pubCol&&shown.some(function(p){return p.status==='published';})){pubCol={id:null,key:'published',label:'Gepost',color:'#16a34a',virtual:true};cols=cols.concat([pubCol]);}
   var keys={}; cols.forEach(function(c){keys[c.key]=true;});
   // Posts waarvan de kolom is verwijderd (status hoort bij geen enkele kolom en is
   // niet 'published') tonen we in de eerste kolom, zodat ze nooit verdwijnen.
@@ -5735,7 +5750,7 @@ function renderBoard(posts){
   var canEditCols=canManage&&BOARD_COLS_CUSTOM;
   var kb='<div class="kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start">'+cols.map(function(c,ci){
     var key=c.key,label=c.label;
-    var items=shown.filter(function(p){return p.status===key;});
+    var items=shown.filter(function(p){return p.status===key||(pubCol&&c===pubCol&&p.status==='published');});
     if(ci===0)items=orphans.concat(items);
     items=boardSort(items);
     var cards=items.map(function(p){return boardCard(p,canManage);}).join('')||'<div style="font-size:12px;color:var(--muted);padding:6px 2px">Leeg</div>';
@@ -5749,7 +5764,7 @@ function renderBoard(posts){
       '</span>';
     }
     return '<div class="kcol" data-status="'+esc(key)+'"'+(canEditCols&&c.id!=null?(' data-colid="'+c.id+'"'):'')+' '+(canManage?'ondragover="kanbanOver(event)" ondragleave="kanbanLeave(event)" ondrop="kanbanDrop(event,\''+escJs(key)+'\')"':'')+' style="min-width:250px;width:250px;flex:0 0 auto;background:'+colTint(c.color,.16,'rgba(16,52,61,.5)')+';border:1px solid '+colTint(c.color,.55,'rgba(90,185,200,.18)')+';border-radius:12px;padding:10px">'+
-      '<div'+((canEditCols&&c.id!=null)?(' draggable="true" ondragstart="colDragStart(event,'+c.id+')" ondragend="colDragEnd()" title="Sleep om de kolom te verplaatsen"'):'')+' style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px'+((canEditCols&&c.id!=null)?';cursor:grab':'')+'"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+(canManage?quickAddHtml(key):'')+'</div>';
+      '<div'+((canEditCols&&c.id!=null)?(' draggable="true" ondragstart="colDragStart(event,'+c.id+')" ondragend="colDragEnd()" title="Sleep om de kolom te verplaatsen"'):'')+' style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;margin-bottom:10px'+((canEditCols&&c.id!=null)?';cursor:grab':'')+'"><span style="display:flex;align-items:center;flex-wrap:wrap">'+(c.color?('<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+esc(c.color)+';margin-right:7px;flex:none"></span>'):'')+esc(label)+ctrls+'</span><span style="color:var(--muted);font-weight:600">'+items.length+'</span></div>'+cards+((canManage&&!c.virtual)?quickAddHtml(key):'')+'</div>';
   }).join('')+
   (canEditCols?('<div style="min-width:150px;flex:0 0 auto"><button class="btn btn-ghost" style="padding:8px 12px;font-size:12.5px;width:100%" onclick="openColumnEdit(null)">+ Kolom</button></div>'):'')+
   '</div>';
